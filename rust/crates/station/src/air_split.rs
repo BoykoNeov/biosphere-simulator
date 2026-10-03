@@ -28,6 +28,7 @@
 
 use domains::biosphere::flows::Irrigation;
 use domains::biosphere::science::N2_MOLAR_MASS_KG_PER_MOL;
+use domains::biosphere::science::{fraction_transpirable, transpirable_capacity};
 use domains::biosphere::stocks::{
     CARBON_POOL, CHAMBER_INERT, IRRIGATION_VAR, O2_POOL, ROOTED_DEPTH, SOIL_WATER, WATER_VAPOR,
 };
@@ -78,13 +79,70 @@ pub struct AirSplit {
     /// Which step the crop's gas exchange is taken on (§16): the plant step starves a small
     /// chamber by construction, the minute step lets the fan refill it as the crop draws.
     pub gas_exchange: GasExchangeStep,
-    /// Whether the plants are watered from the crew's store (§18): the open field's own
-    /// demand-driven `Irrigation` ([F] Eqn 14.8), its source re-pointed at `crew.water_store`.
+    /// Whether the plants are watered from the crew's store (§18b): the open field's own
+    /// refill (`Irrigation`, [F] Eqn 14.8), its source re-pointed at `crew.water_store`, gated
+    /// by FAO-56's depletion trigger ([`TriggeredWatering`]).
     pub watering: bool,
 }
 
 /// The watering flow's id (§18).
 pub const WATERING: &str = "station.watering";
+
+/// FAO-56 (Allen et al. 1998, FAO Irrigation and Drainage Paper 56) **Table 22**, "Ranges of
+/// maximum effective rooting depth (Zr), and soil water depletion fraction for no stress (p)":
+/// spring and winter wheat, **p = 0.55** (`RAW = p TAW`). The watering trigger is `1 − p`.
+pub const FAO56_WHEAT_DEPLETION_FRACTION: f64 = 0.55;
+
+/// Watering on a depletion trigger (§18b): the inner refill runs only on a plant step whose root
+/// zone has fallen below `trigger_ftsw` of its transpirable capacity, and gives NO legs
+/// otherwise.
+///
+/// ⚠ Why the gate exists: §18a measured the bare refill — the field's rule — watering plants
+/// that were not short. It refilled the root zone every step the crop's own transpiration dipped
+/// it, ahead of the chamber's recycled condensate, and the plants' loop gained 30–45 kg of the
+/// crew's water a season. A trigger delivers nothing while the room's own loop keeps up.
+/// ⚠ No latch: with the refill capped per step, the zone is HELD at the trigger, not refilled to
+/// the top.
+pub struct TriggeredWatering {
+    /// The refill: `Irrigation`, sourced from the crew's store.
+    pub inner: Irrigation,
+    /// The fill `FTSW = ATSW / TTSW` below which it waters (`1 − p`).
+    pub trigger_ftsw: f64,
+}
+
+impl Flow for TriggeredWatering {
+    fn type_name(&self) -> &'static str {
+        "TriggeredWatering"
+    }
+
+    fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let i = &self.inner;
+        let capacity = transpirable_capacity(
+            snapshot
+                .aux
+                .get(&i.rooted_depth_aux)
+                .copied()
+                .unwrap_or(0.0),
+            i.soil_extractable_water,
+            i.ground_area,
+        );
+        let ftsw = fraction_transpirable(amount(snapshot, &i.soil_water)?, capacity);
+        if ftsw < self.trigger_ftsw {
+            i.evaluate(snapshot, env, dt)
+        } else {
+            Ok(FlowResult::empty())
+        }
+    }
+}
 
 /// The fan: every species crosses by its concentration difference ([module docs](self)).
 pub struct AirExchange {
@@ -212,14 +270,17 @@ pub fn build_split_station(
     // per day, and it reads the rooted depth the plant step advances).
     let bio_reg = if split.watering {
         let (mut flows, aux) = bio_reg.into_parts();
-        flows.push(Box::new(Irrigation {
-            id: WATERING.to_string(),
-            water_source: WATER_STORE.to_string(),
-            soil_water: SOIL_WATER.to_string(),
-            irrigation_var: IRRIGATION_VAR.to_string(),
-            ground_area: resized.bio.ground_area,
-            rooted_depth_aux: ROOTED_DEPTH.to_string(),
-            soil_extractable_water: resized.bio.soil_extractable_water,
+        flows.push(Box::new(TriggeredWatering {
+            inner: Irrigation {
+                id: WATERING.to_string(),
+                water_source: WATER_STORE.to_string(),
+                soil_water: SOIL_WATER.to_string(),
+                irrigation_var: IRRIGATION_VAR.to_string(),
+                ground_area: resized.bio.ground_area,
+                rooted_depth_aux: ROOTED_DEPTH.to_string(),
+                soil_extractable_water: resized.bio.soil_extractable_water,
+            },
+            trigger_ftsw: 1.0 - FAO56_WHEAT_DEPLETION_FRACTION,
         }));
         Registry::new(flows, &state.stocks, aux)?
     } else {

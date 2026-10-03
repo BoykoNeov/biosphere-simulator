@@ -91,3 +91,12 @@ photosynthesis). Adopted where the cabin's flows act on the crop's air: 3 golden
 (greenhouse +0.29 %, harvest +0.07 %, sealed +0.75 % plant carbon), no water byte. Graded 7 of 7;
 one held only after the bug it caught was fixed (harvest discarded the moved flows). The
 perturbation suite's "pools return to setpoint" claim now takes out the crop's own flux offset.
+
+**Watering from the crew's supply BUILT 2026-10-03 (lab only, off by default)** (note §18–§18c).
+The first form — the field's root-zone refill, sourced from the crew's store — failed 4 of 5
+predictions: it watered plants that were not short (+30–45 kg of crew water a season into the
+plants' loop, ahead of their own recycled condensate). Redesigned on FAO-56 Table 22's depletion
+trigger (wheat p = 0.55: water when the root zone falls below 45 % full, above the crop's 30 %
+stress onset): 4 of 4 held. Over a season it delivers 0 kg in every case (on and off byte-identical)
+and fires, kg for kg from the crew's store, when the zone is set low on purpose. The drain it guards
+against is capped at ≈ 21 kg a season by the plant step's transpiration rule — the next decision.

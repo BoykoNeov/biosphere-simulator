@@ -292,3 +292,119 @@ fn on_the_minute_step_a_cabin_sized_chamber_recovers_shared_air() {
         "big chamber {big} vs shared {base}"
     );
 }
+
+/// The plant registry of a WATERED separate-air build, its resolver, and its state.
+fn watered_build() -> (
+    State,
+    simcore::registry::Registry,
+    simcore::environment::SourceResolver,
+) {
+    let scenario = sealed_station_scenario();
+    let s = AirSplit {
+        chamber_air_mol: BVAD_CHAMBER_AIR_MOL,
+        fan_mol_per_s: 0.2,
+        vapour_crosses: true,
+        gas_exchange: GasExchangeStep::Minute,
+        watering: true,
+    };
+    let (state, bio, _) = build_split_station(
+        &params::charge(),
+        &params::thermal(),
+        &params::crew(),
+        &params::eclss(),
+        &station_params::water_recovery(),
+        &station_params::lamp(),
+        &station_params::harvest(),
+        &scenario,
+        &s,
+    )
+    .expect("build_split_station");
+    let resized = split_scenario(&scenario, &s);
+    let r = sealed_bio_resolver(&station_params::lamp(), &resized).expect("bio resolver");
+    (state, bio, r)
+}
+
+fn with_soil_water(state: &State, kg: f64) -> State {
+    let mut stocks = state.stocks.clone();
+    let sw = stocks[SOIL_WATER].with_amount(kg).unwrap();
+    stocks.insert(SOIL_WATER.to_string(), sw);
+    State::new(state.n, stocks, state.rng_seed, state.aux.clone()).unwrap()
+}
+
+/// The root zone's transpirable capacity at this state's rooted depth (kg).
+fn ttsw(state: &State) -> f64 {
+    let b = sealed_station_scenario().bio;
+    domains::biosphere::science::transpirable_capacity(
+        state.aux[domains::biosphere::stocks::ROOTED_DEPTH],
+        b.soil_extractable_water,
+        b.ground_area,
+    )
+}
+
+/// §18b T2 — watering FIRES on a root zone below FAO-56's trigger (FTSW < 0.45): water moves
+/// from the crew's store to the soil, kilogram for kilogram, until the zone is back over the
+/// trigger, and then it stops. The zone is set low on purpose: no season run gets there
+/// (their lowest fill is 0.66).
+#[test]
+fn watering_fires_below_the_trigger_and_stops_above_it() {
+    let (state, bio, r) = watered_build();
+    let plant_dt = sealed_station_scenario().bio_dt;
+    let flow = bio
+        .flows()
+        .iter()
+        .find(|f| f.id() == station::air_split::WATERING)
+        .expect("the watering flow");
+    let cap = ttsw(&state);
+    let mut s = with_soil_water(&state, 0.30 * cap);
+    let mut steps = 0;
+    loop {
+        let res = flow.evaluate(&s, &r.bind(&s, plant_dt), plant_dt).unwrap();
+        let fill = s.stocks[SOIL_WATER].amount / cap;
+        if res.legs.is_empty() {
+            assert!(fill >= 0.45, "it stopped at fill {fill}, below the trigger");
+            break;
+        }
+        assert!(fill < 0.45, "it watered at fill {fill}, above the trigger");
+        let to_soil: f64 = res
+            .legs
+            .iter()
+            .filter(|l| l.stock == SOIL_WATER)
+            .map(|l| l.amount)
+            .sum();
+        let from_store: f64 = res
+            .legs
+            .iter()
+            .filter(|l| l.stock == WATER_STORE)
+            .map(|l| l.amount)
+            .sum();
+        assert!(
+            to_soil > 0.0 && to_soil == -from_store,
+            "{to_soil} vs {from_store}"
+        );
+        s = with_soil_water(&s, s.stocks[SOIL_WATER].amount + to_soil);
+        steps += 1;
+        assert!(steps < 100, "never stopped");
+    }
+    assert!(
+        steps > 1,
+        "a single step refilled it, so the stop was not tested"
+    );
+}
+
+/// §18b T3 — above the trigger the watering gives EXACTLY nothing: no legs at all, at a fill
+/// just over 0.45 and at the full zone a season starts with.
+#[test]
+fn watering_gives_nothing_above_the_trigger() {
+    let (state, bio, r) = watered_build();
+    let plant_dt = sealed_station_scenario().bio_dt;
+    let flow = bio
+        .flows()
+        .iter()
+        .find(|f| f.id() == station::air_split::WATERING)
+        .expect("the watering flow");
+    for fill in [0.46, 0.66, 1.0] {
+        let s = with_soil_water(&state, fill * ttsw(&state));
+        let res = flow.evaluate(&s, &r.bind(&s, plant_dt), plant_dt).unwrap();
+        assert!(res.legs.is_empty(), "fill {fill}: {:?}", res.legs.len());
+    }
+}

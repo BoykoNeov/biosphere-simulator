@@ -177,8 +177,10 @@ fn season(warm: bool, watering: bool) -> (State, State, Reading) {
 
 fn main() {
     println!("one season; separate air, BVAD chamber, fan 0.2 mol/s, vapour crossing, minute gas exchange");
+    let mut ends: Vec<String> = Vec::new();
     for (warm, watering) in [(false, false), (false, true), (true, false), (true, true)] {
         let (s0, end, r) = season(warm, watering);
+        ends.push(simcore::snapshot::from_engine(&end).to_json());
         let name = format!(
             "{} chamber, watering {}",
             if warm { "22 °C" } else { "weather" },
@@ -206,4 +208,17 @@ fn main() {
             r.events,
         );
     }
+    println!(
+        "end state, watering on vs off: weather chamber {}, 22 °C chamber {}",
+        if ends[0] == ends[1] {
+            "byte-identical"
+        } else {
+            "DIFFERS"
+        },
+        if ends[2] == ends[3] {
+            "byte-identical"
+        } else {
+            "DIFFERS"
+        },
+    );
 }

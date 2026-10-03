@@ -1085,3 +1085,23 @@ or **0.6623** (22 °C).
 * **T3 — above the trigger it gives exactly 0** (pin b).
 * **T4 — liveness:** the always-refill rule (§18a's) turns pin b red; an inverted comparison turns
   pin a red.
+
+### 18c. Triggered watering BUILT (lab, off by default) — graded (2026-10-03)
+
+`station::air_split::TriggeredWatering` gates the field's refill (`Irrigation`, crew-sourced) by
+FAO-56's trigger, `FTSW < 1 − 0.55`; `FAO56_WHEAT_DEPLETION_FRACTION` carries the citation. Output
+`W:\temp\claude\watering_run3.txt`.
+
+| # | Prediction | Result |
+|---|---|---|
+| T1 | 0 kg in all four seasons; on == off byte for byte | **HELD** — 0.000 kg in every run; weather and 22 °C end states byte-identical on vs off |
+| T2 | fires below the trigger, store → soil kg for kg, stops once over 0.45 | **HELD** — `watering_fires_below_the_trigger_and_stops_above_it` (from 0.30 it waters several steps, each leg pair equal and opposite, and stops over 0.45) |
+| T3 | exactly nothing above the trigger | **HELD** — no legs at 0.46, 0.66, 1.0 |
+| T4 | always-refill reddens pin b; inverted reddens pin a | **HELD, stronger** — each mutation turns BOTH pins red |
+
+**Tally: 4 held.** So watering now does what the user asked of it — water goes back to the plants
+from the crew's supply when, and only when, their root zone runs down — and in this build as it
+stands it never has to: the most the season drains is 21 kg, against a root zone that never falls
+below 66 % full. **That 21 kg is the plant step's**, not the room's (§18a, R2): transpiration
+still puts at most the chamber's headroom into its air each 90 minutes. Moving transpiration to the
+minute step is the next decision, and the user's.
