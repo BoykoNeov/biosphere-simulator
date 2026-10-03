@@ -46,3 +46,8 @@ worst slow-step CO₂ draw scales to ≈ 27× the chamber's whole CO₂. The fan
 step but the crop draws on the 1.5-hour one, so a source-sized chamber starves by construction of
 the step. Measured first in slice 2a; the remedy is the user's call. No inter-room ventilation rate
 found in BVAD (its "Ventilation" row is an air speed).
+
+**Cold period DECIDED 2026-10-03** (note §12). The standard protocol binds (Cha et al. 2022, opened
+as the accepted manuscript): **8 weeks at 4 °C**, the centre of its 6–10 weeks at 2–6 °C, with the
+lamp dimmed to 100 µmol m⁻² s⁻¹ and the day cut to 8 h for the cold phase. The 6- and 10-week ends
+become lab sensitivity checks. The model's wheat reads a full vernalization (56 chill-days ≥ 50).

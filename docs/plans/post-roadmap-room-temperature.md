@@ -466,3 +466,25 @@ caps the fan.
 * **2d — the fan's heat**, separate-air option only (lab): sensible + fan power; latent out unless
   chosen.
 * **3, 4** as §10 (the cold period, re-sow on maturity).
+
+## 12. The cold period — DECIDED 2026-10-03
+
+The user, on the two slice-3 questions: *"1. use standard 2. dim it"*; then, asked to resolve the
+range and the day length: **8 h and dim**, **the middle: 8 weeks at 4 °C**.
+
+| # | Decision | Taken | Source / standing |
+|---|---|---|---|
+| 1 | Which figure binds | **the standard protocol**, Cha et al. 2022: 6–10 weeks at 2–6 °C | opened (AAM, lines 40–42); a practice statement, class-general |
+| 2 | The point in the range | **8 weeks (56 days) at 4 °C** — the centre of both ranges, chosen without the model | the 6- and 10-week ends run as lab sensitivity checks |
+| 3 | Light in the cold phase | **dimmed, and the day shortened to 8 h** — the protocol's short day in full | Cha: *"short-day (8-h-light: 16-h-dark) … low light intensity"* |
+| 4 | Dim level | **100 µmol m⁻² s⁻¹** — Cha's own vernalization light (AAM line 384), the low end of Dhakal's 100–150 | the standard sentence states no number; this is the same paper's figure |
+
+Model readings, **predictions only**: 56 chill-days at 4 °C → CUMVER ≥ VDSAT 50 → **factor 1**
+(the ends: 6 weeks → 0.736, 10 weeks → 1). The 8 h day sits below the photoperiod parameter `cpp`
+(16 h), so the daylength factor is **< 1 during the cold phase** — its value from the cited Eqn 7.6
+form is to be computed before code, not guessed. The 16 h, full-power lamp returns when the chamber
+warms to 22 °C. Consequences to price in slice 3: lamp energy and heat fall in the cold phase
+(≈ 100/500 of the light for 8/16 of the hours, ≈ 1/10 of the daily light); photosynthesis falls
+with it; the cold phase's thermal time is small at 4 °C. ⚠ The cold phase is now a **schedule on
+two things** — the chamber setpoint and the lamp — driven from the same sowing clock, which slice 4
+(re-sow on maturity) must restart per crop.
