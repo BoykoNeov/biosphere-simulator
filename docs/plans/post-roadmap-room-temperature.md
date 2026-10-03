@@ -683,3 +683,73 @@ pin was added, `each_room_is_charged_at_its_own_size`, which that mutation turns
    and nothing brings it back (a real station would irrigate from it).
 3. **The cabin's humidity** — `eclss.yaml`'s DESIGN condenser rate holds the cabin at ≈ 1.5 % RH,
    far below BVAD's cabin range.
+
+## 14. The three decisions TAKEN (user, 2026-10-03) — and the order
+
+The user, on §13b's three: *"Calculate the plants' gas exchange minute by minute. This changes
+the frozen plant science — do it"*; *"A way to get water back to the plants, for example watering
+them from the crew's supply, as a real station would — do it"*; *"The crew cabin's humidity: about
+1.5 % today, far below the handbook's range for a cabin — fix it."*
+
+**Order (advisor, 2026-10-03): humidity → gas exchange → watering, three batches, three commits.**
+Watering is sized against the drain the other two leave, so it goes last. Humidity first: small,
+cited, and its golden diff is predictable. The gas exchange regenerates the same station goldens
+again, so it is kept in a commit of its own so each diff has one cause.
+
+## 15. The cabin's humidity — a station unfreeze (predictions committed before code)
+
+**Source, read as the page image** (`W:\temp\claude\bvad\p63-077.png`): BVAD Rev 2 **Table 4-1,
+"Typical Steady-State Values for Vehicle Atmospheres", printed p. 63**, row *Relative Humidity, %*:
+**25** (lower, ref. 9 = NASA Std. 3001 Vol 2 Rev A 2015) / **40** (nominal, ref. 10 = *Typical
+ISS*) / **75** (upper, ref. 9). The text extract scrambles this table's columns (its temperature
+row lands on the wrong line); the image is the authority.
+
+**What is wrong today.** `Condenser` removes `k·h2o` — first-order on the WHOLE cabin vapour — so
+the cabin settles at `P/k` = **0.0675 kg** in every station golden (P = 3.375e-5 kg/s of crew
+humidity, k = 5e-4 /s). That is ≈ 1.5 % RH of a 9500-mol cabin at 22 °C. It is not a humidity
+anyone chose: it is the crew's output divided by a solver-stability rate.
+
+**The form.** A dehumidifier that acts only above its setpoint:
+`R = k · max(0, h2o − h2o_setpoint)`. Same first-order rate `k` (still DESIGN, unchanged), now on
+the EXCESS. The steady state becomes `h2o_eq = h2o_setpoint + P/k`. One-sided because a condensing
+heat exchanger cannot humidify. ⚠ The biosphere's `science::condensed_vapour_kg` is NOT reused: it
+draws first-order *below* its target too (its own recorded scope line), so it would leave the cabin
+at `P/k` — exactly the bug.
+
+**The value.** `humidity_setpoint` = **1.7863 kg**, an absolute inventory derived the way
+`o2_setpoint` was: 0.40 × saturation at **22 °C** (295.15 K, BVAD Table 4-73's cabin nominal, the
+temperature this note already decided) × the cabin's **9500 mol** × M_H2O, using the model's own
+FAO-56 curve (`weather::saturation_vapor_pressure`, 2643.93 Pa → 4.46579 kg saturated). A test
+pins the derivation. ⚠ **TRIGGER**, as on `o2_setpoint`: the value encodes the cabin's air
+(9500 mol) and a temperature the cabin does not hold as a state. When the cabin gets its own heat
+store (§11, the user's choice), the setpoint must become a relative humidity that reads it.
+
+**Starting vapour: every scenario starts AT the setpoint** (`cabin_h2o_0` 0 → 1.7863), the
+`cabin_o2_0` rule ("every scenario that sets this must move WITH the setpoint").
+
+**Predictions (graded after the build):**
+
+* **H1 — the shift.** With `e = h2o − setpoint`, the new law is `ė = P − k·e`, `e(0) = 0`: exactly
+  the OLD law in `h2o`. So the condenser's flux is the old one up to the rounding of `h2o −
+  setpoint`, and in every golden **`eclss.cabin_h2o` rises by the setpoint** (0.0675 → ≈ 1.8538 kg;
+  the standalone `eclss` golden 0.04 → ≈ 1.8263) while **condensate, `crew.water_store`,
+  `eclss.recovered_water` and `boundary.brine` move only in the last few bits** (relative change
+  ≤ 1e-12). Not bit-identical: the subtraction rounds.
+* **H2 — the plants do not notice.** In shared air the crop reads its own `biosphere.water_vapor`,
+  never `cabin_h2o`, so **every carbon, O₂, nitrogen and biosphere-water value is byte-identical**
+  in `greenhouse`, `harvest`, `sealed_station` (and `lighting` does not build a cabin condenser at
+  all — to be confirmed by its golden not moving).
+* **H3 — which goldens move.** Exactly the six that hold `eclss.cabin_h2o`: `cabin_gas`, `eclss`,
+  `greenhouse`, `harvest`, `sealed_station`, `water_recovery`. `sealed_energy_drift_summary` and
+  every biosphere golden: unchanged. No rationing, no events.
+* **H4 — the manifest.** `eclss.yaml`'s hash and the six `golden_sha256` rows change; no flow id,
+  no flow type, no seam. The new param is a new row in the param set. The authoring flow registry's
+  condenser entry keeps `rate_params: [condense_rate]` (the setpoint is a target, not a rate) and is
+  not `demand_controlled` (one-sided: it cannot reverse).
+* **H5 — the split build (lab).** With the cabin at 40 % instead of 1.5 %, the fan's vapour
+  difference shrinks, so the season's drain chamber → cabin falls well below 23.3 kg — but stays
+  positive, because the chamber's own target is 75 % (> 40 %). How far it falls is measured.
+
+**Recorded, not fixed:** shared air now holds two humidities in one room — the crew's vapour stock
+at ≈ 41 % and the plants' at their 75 % target. They were two stocks before; now the mismatch is
+visible in the numbers, not just in the wiring.
