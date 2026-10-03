@@ -58,8 +58,13 @@ pub const O2_MAKEUP: &str = "eclss.o2_makeup";
 pub struct EclssParams {
     /// k_scrub — first-order CO₂ removal rate (1/s), > 0.
     pub co2_scrub_rate: f64,
-    /// k_cond — first-order humidity removal rate (1/s), > 0.
+    /// k_cond — first-order humidity removal rate (1/s), > 0, on the excess above
+    /// `humidity_setpoint`.
     pub condense_rate: f64,
+    /// h2o_set — the cabin vapour inventory the condenser holds (kg), > 0. Below it the
+    /// condenser takes nothing. BVAD's nominal 40 % at 22 °C in the 9500-mol cabin
+    /// (`eclss.yaml`'s source, with its TRIGGER).
+    pub humidity_setpoint: f64,
     /// k_makeup — proportional O₂-regulator gain (1/s), > 0.
     pub o2_makeup_gain: f64,
     /// o2_setpoint — target cabin O₂ inventory (mol), > 0.
@@ -78,7 +83,8 @@ pub struct EclssScenario {
     pub cabin_o2_0: f64,
     /// Initial cabin CO₂ (mol).
     pub cabin_co2_0: f64,
-    /// Initial cabin H₂O (kg).
+    /// Initial cabin H₂O (kg) — starts at the setpoint (`eclss.yaml`'s `humidity_setpoint`),
+    /// by the same rule as `cabin_o2_0`: the condenser's dynamics live in `h2o − setpoint`.
     pub cabin_h2o_0: f64,
     /// Forced crew O₂ consumption (mol/s).
     pub o2_consumption_rate: f64,
@@ -95,7 +101,7 @@ pub struct EclssScenario {
 pub const STEADY_STATE_SCENARIO: EclssScenario = EclssScenario {
     cabin_o2_0: 1995.0,
     cabin_co2_0: 0.0,
-    cabin_h2o_0: 0.0,
+    cabin_h2o_0: 1.7863,
     o2_consumption_rate: 0.004,
     co2_production_rate: 0.003,
     h2o_production_rate: 2.0e-5,
@@ -110,9 +116,16 @@ fn scrub_flux(cabin_co2: f64, co2_scrub_rate: f64) -> f64 {
     co2_scrub_rate * cabin_co2
 }
 
-/// Instantaneous humidity-condensation rate `k_cond · cabin_h2o` (kg/s).
-fn condense_flux(cabin_h2o: f64, condense_rate: f64) -> f64 {
-    condense_rate * cabin_h2o
+/// Instantaneous humidity-condensation rate `k_cond · max(0, cabin_h2o − h2o_set)` (kg/s).
+///
+/// One-sided: a condensing heat exchanger dries the air above its setpoint and cannot humidify
+/// it below. ⚠ Until 2026-10-03 this was `k_cond · cabin_h2o`, first-order on ALL the cabin's
+/// vapour, which held every cabin at `P/k` ≈ 1.5 % relative humidity
+/// (`docs/plans/post-roadmap-room-temperature.md` §15). Do not "simplify" it to the biosphere's
+/// `science::condensed_vapour_kg`: that draws first-order below its target too, which is the
+/// same bug.
+fn condense_flux(cabin_h2o: f64, condense_rate: f64, humidity_setpoint: f64) -> f64 {
+    condense_rate * (cabin_h2o - humidity_setpoint).max(0.0)
 }
 
 /// Instantaneous O₂-makeup rate `k_makeup · (o2_setpoint − cabin_o2)` (mol/s). The
@@ -297,6 +310,7 @@ impl Flow for Condenser {
         let condensed = condense_flux(
             donor_amount(snapshot, &self.cabin_h2o)?,
             self.params.condense_rate,
+            self.params.humidity_setpoint,
         ) * dt;
         FlowResult::new(vec![
             Leg::new(self.cabin_h2o.clone(), -condensed)?,
@@ -469,6 +483,7 @@ mod tests {
     const HAND: EclssParams = EclssParams {
         co2_scrub_rate: 1.0e-3,
         condense_rate: 5.0e-4,
+        humidity_setpoint: 1.7863,
         o2_makeup_gain: 2.0e-3,
         o2_setpoint: 1995.0,
     };
@@ -604,13 +619,38 @@ mod tests {
     }
 
     #[test]
-    fn condense_flux_is_first_order() {
-        close(condense_flux(0.04, 5.0e-4), 2.0e-5);
+    fn condense_flux_is_first_order_in_the_excess() {
+        // 0.04 kg above a 1.7863 kg setpoint at k = 5e-4 /s: R = 5e-4 · 0.04 = 2e-5 kg/s.
+        close(condense_flux(1.7863 + 0.04, 5.0e-4, 1.7863), 2.0e-5);
     }
 
     #[test]
     fn condense_flux_zero_at_floor() {
-        assert_eq!(condense_flux(0.0, 5.0e-4), 0.0);
+        assert_eq!(condense_flux(0.0, 5.0e-4, 1.7863), 0.0);
+    }
+
+    /// ⚠ **The one-sided half, and the reason the 2026-10-03 form exists.** At and below the
+    /// setpoint the condenser takes NOTHING — the old law took `k · h2o` here and dried every
+    /// cabin to `P/k` ≈ 1.5 % RH — and it never runs backwards into a humidifier.
+    #[test]
+    fn condense_flux_is_zero_at_and_below_the_setpoint() {
+        assert_eq!(condense_flux(1.7863, 5.0e-4, 1.7863), 0.0);
+        assert_eq!(condense_flux(0.0675, 5.0e-4, 1.7863), 0.0);
+        assert!(condense_flux(1.7864, 5.0e-4, 1.7863) > 0.0);
+    }
+
+    /// `eclss.yaml`'s `humidity_setpoint` IS its stated derivation: 0.40 (BVAD Table 4-1's
+    /// nominal) × saturation at 22 °C in the 9500-mol cabin, on the model's own curve, written
+    /// to five figures. If the curve, the cabin's air or the cited fraction moves, this goes red
+    /// rather than leaving a number whose source no longer computes it.
+    #[test]
+    fn the_humidity_setpoint_is_forty_percent_of_the_cabins_saturation() {
+        let derived = 0.40 * crate::biosphere::science::saturation_vapour_kg(22.0, 9500.0);
+        let loaded = crate::params::eclss().humidity_setpoint;
+        assert!(
+            (loaded - derived).abs() < 5e-5,
+            "humidity_setpoint {loaded} vs 0.40 · saturation(22 °C, 9500 mol) = {derived}"
+        );
     }
 
     // --- rate law: makeup_flux (demand-controlled toward the setpoint) -------------
@@ -702,7 +742,7 @@ mod tests {
     // --- flow level: Condenser -----------------------------------------------------
     #[test]
     fn condenser_balances_water_only() {
-        let s = state(10.0, 3.0, 0.04);
+        let s = state(10.0, 3.0, HAND.humidity_setpoint + 0.04);
         let result = evaluated(&condenser(), &s, &crew_forcing(), DT);
         assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
         assert_eq!(touched(&result, &s), vec![Quantity::Water]);
@@ -710,9 +750,9 @@ mod tests {
 
     #[test]
     fn condenser_removes_first_order_and_dt_linear() {
-        let s = state(10.0, 3.0, 0.04);
+        let s = state(10.0, 3.0, HAND.humidity_setpoint + 0.04);
         let l = legs(&condenser(), &s, &crew_forcing(), DT);
-        let expected = HAND.condense_rate * 0.04 * DT;
+        let expected = HAND.condense_rate * (HAND.humidity_setpoint + 0.04 - HAND.humidity_setpoint) * DT;
         close(l[CABIN_H2O], -expected);
         close(l[HUMIDITY_CONDENSATE], expected);
     }

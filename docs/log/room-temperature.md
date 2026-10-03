@@ -67,3 +67,16 @@ water flowed back on 78 of 439 200 fan steps; transpiration rose 2.4×, not 3–
 transpiration ignores canopy size (a crop with 14 % of the carbon transpires 99.6 % as much).
 Three decisions are the user's: how the plant step meets the fan, a water return path, the cabin's
 humidity.
+
+**Cabin humidity FIXED 2026-10-03 (a station unfreeze)** (note §14–§15a). The user took all three
+of slice 2a's decisions; the order is humidity, gas exchange, watering. The cabin's condenser drew
+on all its vapour and held every cabin at ≈ 1.5 % relative humidity. It now holds BVAD Table 4-1's
+nominal **40 %** (printed p. 63, page image; 25–75 % range), derived to 1.7863 kg at 22 °C in the
+9500-mol cabin, and acts only above it. Six goldens moved: the cabin's vapour by exactly +1.7863 kg,
+the crew's water books in the last few bits, no plant-side byte. Graded: 3 held, 1 half (the
+manifest has no param-name row), 1 failed. The failure: in the lab's separate air, water now flows
+cabin → plants (+2.08 kg a season), because the plant chamber still runs at the weather's
+temperature. Found, recorded, not fixed (the user's call): shared air holds two vapour stocks whose
+targets add, so the room counted whole is above saturation on 4 876 of 4 880 plant steps (8 before).
+Nothing reads that sum. Also found: the multi-rate ECLSS authoring anchor would have gone dead under
+a dry start, and nothing ran its trajectory since S6; a test now does.

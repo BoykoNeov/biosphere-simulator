@@ -753,3 +753,58 @@ store (§11, the user's choice), the setpoint must become a relative humidity th
 **Recorded, not fixed:** shared air now holds two humidities in one room — the crew's vapour stock
 at ≈ 41 % and the plants' at their 75 % target. They were two stocks before; now the mismatch is
 visible in the numbers, not just in the wiring.
+
+### 15a. The cabin's humidity BUILT — the predictions graded (2026-10-03)
+
+**What landed.** `eclss.yaml` gains `humidity_setpoint` = 1.7863 kg (BVAD Table 4-1, 40 %
+nominal; derivation pinned by `the_humidity_setpoint_is_forty_percent_of_the_cabins_saturation`);
+`Condenser` draws `k_cond·max(0, cabin_h2o − humidity_setpoint)`; every `cabin_h2o_0` and every
+authored fixture's cabin vapour start at the setpoint (`eclss_cabin.yaml`,
+`eclss_multirate_cabin.yaml`, `eclss_thermal_habitat.yaml`, `scenarios/bioregenerative_station.yaml`);
+the authoring `eclss` param set carries the key. Six goldens regenerated, the station manifest
+rewritten, unfreeze logged in `docs/station-reference.md` and `docs/authoring-reference.md`.
+
+| # | Prediction | Result |
+|---|---|---|
+| H1 | `cabin_h2o` +setpoint; the crew's water books move only in the last bits (≤ 1e-12) | **HELD** — `cabin_h2o` 0.0675 → 1.8538 (`eclss` 0.04 → 1.8263); condensate, `water_store`, `recovered_water`, `brine` ≤ **3.4e-14** relative; `sealed_station`'s `water_store` byte-identical |
+| H2 | every plant-side value byte-identical | **HELD** — no carbon, O₂, N or biosphere-water byte moved in any golden |
+| H3 | exactly six goldens move | **HELD** — `cabin_gas`, `eclss`, `water_recovery`, `greenhouse`, `harvest`, `sealed_station`; `lighting` and the drift summary unchanged |
+| H4 | `eclss.yaml` hash + six `golden_sha256`; the new param a new row | **HALF** — the hash and six rows moved, nothing else; ✗ there is **no param-name row** to move: the station manifest records param files by hash only, so a new param shows up as a file digest and nothing more |
+| H5 | split build: the drain shrinks but stays chamber → cabin | ✗ **FALSIFIED — it reversed.** Over a season (`W:\temp\claude\air_split_run4.txt`) the plants GAIN 2.08 kg (195.000 → 197.083) and the crew's store loses 1.88 kg; the chamber's mean RH rises 0.75 → **0.91**; transpiration falls to 0.933 of shared. The chamber runs at the weather's temperature (≈ 16 °C mean), so at 75 % it holds less vapour per mol than a 40 %, 22 °C cabin (1.95e-4 kg/mol) |
+
+**Tally: 3 held, 1 half, 1 failed.**
+
+**Tests that changed, and why each is an unfreeze rather than a weakening:**
+
+* `condense_flux_is_first_order` → `…_in_the_excess`; new `condense_flux_is_zero_at_and_below_the_setpoint`
+  (the one-sided half) and a loader refusal of a non-positive setpoint.
+* `eclss_run.rs`: the steady state is `setpoint + P/k`; the integral invariant and the
+  monotone rise now start from the setpoint (same claims, new start), and assert the start IS
+  the setpoint.
+* Authoring's unsafe-step demonstration re-measured **38 → 28** firings: the condenser's law
+  alone removed the ten (changing it with the fixture untouched already gave 28). At `k·h = 1.8`
+  it overshoots below the setpoint and stops instead of emptying the cabin.
+* The lab pin `vapour_crossing_drains_the_plants_water_into_the_crews` became
+  `…_moves_water_between_the_plants_and_the_crew`, asserting the measured direction (cabin →
+  plants over 90 days: +1.39 kg) with a note that a 22 °C chamber should flip it back.
+* **New:** `the_multirate_eclss_anchor_runs_its_condenser`. That fixture's teeth are its condenser,
+  and a dry start would have left it idle all day (the crew adds ≈ 1.73 kg < 1.7863): a dead
+  anchor with nothing red. Its Python run-match died with S6, so nothing ran its trajectory at all.
+  Measured 2.8387e-2 kg above the setpoint, the header's "~2.84e-02", now pinned.
+
+**⚠ The finding the fix makes visible — shared air (advisor's correction of my first reading).**
+The shared room holds TWO vapour stocks, each held by its own condenser, and their targets ADD:
+the plants' 75 % of the weather's saturation plus the crew's 40 % of 22 °C's. Even at one common
+22 °C that is ≈ 116 % of saturation. Measured over one season, both counted against saturation
+at the plants' temperature: above 1 on **4 876 of 4 880** plant steps, max **2.88×**; before the
+fix (the shift makes the old crew vapour exactly `cabin_h2o − setpoint`, from the same run):
+**8** steps, max **1.22×**. So the frozen 2026-09-23 note "can exceed saturation by at most ~3 %"
+was already wrong, by 22 %. ⚠ The shared room was never at 1.5 %: it was ≈ 76 % (the plants' 75
+plus the crew's 1.5) — only the crew's own stock read 1.5 %. **Nothing reads the sum** (searched:
+the condenser, the crew water balance, the lab fan, the builders, the Godot palette's crew-only
+`cabin_gas` session — no reader adds the two, no display shows a room humidity, the breach readers
+do not touch `cabin_h2o`), so no simulated value changes. The fix is right as built where the cabin
+has its own air (`cabin_gas`, `water_recovery`, standalone ECLSS, the lab split). **The user's
+call:** keep two stocks (recorded flaw), or give shared air one vapour stock held by one condenser —
+a separate station change that moves either the plants' air (drier, more transpiration) or where
+the crew's water ends up (in the plants' soil).

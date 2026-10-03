@@ -43,7 +43,8 @@ const DT: f64 = STEADY_STATE_SCENARIO.dt_seconds;
 /// The emergent per-species cabin steady states `(o2, co2, h2o)`, a closed form.
 ///
 /// At steady state each control loop's removal or supply balances the crew load:
-/// `co2_eq = P_co2 / k_scrub`, `h2o_eq = P_h2o / k_cond`, and
+/// `co2_eq = P_co2 / k_scrub`, `h2o_eq = h2o_set + P_h2o / k_cond` (the condenser acts on the
+/// excess above its setpoint since 2026-10-03), and
 /// `o2_eq = o2_setpoint − Con_o2 / k_makeup` — so cabin O₂ sits just *below* the setpoint,
 /// which is the whole reason the regulator is not idle at rest. Each is algebraic, so
 /// there is nothing to iterate and nothing to read off a run.
@@ -52,7 +53,9 @@ fn steady_state(scenario: &EclssScenario) -> (f64, f64, f64) {
     (
         p.o2_setpoint - scenario.o2_consumption_rate / p.o2_makeup_gain,
         scenario.co2_production_rate / p.co2_scrub_rate,
-        scenario.h2o_production_rate / p.condense_rate,
+        // Since 2026-10-03 the condenser acts on the excess above its setpoint, so the
+        // humidity steady state sits P/k ABOVE the setpoint, not at P/k.
+        p.humidity_setpoint + scenario.h2o_production_rate / p.condense_rate,
     )
 }
 
@@ -163,9 +166,9 @@ fn eclss_only_the_three_mass_quantities_present() {
 
 #[test]
 fn eclss_augmented_totals_are_invariant() {
-    // Integral form. Carbon and water start at 0 in the cabin, so each of those totals is
-    // 0 (the negative-going boundary source cancels the cabin and the sink); oxygen totals
-    // to the initial cabin inventory.
+    // Integral form. Carbon starts at 0 in the cabin, so its total is 0 (the negative-going
+    // boundary source cancels the cabin and the sink); oxygen and water total to their
+    // initial cabin inventories (water starts at the humidity setpoint since 2026-10-03).
     let (states, _, _) = euler(&STEADY_STATE_SCENARIO);
     for s in &states {
         let oxygen = s.stocks[CABIN_O2].amount
@@ -182,7 +185,10 @@ fn eclss_augmented_totals_are_invariant() {
             "{oxygen}"
         );
         assert!(carbon.abs() <= 1e-9, "{carbon}");
-        assert!(water.abs() <= 1e-9, "{water}");
+        assert!(
+            (water - STEADY_STATE_SCENARIO.cabin_h2o_0).abs() <= 1e-9,
+            "{water}"
+        );
     }
 }
 
@@ -226,14 +232,20 @@ fn eclss_converges_to_the_steady_states() {
 
 #[test]
 fn eclss_species_move_monotonically_to_steady_state() {
-    // From the clean cabin: CO₂ and H₂O rise monotonically from 0 to their equilibria; O₂
-    // falls monotonically from the setpoint. A constant crew load gives monotone
-    // relaxation, with no periodic structure at all.
+    // From the clean cabin: CO₂ rises monotonically from 0 and H₂O from its setpoint to their
+    // equilibria; O₂ falls monotonically from the setpoint. A constant crew load gives
+    // monotone relaxation, with no periodic structure at all.
     let (states, _, _) = euler(&STEADY_STATE_SCENARIO);
     let co2 = series(&states, CABIN_CO2);
     let h2o = series(&states, CABIN_H2O);
     let o2 = series(&states, CABIN_O2);
-    assert!(co2[0].abs() < 1e-12 && h2o[0].abs() < 1e-12);
+    assert!(co2[0].abs() < 1e-12);
+    assert!((h2o[0] - STEADY_STATE_SCENARIO.cabin_h2o_0).abs() < 1e-12);
+    assert_eq!(
+        STEADY_STATE_SCENARIO.cabin_h2o_0,
+        params::eclss().humidity_setpoint,
+        "the standalone cabin starts AT the humidity setpoint, as its O₂ starts at the O₂ one"
+    );
     assert!((o2[0] - STEADY_STATE_SCENARIO.cabin_o2_0).abs() < 1e-12);
     for pair in co2.windows(2) {
         assert!(pair[0] <= pair[1] + 1e-15);

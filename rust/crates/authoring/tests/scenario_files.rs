@@ -890,7 +890,7 @@ fn at_an_unsafe_dt_the_run_is_rejected_not_returned() {
     // sniffing the message) is the point of ErrorKind existing.
     assert_eq!(err.kind, authoring::ErrorKind::Rationed);
     assert!(
-        err.message.contains("38"),
+        err.message.contains("28"),
         "count must be named: {}",
         err.message
     );
@@ -916,8 +916,17 @@ fn the_underlying_hazard_is_unchanged_only_its_silence_was_fixed() {
     // is the same one. ⚠ The cross-port half of this claim ("both ports ration
     // identically") is now HISTORICAL and un-recheckable: S6 deleted the Python port, so
     // 37 was the last number both sides ever produced. See docs/log/o2-setpoint-cited.md.
+    // ⚠ 38 until 2026-10-03, when the condenser became one-sided about a humidity setpoint
+    // and this fixture's cabin vapour moved to start AT it. Ten firings went, and the
+    // condenser's law alone removed them: changing the law with this fixture untouched already
+    // gave 28 (measured; the backstop's count is not split per flow, so "they were the
+    // condenser's" is that one-variable change, not a per-flow tally). At `k·h = 1.8` the old
+    // law over-drew the cabin's vapour to the zero clamp; on the excess above a 1.7863 kg
+    // setpoint it overshoots below the setpoint and stops. The O₂ mechanism is the same one —
+    // the airless assertion below says so.
+    // Re-measured, not re-tuned (docs/authoring-reference.md's 2026-10-03 log entry).
     assert_eq!(
-        result.total_rationed, 38,
+        result.total_rationed, 28,
         "the hazard's mechanism moved — docs are stale"
     );
     assert!(result.events.is_empty());
@@ -1013,4 +1022,31 @@ fn at_the_setpoint_the_gate_is_silent_because_the_flow_does_not_reverse() {
     // gate would have condemned the platform's own example. Pinned, not left to luck.
     let result = run_scenario(eclss_anchor_at("60.0", "4")).expect("the fixture must run");
     assert_eq!(result.total_rationed, 0);
+}
+
+/// ⚠ **The multi-rate ECLSS anchor stays LIVE** (2026-10-03). `eclss_multirate_cabin.yaml`'s
+/// teeth are its condenser: `cabin_h2o` is the one stock shared across the rate-class
+/// boundary, so its level is what a mis-partitioned port would get wrong. When the condenser
+/// became one-sided about a 1.7863 kg setpoint, a cabin left starting dry would have stayed
+/// below it for the whole day (the crew adds ≈ 1.73 kg) and the condenser would never have
+/// run — a dead anchor, trivially reproducible, with nothing going red. The Python run-match
+/// that used to check this file's trajectory was deleted by S6, so this is the check now:
+/// the cabin ends ABOVE its setpoint, by the slow-declared offset the file's header states.
+#[test]
+fn the_multirate_eclss_anchor_runs_its_condenser() {
+    let built = load_scenario(
+        &scenarios_dir().join("eclss_multirate_cabin.yaml"),
+        &no_overrides(),
+    )
+    .expect("load the multi-rate anchor");
+    let result = run_scenario(built).expect("run the multi-rate anchor");
+    let setpoint = domains::params::eclss().humidity_setpoint;
+    let excess = result.final_state.stocks["eclss.cabin_h2o"].amount - setpoint;
+    assert!(excess > 0.0, "the condenser never ran: excess {excess}");
+    // Measured 2026-10-03 at 2.8387096774195486e-2 — the header's "~2.84e-02 above its
+    // setpoint", against 4.00e-2 had it been declared fast.
+    assert!(
+        (excess / 2.838_709_677_419_548_6e-2 - 1.0).abs() < 1e-9,
+        "the slow-declared condenser's offset moved: {excess:e}"
+    );
 }

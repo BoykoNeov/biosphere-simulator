@@ -283,7 +283,7 @@ how positivity holds, and whether the flow is multi-instanceable:
 | `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** | — (`τ ≫ dt` is not a predicate) |
 | `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) | — (state-dependent) |
 | `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor (`k_scrub·cabin_co2`) | `co2_scrub_rate` |
-| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor (`k_cond·cabin_h2o`) | `condense_rate` |
+| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor, one-sided (`k_cond·max(0, cabin_h2o − humidity_setpoint)`, since 2026-10-03) | `condense_rate` |
 | `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) | `o2_makeup_gain` |
 
 **`rate_params` names the first-order rate constants** — the `k` in a `dx/dt = k·x` or
@@ -362,7 +362,7 @@ the code. Selecting a flow type hands you the `dt` knob with no guard attached.
 | flow | constraint | frozen sizing | breaks at | caught by |
 |---|---|---|---|---|
 | `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | **build** + rationing |
-| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | **build** + rationing |
+| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | **build** (rationing no longer, since 2026-10-03: it draws on the excess above its setpoint, so an over-large step overshoots below the setpoint and stops there instead of emptying the cabin) |
 | `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **build ONLY** — rationing sees nothing in `1 ≤ k·dt < 2`; see below |
 | `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol | rationing (**state-dependent — no build check possible**) |
 | `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) | **build** + rationing |
@@ -1039,6 +1039,22 @@ An undocumented unfreeze fails CI by construction (the completeness gate, or a m
 vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-10-03 — the condenser holds a humidity setpoint (delegated from the station
+  unfreeze of the same day; `docs/station-reference.md` is the record).** `eclss.yaml` gained
+  `humidity_setpoint` (BVAD Table 4-1's nominal 40 % RH, derived to 1.7863 kg) and the
+  condenser now draws `k_cond·max(0, cabin_h2o − humidity_setpoint)`. The `eclss` param set
+  carries the new key; the flow type's `rate_params` stay `[condense_rate]` (a setpoint is a
+  target, not a rate) and it is not `demand_controlled` (one-sided: it cannot reverse). The
+  authoring manifest did not move. The anchor fixture `eclss_cabin.yaml` starts its cabin
+  vapour AT the setpoint, as its O₂ starts at the O₂ one. ⚠ **The unsafe-step demonstration
+  re-measured 38 → 28 backstop firings** at `dt = 3600` over 15 steps. The condenser's law
+  alone removed the ten (changing it with the fixture untouched already gave 28; the count is
+  not split per flow): at `k·h = 1.8` it now overshoots below the setpoint and stops, where it
+  used to empty the cabin's vapour. The O₂ half of the hazard, and the airless-cabin assertion,
+  are unchanged. Re-measured, not re-tuned. This file's step 6 says a moved science golden is a
+  bug for an *authoring* change; this was a station param change, and its six goldens moved by
+  that contract's ceremony.
 
 - **2026-08-18 — the writer moved to the reference (reference flip, slice C7).** Two
   prose lines moved and **no frozen value did**: every derived key regenerated

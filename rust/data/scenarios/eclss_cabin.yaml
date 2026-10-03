@@ -43,8 +43,9 @@ rng_seed: 0
 
 stocks:
   # The three cabin-air POOLs. cabin_o2 starts AT the setpoint (the regulator idles) and
-  # the crew draw pulls it down to o2_eq = 1993.0; CO2/H2O start at 0 (a clean cabin) and
-  # rise to co2_eq = 3.0 mol / h2o_eq = 0.04 kg. No `composition` — see the note above.
+  # the crew draw pulls it down to o2_eq = 1993.0; CO2 starts at 0 (a clean cabin) and rises
+  # to co2_eq = 3.0 mol; H2O starts AT its setpoint and rises to h2o_eq = 1.7863 + 0.04 kg.
+  # No `composition` — see the note above.
   - id: eclss.cabin_o2
     domain: eclss
     quantity: oxygen
@@ -65,7 +66,10 @@ stocks:
     domain: eclss
     quantity: water
     kind: pool
-    amount: 0.0           # EclssScenario.cabin_h2o_0
+    amount: 1.7863        # EclssScenario.cabin_h2o_0 (== the frozen humidity_setpoint)
+                          # ⚠ 0.0 until 2026-10-03, when the condenser became one-sided
+                          # about a cited 40 % RH setpoint; it tracks `eclss.yaml` exactly
+                          # as cabin_o2 above tracks o2_setpoint.
 
   # The O2-makeup tank: a BOUNDARY *source*, so `unclamped: true` — arbitration must
   # never throttle the supply, and its negative-going amount is pure ledger bookkeeping.
@@ -133,7 +137,8 @@ flows:
       co2_removed: boundary.co2_removed
     params: eclss
 
-  # DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt. The humidity restoring force.
+  # DONOR-CONTROLLED: R = k_cond * max(0, cabin_h2o - humidity_setpoint) * dt. The humidity
+  # restoring force — one-sided since 2026-10-03 (it cannot humidify).
   - id: eclss.condenser
     type: eclss.condenser
     priority: 0

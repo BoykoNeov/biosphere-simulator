@@ -110,7 +110,9 @@ stocks:
     domain: eclss
     quantity: water
     kind: pool
-    amount: 0.0
+    amount: 1.7863        # AT eclss.yaml's humidity_setpoint (0.0 until 2026-10-03, when the
+                          # condenser became one-sided about it; a dry start would leave the
+                          # condenser idle for this whole run — a dead anchor)
 
   # The O2-makeup tank: a BOUNDARY *source*, so `unclamped: true` -- arbitration must never
   # throttle the supply, and its negative-going amount is pure ledger bookkeeping.
@@ -214,7 +216,7 @@ flows:
       co2_removed: boundary.co2_removed
     params: eclss
 
-  # DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt.
+  # DONOR-CONTROLLED: R = k_cond * max(0, cabin_h2o - humidity_setpoint) * dt (one-sided since 2026-10-03).
   - id: eclss.condenser
     type: eclss.condenser
     priority: 0

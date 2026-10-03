@@ -376,6 +376,7 @@ pub fn kinetics_param_map(param_set: &str) -> Result<BTreeMap<String, f64>, Auth
             let p = params::eclss();
             map.insert("co2_scrub_rate".to_string(), p.co2_scrub_rate);
             map.insert("condense_rate".to_string(), p.condense_rate);
+            map.insert("humidity_setpoint".to_string(), p.humidity_setpoint);
             map.insert("o2_makeup_gain".to_string(), p.o2_makeup_gain);
             map.insert("o2_setpoint".to_string(), p.o2_setpoint);
         }

@@ -320,6 +320,35 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-03 — the cabin's condenser holds BVAD's 40 % relative humidity; 6 station goldens
+  move (`eclss.cabin_h2o` by +1.7863 kg, the crew's water books in the last few bits) and
+  `eclss.yaml`'s hash and 6 `golden_sha256` rows follow. One new sibling param; no flow id,
+  flow type, seam or claim changed.** `Condenser` drew `k_cond·cabin_h2o`, first-order on all
+  of the cabin's vapour, so every cabin settled at `P/k` = 0.0675 kg, ≈ 1.5 % RH of a 9500-mol
+  cabin at 22 °C: a value set by a solver-stability rate. It now draws
+  `k_cond·max(0, cabin_h2o − humidity_setpoint)`, one-sided, with `humidity_setpoint` = 1.7863 kg
+  derived from BVAD Rev 2 Table 4-1 (printed p. 63, page image) — 40 % nominal ("Typical ISS"),
+  range 25–75 % — at 22 °C in 9500 mol, with the `o2_setpoint` TRIGGER (it encodes the cabin's
+  air and a temperature the cabin does not hold). Every scenario's `cabin_h2o_0` moved 0 → the
+  setpoint (the `cabin_o2_0` rule). Advisor-reviewed before code; predictions committed first
+  (`docs/plans/post-roadmap-room-temperature.md` §15, graded in §15a). `cabin_gas`, `eclss`,
+  `water_recovery`, `greenhouse`, `harvest` and `sealed_station` moved; the shift argument
+  (`e = h2o − setpoint` obeys the old law) predicted the diff: `cabin_h2o` +1.7863 exactly, and
+  condensate / `crew.water_store` / `recovered_water` / `brine` by ≤ 3.4e-14 relative. **Not one
+  plant-side byte moved**, and `lighting`, `sealed_energy_drift_summary` and every biosphere
+  golden are unchanged. 0 rationing, 0 events, no tier-2 band crossed.
+  ⚠ **What this makes visible in SHARED air, recorded and not fixed (the user's call):** the
+  shared room holds two vapour stocks, each held by its own condenser — the plants' at 75 % of
+  the weather's saturation, the crew's at 40 % of 22 °C's — and their targets ADD. Counted
+  together over one season (`examples/air_split.rs`, `W:\temp\claude\air_split_run4.txt`) the
+  room is above saturation at the plants' temperature on **4 876 of 4 880** plant steps, up to
+  **2.88×**; before this change, **8** steps, up to **1.22×**. Even at one common 22 °C the two
+  targets sum to ≈ 116 %. No flow reads the sum (nothing reacts to it, and no display shows a
+  room humidity), so no simulated value changes; it is a bookkeeping flaw of two stocks in one
+  room, which the crew-only cabin, the standalone ECLSS cabin and the lab's separate air do not
+  have.
+
+
 - **2026-10-01 — the biosphere's crop transpires against the chamber's own air; 4 station
   goldens move (water stocks only) and 4 `golden_sha256` rows follow. No station flow, param,
   seam or claim changed.** Delegated: `docs/biosphere-reference.md`'s 2026-10-01 entry is the
@@ -403,6 +432,10 @@ gate), so the discipline is enforced, not merely requested.
   every run against a 115–219 mol saturation cap — so the cabin's total water can exceed
   saturation by at most ~3 %. This entry claims the biosphere's vapour is bounded, not the
   cabin's humidity.
+  ⚠ **Superseded 2026-10-03, and it was already wrong.** Measured over one season counting both
+  stocks against saturation at the plants' temperature, the room exceeded saturation on 8 of
+  4 880 plant steps, by up to 22 % (not ~3 %). Since the cabin's condenser holds 40 % RH (the
+  entry above), it does so on 4 876 of 4 880, up to 2.88×.
 
 - **2026-09-07 — the biosphere adopts the LIVE-O₂ FvCB form; 4 station goldens move by
   ≤ 0.058 % and 4 `golden_sha256` rows follow. No station flow, param, seam or claim

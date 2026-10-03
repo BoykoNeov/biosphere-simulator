@@ -57,7 +57,11 @@ pub const CABIN_GAS_SCENARIO: CabinScenario = CabinScenario {
     // is the setpoint's, carried for the transient-free start, not a composition of its own.
     cabin_o2_0: 1995.0,
     cabin_co2_0: 0.0,
-    cabin_h2o_0: 0.0,
+    // Starts at `eclss.yaml`'s `humidity_setpoint` (1.7863 kg, BVAD's nominal 40 % RH), by the
+    // `cabin_o2_0` rule: the condenser's dynamics live in `h2o − setpoint`, so a matched start
+    // leaves its flux what it was. It was 0.0 until 2026-10-03, when the condenser drew on all
+    // the cabin's vapour and the cabin settled at ≈ 1.5 % RH.
+    cabin_h2o_0: 1.7863,
     food_store0: 1000.0,
     water_store0: 20.0,
     food_intake_rate: 4.0e-3,

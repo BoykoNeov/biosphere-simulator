@@ -124,7 +124,7 @@ stocks:
     domain: cabin
     quantity: water
     kind: pool
-    amount: 0.0
+    amount: 1.7863        # AT eclss.yaml's humidity_setpoint, BVAD's 40 % RH (0.0 until 2026-10-03)
 
   # ===========================================================================
   # THE BIOREACTOR — the scrubber's product tank and the algal culture.
@@ -344,7 +344,8 @@ flows:
       co2_removed: bioreactor.co2_feed
     params: eclss
 
-  # FROZEN, DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt, k_cond = 5.0e-4 (k*h = 0.15).
+  # FROZEN, DONOR-CONTROLLED: R = k_cond * max(0, cabin_h2o - humidity_setpoint) * dt, k_cond =
+  # 5.0e-4 (k*h = 0.15) — one-sided about BVAD's 40 % RH since 2026-10-03.
   # `humidity_condensate` wired to an interior pool -> the water loop closes.
   - id: eclss.condenser
     type: eclss.condenser

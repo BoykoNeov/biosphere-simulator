@@ -34,8 +34,10 @@
 # commute — unlike eclss_thermal_habitat, whose two domains share no stock and indeed no
 # quantity, making its splitting error exactly zero. Consequence, and it is the point:
 #
-#   * declared slow (this file):    cabin_h2o settles at ~2.84e-02 kg
-#   * declared fast (single-rate):  cabin_h2o settles at  4.00e-02 kg = P_h2o/k_cond
+#   * declared slow (this file):    cabin_h2o settles at ~2.84e-02 kg above its setpoint
+#   * declared fast (single-rate):  cabin_h2o settles at  4.00e-02 kg = P_h2o/k_cond above it
+#   (⚠ the setpoint, 1.7863 kg, since 2026-10-03; the condenser now draws on the excess, so
+#   both offsets are the old absolute levels shifted up by it)
 #
 # ~29 % apart. So a port that mis-classified this flow — or threaded `n_sub` differently,
 # or split at `dt` instead of `dt/2` — does not drift; it lands somewhere else entirely,
@@ -59,7 +61,7 @@
 #     90 % of the bound for no gain in what this file proves.
 #   * steps = 48 master steps at dt = 1800 = 86400 s = 1 day = ~43 tau of the slowest loop,
 #     so every pool is at its steady state by the end and none of them is where it started
-#     (cabin_o2 10.0 -> 8.0; cabin_co2 0.0 -> 3.0; cabin_h2o 0.0 -> ~0.028). A DEAD ANCHOR
+#     (cabin_o2 10.0 -> 8.0; cabin_co2 0.0 -> 3.0; cabin_h2o 1.7863 -> ~1.7863 + 0.028). A DEAD ANCHOR
 #     IS TRIVIALLY BIT-EXACT — the monod_dsl.yaml lesson, applied deliberately here.
 #
 # NO GOLDEN, and not for want of trying: no frozen scenario runs ECLSS multi-rate, so there
@@ -106,7 +108,9 @@ stocks:
     domain: eclss
     quantity: water
     kind: pool
-    amount: 0.0
+    amount: 1.7863        # AT eclss.yaml's humidity_setpoint (0.0 until 2026-10-03, when the
+                          # condenser became one-sided about it; a dry start would leave the
+                          # condenser idle for this whole run — a dead anchor)
 
   # The O2-makeup tank: a BOUNDARY *source*, so `unclamped: true` — arbitration must never
   # throttle the supply, and its negative-going amount is pure ledger bookkeeping.
@@ -198,7 +202,7 @@ flows:
   # is a fixture device, not a sizing claim.
   # --------------------------------------------------------------------------------
 
-  # DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt. Stepped at dt/2 = 900 s by Strang
+  # DONOR-CONTROLLED: R = k_cond * max(0, cabin_h2o - humidity_setpoint) * dt (one-sided since 2026-10-03). Stepped at dt/2 = 900 s by Strang
   # (NOT at dt/n_sub — multi-rate Step 5's finding, and the plan's own formula was wrong
   # about it), giving k_cond * h = 0.45 < 1: the build-time precondition passes, on both
   # ports, via each one's `effective_step(..., slow=true)`.

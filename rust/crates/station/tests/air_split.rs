@@ -153,10 +153,18 @@ fn a_cabin_sized_chamber_recovers_shared_air() {
 }
 
 /// W1 / W2: with vapour held back the plants' water loop is exactly closed; with vapour
-/// crossing, the loop loses water and the crew's store gains it (one way: the cabin is far
-/// drier). A REDISTRIBUTION — conservation alone cannot see it.
+/// crossing, water moves between the plants' books and the crew's. A REDISTRIBUTION —
+/// conservation alone cannot see it.
+///
+/// ⚠ **The direction is a fact about the two rooms' air, and it reversed on 2026-10-03.** Until
+/// then the cabin sat at ≈ 1.5 % RH and the plants lost water to the crew. With the cabin's
+/// condenser holding BVAD's 40 % at 22 °C (1.95e-4 kg of vapour per mol of air), the cabin is
+/// WETTER per mol than a chamber at 75 % of the weather's colder saturation, so over these 90
+/// days the crew's water flows INTO the plants (`docs/plans/post-roadmap-room-temperature.md`
+/// §15, H5). It should flip back once the chamber is held at 22 °C (75 % vs 40 % at one
+/// temperature); this pin will then go red, and that red is the expected one.
 #[test]
-fn vapour_crossing_drains_the_plants_water_into_the_crews() {
+fn vapour_crossing_moves_water_between_the_plants_and_the_crew() {
     let base = shared();
     let off = split(BVAD_CHAMBER_AIR_MOL, 0.2, false);
     let on = split(BVAD_CHAMBER_AIR_MOL, 0.2, true);
@@ -167,16 +175,19 @@ fn vapour_crossing_drains_the_plants_water_into_the_crews() {
         plant_water(&off),
         plant_water(&base)
     );
-    let lost = plant_water(&off) - plant_water(&on);
-    let gained = on.stocks[WATER_STORE].amount - off.stocks[WATER_STORE].amount;
-    assert!(lost > 1.0, "vapour on: the plants lost only {lost} kg");
+    let plants_gained = plant_water(&on) - plant_water(&off);
+    let crew_lost = off.stocks[WATER_STORE].amount - on.stocks[WATER_STORE].amount;
     assert!(
-        gained > 0.0,
-        "vapour on: the crew's store gained {gained} kg"
+        plants_gained > 1.0,
+        "vapour on: the plants gained only {plants_gained} kg from the cabin"
     );
     assert!(
-        gained <= lost,
-        "the crew cannot gain more than the plants lost ({gained} > {lost})"
+        crew_lost > 0.0,
+        "vapour on: the crew's store lost {crew_lost} kg"
+    );
+    assert!(
+        crew_lost <= plants_gained,
+        "the cabin's own vapour and the recovery buffer make up the rest, never more          ({crew_lost} > {plants_gained})"
     );
 }
 

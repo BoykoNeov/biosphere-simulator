@@ -8,7 +8,8 @@
 # / cabin_h2o) against a forced crew metabolic load, with three control loops driving each
 # species to a steady state:
 #     CO₂:  cabin_co2 → co2_removed,          R = k_scrub·cabin_co2        ⇒ co2_eq = P_co2/k_scrub
-#     H₂O:  cabin_h2o → humidity_condensate,  R = k_cond·cabin_h2o         ⇒ h2o_eq = P_h2o/k_cond
+#     H₂O:  cabin_h2o → humidity_condensate,  R = k_cond·max(0, cabin_h2o − h2o_set)
+#                                                                          ⇒ h2o_eq = h2o_set + P_h2o/k_cond
 #     O₂:   o2_supply → cabin_o2,             S = k_makeup·(o2_setpoint − cabin_o2)
 #                                                                          ⇒ o2_eq = o2_setpoint − Con_o2/k_makeup
 # (P_* the forced crew production rates, Con_o2 the forced crew consumption — scenario data.)
@@ -18,7 +19,16 @@
 #   With dt = 60 s here, k_scrub·dt = 0.06 — comfortably < 1.
 #
 # condense_rate (k_cond) — first-order humidity-condensation rate (1/s), > 0. Condensing
-#   heat exchanger. Structural positivity requires k_cond·dt < 1 (here 0.03).
+#   heat exchanger. Structural positivity requires k_cond·dt < 1 (here 0.03). Since
+#   2026-10-03 it acts on the EXCESS above humidity_setpoint, not on the whole cabin vapour.
+#
+# humidity_setpoint (h2o_set) — the cabin water-vapour inventory the condenser holds (kg), > 0.
+#   One-sided: below it the condenser takes nothing (a condensing heat exchanger cannot
+#   humidify). Until 2026-10-03 there was no setpoint and the condenser drew first-order on all
+#   of the cabin's vapour, so the cabin settled at P/k = 0.0675 kg — about 1.5 % relative
+#   humidity, set by a solver-stability rate, not chosen by anyone
+#   (docs/plans/post-roadmap-room-temperature.md §13a, §15). DERIVED like o2_setpoint: see the
+#   value's own source.
 #
 # o2_makeup_gain (k_makeup) — proportional gain of the O₂ partial-pressure regulator (1/s),
 #   > 0. Gives O₂ its restoring force (so O₂ does not recapitulate Power's constructed
@@ -43,8 +53,9 @@
 #   emissivity), NOT routed through pint.
 #
 # Clean-room: first-order gas scrubbing/condensation and proportional partial-pressure
-#   control are textbook process-control physics. All four VALUES are DESIGN choices —
-#   deliberately NOT NASA BVAD / BioSim life-support numbers.
+#   control are textbook process-control physics. The three RATES are DESIGN choices —
+#   deliberately NOT NASA BVAD / BioSim life-support numbers; the two SETPOINTS are derived
+#   from BVAD's cabin atmosphere (o2_setpoint 2026-09-06, humidity_setpoint 2026-10-03).
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
 #   All four TODO(cite) tags discharged as DESIGN. This file is the CLEAREST case in the
@@ -115,6 +126,10 @@ parameters:
     value: 2.0e-3
     unit: "1/s"
     source: "DESIGN — controller-tuning choice, not a literature value: proportional gain (τ ≈ 500 s) giving cabin O₂ its restoring force. The clearest DESIGN case in the file — a P gain is a property of the controller WE wrote, tuned against OUR plant and OUR dt. [B] supports the control law's form; no source can state our gain. Not calibrated."
+  humidity_setpoint:
+    value: 1.7863
+    unit: "kg"
+    source: "[D] BVAD Rev 2 Table 4-1 'Typical Steady-State Values for Vehicle Atmospheres', printed p. 63 (read as the page image, 2026-10-03), row 'Relative Humidity, %': 25 lower (NASA Std. 3001 Vol 2 Rev A 2015) / 40 nominal ('Typical ISS') / 75 upper (NASA Std. 3001). Taken: the NOMINAL 40 %. n = 0.40 x saturation at 22 °C (295.15 K, BVAD Table 4-73's cabin nominal, printed p. 153) x 9500 mol x M_H2O, on the model's own FAO-56 curve (weather::saturation_vapor_pressure: 2643.93 Pa -> 4.46579 kg saturated) = 1.78632 kg, written to 5 figures; a test re-derives it. ⚠ TRIGGER — like o2_setpoint this encodes the ONE cabin air inventory (9500 mol) AND a cabin temperature the model does not hold as a state. When the cabin gets its own heat store, this MUST become a relative humidity read against it. Replaced 2026-10-03 a first-order draw on all the cabin's vapour that held it at ≈ 1.5 % RH."
   o2_setpoint:
     value: 1995.0
     unit: "mol"

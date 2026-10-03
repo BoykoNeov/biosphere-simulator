@@ -72,6 +72,16 @@ struct Reading {
     chamber_dev: f64,
     cabin_dev: f64,
     inert_in: f64,
+    /// Shared air only (§15, 2026-10-03): the ONE room's whole vapour — the crew's
+    /// `cabin_h2o` plus the plants' `water_vapor` — over saturation at the plants' temperature,
+    /// at slow-step starts: its largest value and the steps it reads above 1.
+    room_rh_max: f64,
+    room_over_saturation: u64,
+    /// The same, BEFORE the 2026-10-03 fix, from this same run: the old condenser's crew vapour
+    /// is the new one less the setpoint at every step (the shift, §15 H1), and no plant value
+    /// moved, so `cabin_h2o − humidity_setpoint` IS the old crew vapour.
+    room_rh_max_before: f64,
+    room_over_saturation_before: u64,
 }
 
 fn plant_c(s: &State) -> f64 {
@@ -144,6 +154,18 @@ fn season(
             let temp = bound.get(TEMP_VAR).expect("temp");
             r.rh += before.stocks[WATER_VAPOR].amount / saturation_vapour_kg(temp, chamber_air_mol);
             r.slow_steps += 1;
+            if !before.stocks.contains_key(CABIN_INERT) {
+                let room = (before.stocks[WATER_VAPOR].amount + before.stocks[CABIN_H2O].amount)
+                    / saturation_vapour_kg(temp, chamber_air_mol);
+                r.room_rh_max = r.room_rh_max.max(room);
+                r.room_over_saturation += u64::from(room > 1.0);
+                let before_fix = (before.stocks[WATER_VAPOR].amount
+                    + before.stocks[CABIN_H2O].amount
+                    - params::eclss().humidity_setpoint)
+                    / saturation_vapour_kg(temp, chamber_air_mol);
+                r.room_rh_max_before = r.room_rh_max_before.max(before_fix);
+                r.room_over_saturation_before += u64::from(before_fix > 1.0);
+            }
             for (f, res) in bio.registry().flows().iter().zip(&results) {
                 if f.id() == TRANSPIRATION {
                     let (mut flux, mut air) = (0.0, 0.0);
@@ -294,6 +316,14 @@ fn main() {
     );
     let base = shared(&scenario, days);
     print("shared", &base, &base);
+    println!(
+        "shared room, crew + plant vapour over saturation at the plants' temperature: max {:.4},          above 1 on {} of {} slow steps (before the fix: max {:.4}, above 1 on {})",
+        base.room_rh_max,
+        base.room_over_saturation,
+        base.slow_steps,
+        base.room_rh_max_before,
+        base.room_over_saturation_before
+    );
     let cases = [
         ("split Q0.2 vapour-off", BVAD_CHAMBER_AIR_MOL, 0.2, false),
         ("split Q0.1 vapour-off", BVAD_CHAMBER_AIR_MOL, 0.1, false),
