@@ -808,3 +808,60 @@ has its own air (`cabin_gas`, `water_recovery`, standalone ECLSS, the lab split)
 call:** keep two stocks (recorded flaw), or give shared air one vapour stock held by one condenser —
 a separate station change that moves either the plants' air (drier, more transpiration) or where
 the crew's water ends up (in the plants' soil).
+
+## 16. The plants' gas exchange minute by minute (predictions committed before code, 2026-10-03)
+
+**The form (advisor, 2026-10-03).** The crop's three carbon-budget flows — `Allocation`,
+`GrowthRespiration`, `MaintenanceRespiration` — move **together and unchanged** from the plant
+step (1/16 day) onto the cabin's 60 s step. They share one gross assimilation by design, so none
+moves alone. No new carbon stock: a sugar buffer between the two steps would be a new mechanism
+with no source, and would turn the sealed build's dropped CO₂ round trip into real gross fluxes.
+An adapter, `station::gas_exchange::OnFastStep`, wraps each flow:
+
+* **the forcing window** — after the plant step `state.n` has already advanced, so the fast steps
+  that follow it lie in window `n − 1`; the adapter evaluates every forcing at `(n − 1, plant dt)`.
+  Getting this wrong would shift the light by 90 minutes, silently. **Light keeps the plant
+  step's resolution** (the window's mean PAR, every minute of it): this change moves the CO₂
+  timing and nothing else. Resolving light per minute is a different change, not taken.
+* **the step unit** — the inner flow is handed `dt = 60 / 86400` days;
+* **shared reads** — the CO₂ pool and soil water are read live from the minute's snapshot, so
+  `Allocation`'s bit-equality guard (pool variable vs the stock it draws) still holds;
+* **no double count** — the three are removed from the plant registry (`Registry::into_parts`);
+* **die-off and the safety net** — `substep` runs arbitration and the extinction pass exactly as
+  `step_report` does (read in `simcore::integrator`); it skips only the aux and `n`, which these
+  flows never write.
+* It refuses a day whose fast steps do not follow ONE plant step each (`steps_per_day` must be a
+  multiple of `bio_steps_per_day`): the lamp scenarios' grouping of 2 plant steps per 3 power
+  hours would make "the window this fast step lies in" ambiguous.
+
+⚠ Two reads shift by one plant window: development stage (thermal time) and the stress factors
+are read after the plant step that opens the window, not before it. 90 minutes of thermal time.
+
+**Rollout.** A builder option, measured lab-only on the separate-air build and on shared air,
+then adopted into the reference shared build as its OWN commit (the user authorized the unfreeze).
+Cost measured before adopting.
+
+**Predictions (graded after the build):**
+
+* **G1 — shared air barely moves.** Same light, a 9500-mol room: over one season the crop's gross
+  CO₂ draw and its end carbon are within **±1 %** of the plant-step run (the step studies measured
+  ≈ 0.1 % on harvest from 1/16 to 1/64 once light is held, and light is held here).
+* **G2 — the separate-air crop stops starving.** At the BVAD chamber (27.66 mol) and Q = 0.2 mol/s,
+  the season's crop CO₂ draw rises from **0.174** of shared to **between 0.75 and 0.98** of it. The
+  basis: at steady state the chamber sits `U/Q` below the cabin's concentration; at the shared
+  run's peak draw (0.774 mol/day ≈ 9e-6 mol/s) that is 4.5e-5 mol/mol under the cabin's 4.0e-4,
+  i.e. the crop sees ≈ 89 % of the cabin's CO₂ at peak and more the rest of the season.
+* **G3 — the fan rate now MATTERS** (the signature of the plant step having been the limit): draw
+  at Q 0.1 < Q 0.2 < Q 0.4, and **Q 0.1 / Q 0.4 ≤ 0.97**. If they are still equal to five figures,
+  the plant step is still the limit and the build is wrong.
+* **G4 — the controls hold:** the 9500-mol chamber with Q = 10 stays within ±5 % of shared air
+  (per-minute on both); vapour off vs on still leaves plant carbon unchanged within a season.
+* **G5 — books:** every run conserves every step, rations 0 / 0, raises no events.
+* **G6 — the window pin:** a test holds the adapter's PAR on the minute after a plant step equal to
+  that plant step's own PAR, on a step where the lamp's window changes (so `n` vs `n − 1` differ).
+* **G7 — cost:** measured, not predicted. A season of the split build at the plant step took
+  ≈ 15 s (release). Reported before adoption; if it threatens the suite's run time it goes to the
+  user.
+
+**Scope, stated:** transpiration stays on the plant step. Moving it too would send most of the
+crop's 700–1700 kg of water a season through the fan — the next question, not this one.
