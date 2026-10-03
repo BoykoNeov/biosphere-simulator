@@ -7,6 +7,8 @@ note. Nothing in `rust/` changed.** The decisions in §9 are the user's.
 
 **DECIDED 2026-10-01 (§10):** form B in a dedicated plant chamber (shared air, its own
 temperature), the winter wheat with a cited cold period, re-sow on maturity, 22 °C.
+**EXTENDED 2026-10-03 (§11):** separate air for crew and plants as a lab-only *option* (shared air
+stays the default), joined by a fan that carries gas and heat; the cabin gets its own heat store.
 
 ## 1. What the sealed station's plants read today
 
@@ -296,3 +298,103 @@ current `State`, so it can fire on a state condition (development complete) inst
    recorded before the run.
 
 Out of scope still: net radiation (§6, a possible "3d"); crew body heat; the cabin's temperature.
+(⚠ The last two move **in** scope for the separate-air option only — §11.)
+
+## 11. Separate air as an option — asked and DECIDED 2026-10-03
+
+The user, on reading §10: *"you said that the crew and the plants share the same chamber - this
+may be possible, but i want also to have the option that this is not the case. Also - gas
+exchange between chambers (also heat flow with the gas exchange, fans)"*.
+
+**What §10 actually set:** a separate *temperature*, the *air* shared — one CO₂ pool and one O₂ pool
+(`sealed.rs`: `CrewRespiration` writes `CARBON_POOL`/`O2_POOL`; the scrubber and O₂ makeup act on
+the same two). The ask is a second topology: two air spaces joined by a fan.
+
+**An oddity the split resolves (recorded, NOT fixed under shared air).** The shared-air build
+already carries **two** water-vapour stores — the plants' (`biosphere.water_vapor`, 3b) and the
+crew's (`eclss.cabin_h2o`) — in what is described as one air. That is physically consistent only
+once the air is split.
+
+### Advisor review (2026-10-03), summarized
+
+1. Shared air stays the default and **bit-identical**; separate air is a new option. An option is
+   not free: a new flow type and new cabin gas stocks trip the completeness gates
+   (`manifest_writer.rs`, `science_gates.rs`), so it is **lab-only first** (the slice-1 /
+   lamp-shed pattern) or a full unfreeze.
+2. **The fan moves concentration, not mole fraction.** Each species — **including the inert
+   fill** — moves at `Q · (n_i/capacity_a − n_i/capacity_b)`. Driven by live mole fractions, a
+   pressure difference (a breach on one side) would never move air: the same denominator trap the
+   atmosphere build nearly fell into (`docs/log/atmosphere.md`). ⚠ Do not "simplify" this later.
+3. **The cabin keeps its 9500 mol; the plant chamber gets its own capacity.** `eclss.yaml`'s
+   `o2_setpoint` is an absolute 1995 mol that holds only for a 9500-mol cabin (its own TRIGGER
+   note), and the mole-fraction fix is deferred behind an authoring grammar change. Checked
+   2026-10-03: the file's other three values are first-order rates (1/s) and a gain, none an
+   absolute inventory, so the cabin keeping 9500 mol trips nothing.
+4. **The load-bearing risk is the plants' CO₂ supply** (measured below — it is real).
+5. The fan's heat is three terms: **sensible** `Q·c_p·(T_cabin − T_chamber)`; the **fan's own
+   power** (a battery load that becomes heat in the air — the energy books move); **latent** heat
+   in the moving vapour (§2 already lists latent heat as untracked — stays out unless chosen).
+   Predict condensation when warm cabin air meets a 4 °C chamber.
+6. One cause per change: split the air (gases only, one temperature) first; then the heat stores;
+   then the fan's heat.
+7. The fan rate needs a source; the chamber volume too. Neither is to be quoted from memory.
+
+### Decisions — the user's (2026-10-03)
+
+| # | Question | Taken |
+|---|---|---|
+| 1 | How separate air fits | **an option, lab-only first**; shared air stays the default, every golden unchanged |
+| 2 | The cabin's temperature | **its own heat store** (crew body heat, equipment, the fan) — the recommendation (held at 22 °C) was **declined** |
+| 3 | Order | **air split first** (gases only, one temperature), then heat stores, then the fan's heat |
+| 4 | Cold-period source search | **alongside**, now (it still blocks slice 3) |
+
+### Sources searched (BVAD Rev 2, local text extract `W:\temp\claude\bvad\bvad.txt`) — page images NOT yet read
+
+* **No inter-room ventilation rate found.** Table 4-73's "Ventilation" row (printed p. 153) is an
+  air **speed** in the cabin, m/s — 0.076 / 0.15 / 0.6096 lower / nominal / upper as the extract
+  lays it out — not a volume exchanged between rooms. A locus mismatch for `Q`; usable only as
+  contrast. An ISS inter-module ventilation figure is to be searched in NASA ECLSS documents next;
+  failing that, `Q` is DESIGN.
+* **Table 4-88, "Plant Growth Chamber Equivalent System Mass per Growing Area"** (printed p. 170,
+  Drysdale 1999b; the extract's columns are garbled — **page image owed before anything binds**):
+  shoot zone **0.67 m³ per m²** of growing area, root zone 0.11; shoot zone **power 0.3 kW/m²**,
+  and footnote 183: *"Power consumption and thermal control within the shoot zone reflect fans for
+  gas movement."* So a cited (class) figure exists for both the chamber's air volume and the fan's
+  power, per m² of crop.
+
+### Measured / derived — the CO₂ supply problem is real
+
+The sealed station's crop is **1 m²** (`ground_area` default, `system.rs:153`, untouched by
+`greenhouse_bio_scenario`). At Table 4-88's 0.67 m³/m², 22 °C and 101.325 kPa (n/V = P/RT =
+41.29 mol/m³), the plant chamber holds **27.66 mol of air** — **343× less than the cabin's 9500** —
+and, at the cabin's starting CO₂ fraction (3.796/9500), **0.011 mol of CO₂**.
+
+The draw census (`docs/log/draw-census.md`) measured the crop's worst single slow-step CO₂ draw on
+the shared cabin air at **0.078 of the pool**. Scaled by 343 at equal concentration — **an
+estimate, not a measurement** — the same draw is **≈ 27× the chamber's whole CO₂** in one
+1.5-hour step. The fan would resupply continuously in reality, but the crop is evaluated on the
+slow step (1/16 day) while the fan runs on the fast one (60 s), and arbitration counts no
+same-step inflow. So a chamber sized by the source would starve by construction of the *step*, not
+of the physics. (Option C, built 2026-09-30, makes uptake fall as CO₂ runs low, so it would read as
+a stunted crop rather than a hard error — which is worse, being quiet.)
+
+**This is the first thing the air-split slice measures, and a decision it will owe the user** —
+not decided here. Directions, unpriced: a larger chamber (DESIGN; a size picked to make the crop
+behave is calibration); the crop's gas exchange on the fast step; the fan's resupply folded into
+the slow step. Predictions owed before code: the chamber's CO₂ against one slow step's draw, and the
+steady chamber-CO₂ deficit ≈ crop draw / `Q`; and the Euler bound `Q·60 s / 27.66 mol ≪ 1` — at
+27.66 mol, any `Q` above ≈ 0.46 mol/s (≈ 0.67 m³/min) breaks it, so the same small chamber also
+caps the fan.
+
+### The revised slice list (supersedes §10's numbering from slice 2 on)
+
+* **2a — the air split, lab-only.** A topology switch; under "separate", the cabin gets its own CO₂,
+  O₂, inert fill (9500 mol capacity) and keeps `eclss.cabin_h2o`; crew, scrubber, makeup and
+  condenser re-point to it; the plants keep the biosphere's pools; one exchange flow moves all
+  species by concentration difference. One temperature, no heat. Default (shared) bit-identical.
+* **2b — the chamber heat store** (§10's slice 2), on the default build: the reference path.
+* **2c — the cabin heat store**, separate-air option only (lab): crew body heat (BVAD Table 3-31,
+  12.426 MJ/CM-day ≈ 143.8 W), equipment heat, a capacity-limited exchanger to `thermal.node`.
+* **2d — the fan's heat**, separate-air option only (lab): sensible + fan power; latent out unless
+  chosen.
+* **3, 4** as §10 (the cold period, re-sow on maturity).

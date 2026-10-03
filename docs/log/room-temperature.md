@@ -34,3 +34,15 @@ winter wheat never accrues a chill-day, so it never develops and never sets grai
 All three predictions were committed before the code and all held. The control (the plain
 season develops) and a liveness check (all three go red at 8 °C) both pass. Check:
 `rust/crates/station/tests/warm_room_arrest.rs`. Slice 2 is a station unfreeze and was not started.
+
+**EXTENDED 2026-10-03** (note §11). The user asked for separate air as an *option*: crew and plants
+in two air spaces joined by a fan that carries gas and heat. Decided: an option, **lab-only first**
+(shared air stays the default, every golden unchanged); the cabin gets **its own heat store**
+(the held-22 °C recommendation was declined); the air split comes first, gases only; the cold-period
+source search runs alongside. Found while sizing it: BVAD Table 4-88 (p. 170, page image not yet
+read) gives a plant chamber 0.67 m³ of air per m² of crop and 0.3 kW/m² of fan power. For the
+station's 1 m² crop that is 27.66 mol of air, 343× smaller than the cabin, and the crop's measured
+worst slow-step CO₂ draw scales to ≈ 27× the chamber's whole CO₂. The fan resupplies on the 60 s
+step but the crop draws on the 1.5-hour one, so a source-sized chamber starves by construction of
+the step. Measured first in slice 2a; the remedy is the user's call. No inter-room ventilation rate
+found in BVAD (its "Ventilation" row is an air speed).
