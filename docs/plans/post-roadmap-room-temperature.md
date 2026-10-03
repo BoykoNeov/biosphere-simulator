@@ -900,3 +900,27 @@ crop's 700–1700 kg of water a season through the fan — the next question, no
 
 **Tally: 7 held.** At 90 days (the pins): Q 0.1 / 0.2 / 0.4 → 0.892 / 0.939 / 0.963 of shared air's
 plant carbon; the 9500-mol chamber 1.008.
+
+### 16b. The adapter REDESIGNED before adoption — the plant step records its window (2026-10-03)
+
+**Found while listing adoption's callers:** the first adapter copied a plant-side resolver in at
+BUILD time. Every run that changes the plant's inputs after building — the perturbation suite's
+forcing wrappers, `warm_room_arrest`'s held 22 °C, the lab's lamp shedding (`rewire_for_shedding`
+wraps every plant-step flow and aux, and nothing on the fast side) — would have changed phenology
+and water and left photosynthesis on the unchanged copy. Conserving perfectly, no red.
+
+**Advisor (2026-10-03), taken:** the plant step RECORDS the two forcings the carbon budget reads
+(PAR, temperature) for its own window, from its own environment, into the state's aux
+(`station::gas_exchange::PlantWindowRecorder`, keys `station.plant_window.par` / `.temp`); the
+minute step reads them back and errors on any other read. The window is then right by
+construction (the `n − 1` read is gone), and whatever changes the plant step's environment is
+what gets recorded — `LampLitAux` scales PAR for aux reads (read in `lamp_shed.rs`), so shedding
+reaches photosynthesis too. ⚠ The aux channel is additive, so the record is `old + (X − old)`:
+measured **exact on all 96** of three days' window values.
+
+**Checks:** `examples/air_split.rs` re-run (`W:\temp\claude\air_split_run6.txt`): **identical to
+§16a's table in every printed digit**. New pins: the plant-side light switched off ⇒ the crop
+fixes nothing on the minute step; a plant-side 22 °C is what is recorded. Mutations,
+`--no-fail-fast`, each restored and `cmp`-checked: the recorder reading a build-time copy → 2 red
+(the light and temperature pins); `dt` in seconds → 2 red; no recorder → 4 red; the budget left
+on the plant step too → 2 red. Full suite 1270 passed, 0 failed, 339 s wall.

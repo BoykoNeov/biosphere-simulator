@@ -258,12 +258,13 @@ fn shared(scenario: &SealedStationScenario, days: usize, gas: GasExchangeStep) -
     .expect("build_sealed_station");
     let (bio, fast) = match gas {
         GasExchangeStep::PlantStep => (bio, fast),
-        GasExchangeStep::Minute => {
-            gas_exchange_on_fast_step(&state.stocks, bio, fast, scenario.bio_dt, || {
-                sealed_bio_resolver(&station_params::lamp(), scenario)
-            })
-            .expect("gas exchange on the minute step")
-        }
+        GasExchangeStep::Minute => gas_exchange_on_fast_step(
+            &state.stocks,
+            bio,
+            fast,
+            &domains::biosphere::system::weather_shared(&scenario.bio),
+        )
+        .expect("gas exchange on the minute step"),
     };
     season(
         scenario,

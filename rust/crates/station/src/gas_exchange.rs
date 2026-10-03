@@ -1,5 +1,5 @@
 //! The crop's gas exchange on the cabin's minute step (Step 3c, the user's decision of
-//! 2026-10-03; `docs/plans/post-roadmap-room-temperature.md` §16).
+//! 2026-10-03; `docs/plans/post-roadmap-room-temperature.md` §16–§17).
 //!
 //! The plant step is 1/16 day (90 minutes). On it, the crop's CO₂ uptake is solved against the
 //! chamber's CO₂ at that one instant (option C), and nothing refills the chamber inside the step.
@@ -17,30 +17,49 @@
 //! between the two steps would be a new mechanism with no source. Everything else — phenology,
 //! senescence, nitrogen, water, transpiration — stays on the plant step.
 //!
-//! # The four traps [`OnFastStep`] closes
+//! # The light and temperature: recorded by the plant step, not copied at build time
 //!
-//! * **The forcing window.** The fast steps that follow a plant step lie in THAT plant step's
-//!   window, and by then `state.n` has already advanced. So every forcing is read at
-//!   `(n − 1, plant dt)`. Read at `n`, the light would run 90 minutes early, and nothing would
-//!   go red. ⚠ The light keeps the plant step's resolution — the window's mean PAR, every minute
-//!   of it — so this changes the CO₂ timing and nothing else.
+//! The three flows read two forcings, PAR and temperature ([`WINDOW_VARS`]). The plant step
+//! RECORDS them, for its own window and from its own environment, into the state's aux
+//! ([`PlantWindowRecorder`], keys [`window_key`]); the minute step reads them back. Two traps
+//! close by construction:
+//!
+//! * **The window.** The fast steps after a plant step lie in that step's window, and the
+//!   values were recorded at that step. There is no `n − 1` to get wrong.
+//! * **Whoever changes the plant's inputs reaches the crop's carbon budget.** A perturbed
+//!   resolver, a held room temperature, the lab's lamp shedding (which wraps every plant-step
+//!   aux, this recorder included) — all of them act on the plant step's environment, so they
+//!   are what gets recorded. ⚠ The first build (2026-10-03, same day) copied a plant resolver
+//!   into the adapter at build time instead; every one of those changes would then have missed
+//!   photosynthesis without a single red.
+//!
+//! ⚠ The aux channel is ADDITIVE (`simcore::integrator::advanced_aux`), so "record X" is the
+//! increment `X − old`, and the stored value is `old + (X − old)`: X, or within an ULP of it.
+//!
+//! # The other traps
+//!
 //! * **The step unit.** The inner flow multiplies daily rates by `dt` in days: it is handed
 //!   `fast dt / 86400`.
 //! * **Shared reads.** The chamber CO₂ and the soil water are read live off the minute's own
 //!   snapshot, so `Allocation`'s check that its CO₂ variable IS the stock it draws still holds.
 //! * **No double count.** [`split_carbon_budget`] takes the three out of the plant registry.
+//! * **Any other read is an error**, so a flow that grows a new forcing cannot silently get a
+//!   stale or default value.
 //!
 //! Die-off and the safety net need nothing here: `substep` runs arbitration and the extinction
 //! pass exactly as a full step does, and skips only the aux and `n`, which these flows never
 //! write.
 //!
-//! ⚠ Two reads move by one plant window: development stage (thermal time) and the stress
-//! factors are read after the plant step that opens the window rather than before it.
+//! ⚠ Light keeps the plant step's resolution — the window's mean PAR, every minute of it — so
+//! this changes the CO₂ timing and nothing else. ⚠ Development stage (thermal time) and the
+//! stress factors are read after the plant step that opens the window rather than before it.
 
 use std::collections::{BTreeMap, HashMap};
 
 use domains::biosphere::light_path::SECONDS_PER_DAY;
-use simcore::environment::{Environment, Schedule, SourceResolver};
+use domains::biosphere::stocks::{PAR_VAR, TEMP_VAR};
+use simcore::auxiliary::AuxProcess;
+use simcore::environment::Environment;
 use simcore::error::SimError;
 use simcore::flow::{Flow, FlowResult};
 use simcore::ids::StockId;
@@ -54,71 +73,72 @@ pub const CARBON_BUDGET_FLOWS: [&str; 3] = [
     "biosphere.maintenance_respiration",
 ];
 
+/// The forcings the carbon budget reads in a sealed build, recorded by the plant step.
+pub const WINDOW_VARS: [&str; 2] = [PAR_VAR, TEMP_VAR];
+
+/// The recorder's aux-process id.
+pub const PLANT_WINDOW_RECORDER: &str = "station.plant_window";
+
+/// The aux key holding the plant window's value of forcing `var`.
+pub fn window_key(var: &str) -> String {
+    format!("{PLANT_WINDOW_RECORDER}.{var}")
+}
+
 /// Which step the crop's gas exchange is taken on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GasExchangeStep {
-    /// With the rest of the plant, once per plant step (the frozen form until this change).
+    /// With the rest of the plant, once per plant step (the form until this change).
     PlantStep,
     /// On the cabin's fast step, every minute ([module docs](self)).
     Minute,
 }
 
-/// The plant side's forcings, read for the plant window a fast step lies in.
-pub struct PlantWindow {
-    forcings: HashMap<String, Schedule>,
-    shared: HashMap<String, StockId>,
-    plant_dt: f64,
-}
+/// The plant-step aux process that records [`WINDOW_VARS`] for its window.
+pub struct PlantWindowRecorder;
 
-impl PlantWindow {
-    /// Take over a plant-side resolver (one per flow: a schedule is not `Clone`).
-    pub fn new(resolver: SourceResolver, plant_dt: f64) -> Self {
-        let (forcings, shared) = resolver.into_parts();
-        PlantWindow {
-            forcings,
-            shared,
-            plant_dt,
+impl AuxProcess for PlantWindowRecorder {
+    fn type_name(&self) -> &'static str {
+        "PlantWindowRecorder"
+    }
+
+    fn id(&self) -> &str {
+        PLANT_WINDOW_RECORDER
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        _dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
+        let mut increments = BTreeMap::new();
+        for var in WINDOW_VARS {
+            let key = window_key(var);
+            let old = snapshot.aux.get(&key).copied().unwrap_or(0.0);
+            increments.insert(key, env.get(var)? - old);
         }
-    }
-
-    /// The environment a fast step at `snapshot` sees: forcings for window `snapshot.n − 1`,
-    /// shared stocks live.
-    pub fn at<'a>(&'a self, snapshot: &'a State) -> Result<WindowEnv<'a>, SimError> {
-        let n = snapshot.n.checked_sub(1).ok_or_else(|| {
-            SimError::Validation(
-                "gas exchange on the fast step: a fast step before the first plant step has no \
-                 plant window to read (the master day must open with a plant step)"
-                    .into(),
-            )
-        })?;
-        Ok(WindowEnv {
-            window: self,
-            snapshot,
-            n,
-        })
+        Ok(increments)
     }
 }
 
-/// [`PlantWindow`] bound to one fast step. Mirrors `simcore`'s bound environment, except that
-/// forcings are read at the plant window `n` it was given rather than at `snapshot.n`.
-pub struct WindowEnv<'a> {
-    window: &'a PlantWindow,
+/// What a minute-stepped plant flow reads: the recorded window, and shared stocks live.
+struct WindowEnv<'a> {
     snapshot: &'a State,
-    n: u64,
+    shared: &'a HashMap<String, StockId>,
 }
 
 impl Environment for WindowEnv<'_> {
     fn get(&self, var: &str) -> Result<f64, SimError> {
-        if let Some(schedule) = self.window.forcings.get(var) {
-            let value = schedule(self.n, self.window.plant_dt);
-            if !value.is_finite() {
-                return Err(SimError::Validation(format!(
-                    "forcing schedule for env var {var:?} returned non-finite value: {value:?}"
-                )));
-            }
-            return Ok(value);
+        if WINDOW_VARS.contains(&var) {
+            let key = window_key(var);
+            return self.snapshot.aux.get(&key).copied().ok_or_else(|| {
+                SimError::Validation(format!(
+                    "gas exchange on the fast step: {key:?} is not in the state — no plant step \
+                     has recorded its window yet (the master day must open with a plant step)"
+                ))
+            });
         }
-        if let Some(sid) = self.window.shared.get(var) {
+        if let Some(sid) = self.shared.get(var) {
             return self
                 .snapshot
                 .stocks
@@ -131,7 +151,8 @@ impl Environment for WindowEnv<'_> {
                 });
         }
         Err(SimError::Reference(format!(
-            "unknown env var {var:?} (wired as neither forcing nor shared stock)"
+            "gas exchange on the fast step reads {var:?}, which the plant step does not record \
+             ({WINDOW_VARS:?}) and is not a shared stock"
         )))
     }
 }
@@ -140,13 +161,13 @@ impl Environment for WindowEnv<'_> {
 /// type: it is the same flow, taken on a different step.
 pub struct OnFastStep {
     inner: Box<dyn Flow>,
-    window: PlantWindow,
+    shared: HashMap<String, StockId>,
 }
 
 impl OnFastStep {
-    /// Wrap `inner`, reading its forcings through `window`.
-    pub fn new(inner: Box<dyn Flow>, window: PlantWindow) -> Self {
-        OnFastStep { inner, window }
+    /// Wrap `inner`; `shared` is the plant side's shared-stock wiring (var → stock).
+    pub fn new(inner: Box<dyn Flow>, shared: HashMap<String, StockId>) -> Self {
+        OnFastStep { inner, shared }
     }
 }
 
@@ -165,17 +186,24 @@ impl Flow for OnFastStep {
         _env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let env = self.window.at(snapshot)?;
+        let env = WindowEnv {
+            snapshot,
+            shared: &self.shared,
+        };
         self.inner.evaluate(snapshot, &env, dt / SECONDS_PER_DAY)
     }
 }
 
-/// Take the carbon-budget flows out of the plant registry: `(plant registry without them, the
-/// three)`. An error unless all three are found, so a renamed flow cannot silently stay behind.
-pub fn split_carbon_budget(
-    bio_reg: Registry,
-    stocks: &BTreeMap<StockId, Stock>,
-) -> Result<(Registry, Vec<Box<dyn Flow>>), SimError> {
+/// The plant registry taken apart: `(flows without the carbon budget, the carbon budget, aux)`.
+pub type SplitPlantRegistry = (
+    Vec<Box<dyn Flow>>,
+    Vec<Box<dyn Flow>>,
+    Vec<Box<dyn AuxProcess>>,
+);
+
+/// Take the carbon-budget flows out of the plant registry. An error unless all three are
+/// found, so a renamed flow cannot silently stay behind.
+pub fn split_carbon_budget(bio_reg: Registry) -> Result<SplitPlantRegistry, SimError> {
     let (flows, aux) = bio_reg.into_parts();
     let mut budget: Vec<Box<dyn Flow>> = Vec::new();
     let mut rest: Vec<Box<dyn Flow>> = Vec::new();
@@ -193,11 +221,11 @@ pub fn split_carbon_budget(
              budget's {CARBON_BUDGET_FLOWS:?}; they move together or not at all"
         )));
     }
-    Ok((Registry::new(rest, stocks, aux)?, budget))
+    Ok((rest, budget, aux))
 }
 
-/// Refuse a day whose fast steps do not each follow exactly ONE plant step: with more, "the
-/// plant window this fast step lies in" has two answers.
+/// Refuse a day whose fast steps do not each follow exactly ONE plant step: with more, the
+/// window recorded last would stand for both.
 pub fn require_one_plant_step_per_group(
     steps_per_day: u64,
     plant_steps_per_day: u64,
@@ -213,23 +241,23 @@ pub fn require_one_plant_step_per_group(
 }
 
 /// Move the crop's gas exchange onto the fast step of an assembled two-rate build:
-/// `(bio_reg, fast_reg)` in, the same pair out with the three carbon-budget flows taken out of
-/// the first and wrapped into the second. `window` builds the plant-side resolver each wrapped
-/// flow reads (called once per flow).
+/// `(bio_reg, fast_reg)` in, the same pair out — the three carbon-budget flows taken out of the
+/// first and wrapped into the second, and [`PlantWindowRecorder`] added to the first. `shared`
+/// is the plant side's shared-stock wiring (`weather_shared`).
 pub fn gas_exchange_on_fast_step(
     stocks: &BTreeMap<StockId, Stock>,
     bio_reg: Registry,
     fast_reg: Registry,
-    plant_dt: f64,
-    mut window: impl FnMut() -> Result<SourceResolver, SimError>,
+    shared: &HashMap<String, StockId>,
 ) -> Result<(Registry, Registry), SimError> {
-    let (bio_reg, budget) = split_carbon_budget(bio_reg, stocks)?;
+    let (rest, budget, mut bio_aux) = split_carbon_budget(bio_reg)?;
+    bio_aux.push(Box::new(PlantWindowRecorder));
     let (mut fast_flows, fast_aux) = fast_reg.into_parts();
     for inner in budget {
-        fast_flows.push(Box::new(OnFastStep::new(
-            inner,
-            PlantWindow::new(window()?, plant_dt),
-        )));
+        fast_flows.push(Box::new(OnFastStep::new(inner, shared.clone())));
     }
-    Ok((bio_reg, Registry::new(fast_flows, stocks, fast_aux)?))
+    Ok((
+        Registry::new(rest, stocks, bio_aux)?,
+        Registry::new(fast_flows, stocks, fast_aux)?,
+    ))
 }

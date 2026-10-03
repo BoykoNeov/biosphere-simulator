@@ -28,6 +28,7 @@
 
 use domains::biosphere::science::N2_MOLAR_MASS_KG_PER_MOL;
 use domains::biosphere::stocks::{CARBON_POOL, CHAMBER_INERT, O2_POOL, WATER_VAPOR};
+use domains::biosphere::system::weather_shared;
 use domains::crew::{CrewParams, FECAL_WASTE};
 use domains::eclss::{EclssParams, CABIN_CO2, CABIN_H2O, CABIN_O2, ECLSS_DOMAIN};
 use domains::power::ChargeParams;
@@ -44,7 +45,7 @@ use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
 };
 use crate::scenario::SealedStationScenario;
-use crate::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_flows, CabinAir};
+use crate::sealed::{build_sealed_station, sealed_fast_flows, CabinAir};
 use crate::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
 
 /// The cabin's reference air (mol) — the frozen sealed station's `chamber_air_capacity_mol`,
@@ -233,8 +234,7 @@ pub fn build_split_station(
                 &state.stocks,
                 bio_reg,
                 fast_reg,
-                resized.bio_dt,
-                || sealed_bio_resolver(lamp, &resized),
+                &weather_shared(&resized.bio),
             )?;
             Ok((state, bio_reg, fast_reg))
         }
