@@ -14,10 +14,14 @@
 //! Control: the end state byte-matches the committed `sealed_station_state.json`, so this loop
 //! IS the reference run. It writes nothing and takes no decision.
 
+use domains::biosphere::params as bio_params;
 use domains::biosphere::readouts::withdrawal_demand;
-use domains::biosphere::stocks::CARBON_POOL;
+use domains::biosphere::science::{humidity_target_kg, saturation_vapour_kg};
+use domains::biosphere::stocks::{CARBON_POOL, TEMP_VAR, WATER_VAPOR};
+use domains::eclss::CABIN_H2O;
 use domains::goldens::{committed, compare, Verdict};
 use domains::params;
+use simcore::environment::Environment;
 use simcore::flow::FlowResult;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
@@ -29,6 +33,12 @@ use station::sealed::{
 };
 
 const GOLDEN: &str = "sealed_station_state.json";
+
+/// The cabin's air (mol) and a BVAD-sized plant chamber's (§11: 0.67 m³ × 41.29 mol/m³).
+const CABIN_AIR_MOL: f64 = 9500.0;
+const SMALL_CHAMBER_MOL: f64 = 27.663966;
+
+const TRANSPIRATION: &str = "biosphere.transpiration";
 
 /// One day's CO₂ books on the shared pool (mol).
 #[derive(Default, Clone)]
@@ -44,6 +54,16 @@ struct Day {
     /// The pool at the day's slow steps' starts: min / max.
     pool_min: f64,
     pool_max: f64,
+    /// Σ over the day's slow steps: temperature (°C), the shared room's relative humidity,
+    /// the cabin vapour per mol of air, and the humidity target per mol of air (kg/mol).
+    temp: f64,
+    rh: f64,
+    cabin_conc: f64,
+    target_conc: f64,
+    /// Σ transpiration (kg) and the part of it that reached the air.
+    transpired: f64,
+    to_air: f64,
+    slow_steps: u64,
 }
 
 /// Grow `days` to hold day `d`.
@@ -103,6 +123,14 @@ fn main() {
     let mut worst = (0.0_f64, 0.0_f64, 0.0_f64);
     let mut steps_drawing: u64 = 0;
     let mut gross_sum = 0.0_f64;
+    let setpoint = bio_params::biosphere().water.humidity_setpoint;
+    // Water: the worst one-step transpiration against a small chamber's humidity target,
+    // and how often the cabin's air is the wetter of the two (per mol of air).
+    let mut worst_water = (0.0_f64, 0.0_f64, 0.0_f64); // (flux kg, small target kg, day)
+    let mut ratio_sum = 0.0_f64;
+    let mut ratio_n: u64 = 0;
+    let mut cabin_wetter: u64 = 0;
+    let mut chamber_wetter: u64 = 0;
 
     let mut observe = |side: Side, before: &State, after: &State| match side {
         Side::Reset => {}
@@ -133,6 +161,44 @@ fn main() {
             }
             if gross > worst.0 {
                 worst = (gross, pool, slow_k as f64 / slow_per_day as f64);
+            }
+            // Water.
+            let temp = bound.get(TEMP_VAR).expect("temp");
+            let vapour = before.stocks[WATER_VAPOR].amount;
+            let cabin = before.stocks[CABIN_H2O].amount;
+            let (mut flux, mut air) = (0.0, 0.0);
+            for (f, r) in bio.registry().flows().iter().zip(&results) {
+                if f.id() == TRANSPIRATION {
+                    for leg in &r.legs {
+                        if leg.amount < 0.0 {
+                            flux -= leg.amount;
+                        } else if leg.stock == WATER_VAPOR {
+                            air += leg.amount;
+                        }
+                    }
+                }
+            }
+            let target_conc = humidity_target_kg(temp, 1.0, setpoint);
+            let cabin_conc = cabin / CABIN_AIR_MOL;
+            row.temp += temp;
+            row.rh += vapour / saturation_vapour_kg(temp, CABIN_AIR_MOL);
+            row.cabin_conc += cabin_conc;
+            row.target_conc += target_conc;
+            row.transpired += flux;
+            row.to_air += air;
+            row.slow_steps += 1;
+            if cabin_conc > target_conc {
+                cabin_wetter += 1;
+            } else {
+                chamber_wetter += 1;
+            }
+            let small_target = humidity_target_kg(temp, SMALL_CHAMBER_MOL, setpoint);
+            if flux > 0.0 {
+                ratio_sum += flux / small_target;
+                ratio_n += 1;
+            }
+            if flux > worst_water.0 {
+                worst_water = (flux, small_target, slow_k as f64 / slow_per_day as f64);
             }
             slow_k += 1;
         }
@@ -208,6 +274,35 @@ fn main() {
     );
     println!("mean over the run: crop gross {mean_gross:.6} mol/day; crew emission {mean_crew:.6} mol/day; scrubbed {mean_scrub:.6} mol/day");
     println!("CO2 pool at slow-step starts over the run: {pool_min:.6} – {pool_max:.6} mol");
+
+    println!(
+        "\nwater: worst one-step transpiration {:.6} kg against a small chamber's humidity \
+         target {:.6} kg (ratio {:.2}) on day {:.4}; mean ratio over {ratio_n} transpiring \
+         steps {:.2}",
+        worst_water.0,
+        worst_water.1,
+        worst_water.0 / worst_water.1,
+        worst_water.2,
+        ratio_sum / ratio_n as f64
+    );
+    println!(
+        "water: the cabin's air is wetter than a chamber at its humidity target on \
+         {cabin_wetter} slow steps, drier on {chamber_wetter}"
+    );
+
+    println!("\nday   temp   rh_shared  cabin_kg/mol  target_kg/mol  transp_kg  to_air_kg");
+    for (i, d) in days.iter().enumerate().step_by(10) {
+        let k = d.slow_steps as f64;
+        println!(
+            "{i:4}  {:5.2}  {:8.4}  {:12.4e}  {:13.4e}  {:9.5}  {:9.5}",
+            d.temp / k,
+            d.rh / k,
+            d.cabin_conc / k,
+            d.target_conc / k,
+            d.transpired,
+            d.to_air
+        );
+    }
 
     // A season profile: every 10th day.
     println!("\nday   crop_gross  slow_net   crew_emit  scrubbed   pool_min  pool_max");

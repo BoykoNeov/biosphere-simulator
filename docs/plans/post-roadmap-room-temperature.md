@@ -553,3 +553,64 @@ the cabin's composition. One temperature, no heat. `Q` is DESIGN (no source foun
 **The decision this will owe the user** (after the build, with prediction 3 graded): how the
 plants' gas exchange meets the fan — crop gas exchange on the fast step; the fan's resupply
 inside the slow step; or a larger chamber (DESIGN). Not decided here.
+
+### 13a. Water — measured, and predictions added before code (advisor, 2026-10-03)
+
+The advisor's point: the 343× shrink that starves CO₂ also hits vapour, and the fan's vapour leg
+opens a new water path that conservation cannot see (a *redistribution*). The instrument was
+extended (same file, same byte-exact control) and re-run:
+
+| Quantity (shared air, 1220 days) | Value |
+|---|---|
+| the shared room's relative humidity at slow-step starts | **≈ 0.75 on nearly every step** (10-day means 0.71–0.76; day 0 0.54) — pinned at the humidity target already |
+| worst one-step transpiration / a 27.66-mol chamber's humidity target | **0.4219 kg / 0.006876 kg = 61×**; mean over 19 520 transpiring steps **28×** |
+| the cabin's vapour per mol of air vs a chamber at its target | **7.1e-6 vs 0.8e-4 – 3.3e-4 kg/mol**; cabin wetter on **0 of 19 520** steps |
+
+Read in the code: sealed transpiration is **bounded at the source** — `to_air = min(flux,
+headroom)`, the rest straight to `biosphere.condensate` (`flows.rs`, `Transpiration::evaluate`);
+condensate recycles to the soil (`Recycling`). So a small room cannot overflow and cannot error.
+
+⚠ **A finding about the cabin, recorded, not acted on:** the cabin's air sits at **≈ 1.5 %
+relative humidity** (7.1e-6 kg/mol against ≈ 4.7e-4 saturated at 22 °C). It is `eclss.yaml`'s
+DESIGN `condense_rate` (τ ≈ 2000 s, chosen for solver stability, "not calibrated") holding the
+crew's vapour at `P/k`. BVAD's cabin range is far wetter. Shared air never showed it, because the
+crew's vapour store and the plants' were never compared; the split compares them.
+
+**Predictions — water (W) and the added controls:**
+
+* **W1 — fan vapour leg OFF, small chamber:** the chamber sits at its humidity target, as the
+  shared room already does, so the deficit the crop reads is the same and **transpiration per unit
+  canopy is unchanged**; only the split moves — `to_air` falls to ≈ the small room's headroom, the
+  rest goes to condensate. Water stress stays exactly 1 (3b's finding) unless the canopy changes.
+* **W2 — direction, vapour leg ON:** the fan moves water **one way only, chamber → cabin, in every
+  season** (the cabin is drier on every measured step; the direction cannot flip while the cabin's
+  condenser holds it at 1.5 %). The path: chamber vapour → `eclss.cabin_h2o` → ECLSS condenser →
+  recovered water → the crew's water store. **Nothing returns it to the plants** — the sealed build
+  irrigates only from its own recycled condensate.
+* **W3 — size, vapour leg ON:** the fan's refill time `cap/Q` (≈ 138 s at Q = 0.2 mol/s) is ≪ the
+  slow step (5400 s), so each slow step starts with the chamber's vapour near the **cabin's** level,
+  ≈ 1.5 % RH. The crop then reads nearly the **full** saturation deficit (vs 25 % of it at the
+  target) — **potential transpiration up ≈ 3–4×** (Penman–Monteith's deficit term; not exact —
+  the radiation term does not scale). The water exported to the crew is bounded per slow step by
+  the small room's headroom: **≈ 16 × 0.002–0.010 kg ≈ 0.04–0.16 kg/day**, i.e. **≈ 10–50 kg over a
+  305-day season** out of a plant loop holding ≈ 195 kg of soil water (19.5 root zone + 175.5
+  below). Whether the soil reaches water stress inside a season is **not predicted** — measured.
+* **W4 — control:** vapour leg OFF vs ON separates the water effect from the CO₂ effect. Prediction
+  3 (CO₂ starvation) is graded on the **vapour-OFF** run, so a lighter crop is not double-caused.
+  Each run records per step whether transpiration's source bound binds and the water-stress factor.
+
+**The bounds made falsifiable:**
+
+* Prediction 5's "within a few percent" is **5 %**: at chamber capacity 9500 mol with a fast fan,
+  the crop's season gross CO₂ draw is within **±5 %** of shared air's.
+* **Fan-rate control (new):** at Q = **0.1** and **0.4** mol/s (both inside the 0.068–0.461
+  window; refill times ≈ 277 s and ≈ 69 s, both ≪ 5400 s) the crop's season gross CO₂ draw differs
+  by **< 5 %**. Near-equal draw is what shows the starvation is the slow step's, not the fan's.
+* Prediction 1 is graded by `regen_goldens` (report-only, every golden unchanged), the full
+  `cargo test --no-fail-fast` and `cargo clippy --all-targets -- -D warnings` — not by the sealed
+  golden alone (the Godot session and session-parity tests call the same builder).
+
+**Build discipline (advisor):** the fast flow list is **extracted** from `build_sealed_station`
+(one copy, the public signature kept, the shared build calling it with `CARBON_POOL`/`O2_POOL`),
+never duplicated. The fan is a lab flow in `station/src`, registered in nothing frozen — the
+`SheddingLamp` precedent; the full suite confirms the gates do not flag it.
