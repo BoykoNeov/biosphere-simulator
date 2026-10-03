@@ -614,3 +614,64 @@ crew's vapour store and the plants' were never compared; the split compares them
 (one copy, the public signature kept, the shared build calling it with `CARBON_POOL`/`O2_POOL`),
 never duplicated. The fan is a lab flow in `station/src`, registered in nothing frozen — the
 `SheddingLamp` precedent; the full suite confirms the gates do not flag it.
+
+### 13b. Slice 2a BUILT (lab only) — the predictions graded (2026-10-03)
+
+**What landed.** `rust/crates/station/src/air_split.rs` (LAB-ONLY: the cabin's own CO₂ / O₂ /
+inert fill, the `AirExchange` fan, `build_split_station`); `sealed.rs`'s fast flow list
+**extracted** into `sealed_fast_flows` (one copy; the shared build calls it with the biosphere's
+pools); the season instrument `rust/crates/station/examples/air_split.rs` (output
+`W:\temp\claude\air_split_run1.txt`); lab pins `rust/crates/station/tests/air_split.rs` (90-day
+runs of the same claims). Fan `Q` = 0.2 mol/s (DESIGN, inside the window).
+
+**One season (305 days), every case rationed 0 / 0:**
+
+| Case | Crop gross CO₂ (mol) | Plant C at end | Chamber RH | Transpired (kg) | To the air | Exported to cabin |
+|---|---|---|---|---|---|---|
+| shared | 129.556 | 58.689 | 0.7481 | 711.25 | 284.70 | — |
+| split, Q 0.2, vapour off | 22.519 (**0.174**) | 8.429 (**0.144**) | 0.7502 | 708.21 (0.996) | 0.83 | — |
+| split, Q 0.1, vapour off | 22.519 | 8.429 | 0.7502 | 708.21 | 0.83 | — |
+| split, Q 0.4, vapour off | 22.519 | 8.429 | 0.7502 | 708.21 | 0.83 | — |
+| split, Q 0.2, vapour **on** | 22.519 | 8.429 | **0.0333** | 1704.54 (**2.40×**) | 23.33 | **23.30 kg** (78 fast steps ran back) |
+| big chamber 9500 mol, Q 10 | 129.489 (**0.999**) | 58.654 (0.999) | 0.7481 | 711.25 | 284.70 | — |
+
+**Graded:**
+
+| # | Prediction | Result |
+|---|---|---|
+| 1 | default build untouched | **HELD** — `regen_goldens`: 20 of 20 identical; `cargo test --no-fail-fast` 1252 passed, 1 red that was **not** this build (my own MEMORY.md hook past the 240 B per-line gate — shortened, gate green); `clippy --all-targets -D warnings` clean |
+| 2 | conservation every step | **HELD** — the driver asserts it per sub-step; every run completed |
+| 3 | crop starves by the step, well under half | **HELD** — 0.174 of shared CO₂ (0.074 mol/day, under the ≈ 0.118 ceiling); plant carbon 0.144 |
+| 4 | a fan window exists; starvation is the step's | **HELD** via the fan-rate control |
+| fan-rate | Q 0.1 vs 0.4 within 5 % | **HELD** — equal to 5 figures (22.5186 / 22.5187) |
+| 5 | big chamber within ±5 % of shared | **HELD** — 0.999 |
+| 6 | cabin CO₂ within ±0.01 % of 3.796 | ✗ **FALSIFIED** — 3.7907–3.8012 (±0.14 %). The bound came from the shared pool read at **slow-step** starts (3.79575–3.79617); read at every fast step the shared pool itself swings 3.731–3.833 (±1.7 %). The split cabin is **steadier** than the shared pool, not as steady as claimed |
+| W1 | vapour off: same humidity, same transpiration | **HELD** — RH 0.7502 vs 0.7481; transpiration 0.996; `to_air` 0.83 vs 284.7 kg |
+| W2 | one way only, chamber → cabin, every season | ✗ **FALSIFIED in the absolute** — chamber → cabin on all but **78** of 439 200 fan steps; the seasonal direction held |
+| W3 | export ≈ 10–50 kg/season, ≈ 0.04–0.16 kg/day; transpiration up ≈ 3–4× | export **HELD** (23.30 kg, 0.076 kg/day); transpiration ✗ **MISSED LOW** — **2.40×** |
+| W4 | vapour on/off attributes the effects | **HELD** — plant carbon identical (8.429) on and off: within a season the drain does not touch the crop, so prediction 3 is CO₂ alone |
+
+**Liveness of the lab pins (mutations, `--no-fail-fast`, each restored and `cmp`-checked):**
+vapour never crossing → the drain pin goes red; the crew breathing the chamber's pools (no
+separation) → the starvation pin goes red; the chamber left at the cabin's size → **no growth pin
+went red** (its crop starves either way, from a low concentration instead of the step), so a fifth
+pin was added, `each_room_is_charged_at_its_own_size`, which that mutation turns red.
+
+**Findings, recorded:**
+
+* ⚠ **Transpiration does not follow the canopy.** A crop with 0.144 of the carbon transpires 0.996
+  as much. Penman–Monteith here uses fixed resistances per ground area, so transpiration is set by
+  the weather and the room, not by leaf area. It was invisible while every run grew a full crop.
+* **The water drain is exact bookkeeping:** plant water 195.000 → 171.705 kg (−23.295, the fan's
+  export); the crew's store +20.965, the rest in the cabin vapour, recovery buffer and brine.
+* The cabin's ≈ 1.5 % relative humidity (§13a) is what drives the drain: the dehumidifier's DESIGN
+  rate, now visible.
+
+**Decisions owed to the user (not taken):**
+
+1. **How the plants' gas exchange meets the fan** — the starvation is the slow step's: crop gas
+   exchange on the fast step; the fan's resupply inside the slow step; or a larger chamber (DESIGN).
+2. **A water return path** — with vapour crossing, the plants' water ends up in the crew's store
+   and nothing brings it back (a real station would irrigate from it).
+3. **The cabin's humidity** — `eclss.yaml`'s DESIGN condenser rate holds the cabin at ≈ 1.5 % RH,
+   far below BVAD's cabin range.

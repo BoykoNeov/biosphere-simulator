@@ -52,3 +52,17 @@ found in BVAD (its "Ventilation" row is an air speed).
 as the accepted manuscript): **8 weeks at 4 °C**, the centre of its 6–10 weeks at 2–6 °C, with the
 lamp dimmed to 100 µmol m⁻² s⁻¹ and the day cut to 8 h for the cold phase. The 6- and 10-week ends
 become lab sensitivity checks. The model's wheat reads a full vernalization (56 chill-days ≥ 50).
+
+**Slice 2a BUILT 2026-10-03 (lab only, no golden)** (note §13–§13b). Separate air is
+`station::air_split`: the cabin's own CO₂/O₂/inert fill at 9500 mol, the plants in a BVAD-sized
+27.66-mol chamber, and a fan moving every species by its concentration difference (Q = 0.2 mol/s,
+DESIGN). The fast flow list was extracted from the sealed builder, not copied; all 20 goldens are
+unchanged. Over one season the crop draws **0.174** of shared air's CO₂ and ends with **0.144** of
+its carbon — starved by the 1.5-hour plant step, not by the fan (0.1 and 0.4 mol/s give the same
+numbers to five figures; a cabin-sized chamber gives 0.999). With vapour crossing, **23.3 kg** of
+the plants' water drains into the crew's store in a season, because the cabin sits at ≈ 1.5 %
+humidity. Two predictions failed and are recorded: the cabin's CO₂ moved ±0.14 %, not ±0.01 %;
+water flowed back on 78 of 439 200 fan steps; transpiration rose 2.4×, not 3–4×. Found on the way:
+transpiration ignores canopy size (a crop with 14 % of the carbon transpires 99.6 % as much).
+Three decisions are the user's: how the plant step meets the fan, a water return path, the cabin's
+humidity.

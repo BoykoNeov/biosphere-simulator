@@ -181,13 +181,58 @@ pub fn build_sealed_station(
         ]),
     )?;
 
-    // --- fast flows ---
+    // --- fast flows (the crew breathes the biosphere's own gas pools: shared air) ---
+    let fast_flows = sealed_fast_flows(
+        charge,
+        thermal_params,
+        crew,
+        eclss,
+        recovery,
+        lamp,
+        harvest,
+        CabinAir {
+            co2: CARBON_POOL, // the greenhouse seam: crew exhales into the bio CO₂
+            o2: O2_POOL,      // the greenhouse seam: crew breathes the bio O₂
+        },
+        fecal_target,
+        with_harvest,
+    );
+    let fast_reg = Registry::flows_only(fast_flows, &stocks)?;
+
+    assert_flow_ids_disjoint(&bio_reg, &fast_reg)?;
+    Ok((state, bio_reg, fast_reg))
+}
+
+/// The two gas pools the crew, the CO₂ scrubber and the O₂ makeup act on. In the frozen
+/// sealed station they ARE the biosphere's (`CARBON_POOL` / `O2_POOL`, shared air); the lab
+/// separate-air build ([`crate::air_split`]) points them at the cabin's own.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CabinAir<'a> {
+    pub co2: &'a str,
+    pub o2: &'a str,
+}
+
+/// The sealed station's fast registry, in its one canonical order. Extracted so the lab
+/// separate-air build re-points the cabin gas without a second copy of this list.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn sealed_fast_flows(
+    charge: &ChargeParams,
+    thermal_params: &ThermalParams,
+    crew: &CrewParams,
+    eclss: &EclssParams,
+    recovery: &WaterRecoveryParams,
+    lamp: &LampParams,
+    harvest: &HarvestParams,
+    air: CabinAir<'_>,
+    fecal_target: &str,
+    with_harvest: bool,
+) -> Vec<Box<dyn Flow>> {
     let mut fast_flows: Vec<Box<dyn Flow>> = vec![
         Box::new(CrewRespiration::new(
             CREW_RESPIRATION.to_string(),
             FOOD_STORE.to_string(),
-            CARBON_POOL.to_string(), // the greenhouse seam: crew exhales into the bio CO₂
-            O2_POOL.to_string(),     // the greenhouse seam: crew breathes the bio O₂
+            air.co2.to_string(),
+            air.o2.to_string(),
             fecal_target.to_string(),
             crew.respired_carbon_fraction,
         )),
@@ -200,7 +245,7 @@ pub fn build_sealed_station(
         )),
         Box::new(CO2Scrubber::new(
             CO2_SCRUBBER.to_string(),
-            CARBON_POOL.to_string(),
+            air.co2.to_string(),
             CO2_REMOVED.to_string(),
             *eclss,
         )),
@@ -213,7 +258,7 @@ pub fn build_sealed_station(
         Box::new(O2Makeup::new(
             O2_MAKEUP.to_string(),
             O2_SUPPLY.to_string(),
-            O2_POOL.to_string(),
+            air.o2.to_string(),
             *eclss,
         )),
         Box::new(WaterRecovery::new(
@@ -257,10 +302,7 @@ pub fn build_sealed_station(
             *harvest,
         )));
     }
-    let fast_reg = Registry::flows_only(fast_flows, &stocks)?;
-
-    assert_flow_ids_disjoint(&bio_reg, &fast_reg)?;
-    Ok((state, bio_reg, fast_reg))
+    fast_flows
 }
 
 /// Guard: the biosphere-slow and fast registries share no `FlowId`.
