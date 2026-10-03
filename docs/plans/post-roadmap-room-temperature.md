@@ -436,6 +436,8 @@ and, at the cabin's starting CO₂ fraction (3.796/9500), **0.011 mol of CO₂**
 The draw census (`docs/log/draw-census.md`) measured the crop's worst single slow-step CO₂ draw on
 the shared cabin air at **0.078 of the pool**. Scaled by 343 at equal concentration — **an
 estimate, not a measurement** — the same draw is **≈ 27× the chamber's whole CO₂** in one
+(⚠ **SUPERSEDED by §13's measurement: ≈ 6.7×.** The 0.078 was the census's quarter-day-step figure;
+at today's 1/16 step the worst ratio is 0.0194.)
 1.5-hour step. ⚠ The 0.078 is the draw over the cabin CO₂ **at that worst step** (set by crew and
 scrubber), not over the starting 3.796 mol, so the rescale has an unstated denominator: the
 conclusion holds (under separate air the chamber sits *below* the cabin, so the ratio is if
@@ -488,3 +490,66 @@ warms to 22 °C. Consequences to price in slice 3: lamp energy and heat fall in 
 with it; the cold phase's thermal time is small at 4 °C. ⚠ The cold phase is now a **schedule on
 two things** — the chamber setpoint and the lamp — driven from the same sowing clock, which slice 4
 (re-sow on maturity) must restart per crop.
+
+## 13. Slice 2a — the measured baseline and the predictions, committed before code (2026-10-03)
+
+**Instrument:** `rust/crates/station/examples/air_split_baseline.rs` (lab, writes nothing). It runs
+the frozen sealed station through the two-rate observer and reads the crop's gross CO₂ withdrawal
+per slow step in absolute moles (after option C's end-of-step solve), plus the fast side's books
+on the same pool. **Control: the end state is byte-exact against `sealed_station_state.json`**, so
+the loop is the reference run. Output kept at `W:\temp\claude\air_split_baseline.txt`.
+
+**Measured (shared air, 1220 days, rationed 0 / 0):**
+
+| Quantity | Value |
+|---|---|
+| worst single slow step, crop CO₂ draw | **0.073583 mol** from a pool of 3.795788 (ratio **0.0194**), day 1120.75 |
+| mean draw over the 14 344 slow steps that drew | **0.036129 mol** |
+| crop gross draw, peak day / run mean | **0.774** / **0.425 mol/day** |
+| crew CO₂ emission (fast net + scrubbed) | **327.97 mol/day** (= food intake 4e-3 mol/s × 86 400 × the respired fraction) |
+| shared CO₂ pool at slow-step starts | **3.79575 – 3.79617 mol** — pinned by the scrubber at P/k |
+
+⚠ **Correction to §11.** The draw census's 0.078 was measured at the **quarter-day** step (it
+predates the 1/16 step, 2026-09-30); at 1/16 the worst ratio is 0.0194. So §11's "≈ 27×" rescaled
+a stale figure. Measured instead: **0.0736 / 0.01105 = 6.66×** the chamber's CO₂ on the worst step,
+**3.27×** on the mean drawing step. The conclusion stands, smaller.
+
+⚠ **Context worth stating plainly:** the 1 m² crop takes **0.13 %** of the crew's CO₂ (0.425 of
+328 mol/day). The crop is a token against this crew; nothing about the cabin's air depends on it.
+
+**The setup 2a builds (lab-only):** a `separate` air topology. The cabin gets its own CO₂, O₂ and
+inert fill at **9500 mol** capacity and keeps `eclss.cabin_h2o`; the crew, scrubber, O₂ makeup and
+condenser re-point to it. The plants keep the biosphere's pools, at a chamber capacity of
+**27.66 mol** (BVAD Table 4-88's 0.67 m³/m² × 1 m² × P/RT at 22 °C, 101.325 kPa = 41.29 mol/m³;
+an upper bound on free air). One fan flow, on the fast step, moves **every** species by
+`Q · (n_i/cap_cabin − n_i/cap_chamber)` — CO₂, O₂, the inert fill and vapour. Both rooms start at
+the cabin's composition. One temperature, no heat. `Q` is DESIGN (no source found, §11).
+
+**Predictions (graded after the build):**
+
+1. **The default (shared) build is untouched:** every golden byte-identical; the lab option adds
+   no golden and no manifest row.
+2. **Conservation holds** on the separate build every step (the fan is internally balanced per
+   species), and total moles per room move only by the fan's net, which is zero while both rooms
+   sit at reference pressure.
+3. **The crop starves by the step at the BVAD chamber size.** Option C caps a slow step's uptake
+   below the chamber's CO₂ at the step's start (no same-step inflow is counted), so with the fan
+   refilling the chamber to at most the cabin's concentration between slow steps, the crop's
+   gross draw is ≤ ≈ (16 h / 1.5 h) × 0.01105 ≈ **0.118 mol/day** plus what soil respiration adds
+   inside the chamber — against **0.425** mean and **0.774** peak on shared air. Predicted: crop
+   gross CO₂ draw falls to **well under half** of shared air, and the crop ends lighter. How much
+   lighter is not predicted.
+4. **The physics, not the step, would have fed it.** A continuous crop at the worst-step rate
+   (1.36e-5 mol/s) keeps the chamber at ≥ half the cabin's CO₂ concentration if
+   `Q ≥ 2U/x_cabin` = **0.068 mol/s** (≈ 0.10 m³/min). The fan's own Euler limit on the 60 s step
+   is `Q·dt/27.66 < 1` → **Q < 0.461 mol/s** (≈ 0.67 m³/min). A window exists, so prediction 3's
+   starvation is the slow step's, not a fan too weak to keep up. The build runs inside the window.
+5. **Control — a big chamber recovers shared air.** At a chamber capacity of 9500 mol (the cabin's
+   own size) with a fast fan, the crop's draw returns to within a few percent of shared air.
+   ("A few percent" is a bound to be graded, not a value to fit.)
+6. **The cabin barely notices:** its CO₂ stays within ±0.01 % of 3.796 mol in every case,
+   because the crop is 0.13 % of the crew's CO₂.
+
+**The decision this will owe the user** (after the build, with prediction 3 graded): how the
+plants' gas exchange meets the fan — crop gas exchange on the fast step; the fan's resupply
+inside the slow step; or a larger chamber (DESIGN). Not decided here.

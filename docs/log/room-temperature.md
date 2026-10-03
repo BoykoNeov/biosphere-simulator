@@ -42,7 +42,8 @@ in two air spaces joined by a fan that carries gas and heat. Decided: an option,
 source search runs alongside. Found while sizing it: BVAD Table 4-88 (p. 170, page image not yet
 read) gives a plant chamber 0.67 m³ of air per m² of crop and 0.3 kW/m² of fan power. For the
 station's 1 m² crop that is 27.66 mol of air, 343× smaller than the cabin, and the crop's measured
-worst slow-step CO₂ draw scales to ≈ 27× the chamber's whole CO₂. The fan resupplies on the 60 s
+worst slow-step CO₂ draw scales to ≈ 27× the chamber's whole CO₂ (⚠ corrected the same day to
+≈ 6.7×, measured — the 0.078 it rescaled was a quarter-day-step figure). The fan resupplies on the 60 s
 step but the crop draws on the 1.5-hour one, so a source-sized chamber starves by construction of
 the step. Measured first in slice 2a; the remedy is the user's call. No inter-room ventilation rate
 found in BVAD (its "Ventilation" row is an air speed).
