@@ -254,11 +254,39 @@ page itself, via the open PMC full text:
 * **Wu et al. (2025)**, *Int. J. Mol. Sci.* 26:4280, doi 10.3390/ijms26094280 (PMC12072254):
   *"Germinated seeds vernalized at 4 °C … for 4 weeks before sowing"*. ⚠ Locus: a **seed**
   treatment before sowing — the option §10 set aside (chill seed), not a chamber phase. Contrast only.
-* **NOT opened** (blocked: bioRxiv HTTP 429 three times, Wiley HTTP 403): the speed-vernalisation
-  preprint (published as Cha et al. 2022, *Molecular Plant* 15:1300–1309) — the search summary
-  attributes to it *"usually … 4–6 °C for 8 weeks"* and *"most varieties require approximately 6
-  weeks"*; Zheng et al. 2023 (10 °C, 6 weeks); Li et al. 2013, *Plant J.* (3 vs 6 weeks at 4 °C
-  for two cultivars). These stay **unverified** — not to be bound from the summary.
+  ⚠ **Cultivar class, read on the page:** *"twelve hard red winter wheat genotypes"* — US
+  cultivars (Freeman, Arapahoe, TAM 113, SD Andes, Warthog …) plus Wisconsin lines; Table S1 (their
+  vernalization types) is not in the full text. US Great Plains winter wheats, **not** the model's
+  "Winter Europe" class, and no unvernalized control. So 0.274 is a mismatch in **what the paper
+  studied**, not a disagreement with it.
+* **Cha et al. (2022)**, "Speed vernalization to accelerate generation advance in winter cereal
+  crops", *Molecular Plant* 15(8):1300–1309, doi 10.1016/j.molp.2022.06.012 — **opened** as the
+  author-accepted manuscript (White Rose eprint 188442, CC-BY-NC-ND; local copy
+  `W:\temp\claude\cold-period\cha2022_aam.pdf`, manuscript lines 40–42 and 75–77): *"To date, the
+  agronomic and academic standard cereal vernalization protocol entails 6–10 weeks at a low
+  temperature of 2–6°C under short-day (8-h-light: 16-h-dark) photoperiod, where the lighting
+  conditions are low light intensity"* (citing Luo & He 2020; Xu & Chong 2018; Dixon et al. 2019;
+  Kim et al. 2009). Their own barley "regular vernalization" arm: *"6°C for 6 weeks under
+  8-h-light:16-h-dark"*; their lab vernalization light: 100 µmol m⁻² s⁻¹.
+  **Locus:** a statement of **standard practice** for winter cereals generally (secondary — it
+  cites the four), on growing plants. Not cultivar-specific.
+* **Still NOT opened** (Wiley HTTP 403): Zheng et al. 2023 (10 °C, 6 weeks); Li et al. 2013,
+  *Plant J.* (3 vs 6 weeks at 4 °C, two cultivars). Unverified; not to be bound.
+
+**The rule for choosing, written BEFORE any choice (advisor, 2026-10-03).** The 6–10-week figures
+happen to straddle the model's 50-day saturation; choosing them *for that reason* is the
+calibration in disguise this note forbids. The criteria, in order: (1) opened on the page;
+(2) growing plants in a chamber, not a seed treatment; (3) the cultivar class nearest the model's
+"Winter Europe" (a strong, all-or-nothing requirement). Dhakal passes 1–2 and fails 3; Cha passes
+1–2 and is class-general on 3; Wu fails 2. Model readings at 4 °C stay predictions only:
+Cha's range 6–10 weeks → **factor 0.736–1**.
+
+**⚠ Both opened protocols also fix the LIGHT, and the station's lamp is far off it.** Dhakal:
+100–150 µmol m⁻² s⁻¹ under 16 h; Cha: "low light intensity" under **8 h**. The lamp gives
+200 W × 2.5 µmol/J over 1 m² ≈ **500 µmol m⁻² s⁻¹ for 16 h**. Taking a protocol's temperature and
+duration but not its light is a partial match — and the light matters in a cold chamber
+(photosynthesis continues; the lamp's heat is cooling load). A user decision at slice 3: dim the
+lamp to the protocol during the cold phase, or keep it and record the mismatch.
 * **Model readings at 4 °C, predictions only** (1 chill-day per day; factor `1 − 0.033·(50 − d)`):
   Dhakal's 4 weeks → 28 → **factor 0.274**, held at that value for the rest of the vegetative
   phase once the chamber warms; Vavilov's 30–45 days → 0.34–0.84; 6 weeks → 0.736; 8 weeks → 1.
@@ -391,7 +419,12 @@ once the air is split.
   shoot zone **0.67 m³ per m²** of growing area, root zone 0.11; shoot zone **power 0.3 kW/m²**,
   and footnote 183: *"Power consumption and thermal control within the shoot zone reflect fans for
   gas movement."* So a cited (class) figure exists for both the chamber's air volume and the fan's
-  power, per m² of crop.
+  power, per m² of crop. Cross-checked against the table's own Total row: volume 0.67 + 0.11
+  (root zone) + 0.25 (lamps) = **1.03**, the printed total; power 0.3 + 0.14 + 2.1 + 0.075 ≈
+  **2.6**, the printed total — so the extract's column reading is self-consistent (the page image
+  is still owed). ⚠ An equivalent-system-mass table's volume is the **allocated** space, hardware
+  included, so the free air is **at most** this — the CO₂ finding below is a lower bound on the
+  problem.
 
 ### Measured / derived — the CO₂ supply problem is real
 
@@ -403,7 +436,11 @@ and, at the cabin's starting CO₂ fraction (3.796/9500), **0.011 mol of CO₂**
 The draw census (`docs/log/draw-census.md`) measured the crop's worst single slow-step CO₂ draw on
 the shared cabin air at **0.078 of the pool**. Scaled by 343 at equal concentration — **an
 estimate, not a measurement** — the same draw is **≈ 27× the chamber's whole CO₂** in one
-1.5-hour step. The fan would resupply continuously in reality, but the crop is evaluated on the
+1.5-hour step. ⚠ The 0.078 is the draw over the cabin CO₂ **at that worst step** (set by crew and
+scrubber), not over the starting 3.796 mol, so the rescale has an unstated denominator: the
+conclusion holds (under separate air the chamber sits *below* the cabin, so the ratio is if
+anything larger), the number does not. **2a's committed prediction uses absolute moles drawn per
+slow step, read from the sealed-station trajectory, over the chamber's CO₂.** The fan would resupply continuously in reality, but the crop is evaluated on the
 slow step (1/16 day) while the fan runs on the fast one (60 s), and arbitration counts no
 same-step inflow. So a chamber sized by the source would starve by construction of the *step*, not
 of the physics. (Option C, built 2026-09-30, makes uptake fall as CO₂ runs low, so it would read as
