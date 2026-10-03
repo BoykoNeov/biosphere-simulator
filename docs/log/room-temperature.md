@@ -61,7 +61,7 @@ unchanged. Over one season the crop draws **0.174** of shared air's CO₂ and en
 its carbon — starved by the 1.5-hour plant step, not by the fan (0.1 and 0.4 mol/s give the same
 numbers to five figures; a cabin-sized chamber gives 0.999). With vapour crossing, **23.3 kg** of
 the plants' water drains into the crew's store in a season, because the cabin sits at ≈ 1.5 %
-humidity. Two predictions failed and are recorded: the cabin's CO₂ moved ±0.14 %, not ±0.01 %;
+humidity. Three predictions failed and are recorded: the cabin's CO₂ moved ±0.14 %, not ±0.01 %;
 water flowed back on 78 of 439 200 fan steps; transpiration rose 2.4×, not 3–4×. Found on the way:
 transpiration ignores canopy size (a crop with 14 % of the carbon transpires 99.6 % as much).
 Three decisions are the user's: how the plant step meets the fan, a water return path, the cabin's
