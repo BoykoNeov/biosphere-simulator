@@ -987,3 +987,40 @@ control (byte-exact), reproduces §13's CO₂ figures exactly (0.073583 / 0.0361
 0.424778). Its water line now reads the cabin wetter than a target-held 27.66-mol chamber on
 **11 968 of 19 520** plant steps (§13a: 0) — the humidity fix, the same reversal as §15a's H5.
 Output `W:\temp\claude\air_split_baseline_run2.txt`.
+
+## 18. Watering the plants from the crew's supply (lab, separate air; predictions before code, 2026-10-03)
+
+**Why it is lab-only.** In shared air the plants' water loop is closed by construction (their
+vapour stock and condensate never meet the crew's); only the separate-air build moves water
+between the two, through the fan.
+
+**What changed since §13b asked for it.** The cabin now holds 40 % RH (§15). With the plant
+chamber still at the WEATHER's temperature the flow REVERSED: over a season the plants gain
+2.08 kg from the cabin (§15a, H5). A drain returns once the chamber is held at 22 °C — the
+decided setpoint (§10), not yet built as a room with heat books; here it is a forcing override on
+the plant side, as `warm_room_arrest` does. At one 22 °C the chamber's 75 % target holds
+3.5e-4 kg of vapour per mol of air against the cabin's 1.95e-4, so the fan (Q = 0.2 mol/s) can
+carry up to ≈ 3.2e-5 kg/s ≈ **2.7 kg/day** out of a chamber held at its target — more than a
+season's soil water (195 kg) over 305 days.
+
+**The form — no new science.** The open field's own `Irrigation` flow ([F] Eqn 14.8:
+demand-driven, `min(capacity · A · dt, max(0, TTSW − ATSW))`), on the plant step, with its
+source re-pointed from the weather's boundary at the crew's `crew.water_store`. Capacity: the
+scenario's `irrigation_mm_day` = 8 mm/day (8 kg/day on 1 m²). Id `station.watering`; an
+`AirSplit.watering` switch. It only tops the ROOT ZONE up: water already below the roots is the
+subsoil's, as in the field.
+
+**Predictions (one season, 305 days, Q = 0.2, vapour crossing, minute gas exchange):**
+
+* **R1 — the weather-temperature chamber never needs it:** watering delivers **0 kg** (the root
+  zone stays at capacity while the cabin feeds the chamber); every other number is §16a's.
+* **R2 — a 22 °C chamber without watering drains:** the plants lose **≥ 50 kg** to the cabin over
+  the season, and the root zone reaches water stress at some point (`f_water < 1`), so the crop
+  ends lighter than R3.
+* **R3 — a 22 °C chamber with watering:** the root zone is held near capacity; watering delivers
+  within **±10 %** of what the fan exports; the plants' water ends within **±2 %** of where it
+  started; plant carbon ≥ R2's.
+* **R4 — the crew pays the recovery loss, not the water:** the exported water reaches the crew's
+  store through the condenser and the recovery processor (`recovery_efficiency` 0.9), so with
+  watering the crew's store falls by ≈ **10 % of the water cycled**, not by all of it.
+* **R5 — books:** conservation every step, 0 / 0 rationing, no events.
