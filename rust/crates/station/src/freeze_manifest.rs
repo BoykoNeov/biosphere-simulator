@@ -132,7 +132,12 @@ fn json_array(names: &BTreeSet<&str>) -> String {
 ///    read off `build_sealed_station`, not assumed;
 /// 5. the sealed build's biosphere **slow** registry (`.1`) deliberately **excluded** — the
 ///    biosphere is delegated to its own manifest, and including it would leak all 23
-///    biosphere flows into this set.
+///    biosphere flows into this set. ⚠ **Since 2026-10-03 three biosphere flows ARE in this
+///    set**, through call 4: the crop's carbon budget (`Allocation`, `GrowthRespiration`,
+///    `MaintenanceRespiration`) is stepped on the sealed station's FAST registry
+///    (`crate::gas_exchange`). They are the station stepping them, not a leak; and the
+///    plant-step `PlantWindowRecorder` that feeds them sits in the excluded slow registry, so
+///    no freeze record lists it.
 ///
 /// `close_feces` is left at `false`, which is the Python builder's own default and so
 /// matches the selection. ⚠ **It wires no flow either way — measured, not read**: flipping

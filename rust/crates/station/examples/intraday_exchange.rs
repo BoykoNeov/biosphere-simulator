@@ -23,6 +23,12 @@
 //! overdraws. The probe's count is checked against the driver's plant-side count.
 //!
 //! It writes nothing and takes no decision.
+//!
+//! ⚠ **Since 2026-10-03 every build here takes the crop's gas exchange on the PLANT step**
+//! (`GasExchangeStep::PlantStep`): this instrument reproduces the record that retired the
+//! slow-first day, which was made at the plant step, and on a minute-step build that order is
+//! refused (`station::driver::TwoRate`). Its "reference run" comparisons are therefore against
+//! the plant-step reference, not today's goldens.
 
 use std::collections::BTreeMap;
 
@@ -45,7 +51,10 @@ use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
 use simcore::state::State;
 use station::driver::{DayOrder, Side, SideTotals, TwoRate};
-use station::greenhouse::{build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver};
+use station::gas_exchange::GasExchangeStep;
+use station::greenhouse::{
+    build_greenhouse_at, greenhouse_bio_resolver, greenhouse_cabin_resolver,
+};
 use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver};
 use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver};
 use station::params as station_params;
@@ -54,7 +63,8 @@ use station::scenario::{
     SealedStationScenario,
 };
 use station::sealed::{
-    build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
+    build_sealed_station_at, run_sealed, sealed_bio_resolver, sealed_fast_resolver,
+    sealed_reset_hook,
 };
 
 const ORDERS: [DayOrder; 2] = [DayOrder::SlowFirst, DayOrder::Interleaved];
@@ -385,7 +395,7 @@ fn sealed_measure(sc: &SealedStationScenario, with_harvest: bool, order: DayOrde
     let recovery = station_params::water_recovery();
     let lamp = station_params::lamp();
     let hp = station_params::harvest();
-    let (s0, bio, fast) = build_sealed_station(
+    let (s0, bio, fast) = build_sealed_station_at(
         &charge,
         &thermal,
         &crew,
@@ -396,6 +406,7 @@ fn sealed_measure(sc: &SealedStationScenario, with_harvest: bool, order: DayOrde
         sc,
         with_harvest,
         false,
+        GasExchangeStep::PlantStep,
     )
     .expect("build sealed");
     let bio_res = sealed_bio_resolver(&lamp, sc).expect("bio resolver");
@@ -427,8 +438,18 @@ fn control_full_sealed(interleaved: &State) {
     let lamp = station_params::lamp();
     let hp = station_params::harvest();
     let sc = sealed_station_scenario();
-    let (s0, bio, fast) = build_sealed_station(
-        &charge, &thermal, &crew, &eclss, &recovery, &lamp, &hp, &sc, false, false,
+    let (s0, bio, fast) = build_sealed_station_at(
+        &charge,
+        &thermal,
+        &crew,
+        &eclss,
+        &recovery,
+        &lamp,
+        &hp,
+        &sc,
+        false,
+        false,
+        GasExchangeStep::PlantStep,
     )
     .expect("build sealed");
     let (states, _, _) = run_sealed(
@@ -527,7 +548,15 @@ fn main() {
             let bio_res = greenhouse_bio_resolver(&sc).expect("bio");
             let cabin_res = greenhouse_cabin_resolver(&sc).expect("cabin");
             let build = || {
-                let (s, b, c) = build_greenhouse(&crew, &eclss, &sc, true, FECAL_WASTE).expect("b");
+                let (s, b, c) = build_greenhouse_at(
+                    &crew,
+                    &eclss,
+                    &sc,
+                    true,
+                    FECAL_WASTE,
+                    GasExchangeStep::PlantStep,
+                )
+                .expect("b");
                 (s, EulerIntegrator::new(b), EulerIntegrator::new(c))
             };
             let shape = (

@@ -25,6 +25,15 @@ manifest's `delegates_to` field) rather than re-freezing it. A change to a biosp
 follows *its* unfreeze discipline; a change to a sibling or station item follows *this*
 one.
 
+⚠ **Since 2026-10-03 the delegation has one station-owned exception: WHEN the crop's carbon
+budget is stepped.** Wherever the cabin's flows act on the crop's air (`greenhouse`, `harvest`,
+`sealed_station`), the station takes the crop's three carbon-budget flows (`Allocation`,
+`GrowthRespiration`, `MaintenanceRespiration`) out of `build_season`'s registry and steps them,
+unchanged, on its fast (60 s) registry; the plant step records the light and temperature they
+read (`station::gas_exchange`). The flows' science stays the biosphere's and delegated; the
+STEP they are taken on is this contract's. `lighting` and every standalone biosphere scenario
+keep the plant step. The registry is no longer `build_season`'s verbatim in those three.
+
 **Why whole-assembly, not station-layer-only** (advisor-reviewed, user-confirmed). A
 station-layer-only freeze (owning just the four seams + three params) would leave the
 sibling flows and params changeable with **no unfreeze ceremony — in exactly the layer
@@ -118,7 +127,11 @@ The five *dropped* stand-ins (`HeatInput`, `CrewMetabolism`, `OxygenConsumption`
 `FoodMetabolism`, `SelfDischarge`) exist only in the **standalone** sibling builds — pinned
 by the standalone sibling goldens — which is why the derivation unions those, not only the
 coupled fast registry. The biosphere's slow registry is **never** included (delegated), so
-no biosphere flow (`Allocation` / `MicrobialRespiration` / …) appears here. The `aux_set`
+no biosphere flow stepped on the plant step (`MicrobialRespiration` / …) appears here. ⚠ Since
+2026-10-03 three biosphere types DO: `Allocation`, `GrowthRespiration` and
+`MaintenanceRespiration` are stepped on the sealed station's fast registry (the exception
+above). The plant-step `PlantWindowRecorder` that feeds them is in the excluded slow registry,
+so no freeze record lists it. The `aux_set`
 is empty — the siblings + station carry no non-conserved accumulator (the biosphere's
 `ThermalTimeAccumulation` lives in the delegated slow registry) — but the *set* is frozen
 so a future aux is caught.
@@ -319,6 +332,25 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-10-03 — the crop's gas exchange is stepped on the cabin's minute step; 3 station
+  goldens move, 3 `golden_sha256` rows follow, and the station `flow_set` gains `Allocation`,
+  `GrowthRespiration`, `MaintenanceRespiration`. No `simcore` byte changed; no biosphere formula
+  changed.** The user's decision (*"calculate the plants' gas exchange minute by minute. This
+  changes the frozen plant science — do it"*), after the lab separate-air build measured that the
+  plant step starves a small chamber by construction (a 27.66-mol chamber's crop drew 0.174 of
+  shared air's CO₂, equal at any fan rate). Advisor-reviewed twice before code; designed, built
+  lab-only, redesigned and adopted in four commits with predictions committed first
+  (`docs/plans/post-roadmap-room-temperature.md` §16–§17a). `greenhouse` plant carbon +0.29 %,
+  `harvest` +0.07 %, `sealed_station` +0.75 % (grain +0.79 % over 4 years). **Every water stock
+  and every pre-existing aux value is byte-identical** (transpiration does not read the canopy);
+  the aux block gains `station.plant_window.par` / `.temp`. 0 rationing, 0 events; the tier
+  contract tests pass. Found by a missed prediction: `build_harvest` discarded the greenhouse's
+  fast registry and with it the moved carbon budget (its crop grew nothing, −17.6 %); fixed, and
+  `every_crop_build_steps_the_carbon_budget_exactly_once` now holds every crop build to it. The
+  perturbation suite's "regulator erasure" claim is restated: the pools return to the baseline
+  once the crop's own flux offset (ΔS / k) is taken out, residual ≤ 1.8e-9 against the unchanged
+  1e-6 bound (it was ΔC ≈ 0, which held only while the crop drew a 90-minute pulse).
 
 - **2026-10-03 — the cabin's condenser holds BVAD's 40 % relative humidity; 6 station goldens
   move (`eclss.cabin_h2o` by +1.7863 kg, the crew's water books in the last few bits) and

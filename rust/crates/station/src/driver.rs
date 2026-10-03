@@ -323,6 +323,25 @@ impl TwoRate<'_> {
     /// The day's grouping in `order`: `SlowFirst` is one group of the whole day, and
     /// `Interleaved` is the reference's [`day_groups`] (refusing counts with no equal grouping).
     fn groups(&self, order: DayOrder) -> Result<DayGroups, SimError> {
+        // ⚠ The retired slow-first day runs every plant step before every minute, so a minute-step
+        // gas exchange would read the day's LAST recorded window all day (and conserve while
+        // doing it). Refused rather than reproduced: build the record with
+        // `GasExchangeStep::PlantStep` (`crate::gas_exchange`, 2026-10-03).
+        if order == DayOrder::SlowFirst
+            && self
+                .fast
+                .registry()
+                .flows()
+                .iter()
+                .any(|f| crate::gas_exchange::CARBON_BUDGET_FLOWS.contains(&f.id()))
+        {
+            return Err(SimError::Validation(
+                "the slow-first day cannot run a minute-step gas exchange: every minute would \
+                 read the day's last plant window. Build with GasExchangeStep::PlantStep to \
+                 reproduce a slow-first record"
+                    .into(),
+            ));
+        }
         if order == DayOrder::SlowFirst {
             return Ok(DayGroups {
                 count: 1,

@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{CARBON_POOL, O2_POOL, ROOTED_DEPTH, THERMAL_TIME};
-use domains::biosphere::system::{build_season, weather_resolver};
+use domains::biosphere::system::{build_season, weather_resolver, weather_shared};
 use domains::crew::URINE;
 use domains::crew::{CrewParams, FECAL_WASTE, FOOD_INTAKE_VAR, WATER_INTAKE_VAR};
 use domains::eclss::{EclssParams, CO2_REMOVED, HUMIDITY_CONDENSATE, O2_SUPPLY};
@@ -26,6 +26,9 @@ use simcore::state::{State, Stock};
 
 use crate::cabin::build_cabin_flows;
 use crate::driver::run_master_day;
+use crate::gas_exchange::{
+    gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
+};
 use crate::scenario::GreenhouseScenario;
 use crate::stocks::{
     cabin_h2o_stock, co2_composition, food_store_stock, gas_boundary, o2_composition,
@@ -66,12 +69,36 @@ pub(crate) fn greenhouse_cabin_stocks(
 /// cabin flows re-pointed at the biosphere gas pools, over the merged stock dict. The two
 /// stock-id sets are asserted disjoint. `with_plants = false` gives the no-plant baseline
 /// (empty biosphere registry) — not used by the golden, kept for the "it bit" contrast.
+///
+/// With plants, the crop's gas exchange is taken on the cabin's minute step (the reference
+/// since 2026-10-03, `docs/plans/post-roadmap-room-temperature.md` §17;
+/// [`crate::gas_exchange`]).
 pub fn build_greenhouse(
     crew: &CrewParams,
     eclss: &EclssParams,
     scenario: &GreenhouseScenario,
     with_plants: bool,
     fecal_waste_target: &str,
+) -> Result<(State, Registry, Registry), SimError> {
+    build_greenhouse_at(
+        crew,
+        eclss,
+        scenario,
+        with_plants,
+        fecal_waste_target,
+        GasExchangeStep::Minute,
+    )
+}
+
+/// [`build_greenhouse`] with the crop's gas exchange on the step `gas` names
+/// (`GasExchangeStep::PlantStep` is the form until 2026-10-03, kept for the lab's records).
+pub fn build_greenhouse_at(
+    crew: &CrewParams,
+    eclss: &EclssParams,
+    scenario: &GreenhouseScenario,
+    with_plants: bool,
+    fecal_waste_target: &str,
+    gas: GasExchangeStep,
 ) -> Result<(State, Registry, Registry), SimError> {
     let (bio_state, full_bio_registry) = build_season(&scenario.bio)?;
     let bio_stocks = bio_state.stocks.clone();
@@ -111,12 +138,26 @@ pub fn build_greenhouse(
 
     let cabin_flows = build_cabin_flows(crew, eclss, CARBON_POOL, O2_POOL, fecal_waste_target);
     let cabin_registry = Registry::flows_only(cabin_flows, &stocks)?;
-    let bio_registry = if with_plants {
-        full_bio_registry
-    } else {
-        Registry::flows_only(Vec::new(), &stocks)?
-    };
-    Ok((state, bio_registry, cabin_registry))
+    if !with_plants {
+        return Ok((
+            state,
+            Registry::flows_only(Vec::new(), &stocks)?,
+            cabin_registry,
+        ));
+    }
+    match gas {
+        GasExchangeStep::PlantStep => Ok((state, full_bio_registry, cabin_registry)),
+        GasExchangeStep::Minute => {
+            require_one_plant_step_per_group(scenario.steps_per_day, scenario.bio_steps_per_day)?;
+            let (bio_registry, cabin_registry) = gas_exchange_on_fast_step(
+                &stocks,
+                full_bio_registry,
+                cabin_registry,
+                &weather_shared(&scenario.bio),
+            )?;
+            Ok((state, bio_registry, cabin_registry))
+        }
+    }
 }
 
 /// The biosphere forcing resolver — the frozen `weather_resolver`, reused as-is (the reverse

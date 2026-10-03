@@ -339,6 +339,40 @@ fn sealed_baseline() -> &'static State {
     })
 }
 
+/// The crop's own net flux into `pool` (mol/s) at `state`: the minute-stepped carbon budget's
+/// legs, evaluated on that state. Since 2026-10-03 the crop exchanges gas every minute, so a
+/// regulated pool sits `flux / k` off its crew-only level at every instant — the offset
+/// [`assert_returns_to_setpoint`] takes out.
+fn crop_flux(state: &State, pool: &str) -> f64 {
+    let (_, _, fast_reg) = sealed_build();
+    let env = simcore::environment::SourceResolver::empty();
+    fast_reg
+        .flows()
+        .iter()
+        .filter(|f| station::gas_exchange::CARBON_BUDGET_FLOWS.contains(&f.id()))
+        .flat_map(|f| f.evaluate(state, &env.bind(state, 1.0), 1.0).unwrap().legs)
+        .filter(|l| l.stock == pool)
+        .map(|l| l.amount)
+        .sum()
+}
+
+/// Regulator erasure, restated for a crop that exchanges gas every minute (2026-10-03): the
+/// regulated `pool` returns to the baseline's level once the CROP's own flux offset is taken
+/// out — `ΔC = ΔS / k`, the regulator's quasi-steady shift for a source `S` at rate `k`.
+/// ⚠ Until 2026-10-03 this asserted `ΔC ≈ 0` to 1e-6: true while the crop drew a pulse each
+/// plant step that the regulator erased within the 90 minutes before the day's end, and false
+/// once the crop draws every minute (measured 1.3e-6 and 3.6e-6). The bound did not move; the
+/// claim now names the offset it used to rely on the pulse to hide.
+fn assert_returns_to_setpoint(perturbed: &State, baseline: &State, pool: &str, k: f64) {
+    let offset = (crop_flux(perturbed, pool) - crop_flux(baseline, pool)) / k;
+    let moved = perturbed.stocks[pool].amount - baseline.stocks[pool].amount;
+    let rel = (moved - offset).abs() / baseline.stocks[pool].amount.abs();
+    assert!(
+        rel < 1e-6,
+        "{pool} returns to setpoint (residual rel {rel})"
+    );
+}
+
 fn run_carbon_leak(pool: &str) -> State {
     let scn = matter_scenario();
     let (state, bio_reg, fast_reg) = sealed_build();
@@ -466,11 +500,9 @@ fn crew_spike_raises_regulator_effort_and_drains_food() {
     assert!(spiked.stocks[O2_SUPPLY].amount < baseline.stocks[O2_SUPPLY].amount);
     assert!(spiked.stocks[FOOD_STORE].amount < baseline.stocks[FOOD_STORE].amount);
     // Regulator-erasure: the day-boundary pools return to the SAME setpoint as baseline.
-    for pool in [CARBON_POOL, O2_POOL] {
-        let rel = (spiked.stocks[pool].amount - baseline.stocks[pool].amount).abs()
-            / baseline.stocks[pool].amount.abs();
-        assert!(rel < 1e-6, "{pool} returns to setpoint (rel {rel})");
-    }
+    let eclss = domains::params::eclss();
+    assert_returns_to_setpoint(spiked, baseline, CARBON_POOL, eclss.co2_scrub_rate);
+    assert_returns_to_setpoint(spiked, baseline, O2_POOL, eclss.o2_makeup_gain);
 }
 
 #[test]
@@ -495,9 +527,8 @@ fn lighting_failure_stalls_growth_and_spares_battery() {
         "battery spared"
     );
     // Regulator-erasure: the scrubber holds CARBON_POOL at setpoint despite less assimilation.
-    let rel = (failed.stocks[CARBON_POOL].amount - baseline.stocks[CARBON_POOL].amount).abs()
-        / baseline.stocks[CARBON_POOL].amount.abs();
-    assert!(rel < 1e-6, "carbon pool returns to setpoint (rel {rel})");
+    let k = domains::params::eclss().co2_scrub_rate;
+    assert_returns_to_setpoint(failed, baseline, CARBON_POOL, k);
 }
 
 #[test]

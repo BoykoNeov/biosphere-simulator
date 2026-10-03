@@ -343,7 +343,8 @@ fn main() {
     let base = shared(&scenario, days, GasExchangeStep::PlantStep);
     print("shared", &base, &base);
     println!(
-        "shared room, crew + plant vapour over saturation at the plants' temperature: max {:.4},          above 1 on {} of {} slow steps (before the fix: max {:.4}, above 1 on {})",
+        "shared room, crew + plant vapour over saturation at the plants' temperature: max {:.4}, \
+         above 1 on {} of {} slow steps (before the fix: max {:.4}, above 1 on {})",
         base.room_rh_max,
         base.room_over_saturation,
         base.slow_steps,

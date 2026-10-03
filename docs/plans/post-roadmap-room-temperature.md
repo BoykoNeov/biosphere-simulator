@@ -963,3 +963,27 @@ minute would read the day's last window). Lab instruments that reproduce plant-s
   339 s.
 * **A7 — lab pins with numbers:** pinned values in `warm_room_arrest`, `lamp_shed` and
   `perturbations` may move; each red is read, explained and re-measured, never loosened.
+
+### 17a. ADOPTED — the predictions graded (2026-10-03)
+
+| # | Prediction | Result |
+|---|---|---|
+| A1 | exactly `greenhouse`, `harvest`, `sealed_station` move | **HELD** — `regen_goldens`: 3 of 20 changed |
+| A2 | water stocks and pre-existing aux byte-identical; two aux keys added | **HELD** — no water byte, no `thermal_time` / `vernalization_days` / `rooted_depth` byte moved in any of the three; `station.plant_window.par` / `.temp` appear |
+| A3 | `sealed_station` ±1.5 %, `greenhouse` / `harvest` ±1 % | **HELD after a fix** — sealed plant carbon **+0.75 %**, grain **+0.79 %**; greenhouse **+0.29 %**; harvest **+0.07 %**. ✗ On the first run harvest read **−17.6 %**, its grain and stem reserve at 0: `build_harvest` reused the greenhouse's plant registry and DISCARDED its fast one to rebuild it with `Harvest` — taking the moved carbon budget with it, so the crop grew nothing (and conserved). The prediction is what caught it. Fixed (a plant-step base, the minute step applied onto the rebuilt registry); new pin `every_crop_build_steps_the_carbon_budget_exactly_once`, which the re-introduced bug turns red |
+| A4 | 0 rationing, 0 events; tier contract passes | **HELD** |
+| A5 | 3 `golden_sha256` rows; `flow_set` + the three types; no aux set change | **HELD** exactly (manifest diff: 3 types, 3 rows, nothing else) |
+| A6 | sealed golden ≤ 2 m 45 s; suite ≤ 1.3 × 339 s | **HELD** — all 20 goldens regenerate in **120 s**; the full suite **354 s** (1.04×) |
+| A7 | lab pins with numbers may move | two reds, both in `tests/perturbations.rs`: "regulator erasure" (`ΔC ≈ 0` to 1e-6 at the day's end) read 1.3e-6 and 3.6e-6. Explained: a crop exchanging every minute shifts a regulated pool by its own flux over the regulator's rate, `ΔS/k`; the old claim held only because a 90-minute pulse had been erased by the day's end. Restated with the offset taken out and the SAME 1e-6 bound: residuals **1.8e-9, 6.0e-10 (CO₂), 6.3e-14 (O₂)**. `warm_room_arrest` and `lamp_shed` stayed green |
+
+**Tally: 7 of 7 held, one only after the bug it found was fixed.**
+
+**The reference now has two forms, by where the crop's air is** (§17): minute-step gas exchange
+in `greenhouse`, `harvest`, `sealed_station` (and the Godot sessions built from them);
+plant-step in `lighting` and every standalone biosphere scenario.
+
+`examples/air_split_baseline.rs`, re-pointed at a plant-step build with `run_sealed` as its
+control (byte-exact), reproduces §13's CO₂ figures exactly (0.073583 / 0.036129 / 0.773765 /
+0.424778). Its water line now reads the cabin wetter than a target-held 27.66-mol chamber on
+**11 968 of 19 520** plant steps (§13a: 0) — the humidity fix, the same reversal as §15a's H5.
+Output `W:\temp\claude\air_split_baseline_run2.txt`.

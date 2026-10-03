@@ -48,6 +48,9 @@ use crate::flows::{
     CrewRespiration, Harvest, HarvestParams, Lamp, LampParams, WaterRecovery, WaterRecoveryParams,
     CREW_RESPIRATION, HARVEST, LAMP, LAMP_POWER_VAR, PAR_PHOTON_ENERGY_J_PER_UMOL, WATER_RECOVERY,
 };
+use crate::gas_exchange::{
+    gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
+};
 use crate::lighting::{lamp_light_path, LIGHT_USED};
 use crate::scenario::SealedStationScenario;
 use crate::stocks::{
@@ -93,7 +96,9 @@ pub fn sealed_node_heat(
     thermal_params.heat_capacity * (t_eq - thermal_params.space_temperature)
 }
 
-/// Assemble the fully-coupled sealed station: `(state, bio_reg, fast_reg)`.
+/// Assemble the fully-coupled sealed station: `(state, bio_reg, fast_reg)`, with the crop's
+/// gas exchange on the cabin's minute step (the reference since 2026-10-03,
+/// `docs/plans/post-roadmap-room-temperature.md` §17; [`crate::gas_exchange`]).
 #[allow(clippy::too_many_arguments)]
 pub fn build_sealed_station(
     charge: &ChargeParams,
@@ -106,6 +111,38 @@ pub fn build_sealed_station(
     scenario: &SealedStationScenario,
     with_harvest: bool,
     close_feces: bool,
+) -> Result<(State, Registry, Registry), SimError> {
+    build_sealed_station_at(
+        charge,
+        thermal_params,
+        crew,
+        eclss,
+        recovery,
+        lamp,
+        harvest,
+        scenario,
+        with_harvest,
+        close_feces,
+        GasExchangeStep::Minute,
+    )
+}
+
+/// [`build_sealed_station`] with the crop's gas exchange on the step `gas` names.
+/// `GasExchangeStep::PlantStep` is the form until 2026-10-03, kept for the lab instruments that
+/// reproduce records made with it (and for the separate-air build's own base).
+#[allow(clippy::too_many_arguments)]
+pub fn build_sealed_station_at(
+    charge: &ChargeParams,
+    thermal_params: &ThermalParams,
+    crew: &CrewParams,
+    eclss: &EclssParams,
+    recovery: &WaterRecoveryParams,
+    lamp: &LampParams,
+    harvest: &HarvestParams,
+    scenario: &SealedStationScenario,
+    with_harvest: bool,
+    close_feces: bool,
+    gas: GasExchangeStep,
 ) -> Result<(State, Registry, Registry), SimError> {
     // --- biosphere (slow) — build_season verbatim ---
     let (bio_state, bio_reg) = build_season(&scenario.bio)?;
@@ -200,6 +237,13 @@ pub fn build_sealed_station(
     let fast_reg = Registry::flows_only(fast_flows, &stocks)?;
 
     assert_flow_ids_disjoint(&bio_reg, &fast_reg)?;
+    let (bio_reg, fast_reg) = match gas {
+        GasExchangeStep::PlantStep => (bio_reg, fast_reg),
+        GasExchangeStep::Minute => {
+            require_one_plant_step_per_group(scenario.steps_per_day, scenario.bio_steps_per_day)?;
+            gas_exchange_on_fast_step(&stocks, bio_reg, fast_reg, &weather_shared(&scenario.bio))?
+        }
+    };
     Ok((state, bio_reg, fast_reg))
 }
 

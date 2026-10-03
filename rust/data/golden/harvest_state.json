@@ -1,6 +1,8 @@
 {
   "aux": {
     "rooted_depth": "0x1.4cccccccccccdp+0",
+    "station.plant_window.par": "0x0.0p+0",
+    "station.plant_window.temp": "0x1.a147ae147ae14p+3",
     "thermal_time": "0x1.5da6666666660p+10",
     "vernalization_days": "0x0.0p+0"
   },
@@ -8,7 +10,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.e5e82a5e487f4p+1",
+      "amount": "0x1.e5e8bbd0c795ep+1",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -48,7 +50,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.bcfc2ed67a398p-7",
+      "amount": "0x1.bcfc2f0364569p-7",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -61,7 +63,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.c39da6140b7fap-33",
+      "amount": "0x1.c3a3c42750c23p-33",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -74,7 +76,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.b1e3240ccd334p-5",
+      "amount": "0x1.b1f13f7d58f36p-5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -87,7 +89,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.db372166adb08p+6",
+      "amount": "0x1.db3721c223f8ap+6",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -100,7 +102,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.eb2d4947759ddp-20",
+      "amount": "0x1.eb39c9254694dp-20",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -113,7 +115,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.378263e97d6c3p+1",
+      "amount": "0x1.37826413ced61p+1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -126,7 +128,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.3e7e9de8edabfp-25",
+      "amount": "0x1.3e8464a7de2dfp-25",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -139,7 +141,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.f246872960d43p+10",
+      "amount": "0x1.f246870440fa2p+10",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },
@@ -152,7 +154,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.1501baf218392p-12",
+      "amount": "0x1.150ddec9fade0p-12",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -165,7 +167,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.4e2d296782fd4p-4",
+      "amount": "0x1.4e3dd7e2dd643p-4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -178,7 +180,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8ffffa098289ap+6",
+      "amount": "0x1.8ffffa067667dp+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -204,7 +206,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.4d85b0df50f4bp-5",
+      "amount": "0x1.4d9e49fb91d41p-5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -217,7 +219,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.90c338c32f8dap-8",
+      "amount": "0x1.911b76e818c86p-8",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -230,7 +232,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.a81d92b54f986p-9",
+      "amount": "0x1.b38831b170044p-9",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -269,7 +271,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.1f3d16d3b6c55p+11",
+      "amount": "0x1.1f3d1598d067bp+11",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -322,7 +324,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.1f005b9e00ccep+11",
+      "amount": "-0x1.1f005a74e721ep+11",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },
@@ -348,7 +350,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.8b342adcbc2a1p+10",
+      "amount": "0x1.8b342af07c94ep+10",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },

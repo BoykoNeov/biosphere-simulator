@@ -203,7 +203,8 @@ fn vapour_crossing_moves_water_between_the_plants_and_the_crew() {
     );
     assert!(
         crew_lost <= plants_gained,
-        "the cabin's own vapour and the recovery buffer make up the rest, never more          ({crew_lost} > {plants_gained})"
+        "the cabin's own vapour and the recovery buffer make up the rest, never more \
+         ({crew_lost} > {plants_gained})"
     );
 }
 

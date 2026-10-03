@@ -11,28 +11,31 @@
 //! Also the fast side's budget on the same pool: the scrubber's take (`k·CO₂·dt`, read off the
 //! step's starting state) and the crew's emission (fast net + scrubber).
 //!
-//! Control: the end state byte-matches the committed `sealed_station_state.json`, so this loop
-//! IS the reference run. It writes nothing and takes no decision.
+//! Control: the end state byte-matches the reference RUNNER's own run of the same build
+//! (`run_sealed`), so this loop IS that run. ⚠ Until 2026-10-03 the control was the committed
+//! `sealed_station_state.json`; since then that golden takes the crop's gas exchange on the
+//! minute step, and this instrument reproduces §13's record, made at the PLANT step
+//! (`GasExchangeStep::PlantStep`) — on a minute-step build its slow-side draw reading would be
+//! zero. It writes nothing and takes no decision.
 
 use domains::biosphere::params as bio_params;
 use domains::biosphere::readouts::withdrawal_demand;
 use domains::biosphere::science::{humidity_target_kg, saturation_vapour_kg};
 use domains::biosphere::stocks::{CARBON_POOL, TEMP_VAR, WATER_VAPOR};
 use domains::eclss::CABIN_H2O;
-use domains::goldens::{committed, compare, Verdict};
 use domains::params;
 use simcore::environment::Environment;
 use simcore::flow::FlowResult;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
 use station::driver::{DayOrder, Side, TwoRate};
+use station::gas_exchange::GasExchangeStep;
 use station::params as station_params;
 use station::scenario::sealed_station_scenario;
 use station::sealed::{
-    build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
+    build_sealed_station_at, run_sealed, sealed_bio_resolver, sealed_fast_resolver,
+    sealed_reset_hook,
 };
-
-const GOLDEN: &str = "sealed_station_state.json";
 
 /// The cabin's air (mol) and a BVAD-sized plant chamber's (§11: 0.67 m³ × 41.29 mol/m³).
 const CABIN_AIR_MOL: f64 = 9500.0;
@@ -82,19 +85,23 @@ fn main() {
     let eclss = params::eclss();
     let lamp = station_params::lamp();
     let scenario = sealed_station_scenario();
-    let (state, bio, fast) = build_sealed_station(
-        &charge,
-        &params::thermal(),
-        &params::crew(),
-        &eclss,
-        &station_params::water_recovery(),
-        &lamp,
-        &station_params::harvest(),
-        &scenario,
-        false,
-        false,
-    )
-    .expect("build_sealed_station");
+    let build = || {
+        build_sealed_station_at(
+            &charge,
+            &params::thermal(),
+            &params::crew(),
+            &eclss,
+            &station_params::water_recovery(),
+            &lamp,
+            &station_params::harvest(),
+            &scenario,
+            false,
+            false,
+            GasExchangeStep::PlantStep,
+        )
+        .expect("build_sealed_station_at")
+    };
+    let (state, bio, fast) = build();
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("sealed_bio_resolver");
     let fast_r = sealed_fast_resolver(&charge, &scenario).expect("sealed_fast_resolver");
@@ -217,19 +224,24 @@ fn main() {
         .run(DayOrder::Interleaved, state, scenario.days(), &mut observe)
         .expect("two-rate run");
 
-    // Control: this loop is the reference run.
-    let numerics = station::goldens::all()
-        .into_iter()
-        .find(|g| g.name == GOLDEN)
-        .expect("golden on the roster")
-        .numerics;
-    let snap = simcore::snapshot::from_engine(states.last().expect("a day")).to_json();
-    let verdict = match compare(&snap, &committed(GOLDEN), numerics) {
-        Verdict::ByteExact => "byte-exact".to_string(),
-        Verdict::StructurallyEqual => "structurally equal (off-platform)".to_string(),
-        Verdict::Differs(why) => panic!("control FAILED — {GOLDEN} differs: {why}"),
-    };
-    println!("control: end state vs {GOLDEN}: {verdict}");
+    // Control: this loop is the reference runner's run of the same (plant-step) build.
+    let (s0, rb, rf) = build();
+    let (reference, _, _) = run_sealed(
+        &EulerIntegrator::new(rb),
+        &EulerIntegrator::new(rf),
+        s0,
+        &bio_r,
+        &fast_r,
+        &scenario,
+    )
+    .expect("run_sealed");
+    let ours = simcore::snapshot::from_engine(states.last().expect("a day")).to_json();
+    let theirs = simcore::snapshot::from_engine(reference.last().expect("a day")).to_json();
+    assert_eq!(
+        ours, theirs,
+        "control FAILED — the observed loop differs from run_sealed"
+    );
+    println!("control: end state vs run_sealed (plant-step build): byte-exact");
     println!(
         "rationed: slow {} fast {}; days {}",
         totals.slow_rationed,

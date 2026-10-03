@@ -19,14 +19,17 @@ use simcore::state::State;
 use station::driver::run_master_day;
 use station::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, split_carbon_budget, window_key,
-    OnFastStep, CARBON_BUDGET_FLOWS, PLANT_WINDOW_RECORDER, WINDOW_VARS,
+    GasExchangeStep, OnFastStep, CARBON_BUDGET_FLOWS, PLANT_WINDOW_RECORDER, WINDOW_VARS,
 };
 use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
-use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
+use station::sealed::{
+    build_sealed_station, build_sealed_station_at, sealed_bio_resolver, sealed_fast_resolver,
+};
 
+/// The PLANT-STEP sealed build (this file moves the gas exchange itself, onto that).
 fn built(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
-    build_sealed_station(
+    build_sealed_station_at(
         &params::charge(),
         &params::thermal(),
         &params::crew(),
@@ -37,8 +40,9 @@ fn built(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
         scenario,
         false,
         false,
+        GasExchangeStep::PlantStep,
     )
-    .expect("build_sealed_station")
+    .expect("build_sealed_station_at")
 }
 
 /// The sealed build with the crop's gas exchange on the minute step.
@@ -293,4 +297,126 @@ fn a_day_without_one_plant_step_per_group_is_refused() {
     assert!(require_one_plant_step_per_group(1440, 16).is_ok());
     assert!(require_one_plant_step_per_group(24, 16).is_err());
     assert!(require_one_plant_step_per_group(1440, 0).is_err());
+}
+
+/// The reference IS the minute step since 2026-10-03: `build_sealed_station` hands back the
+/// carbon budget on the fast registry and the recorder on the plant one.
+#[test]
+fn the_reference_sealed_station_takes_its_gas_exchange_on_the_minute() {
+    let scenario = sealed_station_scenario();
+    let (_, bio, fast) = build_sealed_station(
+        &params::charge(),
+        &params::thermal(),
+        &params::crew(),
+        &params::eclss(),
+        &station_params::water_recovery(),
+        &station_params::lamp(),
+        &station_params::harvest(),
+        &scenario,
+        false,
+        false,
+    )
+    .expect("build_sealed_station");
+    for id in CARBON_BUDGET_FLOWS {
+        assert!(
+            fast.flows().iter().any(|f| f.id() == id),
+            "{id} not on the minute step"
+        );
+        assert!(
+            bio.flows().iter().all(|f| f.id() != id),
+            "{id} still on the plant step"
+        );
+    }
+    assert!(bio
+        .aux_processes()
+        .iter()
+        .any(|a| a.id() == PLANT_WINDOW_RECORDER));
+}
+
+/// ⚠ **THE DISCARDED-REGISTRY TRAP, found by a missed prediction (2026-10-03).** A builder that
+/// reuses another's plant registry and REBUILDS the fast one (`build_harvest`, the separate-air
+/// build) would throw a minute-step carbon budget away with the registry it discards — the
+/// crop then grows nothing at all, conserving perfectly. Measured once: `harvest`'s plant carbon
+/// fell 17.6 %. So every crop build is held to stepping each carbon-budget flow EXACTLY once,
+/// across its two registries, on the side its form names.
+#[test]
+fn every_crop_build_steps_the_carbon_budget_exactly_once() {
+    use station::air_split::{build_split_station, AirSplit, BVAD_CHAMBER_AIR_MOL};
+    use station::greenhouse::build_greenhouse_at;
+    use station::harvest::build_harvest;
+    use station::scenario::{greenhouse_scenario, harvest_scenario};
+
+    let crew = params::crew();
+    let eclss = params::eclss();
+    let sealed = sealed_station_scenario();
+    let check = |name: &str, bio: &Registry, fast: &Registry, minute: bool| {
+        for id in CARBON_BUDGET_FLOWS {
+            let on_bio = bio.flows().iter().filter(|f| f.id() == id).count();
+            let on_fast = fast.flows().iter().filter(|f| f.id() == id).count();
+            assert_eq!(
+                on_bio + on_fast,
+                1,
+                "{name}: {id} stepped {} times",
+                on_bio + on_fast
+            );
+            assert_eq!(on_fast == 1, minute, "{name}: {id} on the wrong side");
+        }
+    };
+    for gas in [GasExchangeStep::PlantStep, GasExchangeStep::Minute] {
+        let minute = gas == GasExchangeStep::Minute;
+        let (_, bio, fast) = build_greenhouse_at(
+            &crew,
+            &eclss,
+            &greenhouse_scenario(),
+            true,
+            domains::crew::FECAL_WASTE,
+            gas,
+        )
+        .unwrap();
+        check("greenhouse", &bio, &fast, minute);
+        let (_, bio, fast) = build_sealed_station_at(
+            &params::charge(),
+            &params::thermal(),
+            &crew,
+            &eclss,
+            &station_params::water_recovery(),
+            &station_params::lamp(),
+            &station_params::harvest(),
+            &sealed,
+            true,
+            false,
+            gas,
+        )
+        .unwrap();
+        check("sealed", &bio, &fast, minute);
+        let split = AirSplit {
+            chamber_air_mol: BVAD_CHAMBER_AIR_MOL,
+            fan_mol_per_s: 0.2,
+            vapour_crosses: true,
+            gas_exchange: gas,
+        };
+        let (_, bio, fast) = build_split_station(
+            &params::charge(),
+            &params::thermal(),
+            &crew,
+            &eclss,
+            &station_params::water_recovery(),
+            &station_params::lamp(),
+            &station_params::harvest(),
+            &sealed,
+            &split,
+        )
+        .unwrap();
+        check("split", &bio, &fast, minute);
+    }
+    let (_, bio, fast) = build_harvest(
+        &crew,
+        &eclss,
+        &station_params::harvest(),
+        &harvest_scenario(),
+        true,
+        false,
+    )
+    .unwrap();
+    check("harvest (the reference)", &bio, &fast, true);
 }

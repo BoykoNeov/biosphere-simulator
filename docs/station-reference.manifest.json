@@ -69,15 +69,18 @@
   "aux_set": [],
   "delegates_to": "docs/biosphere-reference.manifest.json",
   "flow_set": [
+    "Allocation",
     "CO2Scrubber",
     "Condenser",
     "CrewMetabolism",
     "CrewRespiration",
     "FoodMetabolism",
+    "GrowthRespiration",
     "Harvest",
     "HeatInput",
     "Lamp",
     "LoadDraw",
+    "MaintenanceRespiration",
     "O2Makeup",
     "OxygenConsumption",
     "RadiatorReject",
@@ -140,12 +143,12 @@
     },
     "greenhouse": {
       "golden": "greenhouse_state.json",
-      "golden_sha256": "f469e9154a5bbf20d001eb2bc0796ce5ffdb9229175a3a36ef82b465721e7d7a",
+      "golden_sha256": "636d9356bcbac1e533df356c012818446262f21cdb0d971d9f46d84296285943",
       "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
     },
     "harvest": {
       "golden": "harvest_state.json",
-      "golden_sha256": "3f8e9a0a7902fac27bac7dfee8fd00649a9dc03e52740068ecfe5933f8904f99",
+      "golden_sha256": "f932b4949b7f706e3c9d558c58dcf421f1fa0701ebd526adeb34de71129382ca",
       "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
     },
     "lighting": {
@@ -170,7 +173,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "d974d078e06cb8dda61bf32d314870885a30fa3a2162f489d6f1004e37e18965",
+      "golden_sha256": "24e8caa05eff832e305cb396486c4063202bf89b3212eb1933d8e3033d9e971c",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

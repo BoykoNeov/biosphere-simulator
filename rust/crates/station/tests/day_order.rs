@@ -23,9 +23,13 @@ use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
 use simcore::state::State;
 use station::driver::{
-    advance_one_master_day, day_groups, run_master_day, DayGroups, DayOrder, Side, TwoRate,
+    advance_one_master_day, day_groups, run_master_day, DayGroups, DayOrder, Side, SideTotals,
+    TwoRate,
 };
-use station::greenhouse::{build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver};
+use station::gas_exchange::GasExchangeStep;
+use station::greenhouse::{
+    build_greenhouse, build_greenhouse_at, greenhouse_bio_resolver, greenhouse_cabin_resolver,
+};
 use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver};
 use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver};
 use station::params as station_params;
@@ -39,6 +43,12 @@ fn snap(state: &State) -> String {
     from_engine(state).to_json()
 }
 
+/// The greenhouse builds here take the crop's gas exchange on the PLANT step: this file holds
+/// the retired slow-first order's record, and on a minute-step build that order is refused
+/// (`the_retired_order_is_refused_on_a_minute_step_build`). Since 2026-10-03 the reference
+/// greenhouse is minute-step; the day-order machinery these tests pin does not depend on which.
+const PLANT: GasExchangeStep = GasExchangeStep::PlantStep;
+
 fn ignore(_: Side, _: &State, _: &State) {}
 
 /// The greenhouse, run `days` both by the reference runner and by `TwoRate` in `order`.
@@ -47,7 +57,8 @@ fn greenhouse_both(order: DayOrder, with_plants: bool) -> (String, String, u64, 
     let crew = params::crew();
     let eclss = params::eclss();
     let scenario = greenhouse_scenario();
-    let build = || build_greenhouse(&crew, &eclss, &scenario, with_plants, FECAL_WASTE).unwrap();
+    let build =
+        || build_greenhouse_at(&crew, &eclss, &scenario, with_plants, FECAL_WASTE, PLANT).unwrap();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
     let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
 
@@ -279,7 +290,8 @@ fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
     let crew = params::crew();
     let eclss = params::eclss();
     let scenario = greenhouse_scenario();
-    let (_, bio, cabin) = build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
+    let (_, bio, cabin) =
+        build_greenhouse_at(&crew, &eclss, &scenario, true, FECAL_WASTE, PLANT).unwrap();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
     let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
     let (slow, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(cabin));
@@ -305,7 +317,8 @@ fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
     assert!(msg.contains("share no common factor"), "{msg}");
     assert!(uneven.validate(DayOrder::SlowFirst).is_ok());
     // advance_day refuses on its own, not only through run().
-    let (s0, _, _) = build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
+    let (s0, _, _) =
+        build_greenhouse_at(&crew, &eclss, &scenario, true, FECAL_WASTE, PLANT).unwrap();
     let mut totals = Default::default();
     assert!(uneven
         .advance_day(DayOrder::Interleaved, &s0, &mut totals, &mut ignore)
@@ -334,7 +347,7 @@ fn the_reference_refuses_an_uneven_split_on_every_entry() {
     let scenario = greenhouse_scenario();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
     let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
-    let build = || build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
+    let build = || build_greenhouse_at(&crew, &eclss, &scenario, true, FECAL_WASTE, PLANT).unwrap();
     let divide = |e: SimError| {
         let msg = e.to_string();
         assert!(msg.contains("share no common factor"), "{msg}");
@@ -419,4 +432,35 @@ fn the_day_is_grouped_as_finely_as_equal_groups_allow() {
     for (fast, slow) in [(1440, 7), (0, 16), (24, 0)] {
         assert!(day_groups(fast, slow).is_err(), "{fast} over {slow}");
     }
+}
+
+/// The retired slow-first day runs every plant step before every minute, so on a minute-step
+/// build every minute would read the day's LAST recorded plant window — refused, loudly, on
+/// both the validating and the day-at-a-time entry.
+#[test]
+fn the_retired_order_is_refused_on_a_minute_step_build() {
+    let crew = params::crew();
+    let eclss = params::eclss();
+    let scenario = greenhouse_scenario();
+    let (s0, bio, cabin) = build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
+    let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
+    let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
+    let (slow, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(cabin));
+    let two = TwoRate {
+        slow: &slow,
+        fast: &fast,
+        slow_resolver: &bio_res,
+        fast_resolver: &cabin_res,
+        steps_per_day: scenario.steps_per_day,
+        slow_steps_per_day: scenario.bio_steps_per_day,
+        slow_dt: scenario.bio_dt,
+        fast_dt: scenario.cabin_dt,
+        slow_reset: None,
+    };
+    assert!(two.validate(DayOrder::SlowFirst).is_err());
+    assert!(two.validate(DayOrder::Interleaved).is_ok());
+    let mut totals = SideTotals::default();
+    assert!(two
+        .advance_day(DayOrder::SlowFirst, &s0, &mut totals, &mut ignore)
+        .is_err());
 }

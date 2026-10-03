@@ -15,6 +15,7 @@ use domains::biosphere::stocks::{
     CARBON_POOL, LITTER_CARBON, O2_POOL, ROOTED_DEPTH, SOIL_WATER, STORAGE_C, SUBSOIL_WATER,
     THERMAL_TIME,
 };
+use domains::biosphere::system::weather_shared;
 use domains::crew::{CrewParams, FECAL_WASTE, FOOD_STORE};
 use domains::eclss::EclssParams;
 use simcore::environment::SourceResolver;
@@ -27,12 +28,15 @@ use simcore::state::State;
 use crate::cabin::build_cabin_flows;
 use crate::driver::run_master_day;
 use crate::flows::{Harvest, HarvestParams, HARVEST};
-use crate::greenhouse::{build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver};
+use crate::gas_exchange::{
+    gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
+};
+use crate::greenhouse::{build_greenhouse_at, greenhouse_bio_resolver, greenhouse_cabin_resolver};
 use crate::scenario::HarvestScenario;
 
 /// Assemble the harvest greenhouse: `(state, bio_reg, cabin_reg)`.
 ///
-/// Reuses [`build_greenhouse`] (the sealed biosphere ↔ cabin gas loop), then: (1) starts the
+/// Reuses [`crate::greenhouse::build_greenhouse`] (the sealed biosphere ↔ cabin gas loop), then: (1) starts the
 /// biosphere `thermal_time` aux at `scenario.thermal_time0` (past anthesis ⇒ grain-filling);
 /// (2) appends the [`Harvest`] flow to the cabin / fast registry (`with_harvest`); and (3)
 /// `close_feces` re-points fecal carbon into `LITTER_CARBON` (omitting the `FECAL_WASTE`
@@ -50,8 +54,19 @@ pub fn build_harvest(
     } else {
         FECAL_WASTE
     };
-    let (gh_state, bio_reg, _gh_cabin_reg) =
-        build_greenhouse(crew, eclss, &scenario.greenhouse, true, fecal_target)?;
+    // ⚠ The PLANT-STEP greenhouse, always: this builder keeps the plant registry and REBUILDS
+    // the cabin one below (to add `Harvest`), so a minute-step base would throw the crop's
+    // carbon budget away with the discarded cabin registry — measured 2026-10-03: the crop
+    // grew nothing and the golden's plant carbon fell 17.6 %. The minute step is applied at
+    // the end, onto the rebuilt registry.
+    let (gh_state, bio_reg, _gh_cabin_reg) = build_greenhouse_at(
+        crew,
+        eclss,
+        &scenario.greenhouse,
+        true,
+        fecal_target,
+        GasExchangeStep::PlantStep,
+    )?;
 
     // (1) Start the biosphere phenology past anthesis (a grain-filling plant) — a
     // station-level aux injection over the greenhouse State's stocks.
@@ -102,6 +117,11 @@ pub fn build_harvest(
     let cabin_reg = Registry::flows_only(cabin_flows, &state.stocks)?;
 
     assert_flow_ids_disjoint(&bio_reg, &cabin_reg)?;
+    // The crop's gas exchange on the minute step, as `build_greenhouse` takes it.
+    let g = &scenario.greenhouse;
+    require_one_plant_step_per_group(g.steps_per_day, g.bio_steps_per_day)?;
+    let (bio_reg, cabin_reg) =
+        gas_exchange_on_fast_step(&state.stocks, bio_reg, cabin_reg, &weather_shared(&g.bio))?;
     Ok((state, bio_reg, cabin_reg))
 }
 

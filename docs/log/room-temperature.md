@@ -80,3 +80,14 @@ temperature. Found, recorded, not fixed (the user's call): shared air holds two 
 targets add, so the room counted whole is above saturation on 4 876 of 4 880 plant steps (8 before).
 Nothing reads that sum. Also found: the multi-rate ECLSS authoring anchor would have gone dead under
 a dry start, and nothing ran its trajectory since S6; a test now does.
+
+**Gas exchange minute by minute ADOPTED 2026-10-03 (a station unfreeze)** (note §16–§17a). On the
+user's call, the crop's three carbon-budget flows are stepped on the cabin's 60 s step instead of
+the 90-minute plant step, unchanged, reading the light and temperature the plant step records for
+its window. Lab first: the separate-air build's crop went from 0.174 to **0.920** of shared air's
+CO₂ uptake, and the fan rate now matters (0.863 / 0.920 / 0.949). Redesigned once before adoption
+(a resolver copied at build time would have hidden every plant-side perturbation from
+photosynthesis). Adopted where the cabin's flows act on the crop's air: 3 goldens moved
+(greenhouse +0.29 %, harvest +0.07 %, sealed +0.75 % plant carbon), no water byte. Graded 7 of 7;
+one held only after the bug it caught was fixed (harvest discarded the moved flows). The
+perturbation suite's "pools return to setpoint" claim now takes out the crop's own flux offset.
