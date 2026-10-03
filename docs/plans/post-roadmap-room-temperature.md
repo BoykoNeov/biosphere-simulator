@@ -235,6 +235,37 @@ page **blocks slice 3**. Controlled-environment practice as summarized: 2–6 °
   If no sound source binds, the cold period is **WHAT-IF, lab-only** (`docs/param-file-conventions.md`)
   and the reference build stops at slice 2. The user is told before slice 3 is built either way.
 
+**The cold period's source — pages OPENED 2026-10-03 (user: "yes, alongside").** Read on the
+page itself, via the open PMC full text:
+* **Dhakal, Sandro & Gutiérrez (2025)**, "Optimized protocol for high-throughput vernalization with
+  speed breeding in winter wheat", *Plant Methods*, doi 10.1186/s13007-025-01473-7 (PMC12690896).
+  Methods: *"After emergence, the plants were subjected to two vernalizing treatments for four
+  weeks."* *"For the normal vernalization (NTV) treatment, the plants were maintained at 4 °C with
+  a 16-hour light and 8-hour dark photoperiod"*, at 100–150 µmol m⁻² s⁻¹ (fluorescent). The HTV
+  arm: 10 °C, 22 h light, 400–500 µmol. Result: *"four of the twelve genotypes reached heading
+  (ZGS 59) earlier in NTV, whereas the other eight genotypes did not significantly differ"*.
+  Background: *"A temperature between 0 and 8 °C is considered an optimum vernalization
+  temperature for winter wheat"*; *"the effective vernalization period is reported to be between
+  30 and 45 days for most genotypes"* — ⚠ that sentence cites Vavilov (1951) [22], a secondary
+  locus, not this paper's own measurement.
+  **Locus:** a primary, controlled-environment protocol on **growing plants** under a 16 h light —
+  the closest match to a plant chamber found. ⚠ Its 12 genotypes are not our cultivar class
+  (Soltani & Sinclair's "Wheat / Winter Europe", VDSAT 50).
+* **Wu et al. (2025)**, *Int. J. Mol. Sci.* 26:4280, doi 10.3390/ijms26094280 (PMC12072254):
+  *"Germinated seeds vernalized at 4 °C … for 4 weeks before sowing"*. ⚠ Locus: a **seed**
+  treatment before sowing — the option §10 set aside (chill seed), not a chamber phase. Contrast only.
+* **NOT opened** (blocked: bioRxiv HTTP 429 three times, Wiley HTTP 403): the speed-vernalisation
+  preprint (published as Cha et al. 2022, *Molecular Plant* 15:1300–1309) — the search summary
+  attributes to it *"usually … 4–6 °C for 8 weeks"* and *"most varieties require approximately 6
+  weeks"*; Zheng et al. 2023 (10 °C, 6 weeks); Li et al. 2013, *Plant J.* (3 vs 6 weeks at 4 °C
+  for two cultivars). These stay **unverified** — not to be bound from the summary.
+* **Model readings at 4 °C, predictions only** (1 chill-day per day; factor `1 − 0.033·(50 − d)`):
+  Dhakal's 4 weeks → 28 → **factor 0.274**, held at that value for the rest of the vegetative
+  phase once the chamber warms; Vavilov's 30–45 days → 0.34–0.84; 6 weeks → 0.736; 8 weeks → 1.
+  ⚠ So the one opened protocol leaves the model's cultivar developing at about a quarter speed —
+  a **source/model disagreement about the cultivar**, not a value to tune. Which figure binds is
+  the user's call.
+
 **Re-sow on maturity is a hook change, not a driver change.** `sealed_reset_hook` is handed the
 current `State`, so it can fire on a state condition (development complete) instead of
 `n % season_steps`.
