@@ -924,3 +924,42 @@ fixes nothing on the minute step; a plant-side 22 °C is what is recorded. Mutat
 `--no-fail-fast`, each restored and `cmp`-checked: the recorder reading a build-time copy → 2 red
 (the light and temperature pins); `dt` in seconds → 2 red; no recorder → 4 red; the budget left
 on the plant step too → 2 red. Full suite 1270 passed, 0 failed, 339 s wall.
+
+## 17. ADOPTION into the reference — a station unfreeze (predictions committed before code, 2026-10-03)
+
+**What changes.** `build_sealed_station` and `build_greenhouse` (with plants) take the crop's gas
+exchange on the minute step. Both gain an `_at(…, GasExchangeStep)` form; the plain names mean
+`Minute`. So after this the reference has **two forms**, by where the crop's air is:
+the minute step wherever the cabin's flows act on the crop's air (`greenhouse`, `harvest`,
+`sealed_station`, and the Godot `greenhouse` / `sealed` sessions, which call the same builders);
+the plant step for the lit-room `lighting` scenario (24 power hours cannot pair one-to-one with
+16 plant steps — refused, not approximated) and for every standalone biosphere scenario (no fast
+step exists). `TwoRate::validate` refuses the retired slow-first day on a minute build (every
+minute would read the day's last window). Lab instruments that reproduce plant-step records
+(`day_order`'s slow-first tests, `draw_census`, `intraday_exchange`, `air_split_baseline`, and
+`build_split_station`'s own base) are pointed at `PlantStep` builds.
+
+**Predictions (graded after the build):**
+
+* **A1 — which goldens move:** exactly `greenhouse`, `harvest`, `sealed_station`. Unchanged:
+  `lighting`, `sealed_energy_drift_summary` (energy books do not read the crop), and every other
+  station and biosphere golden.
+* **A2 — what moves inside them:** carbon, O₂ and nitrogen stocks and the crew-side gas
+  boundaries (`co2_removed`, `o2_supply`). **Every water stock and every pre-existing aux value is
+  byte-identical** — transpiration does not read the canopy (§13b's finding), and nothing in the
+  water loop, phenology or root depth reads carbon. The aux block gains two keys,
+  `station.plant_window.par` / `.temp`.
+* **A3 — how much:** `sealed_station` (4 seasons): grain and total plant carbon within **±1.5 %**;
+  `greenhouse` / `harvest` (7-day seedlings): plant carbon within **±1 %**.
+* **A4 — books:** 0 rationing, 0 events in every golden; the tier contract tests pass.
+* **A5 — the manifest:** the three `golden_sha256` rows; the station `flow_set` gains
+  `Allocation`, `GrowthRespiration`, `MaintenanceRespiration` (the sealed FAST registry now holds
+  them). No aux set moves: the recorder sits in the plant registry, which the station manifest
+  excludes — so `PlantWindowRecorder` is a station-side aux type that **no freeze record lists**.
+  Stated, not hidden. Two prose claims become false and are corrected: `freeze_manifest.rs`'s
+  "the slow registry is excluded so no biosphere flow leaks in", and `station-reference.md`'s
+  "biosphere delegated, `build_season` verbatim" for these three scenarios.
+* **A6 — cost:** the `sealed_station` golden 1 m 57 s → **≤ 2 m 45 s**; the full suite ≤ 1.3 × its
+  339 s.
+* **A7 — lab pins with numbers:** pinned values in `warm_room_arrest`, `lamp_shed` and
+  `perturbations` may move; each red is read, explained and re-measured, never loosened.
