@@ -29,7 +29,8 @@
 //! against the Windows golden fails off the generation platform. That is physically
 //! meaningless noise, not a regression.
 //!
-//! ⚠⚠ **And `cargo test` runs on `ubuntu-latest`.** Python's answer is
+//! ⚠⚠ **And `cargo test` runs on a Linux runner** (pinned in `.github/workflows/ci.yml`;
+//! `ubuntu-26.04` since 2026-10-04, glibc's libm either way). Python's answer is
 //! `windows_golden_only`, a pytest skip. Rust has no skip, and the obvious translation —
 //! `#[cfg(windows)]` — is the shape this repo has been bitten by twice: a gate that
 //! compiles out is a gate nobody can see is gone. So the translation here is
