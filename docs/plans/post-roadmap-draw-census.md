@@ -97,6 +97,12 @@ would mix them.
    lab leaf form in the sealed jar, which rationed in `docs/log/leaf-rust-remeasure.md`. There
    the count must be non-zero and must match.
 
+⚠ **Both re-pointed 2026-10-04** (`post-roadmap-room-temperature.md` §17c): since the 1/16 step and
+option C (2026-09-30) control 2's figure is **0.165230 at step 3108**, and control 4's case is the
+frozen jar shrunk to a tenth in the explicit CO₂ form (205 firings) — the leaf-form jar no longer
+rations. Control 2 had printed "NOT reproduced" from then on without failing the verdict; it now
+counts.
+
 ## 4. Predictions — written 2026-09-30, before any census code ran
 
 From the review (Step 2, "Predictions to write before slice 1"):

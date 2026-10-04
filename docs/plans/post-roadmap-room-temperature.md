@@ -1127,7 +1127,10 @@ minute step is the next decision, and the user's.
 
 ### 17c. §17b's stale checks cleared — and a fourth they hid (2026-10-04)
 
-Outputs in `W:\temp\claude\cleanup-2026-10-04\`.
+Outputs in `W:\temp\claude\cleanup-2026-10-04\`. ⚠ **Cause, stated:** only item 3's breakage
+came from the adoption (§17). Controls 2 and 4 of the census went stale at the 1/16 step and
+option C (2026-09-30); `lamp_shed` was un-run, not stale. A sweep of `station/examples/` for the
+slow-first day finds `intraday_exchange` the only one, its builders now all plant-step.
 
 **1. `examples/draw_census.rs` control 4 re-pointed.** Its rationing case is now the one
 `tests/leaf_form.rs` already uses for the same job: the frozen jar with its room shrunk to a tenth
@@ -1169,8 +1172,9 @@ for both the roster and the verdict, and a full (unfiltered) run that does not r
 
 The lamp is still shed at day 4.625 (the group delivering 1/6 of nominal) and never comes back on.
 The plain build still cannot feel the blackout: the minute-step gas exchange reads the recorded
-window light, which the plain lamp never darkens, and the backstop's 5140 firings fall on flows
-drawing the battery, never on the crop's carbon budget.
+window light, which the plain lamp never darkens; and since the crop ends bit-identical to the
+calm run, none of the backstop's 5140 firings can have scaled its carbon budget (inferred from
+that bit-identity, not counted per flow).
 
 **3. `examples/intraday_exchange.rs` was BROKEN, not merely un-run.** It panicked in its harvest
 section: *"the slow-first day cannot run a minute-step gas exchange"*. §17b's "pinned to the plant

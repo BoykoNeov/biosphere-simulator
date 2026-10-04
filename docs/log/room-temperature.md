@@ -102,7 +102,9 @@ and fires, kg for kg from the crew's store, when the zone is set low on purpose.
 against is capped at ≈ 21 kg a season by the plant step's transpiration rule — the next decision.
 
 **Stale checks after the minute-step adoption, cleared 2026-10-04** (note §17c). Three measuring
-tools were left un-run by the adoption; running them found one broken and one more stale. The
+tools were left un-run after the adoption; running them found one the adoption broke
+(`intraday_exchange`) and two census checks that had gone stale earlier, at the 1/16 step and
+option C on 2026-09-30 — not caused by the adoption. The
 lamp-shedding numbers hold on the minute build (6 of 6 predictions; crop +0.58 %, shedding still
 costs it 31.7 %). `intraday_exchange` had been crashing: adoption wired the harvest build to the
 minute step with no plant-step option; `build_harvest_at` added, reference path unchanged. The draw

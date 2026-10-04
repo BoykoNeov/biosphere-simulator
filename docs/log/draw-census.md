@@ -33,6 +33,10 @@ before any code, `6aa7329`), grading and the full table:
   the lab leaf-form jar, which rations: **5 firings, the same 5 `log/leaf-rust-remeasure.md`
   recorded**, CO₂ named, worst 1.1465, 135 steps over 0.5. The bit-for-bit re-application held
   on those 5 scaled steps too.
+* ⚠ **Superseded 2026-10-04** (room-temperature note §17c): both controls 2 and 4 went stale at
+  the 1/16 step and option C (2026-09-30) — control 2 printing "NOT reproduced" while the verdict
+  read "all held". Re-pointed (0.165230 at step 3108; the tenth-size jar, 205 firings), and
+  control 2 now counts in the verdict.
 
 ## Findings
 
