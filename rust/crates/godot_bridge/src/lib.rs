@@ -34,6 +34,12 @@
 //!    FTZ/DAZ read is a complementary check: a game engine that sets those per-thread for
 //!    SIMD throughput would silently diverge from the IEEE-default headless run.
 
+// gdext 0.5.4's `#[class(init)]` expands to an initializer written `base: base`, spanned
+// on our own `base` field, so clippy from Rust 1.99 reports it as ours (CI went red on the
+// toolchain bump alone, 2026-10-01). An `#[allow]` on the struct does not reach the
+// generated impl — measured — so it has to sit here. Revisit when gdext is next bumped.
+#![allow(clippy::redundant_field_names)]
+
 use std::collections::BTreeMap;
 use std::path::Path;
 
