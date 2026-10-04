@@ -1125,6 +1125,70 @@ minute step is the next decision, and the user's.
 * `docs/station-reference.md`'s "the `aux_set` is empty — the station carries no non-conserved
   accumulator" was false after §17 (it carries `PlantWindowRecorder`); reworded to the real reason.
 
+### 17c. §17b's stale checks cleared — and a fourth they hid (2026-10-04)
+
+Outputs in `W:\temp\claude\cleanup-2026-10-04\`.
+
+**1. `examples/draw_census.rs` control 4 re-pointed.** Its rationing case is now the one
+`tests/leaf_form.rs` already uses for the same job: the frozen jar with its room shrunk to a tenth
+(air, CO₂ and O₂ scaled), in the EXPLICIT CO₂ form (`Co2Read::StartOfStep`) — under the
+reference's option C it does not ration, so it could prove nothing. One constant names the case
+for both the roster and the verdict, and a full (unfiltered) run that does not reach it fails.
+* **Two probes agree:** the census reads **205 firings** (probe 205 = integrator 205) and a
+  tightest CO₂ step of **1.488053** of the pool (step 3348, `allocation`) — the figures
+  `leaf_form.rs` measured with `readouts::step_draws`, a separate probe. Control 3 holds on every
+  step (`draw_census_squeezed.txt`).
+* **It can fail** (each mutation run, then restored and `cmp`-checked): the case under option C →
+  *"does not ration — it proves nothing"*; the probe's count off by one → *"probe firings 206 vs
+  integrator 205 (⚠ DISAGREE)"*; the case's roster key renamed, full run → *"control 4 case is
+  not in the roster"* (`draw_census_breakC.txt`).
+* **A FOURTH stale check, found by the full run: control 2.** The tool carries its own copy of the
+  jar's pinned tightest CO₂ step, and it still held the quarter-day figure (0.756662 at step 777).
+  The gate it copies (`science_gates::margins::JAR_CO2_STEP_DRAW`) was re-pinned for the 1/16 step
+  and again for option C on 2026-09-30, to **0.165230 at step 3108**. Every run since printed
+  *"⚠ NOT reproduced"* — and the verdict still read "all held", because control 2 was printed but
+  never counted (the pre-session and after-adoption outputs both show it). Fixed: the copy carries
+  the gate's figure, and control 2 now joins the verdict (a full run that does not reach the jar
+  fails too). Checked: reproduced on the jar; with the old figure put back → *"FAILED — sealed_jar:
+  control 2"*. Two copies, one stale — and a printed check nobody counts is not a check.
+* **Full run** (`draw_census_full2.txt`): **controls: all held** — control 1 byte-exact on all 20
+  runs it checks, control 2 reproduced, control 3 bit for bit, control 4 agrees everywhere and the
+  squeezed jar rations. `cargo clippy --all-targets -D warnings` clean; `cargo test --no-fail-fast`
+  **1275 passed, 0 failed** (the harvest golden among them, so `build_harvest_at` left the
+  reference path byte-identical).
+
+**2. `examples/lamp_shed.rs` re-run on the minute build** — predictions written before reading
+(`lamp_shed_predictions.md`), **6 of 6 held**:
+
+| run | crop (mol C), plant step (§7 of the lamp plan) | minute step | rationed | battery day 8 (J) |
+|---|---|---|---|---|
+| plain, calm | 0.323944 | 0.325813 (+0.58 %) | 0 | 5.7840e7 |
+| plain, blackout | 0.323944 | 0.325813 — **= calm, bit for bit** | 5140 | 1.8144e4 |
+| lab, calm | 0.323944 | 0.325813 | 0 | 5.7840e7 |
+| lab, blackout | 0.221738 (−31.6 %) | 0.222449 (**−31.7 %**) | 0 | 1.8219e7 |
+
+The lamp is still shed at day 4.625 (the group delivering 1/6 of nominal) and never comes back on.
+The plain build still cannot feel the blackout: the minute-step gas exchange reads the recorded
+window light, which the plain lamp never darkens, and the backstop's 5140 firings fall on flows
+drawing the battery, never on the crop's carbon budget.
+
+**3. `examples/intraday_exchange.rs` was BROKEN, not merely un-run.** It panicked in its harvest
+section: *"the slow-first day cannot run a minute-step gas exchange"*. §17b's "pinned to the plant
+step" was true of its greenhouse and sealed builds, but adoption had hard-wired
+`station::harvest::build_harvest` to the minute step with no plant-step variant. Fixed the way
+the other two builders already are: `build_harvest_at(…, GasExchangeStep)`, with `build_harvest`
+calling it with `Minute` (the reference path unchanged; the harvest golden re-checked byte for
+byte by the suite). Re-run, exit 0, 5 min 23 s (`intraday_exchange_rerun.txt`):
+* control 1 (full 4-year sealed station, interleaved == the reference runner, bit for bit): **true**;
+* every station run rations 0 / 0 with no events, in both day orders.
+* ⚠ **It does NOT reproduce its record's numbers, and this is no longer expected to.** The record
+  (`docs/log/intraday-gas-exchange.md`, 2026-09-29) was made at the quarter-day step; since then the
+  1/16 step, option C, Step 3b's sealed transpiration and the 40 % cabin humidity all moved the
+  plant-step tree it runs. Finding 4's SHAPE holds (harvest flow carries the grain half, feces→litter
+  the soil half, independently); its sizes moved: grain store +0.375 → **+0.483**, microbes +0.121 →
+  **+0.151**, humus +0.191 → **+0.237** (both seams on, 7 days). The instrument is a plant-step tool
+  on today's science, not a check of the minute build.
+
 ## 19. Two decisions TAKEN (user, 2026-10-03)
 
 1. **Shared air's two moisture stocks: KEEP two, record the flaw.** The crew's `cabin_h2o` (held

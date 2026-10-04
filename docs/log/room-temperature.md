@@ -100,3 +100,13 @@ trigger (wheat p = 0.55: water when the root zone falls below 45 % full, above t
 stress onset): 4 of 4 held. Over a season it delivers 0 kg in every case (on and off byte-identical)
 and fires, kg for kg from the crew's store, when the zone is set low on purpose. The drain it guards
 against is capped at ≈ 21 kg a season by the plant step's transpiration rule — the next decision.
+
+**Stale checks after the minute-step adoption, cleared 2026-10-04** (note §17c). Three measuring
+tools were left un-run by the adoption; running them found one broken and one more stale. The
+lamp-shedding numbers hold on the minute build (6 of 6 predictions; crop +0.58 %, shedding still
+costs it 31.7 %). `intraday_exchange` had been crashing: adoption wired the harvest build to the
+minute step with no plant-step option; `build_harvest_at` added, reference path unchanged. The draw
+census's control 4 now uses the tenth-size jar (205 firings, matching an independent probe), and its
+control 2 still carried the jar pin from before the 1/16 step — printed "NOT reproduced" on every
+run while the verdict read "all held", because it was never counted. Both now count, and each was
+shown to turn red when broken.
