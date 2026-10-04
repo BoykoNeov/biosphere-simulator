@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `room-temperature.md`
+**Re-read against the record's last row:** `ci-runner-pinned.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -344,6 +344,13 @@ against the branch that does not bind.
 * **The eleven transcendental goldens can only be regenerated on Windows/UCRT.** An unfreeze
   that moves one of them from a Linux box has no regeneration step there. Record it in the
   ceremony; do not `--write` around it.
+* **CI's Rust toolchain is unpinned** (`dtolnay/rust-toolchain@stable`), found 2026-10-04
+  (`log/ci-runner-pinned.md`): the 1.99.0 release alone turned clippy red for three days with
+  tests green throughout. The runner image is now pinned (`ubuntu-26.04`); the toolchain was
+  offered the same pin and not taken. The fix is a crate-wide
+  `allow(clippy::redundant_field_names)` in `godot_bridge`, owed to gdext 0.5.4's generated
+  `base: base` — re-check it whenever gdext is bumped, since a crate-wide allow outlives its
+  cause silently.
 
 ---
 
