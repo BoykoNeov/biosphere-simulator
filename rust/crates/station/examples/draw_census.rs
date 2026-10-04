@@ -20,11 +20,13 @@
 //!
 //! 1. the run's end state byte-matches its committed golden (or, for the two folded goldens,
 //!    the reference runner's own end state) — so the census loop IS the reference run;
-//! 2. the sealed jar's CO₂ row reads the pinned 0.756662 at step 777;
+//! 2. the sealed jar's CO₂ row reads the pinned 0.165230 at step 3108 (a full run that does not
+//!    reproduce it fails the verdict);
 //! 3. on every step, `before + Σ legs (after the backstop's scaling) == after` bit for bit for
 //!    every store — the check that can fail on a run that never rations;
 //! 4. the probe's firing count equals the integrator's, and on one case that really rations
-//!    (the lab leaf form in the jar) it is not zero.
+//!    (the jar shrunk to a tenth, in the explicit CO₂ form) it is not zero. An unfiltered run
+//!    that does not reach that case fails the verdict too.
 //!
 //! It writes nothing and takes no decision.
 
@@ -32,7 +34,7 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::params::{self as bio_params, BiosphereParams};
 use domains::biosphere::readouts::withdrawal_demand;
-use domains::biosphere::science::LeafAreaForm;
+use domains::biosphere::science::Co2Read;
 use domains::biosphere::stocks::{CARBON_POOL, WATER_VAPOR};
 use domains::biosphere::system::{
     annual_reset_with, build_season_with, consumer_chamber_scenario, perennial_chamber_scenario,
@@ -46,7 +48,7 @@ use domains::biosphere::{
 use domains::crew::{build_crew, crew_resolver, MISSION_DAYS, MISSION_SCENARIO};
 use domains::eclss::{build_eclss, eclss_resolver, STEADY_STATE_SCENARIO, STEADY_STATE_STEPS};
 use domains::goldens::{committed, compare, Verdict};
-use domains::lab::biosphere_with_leaf_form;
+use domains::lab::biosphere_with_co2_read;
 use domains::params;
 use domains::power::{
     build_power, power_resolver, BOUNDED_SOC_DAYS, BOUNDED_SOC_SCENARIO, SELF_DISCHARGE_DAYS,
@@ -77,9 +79,15 @@ use station::sealed::{
 use station::system::{build_station, station_resolver};
 use station::water::{build_water_recovery, water_recovery_resolver};
 
-/// The pinned jar figure (`science_gates::margins::JAR_CO2_STEP_DRAW`) and its step.
-const JAR_CO2_DRAW: f64 = 0.756662;
-const JAR_CO2_STEP: u64 = 777;
+/// The pinned jar figure (`science_gates::margins::JAR_CO2_STEP_DRAW`) and its step. ⚠ A COPY:
+/// the gate was re-pinned for the 1/16 step and again for option C (2026-09-30), and this stayed
+/// at the quarter-day step's 0.756662 at step 777 — printed "NOT reproduced" while the verdict
+/// read "all held", until control 2 joined the verdict (2026-10-04).
+const JAR_CO2_DRAW: f64 = 0.165230;
+const JAR_CO2_STEP: u64 = 3108;
+/// The roster key of control 4's rationing case — one name, so the verdict cannot look up a
+/// case the roster no longer carries.
+const SQUEEZED_JAR: &str = "lab_squeezed_jar";
 
 const SECONDS_PER_DAY: f64 = 86400.0;
 
@@ -478,17 +486,27 @@ fn roster() -> Vec<Job> {
             }),
         ),
         (
-            "lab_leaf_jar",
+            SQUEEZED_JAR,
             Box::new(|| {
-                // Control 4's rationing case: the lab leaf form, one season of the jar (all its
-                // firings are in season 1 — `docs/log/leaf-rust-remeasure.md`).
-                let lab = biosphere_with_leaf_form(&[], LeafAreaForm::NodeEnvelope)
+                // Control 4's rationing case. Until 2026-10-04 it was the lab leaf form in the
+                // jar, which stopped rationing at the 1/16 step (2026-09-30). Now the one
+                // `tests/leaf_form.rs` measures for the same purpose: the frozen jar with its
+                // room shrunk to a tenth (air and both gases), in the EXPLICIT CO₂ form — under
+                // the reference's option C it does not ration, so it could prove nothing.
+                let s = sealed_chamber_scenario();
+                let squeezed = SeasonScenario {
+                    chamber_air_capacity_mol: s.chamber_air_capacity_mol * 0.1,
+                    chamber_co2_mol0: s.chamber_co2_mol0 * 0.1,
+                    chamber_o2_mol0: s.chamber_o2_mol0 * 0.1,
+                    ..s
+                };
+                let explicit = biosphere_with_co2_read(&[], Co2Read::StartOfStep)
                     .expect("the frozen params load");
                 season(
-                    "lab_leaf_jar (control 4, NOT frozen)",
-                    sealed_chamber_scenario(),
+                    "lab_squeezed_jar (control 4, NOT frozen)",
+                    squeezed,
                     1,
-                    &lab,
+                    &explicit,
                     false,
                     None,
                 )
@@ -854,17 +872,16 @@ fn main() {
     }
 
     // Control 2: the pinned jar figure.
+    let mut control2_ok = None;
     if let Some((_, jar)) = measured.iter().find(|(k, _)| *k == "sealed_jar") {
         let row = &jar.sides[0].1.rows[CARBON_POOL];
+        let ok = row.worst_n == JAR_CO2_STEP && (row.worst - JAR_CO2_DRAW).abs() < 5e-7;
+        control2_ok = Some(ok);
         println!(
             "\ncontrol 2: jar CO₂ worst {:.6} at step {} (pinned {JAR_CO2_DRAW} at step {JAR_CO2_STEP}) — {}",
             row.worst,
             row.worst_n,
-            if row.worst_n == JAR_CO2_STEP && (row.worst - JAR_CO2_DRAW).abs() < 5e-7 {
-                "reproduced"
-            } else {
-                "⚠ NOT reproduced"
-            }
+            if ok { "reproduced" } else { "⚠ NOT reproduced" }
         );
         // The vapour store's worst step: the condenser draws the whole excess above the
         // humidity target, and the target follows the day's temperature. So a cold day in the
@@ -925,10 +942,27 @@ fn main() {
             }
         }
     }
-    if let Some((_, lab)) = measured.iter().find(|(k, _)| *k == "lab_leaf_jar") {
-        if lab.sides[0].2 == 0 {
-            failed.push("lab_leaf_jar: control 4 case does not ration — it proves nothing".into());
+    match control2_ok {
+        Some(false) => failed.push("sealed_jar: control 2 (the pinned jar figure)".into()),
+        None if only.is_none() => {
+            failed.push("sealed_jar: control 2 case is not in the roster".into())
         }
+        _ => {}
+    }
+    match measured.iter().find(|(k, _)| *k == SQUEEZED_JAR) {
+        Some((_, lab)) if lab.sides[0].2 == 0 => {
+            failed.push(format!(
+                "{SQUEEZED_JAR}: control 4 case does not ration — it proves nothing"
+            ));
+        }
+        Some(_) => {}
+        // A `--only` subset may leave it out; a full run that does not reach it is a failure.
+        None if only.is_none() => {
+            failed.push(format!(
+                "{SQUEEZED_JAR}: control 4 case is not in the roster"
+            ));
+        }
+        None => {}
     }
     println!(
         "\ncontrols: {}",

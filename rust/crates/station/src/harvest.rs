@@ -49,6 +49,30 @@ pub fn build_harvest(
     with_harvest: bool,
     close_feces: bool,
 ) -> Result<(State, Registry, Registry), SimError> {
+    build_harvest_at(
+        crew,
+        eclss,
+        harvest,
+        scenario,
+        with_harvest,
+        close_feces,
+        GasExchangeStep::Minute,
+    )
+}
+
+/// [`build_harvest`] with the crop's gas exchange on the step `gas` names.
+/// `GasExchangeStep::PlantStep` is the form until 2026-10-03, kept for the lab instruments that
+/// reproduce records made with it (`examples/intraday_exchange.rs`'s slow-first day, which a
+/// minute-step build refuses).
+pub fn build_harvest_at(
+    crew: &CrewParams,
+    eclss: &EclssParams,
+    harvest: &HarvestParams,
+    scenario: &HarvestScenario,
+    with_harvest: bool,
+    close_feces: bool,
+    gas: GasExchangeStep,
+) -> Result<(State, Registry, Registry), SimError> {
     let fecal_target = if close_feces {
         LITTER_CARBON
     } else {
@@ -117,11 +141,15 @@ pub fn build_harvest(
     let cabin_reg = Registry::flows_only(cabin_flows, &state.stocks)?;
 
     assert_flow_ids_disjoint(&bio_reg, &cabin_reg)?;
-    // The crop's gas exchange on the minute step, as `build_greenhouse` takes it.
-    let g = &scenario.greenhouse;
-    require_one_plant_step_per_group(g.steps_per_day, g.bio_steps_per_day)?;
-    let (bio_reg, cabin_reg) =
-        gas_exchange_on_fast_step(&state.stocks, bio_reg, cabin_reg, &weather_shared(&g.bio))?;
+    // The crop's gas exchange on the step `gas` names, as `build_greenhouse_at` takes it.
+    let (bio_reg, cabin_reg) = match gas {
+        GasExchangeStep::PlantStep => (bio_reg, cabin_reg),
+        GasExchangeStep::Minute => {
+            let g = &scenario.greenhouse;
+            require_one_plant_step_per_group(g.steps_per_day, g.bio_steps_per_day)?;
+            gas_exchange_on_fast_step(&state.stocks, bio_reg, cabin_reg, &weather_shared(&g.bio))?
+        }
+    };
     Ok((state, bio_reg, cabin_reg))
 }
 

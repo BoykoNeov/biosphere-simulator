@@ -55,7 +55,7 @@ use station::gas_exchange::GasExchangeStep;
 use station::greenhouse::{
     build_greenhouse_at, greenhouse_bio_resolver, greenhouse_cabin_resolver,
 };
-use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver};
+use station::harvest::{build_harvest_at, harvest_bio_resolver, harvest_cabin_resolver};
 use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver};
 use station::params as station_params;
 use station::scenario::{
@@ -599,7 +599,16 @@ fn main() {
             let bio_res = harvest_bio_resolver(&sc).expect("bio");
             let cabin_res = harvest_cabin_resolver(&sc).expect("cabin");
             let build = || {
-                let (s, b, c) = build_harvest(&crew, &eclss, &hp, &sc, true, true).expect("b");
+                let (s, b, c) = build_harvest_at(
+                    &crew,
+                    &eclss,
+                    &hp,
+                    &sc,
+                    true,
+                    true,
+                    GasExchangeStep::PlantStep,
+                )
+                .expect("b");
                 (s, EulerIntegrator::new(b), EulerIntegrator::new(c))
             };
             let shape = (
@@ -622,9 +631,16 @@ fn main() {
                 [(false, false), (true, false), (false, true), (true, true)]
             {
                 let build = || {
-                    let (s, b, c) =
-                        build_harvest(&crew, &eclss, &hp, &sc, with_harvest, close_feces)
-                            .expect("b");
+                    let (s, b, c) = build_harvest_at(
+                        &crew,
+                        &eclss,
+                        &hp,
+                        &sc,
+                        with_harvest,
+                        close_feces,
+                        GasExchangeStep::PlantStep,
+                    )
+                    .expect("b");
                     (s, EulerIntegrator::new(b), EulerIntegrator::new(c))
                 };
                 let (a, _) =
