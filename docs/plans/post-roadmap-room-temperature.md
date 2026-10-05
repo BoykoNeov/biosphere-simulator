@@ -1913,7 +1913,7 @@ tests `rust/crates/station/tests/chamber_walls.rs` (four, plus two full-horizon 
 | R4 | **HELD, to 7 figures** — chamber end **295.1999296 K**; daily range **295.1886868–295.2034234 K**, the re-simulation's exactly |
 | R5 | **HELD** — `boundary.space` fell **1.833528e9 J** against 1.833530e9 (1.1e-6) |
 | R6 | **HELD** — `regen_goldens`: only `sealed_station`; manifest diff = + `ChamberHeater`, + `ChamberWall`, `chamber.yaml`'s digest, the golden hash |
-| R7 | **HALF** — the seven examples against 2b-ii's outputs (`W:\temp\claude\chamber-heat\run_2biii\` vs `…\examples_2bii\`), timings stripped: `air_split`, `air_split_baseline`, `watering`, `minute_transpiration` identical; `draw_census` differs in the energy rows only (`thermal.chamber` worst 0.000195, on day 197.9). ✗ Two differences I did not foresee: **(1)** `lamp_shed`'s blackout run ends with **3.9 MJ less battery** (1.8219e7 → 1.4355e7 J; crop, shed timing and shares identical): once the lamp is shed the chamber cools and the **heater draws on the very battery the shedding protects** — about a fifth of what was left. A finding about the design, recorded, not changed. **(2)** `intraday_exchange`'s day-order comparison now moves 3 energy stocks: the walls read the outdoor temperature by `n`, and the fast minutes after plant step `k` carry `n = k + 1`, so under the retired slow-first order they read the next day's weather all day, under the reference order for the last 90 minutes of each day — the one-plant-step lead every fast-side forcing keyed on `n` already has (L1's lamp window). Documented at `outdoor_temperature`; not special-cased |
+| R7 | **HALF** — the seven examples against 2b-ii's outputs (`W:\temp\claude\chamber-heat\run_2biii\` vs `…\examples_2bii\`), timings stripped: `air_split`, `air_split_baseline`, `watering`, `minute_transpiration` identical; `draw_census` differs in the energy rows only (`thermal.chamber` worst 0.000195, on day 197.9). ✗ Two differences I did not foresee: **(1)** `lamp_shed`'s blackout run ends with **3.9 MJ less battery** (1.8219e7 → 1.4355e7 J; crop, shed timing and shares identical): once the lamp is shed the chamber cools and the **heater draws on the very battery the shedding protects** — about a fifth of what was left. A finding about the design, recorded, not changed here — **the user then chose to shed the heater with the lamp (§23k), built in §23l–§23m: the 3.9 MJ is back.** **(2)** `intraday_exchange`'s day-order comparison now moves 3 energy stocks: the walls read the outdoor temperature by `n`, and the fast minutes after plant step `k` carry `n = k + 1`, so under the retired slow-first order they read the next day's weather all day, under the reference order for the last 90 minutes of each day — the one-plant-step lead every fast-side forcing keyed on `n` already has (L1's lamp window). Documented at `outdoor_temperature`; not special-cased |
 | L1 | **HELD** — the heater drew **1.45653e7 J** (predicted 1.4574e7, −0.06 %); battery vs nominal **+4.30347e7 J** (4.3026e7, +0.02 %); chamber within 0.015 K under 22 °C on every day-end inside the window; without the heater it fell below 280 K; crop byte-identical between the two. ⚠ **Found, not predicted — an instrument lag:** the fast operator runs after its group's plant step has advanced `n`, so a lamp window keyed `[113·16, 118·16)` goes dark in the **last 90 minutes of day 112** and comes back 90 minutes before day 118 ends. The test first compared at `states[113]` and went red on its own control; it now compares at `states[112]` and asserts the lag is where it says (a red there means the lag moved). The same one-plant-step lag the lamp-shed record carries for the crop's light |
 | L2 | **HELD** — cabin 18 °C: **6.2221 W** out; 27 °C: **7.5934 W in**; chamber held (295.201 / 295.206 K) |
 | L3 | **HELD** — space, ε* = 0.01: **22.047 W** at 295.2 K (unit test) |
@@ -1974,3 +1974,24 @@ its heater, which holds the chamber.
 brings up to 200 W of re-warming heat along with the lamp (the chamber cooled while dark), and
 the rule has no latch — so the restore can push the battery straight back under the reserve and
 chatter. The sealed fixture cannot reach it; whoever builds a recovering battery owns that check.
+
+### 23m. The heater shed with the lamp — BUILT (lab), graded (2026-10-05)
+
+Built as §23l describes: `SheddingLoad` and `INTERRUPTIBLE_LOADS` in
+`rust/crates/station/src/lamp_shed.rs`; two tests in `rust/crates/station/tests/lamp_shed.rs`
+(`a_shed_heater_is_the_heaterless_run_bit_for_bit`, `a_lamp_failure_with_a_healthy_battery_keeps_its_heater`).
+Outputs in `W:\temp\claude\heater-shed\`.
+
+| # | Result |
+|---|---|
+| H1 | **HELD** — the blackout run equals the heater-disabled run in every stock and aux value on all 9 day-ends, and in the shed log, bit for bit |
+| H2 | **HELD** — the dark chamber ends at **286.348 K, 8.80 K** below its setpoint (estimate ≈ 8–9 K) |
+| H3 | **HELD** — the example's "lab shed, blackout" battery is **1.8219e7 J** again (was 1.4355e7); crop −31.725 %, first shed in group 74, share 0.5794 — all as before |
+| H4 | **HELD** — with only the lamp's power cut and a healthy battery, the heater drew **3.566e6 J** (predicted 3.5e6 ±20 %, +1.9 %) |
+| H5 | **HELD** — the nine existing `lamp_shed` tests and the four `chamber_walls` tests green unchanged; `regen_goldens` report-only: 20 of 20 identical; clippy clean; full suite **1306 passed, 0 failed** (`--no-fail-fast`) |
+| H6 | **HELD** — exempting the heater from the rule turned exactly H1's test red, the other ten green |
+
+**Tally: H1–H6 held.** One harness slip on the way, not a finding: the first H1 test reused
+`assert_same_run`, which strips the lab's bookkeeping slot from one side only (it compares a lab
+run against a plain one), so it went red at day 0 on identical runs; it now compares the two lab
+runs directly.

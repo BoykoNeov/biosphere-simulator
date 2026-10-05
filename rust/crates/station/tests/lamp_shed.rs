@@ -10,18 +10,21 @@
 
 use std::sync::OnceLock;
 
+use domains::biosphere::perturbations::{window_override, with_forcing};
 use domains::biosphere::stocks::{CONDENSATE, LEAF_C, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C};
 use domains::power::BATTERY;
-use simcore::environment::SourceResolver;
+use simcore::environment::{constant, SourceResolver};
+use simcore::flow::Flow;
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
+use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_HEATER};
 use station::driver::run_master_day;
 use station::lamp_shed::{
     rewire_for_shedding, run_shedding, what_if_reserve, with_lamp_power_cut, ShedLog,
     LAMP_DELIVERY_AUX,
 };
-use station::perturbations::with_brownout;
+use station::perturbations::{with_brownout, ScaledFlow};
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
 
@@ -121,6 +124,60 @@ fn lab(
         rationed,
         log,
     }
+}
+
+const HEATER_HEALTH: &str = "test.chamber_heater_health";
+
+/// [`lab`] with the chamber heater scaled by `heater` (0 = a heater that gives nothing). The
+/// wrapper keeps the heater's id, so the rewire still finds and sheds it.
+fn lab_with_heater(
+    scn: &SealedStationScenario,
+    fast: SourceResolver,
+    bio: &SourceResolver,
+    reserve_j: f64,
+    heater: f64,
+) -> Run {
+    let (state, bio_reg, fast_reg) = build(scn);
+    let (flows, aux) = fast_reg.into_parts();
+    let flows: Vec<Box<dyn Flow>> = flows
+        .into_iter()
+        .map(|f| {
+            if f.id() == CHAMBER_HEATER {
+                Box::new(ScaledFlow::new(f, HEATER_HEALTH.to_string())) as Box<dyn Flow>
+            } else {
+                f
+            }
+        })
+        .collect();
+    let fast_reg = Registry::new(flows, &state.stocks, aux).unwrap();
+    let fast = with_forcing(
+        fast,
+        HEATER_HEALTH,
+        window_override(constant(1.0).unwrap(), 0, u64::MAX, heater),
+    )
+    .unwrap();
+    let (state, bio_reg, fast_reg) =
+        rewire_for_shedding(state, bio_reg, fast_reg, reserve_j).unwrap();
+    let (states, rationed, events, log) = run_shedding(
+        &EulerIntegrator::new(bio_reg),
+        &EulerIntegrator::new(fast_reg),
+        state,
+        bio,
+        &fast,
+        scn,
+        DAYS,
+    )
+    .unwrap();
+    assert!(events.is_empty());
+    Run {
+        states,
+        rationed,
+        log,
+    }
+}
+
+fn chamber_t(state: &State) -> f64 {
+    chamber_temperature(state.stocks[CHAMBER].amount, &station::params::chamber())
 }
 
 fn reserve(scn: &SealedStationScenario) -> f64 {
@@ -331,4 +388,72 @@ fn a_blackout_also_cuts_the_crops_water_loss() {
         c.stocks[SOIL_WATER].amount
     );
     assert!(d.stocks[CONDENSATE].amount < c.stocks[CONDENSATE].amount);
+}
+
+// --- the heater is shed with the lamp (room-temperature plan §23l) ---------------------------
+
+#[test]
+fn a_shed_heater_is_the_heaterless_run_bit_for_bit() {
+    // H1: lit, the lamp holds the chamber above its setpoint, so the heater gives nothing; shed,
+    // the heater goes with the lamp on the same reading; and this station never restores. So
+    // the blackout run is the run with no heater at all, in every stock on every day.
+    let dark = small_lab_blackout();
+    let scn = scenario(SMALL_BATTERY);
+    let (bio, fast) = resolvers(&scn, true);
+    let heaterless = lab_with_heater(&scn, fast, &bio, reserve(&scn), 0.0);
+    assert!(
+        dark.log.delivery.iter().any(|&x| x < 1.0),
+        "nothing was shed"
+    );
+    assert_eq!(dark.log, heaterless.log);
+    assert_eq!(dark.rationed, heaterless.rationed);
+    assert_eq!(dark.states.len(), heaterless.states.len());
+    for (day, (d, h)) in dark.states.iter().zip(&heaterless.states).enumerate() {
+        assert_eq!(d, h, "day {day} differs");
+    }
+    // H2, the liveness: the chamber did fall well below its setpoint, so a heater left on would
+    // have drawn (3.9 MJ before §23l).
+    let setpoint = station::params::chamber().setpoint;
+    let end = chamber_t(dark.states.last().unwrap());
+    eprintln!(
+        "H1/H2: dark chamber ends {end} K, {} K below the setpoint",
+        setpoint - end
+    );
+    assert!(
+        end < setpoint - 3.0,
+        "chamber {end} K, setpoint {setpoint} K"
+    );
+}
+
+#[test]
+fn a_lamp_failure_with_a_healthy_battery_keeps_its_heater() {
+    // H4: the heater is cut by the battery rule, not by the lamp being dark. With only the lamp's
+    // power cut and the frozen battery (never near the reserve), the heater holds the chamber.
+    let scn = scenario(sealed_station_scenario().battery0);
+    let (bio, _) = resolvers(&scn, false);
+    let cut = || {
+        with_lamp_power_cut(
+            sealed_fast_resolver(&domains::params::charge(), &scn).unwrap(),
+            BLACKOUT.0,
+            BLACKOUT.1,
+        )
+        .unwrap()
+    };
+    let heated = lab_with_heater(&scn, cut(), &bio, reserve(&scn), 1.0);
+    let cold = lab_with_heater(&scn, cut(), &bio, reserve(&scn), 0.0);
+    assert!(
+        heated.log.delivery.contains(&0.0),
+        "the lamp never went dark"
+    );
+    assert!(heated
+        .states
+        .iter()
+        .all(|s| s.stocks[BATTERY].amount > reserve(&scn)));
+    let battery = |r: &Run| r.states.last().unwrap().stocks[BATTERY].amount;
+    let drawn = battery(&cold) - battery(&heated);
+    eprintln!("H4: the heater drew {drawn} J with the lamp's power cut");
+    assert!(
+        (drawn / 3.5e6 - 1.0).abs() < 0.2,
+        "the heater drew {drawn} J, predicted 3.5e6 ±20 %"
+    );
 }

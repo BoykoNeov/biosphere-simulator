@@ -173,6 +173,8 @@ is invented) or gradual dimming (shape and threshold both invented). Recommendat
 * `SheddingLamp` — the frozen `Lamp` with every leg times 1.0 or 0.0: on exactly when the battery
   holds at least the reserve. Stateless: below the reserve it is off, and only charging can lift
   the battery back over it, so no latch is stored (the restore reading is ours; §5).
+  ⚠ Renamed `SheddingLoad` on 2026-10-05: it now also sheds the plant chamber's heater, at the
+  same reserve (`docs/plans/post-roadmap-room-temperature.md` §23k–§23m).
 * `WHAT_IF_RESERVE_HOURS = 24` h of the life-support load (`balanced_load_w`) — 2.61e7 J on the
   sealed station. Chosen, not sourced.
 * `run_shedding` — the reference's interleaved day, plus bookkeeping: over each power group it

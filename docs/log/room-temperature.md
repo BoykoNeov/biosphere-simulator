@@ -189,3 +189,12 @@ chamber went red, unpredicted; it now runs with the walls off.
 
 Saved sealed sessions from before 2b-iii also lack `boundary.chamber_surroundings`, so the same
 `load_state` set-equality guard refuses them with the same error (read, not run).
+
+**The heater shed with the lamp, BUILT 2026-10-05 (lab only)** (note §23k–§23m). The user's
+call: the heater is an interruptible load, so the lab's lamp shedding switches it off too, on
+the same battery reading. The blackout run is now the run with no heater at all, bit for bit,
+and its battery is back at 1.8219e7 J; the chamber, unheated, ends 8.8 K below 22 °C. A lamp
+that fails while the battery is healthy keeps its heater (3.57 MJ over three days). Six
+predictions, six held; nothing frozen moved. Unbuilt and recorded: on a station whose battery
+recovers, switching back on brings up to 200 W of re-warming with the lamp, and the rule has no
+latch, so the restore could chatter.

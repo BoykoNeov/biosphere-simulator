@@ -18,8 +18,16 @@
 //! is split into an *interruptible* load and an *uninterruptible* one, and *"the interruptible
 //! load is shed when the battery system contains an amount of charge remaining that is
 //! sufficient to enable the spacecraft system to survive until a positive battery charging
-//! condition is achieved"*. Here the lamp is the interruptible load and life support
-//! (`LoadDraw`) the uninterruptible one; the lamp is **switched off**, not dimmed.
+//! condition is achieved"*. Here the interruptible load is the lamp **and the plant chamber's
+//! heater** ([`INTERRUPTIBLE_LOADS`]; the heater since 2026-10-05, the user's *"cut it with the
+//! lamp"*, `docs/plans/post-roadmap-room-temperature.md` §23k–§23l) and life support
+//! (`LoadDraw`) the uninterruptible one; both are **switched off**, not dimmed, on the same
+//! battery reading. The heater follows the battery rule, not the lamp: a lamp that fails with a
+//! healthy battery keeps its heater.
+//!
+//! ⚠ Untested: on a station whose battery recovers, switching back on brings up to the heater's
+//! capacity of re-warming heat along with the lamp, and the rule has no latch, so the restore
+//! can push the battery straight back under the reserve. The sealed station never restores.
 //!
 //! The rule is stateless: the lamp is on exactly when the battery holds at least the reserve
 //! ([`lamp_on`]). Below the reserve it is off, and the battery can only climb back over the
@@ -65,9 +73,13 @@ use simcore::integrator::{EulerIntegrator, Substepper};
 use simcore::registry::Registry;
 use simcore::state::State;
 
+use crate::chamber::CHAMBER_HEATER;
 use crate::driver::{day_groups, DAYS_PER_MASTER_DAY, SECONDS_PER_DAY};
 use crate::flows::{LAMP, LAMP_POWER_VAR};
 use crate::scenario::SealedStationScenario;
+
+/// The loads switched off below the reserve: the lamp and the plant chamber's heater.
+pub const INTERRUPTIBLE_LOADS: [&str; 2] = [LAMP, CHAMBER_HEATER];
 
 /// The aux slot carrying the share of the nominal lamp power drawn over the last power group.
 pub const LAMP_DELIVERY_AUX: &str = "station.lab.lamp_delivery";
@@ -88,16 +100,16 @@ pub fn lamp_on(battery_j: f64, reserve_j: f64) -> bool {
     battery_j >= reserve_j
 }
 
-/// The lamp, shed below the reserve: every leg of the wrapped `Lamp` times `1.0` or `0.0`,
-/// so the result stays balanced.
-pub struct SheddingLamp {
+/// An interruptible load, shed below the reserve: every leg of the wrapped flow (`Lamp` or the
+/// chamber heater) times `1.0` or `0.0`, so the result stays balanced.
+pub struct SheddingLoad {
     inner: Box<dyn Flow>,
     reserve_j: f64,
 }
 
-impl Flow for SheddingLamp {
+impl Flow for SheddingLoad {
     fn type_name(&self) -> &'static str {
-        "SheddingLamp"
+        "SheddingLoad"
     }
 
     fn id(&self) -> &str {
@@ -132,7 +144,7 @@ fn battery(state: &State) -> Result<f64, SimError> {
         .stocks
         .get(BATTERY)
         .map(|s| s.amount)
-        .ok_or_else(|| SimError::Reference(format!("no {BATTERY:?} stock to shed the lamp on")))
+        .ok_or_else(|| SimError::Reference(format!("no {BATTERY:?} stock to shed a load on")))
 }
 
 /// Whether the fast registry's lamp draws from the battery on `state` — the lit detector.
@@ -140,7 +152,7 @@ fn battery(state: &State) -> Result<f64, SimError> {
 /// ⚠ Until 2026-10-05 a step counted as lit when light arrived in `boundary.light_used`; the
 /// sealed station's light now heats the plant chamber and that stock is gone (Step 3c slice
 /// 2b-ii, `docs/plans/post-roadmap-room-temperature.md` §23g). The lamp is evaluated on the
-/// step's starting state with the step's own environment, so a shed lamp ([`SheddingLamp`]
+/// step's starting state with the step's own environment, so a shed lamp ([`SheddingLoad`]
 /// zeroes every leg) and a failed one (`lamp_power` 0) both read dark.
 fn lamp_draws(
     fast_integrator: &EulerIntegrator,
@@ -250,10 +262,10 @@ impl AuxProcess for LampLitAux {
     }
 }
 
-/// Re-wire a built sealed station for the lab: the fast registry's `Lamp` becomes a
-/// [`SheddingLamp`] at `reserve_j`, every slow flow and aux process becomes lamp-lit, and the
-/// state carries [`LAMP_DELIVERY_AUX`] — 1.0 unless it already carries one, as a state saved
-/// by [`run_shedding`] does. Takes the pieces `build_sealed_station` returns, so a
+/// Re-wire a built sealed station for the lab: the fast registry's `Lamp` and chamber heater
+/// each become a [`SheddingLoad`] at `reserve_j`, every slow flow and aux process becomes
+/// lamp-lit, and the state carries [`LAMP_DELIVERY_AUX`] — 1.0 unless it already carries one,
+/// as a state saved by [`run_shedding`] does. Takes the pieces `build_sealed_station` returns, so a
 /// perturbation can be composed before or after.
 pub fn rewire_for_shedding(
     state: State,
@@ -271,24 +283,26 @@ pub fn rewire_for_shedding(
         .map(|inner| Box::new(LampLitAux { inner }) as Box<dyn AuxProcess>)
         .collect();
     let (fast_flows, fast_aux) = fast_reg.into_parts();
-    let mut found = false;
+    let mut found = [false; INTERRUPTIBLE_LOADS.len()];
     let shed_flows: Vec<Box<dyn Flow>> = fast_flows
         .into_iter()
-        .map(|flow| {
-            if flow.id() == LAMP {
-                found = true;
-                Box::new(SheddingLamp {
-                    inner: flow,
-                    reserve_j,
-                }) as Box<dyn Flow>
-            } else {
-                flow
-            }
-        })
+        .map(
+            |flow| match INTERRUPTIBLE_LOADS.iter().position(|id| *id == flow.id()) {
+                Some(i) => {
+                    found[i] = true;
+                    Box::new(SheddingLoad {
+                        inner: flow,
+                        reserve_j,
+                    }) as Box<dyn Flow>
+                }
+                None => flow,
+            },
+        )
         .collect();
-    if !found {
+    if let Some(i) = found.iter().position(|f| !f) {
         return Err(SimError::Reference(format!(
-            "the fast registry carries no {LAMP:?} flow to shed"
+            "the fast registry carries no {:?} flow to shed",
+            INTERRUPTIBLE_LOADS[i]
         )));
     }
     let mut state = state;
