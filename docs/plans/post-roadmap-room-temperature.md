@@ -1646,3 +1646,69 @@ flat from step 0. The stock is referenced to absolute zero (`T = Q / C_ch`), not
 
 Not asked, defaulted (say so to override): all the light becomes chamber heat (≤ 0.72 %
 overcount); C_ch = 1.5e5 J/K and capacity = 200 W, both DESIGN with the anchors above.
+
+**ANSWERED 2026-10-05 (verbatim):**
+1. Dead lamp: *"walls loose heat to what is near them, the outside should be modelled - it can be
+   environment, it can be inside the station, it can be in space . also the oustide may be hotter
+   or cooler"* — the recommendation (hot direction only) was **declined**.
+2. Radiator: *"Yes, physical (Recommended)"* — the exchanger moves heat only into a colder node.
+3. Control: *"1-minute response"* — k = 1/60 s⁻¹, k·dt = 1.0 on the 60 s step: the controller
+   removes the **whole** snapshot excess each step (capped by capacity). Steady offset 0.024 K
+   (2b-i) / 0.053 K (2b-ii) above 22 °C. ⚠ `k·dt > 1` would overshoot and oscillate on a coarser
+   step, silently — so the build **hard-errors** on `k·dt > 1`.
+
+**Advisor on the answers (2026-10-05), summarized.** 2b-i and 2b-ii stand unchanged (they do not
+depend on what the chamber sits next to). The walls are a **third** golden diff, **2b-iii**. Before
+asking again: price each surroundings option (wall flow across a range of insulation, sources
+searched first), and say whether the lamp's 133 W alone holds 22 °C against the loss — if not, a
+heater is not optional. Questions owed: a heater on the battery (a new load, a new DESIGN
+capacity); what the reference chamber sits in (§10 put it **inside the station**, so "inside" is
+the consistent default — the cabin held at 22 °C, cited, or the node, whose −98 °C is not
+physical; or wait for 2c's cabin store); ship one surroundings in the reference and the others
+lab-only. Mechanics: a two-signed boundary for the surroundings (check simcore already has one —
+its diff stays empty); a test either side of `T_node = T_ch`, since the node is referenced to
+`T_space` and the chamber to 0 K; predict the bounded dip `wall·dt/C` when wall and exchanger act
+on the same step.
+
+**Checked:** simcore's `boundary::source(.., unclamped = true)` already takes both signs
+(`boundary.o2_supply` ends negative in the golden), so a two-signed surroundings reservoir needs
+no simcore change.
+
+### 23d. 2b-iii — the walls, priced (2026-10-05)
+
+**The wall's conductance — a CLASS citation.** BVAD Table 4-50, "Frozen Food Storage on a Property
+per Frozen-Food-Mass Basis" (page image READ, PDF page index 125,
+`W:\temp\claude\chamber-heat\bvad_t4-50.png`): **1/R_S = 0.28 / 0.32 / 0.32 × 10⁻³ kW/m²·K** (low /
+nominal / high, Ewert 2002) — the composite wall resistance of an ISS-class cooled cabinet *"through
+the cabinet wall accounting for insulation, door seals, and any other pathways"* (text, printed
+p. 111). Locus: a freezer cabinet inside a cabin, not a plant chamber — class only. Taken: **U =
+0.30 W/m²·K** (mid of the range). The chamber's wall area is DESIGN geometry: a 1 m × 1 m box of
+Table 4-88's shoot + root volume (0.78 m³ → 0.78 m tall) = **5.12 m²** → **UA = 1.536 W/K** (cited
+range 1.43–1.64). Time constant `C_ch/UA` = **27 h**.
+* BVAD p. 144: *"Passive thermal control … generally takes the form of insulation and resistive
+  heaters"*, and footnote 161: inside a pressurized cabin, conduction/convection dominate and
+  radiant exchange is often neglected. A cited precedent for a heater, and for a linear wall law
+  inside the station.
+
+**Each surroundings, with the chamber at 22.05 °C and the lamp's 133.3 W (2b-ii):**
+
+| Surroundings | Law | Normal wall flow | Lamp alone holds 22 °C? | Lamp dead |
+|---|---|---|---|---|
+| **Cabin**, held at a setting (22 °C BVAD nominal; settable hotter or cooler) | UA·ΔT | **0.08 W** out | yes | stays ≈ 22 °C (nothing to see at a 22 °C cabin) |
+| **Outdoor weather** (the Dutch file, −1.8 to 22.2 °C) | UA·ΔT | 17.5 W mean, 36.6 W max out | yes | cools toward outdoors, 27 h time constant |
+| **Space** (insulation blanket, radiative to 2.7 K) | ε*σA(T⁴−T_s⁴) | 3.1 / 22 / 66 W at ε* = 0.0014 / 0.01 / 0.03 | yes | cools, radiatively |
+| **Station structure** (the node, −98 °C) | UA·ΔT | **185 W** out | **NO** — settles at −11.4 °C without a heater | — |
+
+* ε* has **no source**: NASA/TP-1999-209263 (Finckenor & Dooling, opened) gives layer
+  emittance < 0.04 and "each reflector will reflect 90 to 99 percent", not a blanket's effective
+  emittance. 0.0014 is the textbook ideal for 15 layers at 0.04 (form only); real blankets are
+  worse by an unsourced factor.
+* The station-structure row is driven by the node's −98 °C, which §2 already says is not physical.
+* With the cabin at 22 °C the wall matters in slice 3's **cold phase**: a 4 °C chamber gains
+  1.536 × 18 = **27.7 W** from the cabin.
+* Where the heat goes: to a boundary for cabin / outdoors / space (it leaves the station's energy
+  books — for the cabin, a recorded gap until 2c gives the cabin a store); to the node for the
+  structure.
+
+**A heater** (a battery load, resistive, DESIGN capacity) matters only where the lamp cannot hold
+the chamber: always for the structure, and with the lamp dead for outdoors and space.
