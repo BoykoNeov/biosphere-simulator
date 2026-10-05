@@ -147,3 +147,18 @@ night-time leaf water loss is smaller than predicted, so in the weather chamber 
 steps now fall under the cap. Found on the way: `examples/air_split.rs` had crashed since the
 minute-step adoption, and its "shared" row had silently become the minute build before the crash.
 Nothing runs examples, and the 2026-10-04 sweep of stale instruments missed it. Repaired.
+
+**The plant chamber's heat store, slice 2b-i BUILT 2026-10-05 (a station unfreeze)** (note
+§23–§23f). The user took the heat store over the minute-step adoption question, then decided its
+design: walls that lose heat to their surroundings, which may be hotter or cooler (*"it can be
+environment, it can be inside the station, it can be in space"*); the reference chamber's walls
+face the outdoor weather, the cabin, space and the station structure are lab options; a heater
+on the battery; the cooler works only into a colder node; a 1-minute response. Priced first: at
+most 0.72 % of the lamp's light is stored as sugar (NIST's glucose combustion on the golden's
+organic carbon), so all the light becomes chamber heat; BVAD Table 4-88 books every chamber
+watt as heat to remove; Table 4-50's freezer-wall conductance gives the walls a class figure.
+Three diffs, one cause each. **2b-i**: the lamp's waste heat passes through the chamber to the
+node. Every existing stock in the reference run is byte-identical, the node included (predicted
+only within 1e-9); 8 of 9 predictions held. A dead cooler heats the chamber 34.8 K a day with
+the crop untouched. ⚠ Flagged for slice 3: walls facing the weather do not make the plants feel
+the weather; which temperature the plants read is the calibration question.

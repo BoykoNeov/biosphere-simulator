@@ -1,0 +1,59 @@
+# chamber — the plant growth chamber's heat store and its cooler (Step 3c, slice 2b-i,
+# 2026-10-05; docs/plans/post-roadmap-room-temperature.md §23).
+# Currency/units: ENERGY (J). The coefficients the chamber introduces.
+#
+# The chamber is a held room that can fail (§10, the user's form B): a sensible-heat store
+#     T_ch = Q / C_ch                (K, referenced to absolute zero — NOT to T_space)
+# that the grow lamp's heat flows into, and a cooler that moves heat on to the station's
+# thermal node, first-order toward the setpoint and capped:
+#     removed = min(cooling_capacity·dt, (Q − C_ch·setpoint)·dt/response_time)
+# only while Q > C_ch·setpoint AND the node is colder than the chamber (the second law: no
+# heat pump is modelled). The PLANTS DO NOT READ THIS TEMPERATURE YET (that is slice 3).
+#
+# heat_capacity (C_ch) — the chamber's lumped heat capacity (J/K), > 0.
+# cooling_capacity — the most heat the cooler moves (W), >= 0. 0 is a valid, failed cooler.
+# response_time (τ) — the cooler's first-order time constant (s), > 0. LOAD-BEARING: the
+#   fast step must satisfy dt <= τ, or the cooler overshoots the setpoint and oscillates
+#   without any error; the station build hard-errors on dt > τ. At τ = dt = 60 s the cooler
+#   removes the whole excess each step (deadbeat).
+# setpoint — the chamber's held temperature (K), > 0. Absolute Kelvin, like radiator.yaml.
+#
+# PROVENANCE. One value is a class citation; three are DESIGN.
+#   setpoint         → CITED by ANALOGY [A] (a crew-cabin figure applied to a plant chamber)
+#   heat_capacity    → DESIGN, with a plausibility anchor [B][C] (NOT a derivation)
+#   cooling_capacity → DESIGN, sized by a class rule [B]
+#   response_time    → DESIGN, the user's choice ("1-minute response", 2026-10-05)
+#
+# Sources:
+#   [A] NASA/TP-2015-218570 Rev 2 (BVAD, Feb 2022), Table 4-73 "Crew Cabin Thermal Ranges",
+#       printed p. 153 (read as the page image, 2026-10-01): air temperature 291.15 / 295.15 /
+#       300.15 K lower / nominal / upper.
+#   [B] BVAD Rev 2, Table 4-88 "Plant Growth Chamber Equivalent System Mass per Growing Area",
+#       printed p. 170 (read as the page image, 2026-10-05; Drysdale 1999b): thermal control
+#       equals power on every row (shoot zone 0.3, root zone 0.14, lamps 2.1, ballasts 0.075,
+#       total 2.6 kW/m²) — every installed watt is booked as heat to reject; root zone "Water
+#       and Nutrients" 36.8 kg/m².
+#   [C] NIST Chemistry WebBook, SRD 69, water (CAS 7732-18-5), liquid-phase Shomate equation
+#       (Chase 1998), 298–500 K: Cp = 75.375 J/mol·K at 298.15 K = 4184 J/kg·K (opened
+#       2026-10-05).
+
+name: chamber
+process: chamber_heat
+
+parameters:
+  heat_capacity:
+    value: 1.5e5
+    unit: "J/K"
+    source: "DESIGN — no source fixes a plant chamber's lumped heat capacity. Plausibility anchor, NOT a derivation (the radiator.yaml heat_capacity precedent): [B]'s root-zone water and nutrients, 36.8 kg per m² of crop, taken as water at [C]'s 4184 J/kg·K, gives 1.54e5 J/K for the station's 1 m² crop; rounded. Air alone (27.66 mol at 29.1 J/mol·K, ≈ 0.80 kJ/K) would heat 9.9 K per 60 s step at the lamp's 133 W — unusable. At this value one step's full lamp input moves the chamber 0.053 K. Not calibrated."
+  cooling_capacity:
+    value: 200.0
+    unit: "W"
+    source: "DESIGN — a class sizing rule from [B]: thermal control is sized to the installed power, row by row. The chamber's installed power here is the grow lamp's nameplate, scenario lamp_power_w = 200 W (fans are not modelled). 1.5× the lamp's averaged draw of 133.3 W. Not calibrated."
+  response_time:
+    value: 60.0
+    unit: "s"
+    source: "DESIGN — the user's choice of a 1-minute response (2026-10-05, §23c), over the cabin condenser's 2000 s precedent (eclss.yaml condense_rate). At the station's 60 s fast step dt/τ = 1.0 exactly: the cooler removes the whole excess each step, and the chamber settles one step's input above the setpoint (0.024 K on the waste heat alone). No source can fix a controller's time constant for this chamber. Not calibrated."
+  setpoint:
+    value: 295.15
+    unit: "K"
+    source: "[A], Table 4-73 p. 153, the crew cabin's NOMINAL air temperature 295.15 K (22 °C; nominal attributed there to Thirsk et al. 2009). ⚠ LOCUS: a crew-cabin figure, applied to a plant chamber by ANALOGY only — a class citation, the same standing as BVAD Table 4-111's 23 °C crop-room figure (§10). The value is the user's choice (2026-10-01)."

@@ -340,6 +340,23 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-05 — the plant chamber's heat store, slice 2b-i: a station PARAMETER FILE and a
+  FLOW are added; 1 golden moves (`sealed_station`) by one added stock and nothing else.** The
+  user's form B (*"a held room that can fail"*, 2026-10-01), the first of three diffs
+  (`docs/plans/post-roadmap-room-temperature.md` §23). The grow lamp's waste heat, which went
+  straight to `thermal.node`, now goes into `thermal.chamber` (`T = Q / C_ch`, from 0 K), and a
+  new flow `station.chamber_cooling` (`ChamberCooling`) hands it to the node: first-order
+  toward the setpoint, capped, and only into a colder node (the second law). New
+  `station/params/chamber.yaml`: `setpoint` 295.15 K (BVAD Table 4-73, by analogy),
+  `heat_capacity` 1.5e5 J/K (DESIGN; anchor: Table 4-88's 36.8 kg/m² of root-zone water at
+  NIST's 4184 J/kg·K), `cooling_capacity` 200 W (DESIGN; Table 4-88 sizes thermal control to
+  installed power), `response_time` 60 s (DESIGN, the user's "1-minute response"); the build
+  refuses `dt > τ`. Advisor-reviewed before code; predictions committed first (§23e), graded
+  in §23f, 8 of 9 held: **every pre-existing stock and aux value is byte-identical**, the node
+  and `boundary.space` included (predicted only within 1e-9), and the chamber holds
+  295.1741575 K to the bit. The station census gains its ninth param file. The plants do not
+  read the chamber yet. Lab: a dead cooler heats it 34.79 K a day and the node relaxes to the
+  closed-form 160.31 K, with the crop byte-identical (`tests/chamber_heat.rs`).
 - **2026-10-05 — a lamp-lit crop's net radiation is the lamp's, not the weather file's
   outdoor value; 2 station goldens move (`sealed_station`, `lighting`), 2 `golden_sha256`
   rows follow. No parameter added, no flow added, no `simcore` byte changed.** The user's

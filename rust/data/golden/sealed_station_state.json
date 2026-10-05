@@ -454,6 +454,19 @@
       "unit": "J"
     },
     {
+      "amount": "0x1.51cccdd0f1feep+25",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "thermal",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "thermal.chamber",
+      "kind": "pool",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    },
+    {
       "amount": "0x1.88bb681977d89p+30",
       "composition": {
         "energy": "0x1.0000000000000p+0"

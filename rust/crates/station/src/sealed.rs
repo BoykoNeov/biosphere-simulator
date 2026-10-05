@@ -43,6 +43,10 @@ use simcore::quantities::Quantity;
 use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
+use crate::chamber::{
+    chamber_heat0, chamber_stock, require_step_within_response, ChamberCooling, ChamberParams,
+    CHAMBER, CHAMBER_COOLING,
+};
 use crate::driver::{run_master_day, OwnedResetHook};
 use crate::flows::{
     CrewRespiration, Harvest, HarvestParams, Lamp, LampParams, WaterRecovery, WaterRecoveryParams,
@@ -94,6 +98,13 @@ pub fn sealed_node_heat(
         (1.0 - charge.charge_efficiency) * solar_avg + load_w + (1.0 - eta_lamp) * lamp_avg;
     let t_eq = equilibrium_temperature(thermal_params, heat_w);
     thermal_params.heat_capacity * (t_eq - thermal_params.space_temperature)
+}
+
+/// The lamp's averaged waste heat (W), `(1 − η_lamp)·lamp_avg` — the chamber's only heat
+/// input in slice 2b-i (`docs/plans/post-roadmap-room-temperature.md` §23e).
+pub fn lamp_waste_heat_w(lamp: &LampParams, scenario: &SealedStationScenario) -> f64 {
+    let eta_lamp = lamp.photon_efficacy * PAR_PHOTON_ENERGY_J_PER_UMOL;
+    (1.0 - eta_lamp) * lighting_average_power(scenario)
 }
 
 /// Assemble the fully-coupled sealed station: `(state, bio_reg, fast_reg)`, with the crop's
@@ -155,6 +166,8 @@ pub fn build_sealed_station_at(
         FECAL_WASTE
     };
     let node0 = sealed_node_heat(charge, thermal_params, lamp, scenario);
+    let chamber = crate::params::chamber();
+    require_step_within_response(scenario.cabin_dt, &chamber)?;
     let mut fast_seq = vec![
         food_store_stock(scenario.cabin.food_store0)?,
         water_store_stock(scenario.cabin.water_store0)?,
@@ -179,6 +192,10 @@ pub fn build_sealed_station_at(
         true,
     )?);
     fast_seq.push(node_stock(node0)?);
+    fast_seq.push(chamber_stock(chamber_heat0(
+        &chamber,
+        lamp_waste_heat_w(lamp, scenario),
+    ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
     fast_seq.push(boundary::sink(
         LIGHT_USED.to_string(),
@@ -227,6 +244,7 @@ pub fn build_sealed_station_at(
         recovery,
         lamp,
         harvest,
+        &chamber,
         CabinAir {
             co2: CARBON_POOL, // the greenhouse seam: crew exhales into the bio CO₂
             o2: O2_POOL,      // the greenhouse seam: crew breathes the bio O₂
@@ -267,6 +285,7 @@ pub(crate) fn sealed_fast_flows(
     recovery: &WaterRecoveryParams,
     lamp: &LampParams,
     harvest: &HarvestParams,
+    chamber: &ChamberParams,
     air: CabinAir<'_>,
     fecal_target: &str,
     with_harvest: bool,
@@ -328,8 +347,15 @@ pub(crate) fn sealed_fast_flows(
             LAMP.to_string(),
             BATTERY.to_string(),
             LIGHT_USED.to_string(),
-            NODE.to_string(), // the inward move Step 5 deferred: lamp heat → the node
+            CHAMBER.to_string(), // lamp heat → the plant chamber (Step 3c slice 2b-i)
             *lamp,
+        )),
+        Box::new(ChamberCooling::new(
+            CHAMBER_COOLING.to_string(),
+            CHAMBER.to_string(),
+            NODE.to_string(), // the chamber's cooler hands the lamp heat on to the node
+            *chamber,
+            *thermal_params,
         )),
         Box::new(RadiatorReject::new(
             RADIATOR_REJECT.to_string(),

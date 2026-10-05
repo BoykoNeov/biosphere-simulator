@@ -1755,3 +1755,32 @@ heater, light leg unchanged (2b-ii, 2b-iii).
 | P9 | A cooler fault (capacity → 0, lab test): the chamber warms at `w/C_ch` = **1.45 K per hour**, and the node, losing that input, relaxes toward the colder equilibrium of 317.6 W ≈ **160.3 K** on its 12.8-day time scale |
 
 P9's 160.3 K is computed with the closed form `equilibrium_temperature` from 378.703 − 60.394 W.
+
+### 23f. 2b-i BUILT — graded (2026-10-05)
+
+Built as §23e describes: `rust/crates/station/src/chamber.rs` (the stock, the flow, the
+build guard), `rust/crates/station/params/chamber.yaml`, the sealed builder wiring
+(`sealed.rs`; `air_split` passes the same params). Golden regenerated; the station manifest
+regenerated. HEAD's golden kept for the comparison at
+`W:\temp\claude\chamber-heat\sealed_head.json`.
+
+| # | Result |
+|---|---|
+| P1 | **HELD, and stronger** — every stock present in both goldens is byte-identical, energy included; the only difference is the added `thermal.chamber`. Every aux value identical; `n` = 19 520 both |
+| P2 | **HELD, exactly** — the end-state chamber is `295.1741575492341 K`, the same bits as its start `C_ch·T_set + w·τ`; the lab test asserts ≤ 1e-9 K on all 61 days of its nominal run |
+| P3 | ✗ **MISSED, on the safe side** — predicted "not byte-identical, within 1e-9"; measured **byte-identical**, `thermal.node` and `boundary.space` both. The reading offered (not tested): the cooler hands the node the same bits the lamp's leg used to, in the same position among the node's legs. |
+| P4 | **HELD** — the golden run asserts `rationed == 0` and no events |
+| P5 | **HELD** — `chamber::tests::heat_moves_only_into_a_colder_node`: heat moves with the node 1e-6 K below the chamber, none at equality, 1e-6 K above or 50 K above |
+| P6 | **HELD** — `regen_goldens` report: 19 of 20 identical, `sealed_station_state.json` alone changed |
+| P7 | **HELD** — manifest diff is three lines: + `ChamberCooling` in the flow set, + `chamber.yaml`'s digest, `sealed_station`'s `golden_sha256`. (The manifest carries a file digest, not a per-parameter list, so "its four params" appear only through that digest.) |
+| P8 | **HELD** — the full suite is green apart from the stale-manifest gate before regeneration; `air_split`, `lamp_shed` (its rule-off bit-identity included), session parity and save/load all pass |
+| P9 | **HELD** — `tests/chamber_heat.rs`, 60 days, the cooler scaled to 0: the chamber's first-day rise equals `w·86400/C_ch` = 34.787 K to 1e-9 relative; the node falls on every day and ends within 0.15 K of the closed-form **160.308 K**; every non-energy stock and every aux value byte-identical to the nominal run on all 61 days |
+
+**Tally: 8 held, 1 missed (P3, conservative).** Liveness: re-pointing the lamp's heat leg back
+to the node (the pre-2b-i wiring) turns `tests/chamber_heat.rs` red at P2's assertion
+(`nominal chamber drifted: 295.15 vs 295.1741575492341`); restored.
+
+⚠ **What 2b-i shows and does not.** With no walls, a dead cooler heats the chamber without limit
+(≈ +2 090 K over the 60-day test). That is the absence of 2b-iii's heat-loss path, not a
+prediction about a real chamber. Next: 2b-ii (the light leg into the chamber; the node warms to
+174.961 K), predictions first.

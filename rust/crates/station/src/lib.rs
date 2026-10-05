@@ -17,6 +17,7 @@
 pub mod air_split;
 pub mod builder;
 pub mod cabin;
+pub mod chamber;
 pub mod display;
 pub mod driver;
 pub mod flows;

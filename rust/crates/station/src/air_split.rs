@@ -394,6 +394,7 @@ pub fn build_split_station(
         recovery,
         lamp,
         harvest,
+        &crate::params::chamber(),
         CabinAir {
             co2: CABIN_CO2,
             o2: CABIN_O2,
