@@ -32,7 +32,7 @@
 use domains::biosphere::perturbations::{
     window_override, with_forcing, LeakFlow, LEAK_SINK, LEAK_VAR,
 };
-use domains::biosphere::stocks::PAR_VAR;
+use domains::biosphere::stocks::{PAR_VAR, RN_VAR};
 use domains::crew::FOOD_INTAKE_VAR;
 use domains::power::SOLAR_POWER_VAR;
 use domains::thermal::RADIATOR_REJECT;
@@ -136,7 +136,8 @@ pub fn with_crew_load_spike(
     })
 }
 
-/// Zero `par` **and** `lamp_power` over `[start, end)` (the #16 lamp lighting failure).
+/// Zero `par`, the lamp's `net_radiation` **and** `lamp_power` over `[start, end)` (the #16 lamp
+/// lighting failure).
 ///
 /// The one **two-resolver** perturbation: the lamp is a single device whose failure has a
 /// *photon* leg (the biosphere's `par` **forcing**, in `bio_resolver`) and an *energy* leg
@@ -152,6 +153,10 @@ pub fn with_lighting_failure(
     end: u64,
 ) -> Result<(SourceResolver, SourceResolver), SimError> {
     let new_bio = map_forcing(bio_resolver, PAR_VAR, |base| {
+        window_override(base, start, end, 0.0)
+    })?;
+    // The lamp's net radiation goes dark with its light (§21): the crop's water loss reads it.
+    let new_bio = map_forcing(new_bio, RN_VAR, |base| {
         window_override(base, start, end, 0.0)
     })?;
     let new_fast = map_forcing(fast_resolver, LAMP_POWER_VAR, |base| {

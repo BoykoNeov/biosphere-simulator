@@ -37,7 +37,8 @@
 //! power actually drawn against the nominal draw and writes the ratio into
 //! `State.aux[`[`LAMP_DELIVERY_AUX`]`]` before the next plant step; a power step counts as lit
 //! when the lamp's light actually arrived in `boundary.light_used`. Every slow flow and aux
-//! process is wrapped ([`LampLitFlow`], [`LampLitAux`]) so that reading `par` returns the
+//! process is wrapped ([`LampLitFlow`], [`LampLitAux`]) so that reading `par` (and, since
+//! 2026-10-05, the lamp's `net_radiation`) returns the
 //! schedule's value times that ratio. With nothing shed the two sums are the same numbers
 //! added in the same order, so the ratio is exactly `1.0` and `x * 1.0 == x`: the rule-off
 //! build reproduces the plain sealed run bit for bit (tested). The crop reads the light of
@@ -49,7 +50,7 @@
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::PAR_VAR;
+use domains::biosphere::stocks::{PAR_VAR, RN_VAR};
 use domains::power::BATTERY;
 use simcore::auxiliary::AuxProcess;
 use simcore::conservation::assert_conserved_default;
@@ -149,7 +150,9 @@ fn delivery(state: &State) -> Result<f64, SimError> {
     })
 }
 
-/// An environment whose `par` is the inner value times the lamp's delivered share.
+/// An environment whose `par` and `net_radiation` are the inner values times the lamp's
+/// delivered share: both are the lamp's (§21 of the room-temperature plan), so a shed lamp
+/// darkens the crop's water loss as well as its photosynthesis.
 struct LampLitEnv<'a> {
     inner: &'a dyn Environment,
     delivered: f64,
@@ -158,7 +161,7 @@ struct LampLitEnv<'a> {
 impl Environment for LampLitEnv<'_> {
     fn get(&self, var: &str) -> Result<f64, SimError> {
         let value = self.inner.get(var)?;
-        if var == PAR_VAR {
+        if var == PAR_VAR || var == RN_VAR {
             Ok(value * self.delivered)
         } else {
             Ok(value)

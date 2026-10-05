@@ -34,6 +34,12 @@ read (`station::gas_exchange`). The flows' science stays the biosphere's and del
 STEP they are taken on is this contract's. `lighting` and every standalone biosphere scenario
 keep the plant step. The registry is no longer `build_season`'s verbatim in those three.
 
+⚠ **Since 2026-10-05 the two lamp seams also own the crop's NET RADIATION** (`sealed`,
+`lighting`): `(1 − 0.23) ×` the lamp's radiant PAR while lit and 0 in the dark, where before
+they replaced PAR and day length but left transpiration on the weather file's outdoor value.
+The formula's science stays the biosphere's (`weather::net_shortwave`); which light it is fed is
+this contract's. See the unfreeze log.
+
 **Why whole-assembly, not station-layer-only** (advisor-reviewed, user-confirmed). A
 station-layer-only freeze (owning just the four seams + three params) would leave the
 sibling flows and params changeable with **no unfreeze ceremony — in exactly the layer
@@ -334,6 +340,24 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-05 — a lamp-lit crop's net radiation is the lamp's, not the weather file's
+  outdoor value; 2 station goldens move (`sealed_station`, `lighting`), 2 `golden_sha256`
+  rows follow. No parameter added, no flow added, no `simcore` byte changed.** The user's
+  ruling (*"fix this, in its current state, it doesnt make sense"*) on a finding of the minute-
+  step transpiration lab (`docs/plans/post-roadmap-room-temperature.md` §20): every lamp-lit
+  build replaced the crop's PAR with the lamp's but left transpiration on outdoor net radiation,
+  so a sealed crop lost more water on sunny days outside and a dark lamp left its water loss
+  untouched. Now `(1 − 0.23) ×` the lamp's radiant PAR while lit (500 µmol m⁻² s⁻¹ → 84.25
+  W m⁻²), 0 in the dark, on the lamp's own top-hat (`station::lighting::lamp_net_radiation`).
+  The 0.23 is FAO-56's broadband grass albedo, the same constant the outdoor form uses, **the
+  user's choice** over holding the fix for a PAR-specific canopy reflectance; it probably
+  under-counts what leaves absorb of an all-PAR lamp by up to ≈ 20 %. Predictions committed
+  first (§21), graded in §21a: **water stocks only** — condensate, root-zone and below-root
+  soil water; every carbon, O₂, nitrogen, crew and energy byte and every aux value is unchanged
+  (the crop is never water-stressed). Transpiration over the goldens' horizons: `sealed_station`
+  **−20.9 %**, `lighting` **−7.5 %**. The lab's lamp shedding and `with_lighting_failure`
+  darken it too. Sunlit builds (`greenhouse`, `harvest`, every biosphere scenario) are
+  byte-identical.
 - **2026-10-03 — the crop's gas exchange is stepped on the cabin's minute step; 3 station
   goldens move, 3 `golden_sha256` rows follow, and the station `flow_set` gains `Allocation`,
   `GrowthRespiration`, `MaintenanceRespiration`. No `simcore` byte changed; no biosphere formula

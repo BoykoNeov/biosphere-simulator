@@ -1227,7 +1227,9 @@ not at all).
 **Found while reading, recorded, not changed.** The sealed crop's net radiation is the weather
 file's **outdoor daily value**, not the lamp's (`weather_forcings`; only PAR is replaced by the
 lamp in `sealed_bio_resolver`). Daily temperature and net radiation are per-day tables, so a
-window's recorded value is exact for every minute in it.
+window's recorded value is exact for every minute in it. ⚠ *Superseded 2026-10-05 (§21):* net
+radiation is now the lamp's per-window value. That is still constant within a window, which is
+all the recorder needs, but it is no longer a per-day table.
 
 **Measured before predicting** (`W:\temp\claude\minute-transpiration\crossover.txt`, a throwaway
 tool, deleted). The cabin holds 1.8803e-4 kg of vapour per mol of air. A chamber at its 75 % target
@@ -1385,3 +1387,35 @@ fill **0.7805** over the 4-season golden (stress onset 0.30).
   red with the change reverted.
 * **L7 — the outdoor form is untouched:** `weather::net_radiation` is bit-identical (refactored to
   share one `(1 − α)` helper with the lamp form). Held by the 7 biosphere goldens, plus a pin.
+
+### 21a. Built — graded (2026-10-05)
+
+**What landed.** `domains::biosphere::weather::net_shortwave` (the outdoor `net_radiation` now
+calls it, same operations); `station::lighting::{lamp_net_radiation, lamp_net_radiation_path}`,
+inserted as `net_radiation` by `sealed_bio_resolver` and `lighting_bio_resolver`;
+`lamp_shed::LampLitEnv` scales it with PAR; `perturbations::with_lighting_failure` zeroes it with
+PAR. New pins: `rust/crates/station/tests/lamp_net_radiation.rs` (4) and
+`tests/lamp_shed.rs::a_blackout_also_cuts_the_crops_water_loss`. L3's measuring tool
+(`W:\temp\claude\minute-transpiration\zz_scratch_lamp_rn.rs`, output `lamp_rn_L3.txt`)
+reproduces both goldens' final soil water before and after, to every digit.
+
+| # | Prediction | Result |
+|---|---|---|
+| L1 | exactly `sealed_station_state` and `lighting_state` move | **HELD** — `regen_goldens`: 2 of 20 |
+| L2 | water stocks only | **HELD** — `lighting`: condensate 4.1904 → 3.9639, soil water 30.2475 → 30.4741; `sealed_station`: condensate 8.0323 → 4.3257, soil water 161.2299 → 165.5191, subsoil 23.3583 → 22.7757. Every other stock and every aux value is byte-identical. The chamber's vapour is unchanged too: it ends at its target either way |
+| L3 | transpiration −21 ± 5 % (sealed), −8 ± 4 % (lighting) | **HELD** — sealed 2841.40 → 2248.55 kg over 1220 days (**−20.9 %**); lighting 16.012 → 14.810 kg (**−7.5 %**) |
+| L4 | books; tier tests pass | **HELD** — 0 / 0 rationing; clippy clean; `cargo test --release --no-fail-fast` **1285 passed, 0 failed**, 4 ignored (1280 + 5 new), the tier-contract tests among them. The Godot parity job runs on CI only |
+| L5 | exactly the two `golden_sha256` rows | **HELD** — manifest diff is those two lines |
+| L6 | a blackout cuts water loss, pinned, and each pin red when reverted | **HELD** — four reversions, each run `--no-fail-fast`, restored and `cmp`-checked: sealed resolver back on outdoor → 2 red (its pin and the lighting-failure pin); lighting resolver back → 1 red; lamp shedding scaling PAR only → 1 red (the blackout pin); lighting failure leaving net radiation → 1 red |
+| L7 | the outdoor form is bit-identical | **HELD** — all 7 biosphere goldens and the sunlit `greenhouse` / `harvest` identical; `the_sunlit_greenhouse_keeps_the_weathers_net_radiation` compares bits |
+
+**Not done, and the next decisions (the user's).**
+* The **chamber's temperature** is also the outdoor weather's in every lamp-lit build: the same
+  kind of defect, already queued as the chamber heat store (slice 2b). Kept out of this batch.
+* **§20's lab numbers were measured on the outdoor input.** They are re-predicted from scratch
+  on this tree before §20's adoption question goes to the user.
+* ⚠ **So were EVERY separate-air water figure before this.** The split build reads
+  `sealed_bio_resolver`. That covers §13b's 23.3 kg drain, §15a's +2.08 kg reversal, §18a's and
+  §18c's 21.2 kg drain and 0.66 lowest fill, and the instruments that print them
+  (`examples/air_split.rs`, `examples/watering.rs`). None was re-run here. Read them as measured
+  on the outdoor input. The carbon figures (§13b, §16a) do not read net radiation.

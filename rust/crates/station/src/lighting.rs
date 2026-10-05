@@ -2,18 +2,21 @@
 //!
 //! The phase's **one non-shared-stock coupling** (#16): Power and the biosphere share *no*
 //! stock; the whole interface is the **lamp-draw schedule**, which drives both the [`Lamp`]
-//! flow (the ENERGY it withdraws from `power.battery`) and the biosphere's `par` /
-//! `daylength_s` **forcings** (this module computes `PAR = photon_efficacy·lamp_power/
-//! ground_area` and `daylength_s = photoperiod·3600`). The lamp draws a constant
-//! **daily-average** power (`substep` freezes `n`, so a within-day top-hat is not an
-//! `n`-schedule; daily energy is exact). The `waste_heat` leg lands in `boundary.waste_heat`
+//! flow (the ENERGY it withdraws from `power.battery`) and the biosphere's `par`,
+//! `net_radiation` and `daylength_s` **forcings** (this module computes `PAR =
+//! photon_efficacy·lamp_power/ground_area`, the crop's net radiation from that PAR
+//! ([`lamp_net_radiation`], since 2026-10-05), and `daylength_s = photoperiod·3600`). The lamp
+//! draws a constant **daily-average** power (`substep` freezes `n`, so a within-day top-hat is
+//! not an `n`-schedule; daily energy is exact). The `waste_heat` leg lands in `boundary.waste_heat`
 //! (the inward move to `thermal.node` is deferred to the sealed station). Tier-2 (FvCB).
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::light_path;
-use domains::biosphere::stocks::{DAYLENGTH_VAR, PAR_VAR, ROOTED_DEPTH, TEMP_VAR, THERMAL_TIME};
+use domains::biosphere::stocks::{
+    DAYLENGTH_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH, TEMP_VAR, THERMAL_TIME,
+};
 use domains::biosphere::system::{build_season, weather_forcings, weather_shared};
+use domains::biosphere::{light_path, weather};
 use domains::power::{battery_stock, BATTERY, WASTE_HEAT};
 use simcore::boundary;
 use simcore::environment::{constant, Schedule, SourceResolver};
@@ -26,7 +29,7 @@ use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 use crate::driver::run_master_day;
-use crate::flows::{Lamp, LampParams, LAMP, LAMP_POWER_VAR};
+use crate::flows::{Lamp, LampParams, LAMP, LAMP_POWER_VAR, PAR_PHOTON_ENERGY_J_PER_UMOL};
 use crate::scenario::LightingScenario;
 
 /// The radiant-PAR-energy boundary sink id (the `η_lamp` leg of the Lamp flow).
@@ -119,10 +122,30 @@ pub(crate) fn lamp_light_path(on_par: f64, photoperiod_s: f64) -> Schedule {
     })
 }
 
-/// The biosphere forcing resolver: weather-driven, with `PAR` + `daylength` from the lamp.
+/// The lamp-lit crop's net radiation (W m⁻²) while the lamp is on: the lamp's radiant PAR,
+/// `on_par · PAR_PHOTON_ENERGY_J_PER_UMOL` (the conversion the lamp's own energy split uses), net
+/// of FAO-56's albedo ([`weather::net_shortwave`]).
 ///
-/// Rebuilds the weather forcing table ([`weather_forcings`]) and overrides two entries —
-/// `PAR_VAR` → [`lamp_par`] (0 when `with_lamp = false`) and `DAYLENGTH_VAR` →
+/// ⚠ Before 2026-10-05 a lamp-lit crop's transpiration read the weather file's OUTDOOR net
+/// radiation: it lost more water on sunny days outside, and a lamp blackout left its water loss
+/// untouched (`docs/plans/post-roadmap-room-temperature.md` §21). Left out, as outdoors: net
+/// long-wave, the lamp's waste heat, and the canopy's size.
+pub fn lamp_net_radiation(on_par: f64) -> f64 {
+    weather::net_shortwave(on_par * PAR_PHOTON_ENERGY_J_PER_UMOL)
+}
+
+/// The lamp-lit crop's net-radiation forcing: [`lamp_net_radiation`] on the lamp's own top-hat,
+/// so it is 0 in the dark and follows the lamp window for window.
+pub(crate) fn lamp_net_radiation_path(on_par: f64, photoperiod_s: f64) -> Schedule {
+    lamp_light_path(lamp_net_radiation(on_par), photoperiod_s)
+}
+
+/// The biosphere forcing resolver: weather-driven, with `PAR`, net radiation and `daylength`
+/// from the lamp.
+///
+/// Rebuilds the weather forcing table ([`weather_forcings`]) and overrides three entries —
+/// `PAR_VAR` → [`lamp_par`] (0 when `with_lamp = false`), `RN_VAR` → [`lamp_net_radiation`] of
+/// that PAR (the weather's outdoor value before 2026-10-05), and `DAYLENGTH_VAR` →
 /// `photoperiod·3600` — then reassembles the resolver with the sealed shared map. (The
 /// `Box<dyn Fn>` schedules of a built resolver are not `Clone`, so the map is regenerated
 /// rather than copied — the Python `dict(base.forcings)` analogue.)
@@ -139,6 +162,10 @@ pub fn lighting_bio_resolver(
     };
     let photoperiod_s = scenario.photoperiod_hours as f64 * 3600.0;
     forcings.insert(PAR_VAR.to_string(), lamp_light_path(par, photoperiod_s));
+    forcings.insert(
+        RN_VAR.to_string(),
+        lamp_net_radiation_path(par, photoperiod_s),
+    );
     forcings.insert(DAYLENGTH_VAR.to_string(), constant(photoperiod_s)?);
     // A warm lamp-lit habitat overrides the weather-table temperature with a constant
     // (the lamp supplies light, the environment supplies warmth) — beside the PAR /

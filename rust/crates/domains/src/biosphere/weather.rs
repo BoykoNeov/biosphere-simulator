@@ -133,7 +133,16 @@ pub fn incident_par(irrad_j_m2_day: f64, daylength_s: f64) -> f64 {
 /// Daily-mean net radiation (W m⁻²) ≈ net shortwave (1 − α)·Rs (FAO-56).
 pub fn net_radiation(irrad_j_m2_day: f64) -> f64 {
     let shortwave = irrad_j_m2_day / SECONDS_PER_DAY;
-    (1.0 - ALBEDO) * shortwave
+    net_shortwave(shortwave)
+}
+
+/// Net shortwave (W m⁻²) from incident shortwave (W m⁻²): `(1 − α)·Rs`, FAO-56's reference-crop
+/// albedo. Shared by the outdoor form ([`net_radiation`]) and the lamp-lit chamber's (the lamp's
+/// radiant PAR, `station::lighting`). ⚠ For a lamp, α = 0.23 is a class citation: it is
+/// broadband sunlight on grass, and leaves reflect less of an all-PAR lamp's light — the user's
+/// choice of 2026-10-05 (`docs/plans/post-roadmap-room-temperature.md` §21).
+pub fn net_shortwave(shortwave_w_m2: f64) -> f64 {
+    (1.0 - ALBEDO) * shortwave_w_m2
 }
 
 /// Saturation vapour pressure e_s = A·exp(B·T/(T+C)) (Pa; Tetens/FAO-56). Python locates

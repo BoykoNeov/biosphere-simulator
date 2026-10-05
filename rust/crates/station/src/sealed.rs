@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
-    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, ROOTED_DEPTH, STORAGE_C,
+    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, RN_VAR, ROOTED_DEPTH, STORAGE_C,
     THERMAL_TIME,
 };
 use domains::biosphere::system::{annual_reset, build_season, weather_forcings, weather_shared};
@@ -51,7 +51,7 @@ use crate::flows::{
 use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
 };
-use crate::lighting::{lamp_light_path, LIGHT_USED};
+use crate::lighting::{lamp_light_path, lamp_net_radiation_path, LIGHT_USED};
 use crate::scenario::SealedStationScenario;
 use crate::stocks::{
     cabin_h2o_stock, co2_composition, food_store_stock, gas_boundary, o2_composition,
@@ -366,17 +366,21 @@ fn assert_flow_ids_disjoint(bio_reg: &Registry, fast_reg: &Registry) -> Result<(
     Ok(())
 }
 
-/// The biosphere forcing: weather-driven, with `PAR` + `daylength` from the lamp. The
-/// `weather` is tiled over `scenario.years` seasons (so `_table` never end-clamps).
+/// The biosphere forcing: weather-driven, with `PAR`, net radiation (since 2026-10-05; the
+/// weather's outdoor value before) and `daylength` from the lamp. The `weather` is tiled over
+/// `scenario.years` seasons (so `_table` never end-clamps).
 pub fn sealed_bio_resolver(
     lamp: &LampParams,
     scenario: &SealedStationScenario,
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = weather_forcings(&scenario.bio, scenario.years)?;
     let photoperiod_s = scenario.photoperiod_hours as f64 * 3600.0;
+    let par = sealed_lamp_par(lamp, scenario);
+    forcings.insert(PAR_VAR.to_string(), lamp_light_path(par, photoperiod_s));
+    // The crop's net radiation is the lamp's too, not the weather file's outdoor value (§21).
     forcings.insert(
-        PAR_VAR.to_string(),
-        lamp_light_path(sealed_lamp_par(lamp, scenario), photoperiod_s),
+        RN_VAR.to_string(),
+        lamp_net_radiation_path(par, photoperiod_s),
     );
     forcings.insert(DAYLENGTH_VAR.to_string(), constant(photoperiod_s)?);
     SourceResolver::new(forcings, weather_shared(&scenario.bio))

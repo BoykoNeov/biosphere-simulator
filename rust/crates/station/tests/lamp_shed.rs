@@ -10,7 +10,7 @@
 
 use std::sync::OnceLock;
 
-use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C, STORAGE_C};
+use domains::biosphere::stocks::{CONDENSATE, LEAF_C, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C};
 use domains::power::BATTERY;
 use simcore::environment::SourceResolver;
 use simcore::integrator::EulerIntegrator;
@@ -307,4 +307,26 @@ fn cutting_only_the_lamps_power_darkens_the_lab_crop() {
         crop(plain_cut.states.last().unwrap()).to_bits(),
         crop(plain_lit.states.last().unwrap()).to_bits()
     );
+}
+
+#[test]
+fn a_blackout_also_cuts_the_crops_water_loss() {
+    // §21 of the room-temperature plan (2026-10-05): the crop's net radiation is the lamp's, so a
+    // shed lamp darkens its water loss too. The plants' water is a closed loop, so less
+    // transpired leaves more in the soil and less in the condensate. Before §21 the water books
+    // of the two runs were bit-identical (nothing that moves water reads the canopy).
+    let calm = small_lab_baseline();
+    let dark = small_lab_blackout();
+    let (c, d) = (calm.states.last().unwrap(), dark.states.last().unwrap());
+    assert!(
+        dark.log.delivery.iter().any(|&x| x < 1.0),
+        "nothing was shed"
+    );
+    assert!(
+        d.stocks[SOIL_WATER].amount > c.stocks[SOIL_WATER].amount,
+        "the dark crop transpired no less: soil {} vs {}",
+        d.stocks[SOIL_WATER].amount,
+        c.stocks[SOIL_WATER].amount
+    );
+    assert!(d.stocks[CONDENSATE].amount < c.stocks[CONDENSATE].amount);
 }
