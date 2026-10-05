@@ -1202,3 +1202,80 @@ byte by the suite). Re-run, exit 0, 5 min 23 s (`intraday_exchange_rerun.txt`):
 2. **Leaf water loss (transpiration) on the minute step: LAB FIRST, then decide.** Build it on the
    separate-air lab build, measure, and bring the main-build decision back to the user — the path
    the gas exchange took (§16 → §17).
+
+## 20. Leaf water loss on the minute step — lab first (predictions committed before code, 2026-10-05)
+
+**What changes (lab only).** On the separate-air build, the plants' `Transpiration` and the plant
+chamber's `Condensation` move **together and unchanged** from the plant step onto the cabin's 60 s
+step — a new `AirSplit.transpiration` switch, default the plant step. Why the pair: transpiration's
+split between air and condensate counts the condenser's same-step draw
+(`headroom = target − v + condensed`), so it is only consistent when the two share a step.
+`Recycling` (condensate → soil), root-zone capture, drainage and the watering trigger stay on the
+plant step. The reference is not touched.
+
+**Reads.** `Transpiration` reads temperature, net radiation, the chamber's own vapour (`VpdRead::Chamber`,
+checked in `params.rs`; the weather's deficit is never read), soil water and the rooted depth;
+`Condensation` reads temperature. Temperature is already recorded by the plant step
+(`PlantWindowRecorder`). Net radiation is recorded by a **second, lab-only recorder** on its own
+key, `station.plant_window.net_radiation` — not added to the reference recorder, which would put a
+new aux key into three goldens. The minute step refuses any other read. Stocks and aux are read live.
+
+**Refusals, at build time.** Water on the minute step with gas exchange on the plant step (the
+temperature record would not exist); a plant registry missing either flow (they move together or
+not at all).
+
+**Found while reading, recorded, not changed.** The sealed crop's net radiation is the weather
+file's **outdoor daily value**, not the lamp's (`weather_forcings`; only PAR is replaced by the
+lamp in `sealed_bio_resolver`). Daily temperature and net radiation are per-day tables, so a
+window's recorded value is exact for every minute in it.
+
+**Measured before predicting** (`W:\temp\claude\minute-transpiration\crossover.txt`, a throwaway
+tool, deleted). The cabin holds 1.8803e-4 kg of vapour per mol of air. A chamber at its 75 % target
+holds more than that above **≈ 12 °C**: the weather is above it on **127 of 305** days. Held AT its
+target every minute, the fan (Q 0.2) would carry **113.8 kg out** on those days and **157.7 kg in**
+on the others; at 22 °C, **867.1 kg out**. Penman–Monteith at the target: 708.0 kg a season
+(weather), 1012.9 kg (22 °C).
+⚠ **The fan sees only 70 % of that gradient on the minute step.** It exchanges `Q·dt = 12` mol a
+minute of a 27.66-mol chamber (`k = 0.434`). All flows read the minute's start, so after
+transpiration refills to the target the fan has already drawn on the start value. The chamber
+settles at `(target − cabin-equivalent)/(1 + k)` above the cabin's level, and the fan moves
+**1/(1 + k) = 0.697** of the full-gradient figure. This is explicit Euler meeting a fast fan, and the
+CO₂ exchange has it already. Stated, not changed.
+
+**Predictions (one season, BVAD chamber, Q 0.2, vapour crossing, minute gas exchange; "the
+plant-step run" = §18c's same case):**
+
+* **M1 — the weather chamber now GAINS, by tens of kg.** The fan's net vapour flow is cabin →
+  plants by **20–45 kg** (basis 0.697 × (113.8 − 157.7) = −30.6; the plant-step run: 2.08 kg).
+  Watering delivers 0. Plant carbon within ±1 % of 53.263.
+* **M2 — the 22 °C chamber without watering DRAINS and STRESSES** (retests §18a's R2). The plants
+  lose **≥ 100 kg** of their 195 kg (the plant-step run: 21.2). The crop is water-stressed
+  (`f_water < 1`) on **≥ 20 %** of the season's minutes (plant-step run: never). Plant carbon below
+  28.314 by **more than 1 %**.
+* **M3 — with watering on, watering does the work it was built for.** It delivers **300–650 kg**
+  (§18c: 0); the fan exports **400–650 kg** (0.697 × 867.1 = 604, less where transpiration falls
+  short); the root zone's lowest fill stays **≥ 0.40** (held at the 0.45 trigger, since the 8 kg/day
+  cap is far above a ≈ 2 kg/day drain); **no minute** is stressed. Plant carbon within ±2 % of
+  28.314.
+* **M4 — the crew pays the recovery loss.** Exported vapour reaches the crew's store through the
+  cabin condenser and the recovery processor (wired in `sealed_fast_flows`). So brine rises over
+  the plant-step run's 133.873 kg by **0.10 × (export − 21.248) ± 10 %**.
+* **M5 — season transpiration** (counted on whichever step runs it): weather chamber **650–900 kg**;
+  22 °C with watering **1000–1500 kg** (the chamber sits below its target, so the air is drier
+  than the 1012.9 basis).
+* **M6 — control, vapour not crossing:** the plants' water stays 195.000 kg to 1e-9. Season
+  transpiration on the minute step is within **±2 %** of the plant-step run's, and plant carbon
+  within ±0.5 %. Total transpired is not capped by the air's headroom (the overflow goes straight to
+  condensate), so only its timing changes.
+* **M7 — books:** conservation every step, 0 / 0 rationing, no events, in every run.
+* **M8 — the reference is untouched:** `regen_goldens` reports 0 of 20 changed; full
+  `cargo test --no-fail-fast` and clippy green.
+* **M9 — pins turn red when broken** (mutations `--no-fail-fast`, each restored and `cmp`-checked):
+  * the minute after a plant step reads that step's net radiation, at a day boundary where it
+    changes;
+  * `dt` left in seconds turns a pin red;
+  * the pair left on the plant step too (double count) turns a pin red;
+  * no net-radiation recorder is an error;
+  * a plant-side 22 °C reaches minute-step condensation;
+  * the refused combinations error.
+* **M10 — cost:** measured. Expected within 1.3× of the ≈ 26 s minute-gas-exchange season.
