@@ -1943,3 +1943,34 @@ A radiator loss reaches it after ≈ 31 days through the cooler's second-law gat
    the outdoor weather for calibration and over a switchable option. Slice 3 (the plants read
    the chamber, with the cited cold period) is next after item 1, with its own design and
    predictions.
+
+### 23l. The heater shed with the lamp (lab) — design and predictions, before code (2026-10-05)
+
+§23k item 1. Lab only: the reference has no shedding, so nothing frozen moves.
+
+**What is built.** `station::lamp_shed`'s switch-off wrapper covers **both** interruptible loads,
+`Lamp` and `station.chamber_heater`, at the same reserve and on the same battery reading;
+`rewire_for_shedding` refuses a fast registry missing either. The wrapper is renamed
+`SheddingLamp` → `SheddingLoad` (nothing in code pins the old name). The lit detector and the
+crop's light are untouched — the heater gives heat, not light.
+
+**Which reading of the decision this is.** The heater is cut by the **battery rule**, not by the
+lamp being dark: it is an interruptible load *like* the lamp (Chung & Mazzocco's split), not a
+load slaved to it. So a lamp that fails with a healthy battery (`with_lamp_power_cut`) still has
+its heater, which holds the chamber.
+
+**Predictions — `tests/lamp_shed.rs` fixture (1.5e8 J battery, solar ×0 over days 2–5, 8 days):**
+
+| # | Prediction |
+|---|---|
+| H1 | The lab blackout run equals, **in every stock and aux value on every day, bit for bit**, the same lab run with the heater disabled (wrapped at health 0). Why exactly: while the lamp is lit it holds the chamber above its setpoint, so the heater gives zero legs; the lamp and the heater are shed on the same step (same reading, same reserve); and on this station a shed lamp never comes back (§6 of the lamp-shed record), so the heater never restores |
+| H2 | Liveness of H1: the dark run's chamber ends **more than 3 K** below its 22 °C setpoint (estimate ≈ 8–9 K: the unshed heater drew 3.9 MJ over the 3.375 dark days, 13.4 W mean, which at the walls' 1.536 W/K means outdoors averaged ≈ 13 °C, and 3.375 days is 3 of the walls' 27 h time constants) — so an unshed heater would have drawn |
+| H3 | The `lamp_shed` example's "lab shed, blackout" battery returns from **1.4355e7** to **1.8219e7 J**, its value before the walls (2b-ii); crop, first-shed group and share unchanged |
+| H4 | The battery rule, not the lamp: with only the lamp's power cut over days 2–5 and the frozen battery (never near the reserve), the heater **draws** — the battery ends lower than the same run with the heater disabled, by ≈ **3.5 MJ** (13.4 W × 3 days; ±20 %, the window is earlier in the season than H2's) |
+| H5 | Every existing test in `tests/lamp_shed.rs` and `tests/chamber_walls.rs` stays green unchanged (`chamber_walls` never calls the rewire; the lamp-cut run never crosses the reserve; no test pins the blackout battery). `regen_goldens` report-only: nothing moves |
+| H6 | Mutation: wrapping the lamp alone turns H1's test red (it would differ by the 3.9 MJ) |
+
+**Untested, recorded (advisor):** on a station whose battery *does* recover, switching back on
+brings up to 200 W of re-warming heat along with the lamp (the chamber cooled while dark), and
+the rule has no latch — so the restore can push the battery straight back under the reserve and
+chatter. The sealed fixture cannot reach it; whoever builds a recovering battery owns that check.
