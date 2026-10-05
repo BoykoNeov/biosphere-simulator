@@ -1450,7 +1450,9 @@ numbers no conclusion rests on.
   panicked. Worse, before the panic its plain `shared` row had silently become the MINUTE build
   (130.4561 mol instead of 129.5564). `cargo test` compiles examples but runs none, and §17c's
   sweep of stale instruments did not include it. Repaired: the case asks
-  `build_sealed_station_at(…, gas)` for its step.
+  `build_sealed_station_at(…, gas)` for its step. **No recorded figure came from the broken
+  form:** its newest output, `W:\temp\claude\air_split_run6.txt` (written 18:41 on 2026-10-03),
+  predates `49adbc6` (19:17), and nothing after §16b quotes this instrument.
 * `examples/watering.rs` now also prints each season's transpiration, the part that reached the
   chamber's air, and the plant steps where the headroom held some back (the cap claim 2 rests
   on). Advisor's point: the cap cannot be argued from the season's MEAN transpiration — with the
@@ -1512,9 +1514,9 @@ re-runs printed the same tables) and comparing all 38 stocks and every aux value
 | N3 | plant carbon byte-identical, all four | **HELD** — no carbon stock and no aux value differs in any run |
 | N4 | weather −15 to −25 %, 22 °C −10 to −25 %; the fall lands in the soil | **HALF** — weather **HELD** (−22.7 %); 22 °C ✗ **MISSED** by a hair, **−9.88 %**. The fall lands in the soil (22 °C: soil +4.509 kg, condensate the same amount lower, plants' total unchanged; weather: soil +3.408, subsoil +0.379, total +0.048 = the export's move) |
 | N5 | lowest fill rises; watering 0; on/off byte-identical | **HELD** |
-| N6 | `air_split` at HEAD: carbon columns byte-identical; vapour-on rows move as N1–N4 | **HELD** — every co2 / plant C / cabin CO₂ column identical to pre-fix; the vapour-on row is the weather case above (to air 3.217 → 3.169, capped 4880 → 4424). Unpredicted but in line: the vapour-OFF split's transpiration 708.207 → 557.383 with the cap 4880 → 4877, and the shared rows 711.247 → 563.077 (−20.8 % in one season; the 1220-day golden fell 20.9 %) |
+| N6 | `air_split` at HEAD: carbon columns byte-identical; vapour-on rows move as N1–N4 | **HALF** — carbon **HELD**: every co2 / plant C / cabin CO₂ column identical to pre-fix. The vapour-on row moves as N1–N4 graded, so it carries N1's miss: to air 3.217 → 3.169, capped 4880 → 4424, plant and crew water move too — under the "transpiration only" N1 at 4880 would have given, ✗ **FAILED as stated**. Unpredicted but in line: the vapour-OFF split's transpiration 708.207 → 557.383 with the cap 4880 → 4877, and the shared rows 711.247 → 563.077 (−20.8 % in one season; the 1220-day golden fell 20.9 %) |
 
-**Tally: 4 held, 2 half.** The two misses are both the size of the night-time flux: I put it
+**Tally: 3 held, 3 half.** The two misses are both the size of the night-time flux: I put it
 higher than it is, so more weather-chamber steps fall under the cap than predicted, and the warm
 chamber, where the vapour deficit dominates, fell a little less.
 

@@ -142,7 +142,7 @@ pre-fix tree first reproduced the record exactly. All four conclusions still sta
 The weather-temperature chamber still gains from the cabin (2.131 kg a season, was 2.083). The
 22 °C chamber still drains 21.248 kg, byte for byte, with the plant step's cap setting it on every
 step. Watering still delivers 0 kg, with more margin (lowest fill 0.836 / 0.680). Plant carbon is
-unchanged. Leaf water loss in the split build falls 22.7 % and 9.9 %. Graded 4 held, 2 half:
+unchanged. Leaf water loss in the split build falls 22.7 % and 9.9 %. Graded 3 held, 3 half:
 night-time leaf water loss is smaller than predicted, so in the weather chamber 456 of 4 880
 steps now fall under the cap. Found on the way: `examples/air_split.rs` had crashed since the
 minute-step adoption, and its "shared" row had silently become the minute build before the crash.
