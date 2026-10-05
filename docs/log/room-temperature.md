@@ -112,3 +112,26 @@ census's control 4 now uses the tenth-size jar (205 firings, matching an indepen
 control 2 still carried the jar pin from before the 1/16 step — printed "NOT reproduced" on every
 run while the verdict read "all held", because it was never counted. Both now count, and each was
 shown to turn red when broken.
+
+**Leaf water loss on the minute step BUILT 2026-10-05 (lab only, off by default)** (note §20–§20a).
+On the user's "lab first", transpiration and the plant chamber's condenser move together onto the
+60 s step in the separate-air build (a second recorder holds the window's net radiation, so the
+reference's goldens did not move). 8 of 9 graded predictions held. The fan now drains or feeds the
+chamber at a full gradient, scaled by 0.697 because it swaps 43 % of the small chamber's air a
+minute. At 22 °C without watering the crop dies of drought (169 kg lost, stressed 81 % of minutes);
+with watering it delivers 477 kg and the crew pays only the recovery loss (brine +54.09 kg,
+predicted to the digit). Missed: the weather-temperature chamber gains 55 kg, not 20–45. A
+candidate cause, estimated and not measured: the cabin sits 0.04 kg above its 40 % setting.
+⚠ All measured on the outdoor input that §21 then fixed; to be re-predicted, not re-graded.
+
+**A lamp-lit crop's net radiation from the LAMP: a station unfreeze, 2026-10-05** (note §21–§21a).
+Found while building §20: every lamp-lit build gave the crop the lamp's PAR but the weather file's
+OUTDOOR net radiation, so a sealed crop lost more water on sunny days outside, and a dark lamp left
+its water loss untouched. The user: *"fix this, in its current state, it doesnt make sense."* Now
+`(1 − 0.23) ×` the lamp's radiant PAR while lit (84.25 W m⁻²), 0 in the dark; the 0.23 is
+FAO-56's albedo, the user's choice over waiting for a PAR-specific reflectance no reachable page
+gives. 7 of 7 predictions held: 2 goldens move (`sealed_station`, `lighting`), **water stocks
+only**; transpiration −20.9 % and −7.5 %; lamp shedding and the lighting failure darken it too,
+each pinned. ⚠ Every earlier separate-air WATER figure (§13b, §15a, §18) was measured on the
+outdoor input and was not re-run. Still open, the same kind of defect: the chamber's temperature
+follows the outdoor weather too (the queued chamber heat store).
