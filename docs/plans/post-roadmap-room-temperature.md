@@ -1932,3 +1932,14 @@ by 0, as its cooler is), so it keeps isolating the cooler; the walls have their 
 `T_out + 133.3 W / UA` ≈ 87 K above outdoors with walls). Cold direction: a dead lamp on cold
 days pulls the chamber toward outdoors at a 27 h time constant, and the battery heater holds it.
 A radiator loss reaches it after ≈ 31 days through the cooler's second-law gate.
+
+### 23k. Two decisions TAKEN (user, 2026-10-05)
+
+1. **The heater when the lamp is shed:** *"Cut it with the lamp"* — the heater is an
+   interruptible load, like the lamp (the shedding rule's source, Chung & Mazzocco, splits loads
+   into interruptible and uninterruptible). Owed: the lab's lamp shedding sheds the heater too,
+   predictions first. The reference has no shedding, so no golden moves.
+2. **Which temperature the plants read in slice 3:** *"The chamber (as planned)"* — over keeping
+   the outdoor weather for calibration and over a switchable option. Slice 3 (the plants read
+   the chamber, with the cited cold period) is next after item 1, with its own design and
+   predictions.
