@@ -1791,3 +1791,36 @@ to the node (the pre-2b-i wiring) turns `tests/chamber_heat.rs` red at P2's asse
 (≈ +2 090 K over the 60-day test). That is the absence of 2b-iii's heat-loss path, not a
 prediction about a real chamber. Next: 2b-ii (the light leg into the chamber; the node warms to
 174.961 K), predictions first.
+
+### 23g. 2b-ii — the lamp's light into the chamber: design and predictions, before code (2026-10-05)
+
+**What is built.**
+* **The lamp's whole draw becomes chamber heat.** simcore rejects two legs on one stock
+  (`FlowResult::new`: "a flow must net…"), so `Lamp` with its light and heat targets equal
+  emits **one** leg, `+draw`, to that target (`battery −draw`). Physically Table 4-88's
+  "thermal control = power"; the ≤ 0.72 % stored as sugar is the recorded overcount (§23b).
+  `Lamp` with two different targets (the `lighting` build) is untouched.
+* **`boundary.light_used` leaves the sealed build** (a stock that would read 0 forever is a
+  false record). The `lighting` build keeps its own.
+* **`sealed_node_heat`** counts the whole lamp draw (its doc's "the radiant leg leaves as PAR,
+  not to the node" becomes false and is rewritten), so the node starts at its new equilibrium.
+  The chamber's input is the whole averaged draw; `chamber_heat0` takes it.
+* **`lamp_shed`'s lit detector** read `boundary.light_used`. Replaced: a fast step counts as lit
+  when the lamp flow, evaluated on the step's starting state, draws from the battery (the
+  `SheddingLamp` zeroes every leg when shed; a failed lamp draws 0). The caveat it already
+  carried stands: a lamp cut by the arbitration backstop would count as lit; the tests assert
+  `rationed == 0` where they rely on it.
+
+**Predictions** (closed forms from `equilibrium_temperature` and the 2b-i golden):
+
+| # | Prediction |
+|---|---|
+| Q1 | Every non-energy stock and every aux value **byte-identical** to the 2b-i golden; `power.battery` and `boundary.solar_source` byte-identical (the lamp draws the same) |
+| Q2 | `boundary.light_used` gone from the golden; `thermal.chamber` starts and stays at **295.203333 K** (`T_set + 133.333·60/1.5e5`), within 1e-9 K |
+| Q3 | `thermal.node` starts and holds at **174.961 K** (451.643 W), +7.537 K; end state within 1e-6 K of the closed form |
+| Q4 | `boundary.space` at the end = the 2b-i value + the 2b-i `light_used` (39.918 + 7.688 = **47.607 GJ**), within 1e-6 relative |
+| Q5 | Goldens: only `sealed_station` moves (`lighting` byte-identical — its `Lamp` keeps two targets); manifest diff = that golden's hash only (no flow or param added) |
+| Q6 | `lamp_shed`: the rule-off build reproduces the plain sealed run bit for bit (the detector counts every step lit, so the ratio stays exactly 1.0); its rule-on tests keep their verdicts; the blackout test's `light_used` comparison is rewritten to the battery-drawn lit-step count (the same claim: the lamp ran less) |
+| Q7 | A dead cooler (`tests/chamber_heat.rs`, updated to the whole draw): the chamber warms **76.8 K a day**; the node relaxes toward the **same 160.308 K** as in 2b-i (it loses the whole lamp either way); crop byte-identical |
+| Q8 | `tier1_node_is_period_1_fixed_point` and every heat-closure figure unmoved (they read the heat-closure run) |
+| Q9 | The seven sealed examples: identical to 2b-i apart from timings, except `lamp_shed`'s printed `light_used` column, which is replaced |
