@@ -211,3 +211,8 @@ reaches the crop through the room (an empty battery rations the lamp, so its hea
 tests read the plants' temperature off their inputs, which the plan's search missed; and the
 order matters — the plants must be wrapped to read the chamber after any flow is moved onto the
 minute step, and a test now refuses the wrong order. Saved sessions keep loading (no stock added).
+Unpredicted and measured after the commit (§24k): the soil's carbon roughly halved (humus 24.6 →
+12.9 mol C). The soil itself did not change — its processes read no temperature — but its income
+did: the crop, maturing 117 days earlier, hands the soil 63 mol C a season instead of 120, and the
+soil's pools follow their income. Production per growing day is about the same in both runs, which
+points to fewer growing days; that link is measured, not isolated by an experiment.

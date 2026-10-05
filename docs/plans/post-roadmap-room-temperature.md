@@ -2295,5 +2295,34 @@ holds both ways: cold phase plants **+2.16 kg** (crew store −1.94), warm phase
 176.21889 / 173.74488**, chamber day-ends 277.2042–295.2034 K with 8 between the bands (one warm-up,
 one cool-down per season), end 292.5662711 K. Full suite and clippy green.
 
+**The soil carbon halved — UNPREDICTED, then measured (same day, after the commit; the user
+asked why).** §24f predicted no crop or soil magnitudes, and the golden diff showed humus 24.60 →
+12.91, litter 23.20 → 6.95, microbial 10.29 → 4.33 mol C. Instrument: a temporary example (not
+committed) counting carbon INTO the litter by source and season, and soil respiration, for the
+new reference and for the pre-3a reference rebuilt from today's code (no cold period, plants
+unwrapped and reading the weather). **Controls: both runs' end states equal their goldens byte
+for byte; litter closure exact in both** (observed net = stock change).
+
+| Per full season (mol C) | pre-3a | 3a |
+|---|---|---|
+| shed by the living crop (`Senescence` → litter) | 60.34 | 21.93 |
+| dumped at the re-sow (residue + grain − seed) | 59.55 | 41.44 |
+| **into the soil, in all** (= the crop's net production) | **119.9** | **63.4** (0.53×) |
+| soil respiration (settled seasons) | 113.3 | 59.9 |
+| peak crop carbon | 59.18 | 44.05 |
+
+**Cause, measured:** the soil's income halved. The soil's own processes read no temperature
+(`Decomposition`, `HumusDecomposition`, `MicrobialRespiration` carry no `temp_var` — read in
+`flows.rs`), so its first-order pools settle in proportion to the input: humus 0.525× against an
+income of 0.53×. Litter fell further (0.30×) by TIMING: the old crop shed late in the season, so
+its leaves were still litter at the day-1220 snapshot; the new one sheds early and they have
+decomposed. Grain fell only 6 % (it is filled late, and matures with the crop).
+**Why the crop produces less: measured, NOT isolated.** It matures 117 days earlier and spends
+its first 56 days at 4 °C. Production per growing day is about the same — 119.9 / ≈ 266 ≈ 0.45
+against 63.4 / ≈ 137 ≈ 0.46 mol C/day — which points to fewer growing days, not slower growth;
+an experiment that removes the cause has not been run. **Lesson:** a prediction table that
+grades only the quantities it names cannot see a large move elsewhere in the same golden — the
+diff of every stock should be read against the prediction BEFORE `--write`, not after.
+
 **Not removed (recorded):** `VPD_VAR` (outdoor deficit) stays in the sealed plant resolver, unread
 under `VpdRead::Chamber`. **Next:** 3b, the cold phase's dimmed 8 h lamp (§24g), on top of this.
