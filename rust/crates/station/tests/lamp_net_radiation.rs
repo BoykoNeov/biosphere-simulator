@@ -27,6 +27,8 @@ fn midnight(day: u64) -> u64 {
 
 /// The 500 µmol m⁻² s⁻¹ lamp, by hand: 0.77 × 500 / 4.57 W m⁻².
 const LAMP_RN: f64 = 0.77 * 500.0 / 4.57;
+/// The cold phase's dimmed 100 µmol m⁻² s⁻¹ lamp (slice 3b, §24l C5): 0.77 × 100 / 4.57.
+const DIM_RN: f64 = 0.77 * 100.0 / 4.57;
 
 fn state_at(n: u64) -> State {
     let (s, _, _) = build_sealed_station(
@@ -61,9 +63,12 @@ fn the_sealed_crops_net_radiation_is_the_lamps_lit_and_zero_dark() {
     let outdoor = weather_forcings(&scn.bio, scn.years).unwrap();
     let dt = 1.0 / STEPS as f64;
     let mut differs = 0;
-    for day in [0, 40, 150, 250] {
+    // Days 0 and 40 are in the cold period (the dimmed lamp, an 8 h day still lit at midday);
+    // 150 and 250 under the full lamp. Both phases asserted.
+    assert!(scn.is_cold_on_step(midday(40)) && !scn.is_cold_on_step(midday(150)));
+    for (day, lamp_rn) in [(0, DIM_RN), (40, DIM_RN), (150, LAMP_RN), (250, LAMP_RN)] {
         let lit = rn(&r, midday(day));
-        assert!(close(lit, LAMP_RN), "day {day}: lit {lit}, lamp {LAMP_RN}");
+        assert!(close(lit, lamp_rn), "day {day}: lit {lit}, lamp {lamp_rn}");
         assert_eq!(
             rn(&r, midnight(day)),
             0.0,
@@ -112,8 +117,9 @@ fn a_lighting_failure_darkens_the_crops_net_radiation_too() {
     let fast = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
     let (bio, _) = with_lighting_failure(bio, fast, 2 * STEPS, 5 * STEPS).unwrap();
     assert_eq!(rn(&bio, midday(3)), 0.0, "the failed lamp still radiates");
+    // Day 6 is in the cold period: the lamp comes back DIMMED (slice 3b).
     assert!(
-        close(rn(&bio, midday(6)), LAMP_RN),
+        close(rn(&bio, midday(6)), DIM_RN),
         "the lamp did not come back"
     );
 }

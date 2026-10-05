@@ -218,3 +218,23 @@ soil's pools follow their income. Split by phase, the new crop grows 18 % faster
 than the old, but almost nothing in its 8 cold weeks and for only 80 warm days before maturity
 instead of 210 — so it makes about half the carbon. (A first reading, that production per
 growing day was "about the same", counted the cold weeks as growing days and was corrected.)
+
+**Slice 3b BUILT 2026-10-06 (a station unfreeze)** (note §24l predictions, graded in §24m). In
+the 8 cold weeks the lamp is dimmed to 100 µmol m⁻² s⁻¹ for an 8-hour day (Cha et al. 2022: the
+8 hours are the standard protocol's; the 100 is the paper's own vernalization light from a
+different, faster protocol — the standard one says only "low light", and the paper's other two
+institutes used 900 and 1300, so it is cited with that warning). The lamp keeps its efficiency
+when dimmed (a PWM-dimmed LED, the user's design call): 40 W instead of 200. Built in two
+stages: first the wiring with the cold-week light set equal to the normal light, which
+reproduced every saved reference result byte for byte, then the switch. Every prediction held,
+most to the printed digit: the battery ends 2.3 GJ fuller less the heater's 6.6 MJ; the crop
+flowers 105 and matures 139 days after sowing (from 103 / 137). Found: the seedling cannot keep
+itself under the dim cold light — it LOSES half its carbon in those 8 weeks (0.160 → 0.077 mol C)
+— so it starts the warm weeks smaller, and grain falls 36 % and the soil's carbon about 40 %
+(directions predicted, sizes not). No rationing. Two water stocks came out bit-identical to 3a,
+unpredicted and explained: the plants' water use does not read the crop's size, and the
+warm-phase chamber forgets its past every minute, so the water ring converged to the same bits.
+Three tests the roster missed went red, all by the seedling being smaller: a two-day test that
+asked the lit crop to grow (now: lit above dark), and two separate-air tests at day 90 whose
+crop is no longer hungry enough (moved to a cold period with the full lamp; the dim-world
+figures recorded).

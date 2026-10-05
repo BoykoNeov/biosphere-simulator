@@ -16,13 +16,32 @@ use station::air_split::{build_split_station, split_scenario, AirSplit, BVAD_CHA
 use station::driver::run_master_day;
 use station::gas_exchange::GasExchangeStep;
 use station::params as station_params;
-use station::scenario::{sealed_station_scenario, SealedStationScenario};
+use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScenario};
 use station::sealed::{
     build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
 };
 
 /// Long enough for the crop to be well past seedling (the starvation is visible by day 30).
 const DAYS: usize = 90;
+
+/// The sealed scenario with the cold period's lamp at FULL power (slice 3b, §24m): the cold
+/// setpoint kept, the dimmed lamp and short day undone — stage 1's program, which reproduced
+/// slice 3a bit for bit. These pins' subject is the CO₂ supply to a GROWING crop; under the
+/// reference's dim cold phase the seedling shrinks for 56 days and the crop at day 90 is too
+/// small to be hungry (measured on 3b's first run: the BVAD chamber at 0.513 of shared air, not
+/// under 0.5; the fan's 0.1 / 0.4 ratio 0.973, not under 0.97). Not `cold.days = 0`: that would
+/// change the temperature the crop reads as well (a second cause).
+fn scenario() -> SealedStationScenario {
+    let s = sealed_station_scenario();
+    SealedStationScenario {
+        cold: ColdProgram {
+            par: s.full_lamp_par(station_params::lamp().photon_efficacy),
+            photoperiod_hours: s.photoperiod_hours,
+            ..s.cold
+        },
+        ..s
+    }
+}
 
 fn plant_c(s: &State) -> f64 {
     [LEAF_C, STEM_C, ROOT_C, STORAGE_C]
@@ -90,7 +109,7 @@ fn run_all(
 }
 
 fn shared() -> State {
-    let scenario = sealed_station_scenario();
+    let scenario = scenario();
     let built = build_sealed_station(
         &params::charge(),
         &params::thermal(),
@@ -135,7 +154,7 @@ fn split_all(
     vapour_crosses: bool,
     gas_exchange: GasExchangeStep,
 ) -> Vec<State> {
-    let scenario = sealed_station_scenario();
+    let scenario = scenario();
     let s = AirSplit {
         chamber_air_mol,
         fan_mol_per_s,
@@ -273,7 +292,7 @@ fn each_room_is_charged_at_its_own_size() {
     use domains::biosphere::science::N2_MOLAR_MASS_KG_PER_MOL;
     use domains::biosphere::stocks::{CARBON_POOL, CHAMBER_INERT, O2_POOL};
     use station::air_split::{cabin_gases, CABIN_AIR_MOL};
-    let scenario = sealed_station_scenario();
+    let scenario = scenario();
     let s = AirSplit {
         chamber_air_mol: BVAD_CHAMBER_AIR_MOL,
         fan_mol_per_s: 0.2,
@@ -355,7 +374,7 @@ fn watered_build() -> (
     simcore::registry::Registry,
     simcore::environment::SourceResolver,
 ) {
-    let scenario = sealed_station_scenario();
+    let scenario = scenario();
     let s = AirSplit {
         chamber_air_mol: BVAD_CHAMBER_AIR_MOL,
         fan_mol_per_s: 0.2,

@@ -2420,3 +2420,92 @@ day 120 **179.14648 K**, heater **44.8425 W**, full-horizon battery **1.676676e9
 | B12 | ⚠ **A9 (`rationed == 0`, no extinction events) is at risk**, stated before running: a seedling at 4 °C under 100 µmol for 8 h may not cover its own upkeep for 56 days. If the backstop fires, that is a finding about the cold protocol's light on THIS crop — recorded, not tuned |
 | B13 | B9's vapour ceiling is graded at the **measured** cold maximum, not at 4.011 °C |
 | B14 | Manifest: `cold_period.yaml`'s digest and the golden hash only; no flow-set change; 19 of 20 goldens identical |
+
+### 24m. Slice 3b BUILT (2026-10-06, a station unfreeze) — the predictions graded
+
+**What landed.** `cold_period.yaml` + `cold_par` 100 µmol m⁻² s⁻¹ (CITED, ⚠ LOCUS — manuscript
+lines 318–319 are Cha's own speed-vernalization arms; the standard sentence names no number) and
+`cold_photoperiod_hours` 8 (CITED, the standard protocol's short day); `ColdProgram { par,
+photoperiod_hours }`; the four lamp readers on the one clock (§24l); the plant resolver's `PAR`,
+`RN` and `daylength` and the fast `lamp_power` on the program; the chamber's start at the
+program's step-0 lamp; `full_lamp_average_power` / `full_lamp_heat_input_w` (renamed: the node's
+start keeps the full lamp); `run_shedding`'s nominal from the program. Unit pin
+`the_cold_lamp_is_forty_watts_for_eight_hours`.
+
+**Instrument:** `W:\temp\claude\slice3b\resim.py` (§24e's, extended to the structure) for the
+predictions; a temporary day-by-day example (not committed; output
+`W:\temp\claude\slice3b\grade.txt`) and `W:\temp\claude\slice3a\compare_golden.py` for the grades.
+
+| # | Prediction | Measured | Grade |
+|---|---|---|---|
+| B1 | battery 8.261426e9 | **8.261426027e9** (3e-9); `solar_source` identical | HELD |
+| B2 | heater 1.6515e6 J per warm-up, 6.6060e6 in all | **6.605973e6** in all (= 2b-iii + lamp saved − battery); every season's battery change identical (−2.934643e9), so **1.65149e6** each | HELD |
+| B3 | cold 4.005–4.013 °C; day 56's first reading ≈ 15.97; day 305's ≈ 15.2; end 288.3622829 K | day-ends **4.0062–4.0128 °C**; day-end 56 **15.965**, 305 **15.206**; end **288.3622829** | HELD |
+| B4 | node end 174.18129; daily 163.1421 / 174.3095 / 171.44761 | **174.18129**; **163.1421 / 174.3095 / 171.44761** | HELD (to the printed digit) |
+| B5 | surroundings 1.305818e9; space 43 991 226 753.0 | **1.3058179e9**; **43 991 226 753.017** (the instrument's own 43 991 226 753.017456 to every digit) | HELD |
+| B6 | chill-days 55.926093595 | **55.926093595** | HELD |
+| B7 | thermal time 5512.7606791 if unstressed | **5512.7606791** | HELD — the crop is never water-stressed |
+| B8 | flowering / maturity 104.875 / 138.875 | first day-end past each: **105 / 139**, all four seasons | HELD |
+| B9 | cold vapour ceiling 1.031 kg (4.011 °C) | settled cold days' max **1.031171 kg** — the ceiling at the MEASURED warmest settled cold reading, 4.0128 °C, is 1.031171 (A10's lesson applied). One re-sow day-end reads 1.031181, mid-way through condensing the warm air's excess | HELD |
+| B10 | the same 10 stocks identical to 3a; `thermal.chamber` 43 254 342.4 J | the 10 identical, **plus 2 unpredicted** (`condensate`, `water_vapor`, below); chamber **43 254 342.43** | HELD, with an unpredicted extra |
+| B11 | cold-phase production below 3a's 0.47 mol C, maybe negative; season production, soil pools and grain below 3a | the seedling **loses** carbon: 0.160 → **0.077** mol C over the 56 dim days; humus 12.91 → **7.54**, litter 6.95 → **3.93**, microbial 4.33 → **2.43**, grain 37.87 → **24.26**; peak crop 44.05 → **28.43** | HELD (direction; magnitude not predicted) |
+| B12 | ⚠ A9 (`rationed == 0`, no events) at risk | rationed **0**, events **0** (the golden asserts both) | HELD — the risk did not fire |
+| B13 | the vapour ceiling graded at the measured temperature | done (B9) | — |
+| B14 | manifest: `cold_period.yaml` + golden hash; 19 of 20 identical | exactly those two lines; **19 of 20** | HELD |
+| C1 | L2: −21.483 / −35.298 W | **−21.4826** (18 °C cabin) | HELD |
+| C2 | L4 120 d unchanged (179.1465 K, 44.84 W) | green, unchanged | HELD |
+| C5 | net radiation dim 16.849 W m⁻² on cold days | re-pinned, green | HELD |
+| C6 | perturbation signs hold; `|carbon| > |O₂|` at risk | all green, the comparison included | HELD |
+
+**Unpredicted, explained (`condensate` and `water_vapor` byte-identical to 3a).** The plants'
+water ring reads the crop nowhere: transpiration (`Transpiration`, Penman–Monteith) reads the
+lamp's net radiation, the chamber's temperature and vapour, and the soil's water stress — not the
+canopy (a recorded scope line since §21) — and the crop is never water-stressed (B7). The
+warm-phase chamber is history-free: the deadbeat cooler (dt = τ) resets it every minute. So in
+every warm phase the ring runs on bit-identical inputs in 3a and 3b, and the condensate's
+first-order return contracts any difference by 0.96875 a plant step — e^−126 over the 249 warm
+days, far below one ulp. The two runs land on the same bits. Read in the code, not isolated.
+
+**The roster, graded on the first full run (`--no-fail-fast`).** Eight reds in five binaries:
+`chamber_walls` L2 (C1), `lamp_net_radiation` ×2 (C5), the manifest (B14) — predicted; and three
+NOT predicted, recorded:
+
+1. **`gas_exchange::a_change_to_the_plant_side_light_reaches_the_minute_step`** — "the lit crop
+   did not grow: −0.0042 mol C" over two days. The same cause as B11: under the dim cold lamp the
+   lit seedling shrinks too. The pin was `lit > 0`; its subject is that a plant-side light change
+   reaches the minute step, which a copied resolver would erase as `lit == dark`. Re-expressed
+   `lit > dark` (and `dark <= 0` kept).
+2. **`air_split` — the BVAD chamber's starvation and the fan control** — measured in the dim world
+   at day 90: the BVAD chamber at **0.513** of shared air (the pin: under 0.5), the fan's 0.1/0.4
+   ratio **0.973** (the pin: under 0.97). §24l's roster missed this file for 3b (it listed only
+   3a's figures). Cause: the crop enters the warm phase smaller and at day 90 has had 34 warm days
+   — it is not hungry enough for the chamber's CO₂ supply to bind. Moved, like `lamp_shed`'s
+   reserve-crossing six, to the cold period with the full lamp (3a's world exactly, by stage 1);
+   the dim-world figures are this record. ⚠ So under the reference's own cold program the
+   separate-air starvation is shallower at day 90 — a finding about 3b, not measured past day 90.
+
+**The §24i fix's liveness:** with `run_shedding`'s nominal mutated back to the constant full
+lamp, `rule_off_the_lab_wiring_is_the_plain_sealed_run_bit_for_bit` and
+`rule_on_with_the_frozen_battery_nothing_sheds_and_nothing_moves` both go **red**; restored,
+green.
+
+**Why the grain fell 36 % — measured, not isolated.** The same day-by-day example run with the
+cold period's lamp at full power (3a's world, by stage 1): crop carbon at the end of the cold
+weeks **0.424** (3a) against **0.077** mol C (3b), at day 90 **9.76** against **1.93**, peak
+**44.43** against **28.41**, grain **37.70** against **24.24** (season 1). The 3b crop enters the
+warm weeks 5.5 times smaller and never closes the gap before maturity; 2.75 more warm days (B8)
+do not make it up.
+
+**The slow (ignored) station tests, run:** all pass — L4's full horizon battery
+**1.680819683e9** J (C3: 1.680820e9); R3/R4 node **163.14207 / 174.30953 / 171.44761**, chamber
+day-ends 277.1562020–295.2034234 K with **8** between the bands, end 288.3622829 (C4); the sealed
+golden, session parity, resume and tier band tests green. Full suite and clippy green.
+
+**The seven examples, run after:** all complete. `draw_census`'s control 1 is byte-exact against
+the regenerated golden. `lamp_shed` (the reference's own cold program, the SMALL battery): under
+the dim lamp's 13 W the blackout never brings the battery to the reserve (lowest 6.24e7 J against
+2.61e7), so nothing sheds and all four runs' crops are identical — §24h's 3b warning, measured.
+That is why the tests moved to the full-lamp cold period.
+
+**Not removed (recorded):** `VPD_VAR` still in the sealed plant resolver, unread. **Next:** slice 4,
+re-sow on maturity (the clock moves into the state, §24c).

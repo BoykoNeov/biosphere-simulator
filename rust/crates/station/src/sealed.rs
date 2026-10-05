@@ -78,14 +78,12 @@ fn mean_solar_power(scenario: &SealedStationScenario) -> f64 {
     daily_solar_energy(ph) / (ph.steps_per_day as f64 * ph.dt_seconds)
 }
 
-/// The constant daily-average lamp draw (W): `lamp_power_w · photoperiod / 24`.
-pub(crate) fn lighting_average_power(scenario: &SealedStationScenario) -> f64 {
+/// The FULL lamp's daily-average draw (W): `lamp_power_w · photoperiod / 24` — the warm phase's.
+/// ⚠ Not the lamp's draw on a given step since slice 3b (the cold phase dims it):
+/// [`SealedStationScenario::lamp_average_power_on_step`] is that. Renamed from
+/// `lighting_average_power` so every reader re-decided which one it meant.
+pub(crate) fn full_lamp_average_power(scenario: &SealedStationScenario) -> f64 {
     scenario.lamp_power_w * scenario.photoperiod_hours as f64 / 24.0
-}
-
-/// The on-window PAR photon flux the lamp delivers (µmol m⁻² s⁻¹).
-fn sealed_lamp_par(lamp: &LampParams, scenario: &SealedStationScenario) -> f64 {
-    lamp.photon_efficacy * scenario.lamp_power_w / scenario.bio.ground_area
 }
 
 /// The node's initial heat `Q_eq = C·(T_eq − T_space)` (J), set by all forced dissipation.
@@ -109,16 +107,20 @@ pub fn sealed_node_heat(
     let solar_avg = mean_solar_power(scenario);
     let load_w = balanced_load_w(charge, &scenario.power);
     let heat_w =
-        (1.0 - charge.charge_efficiency) * solar_avg + load_w + chamber_heat_input_w(scenario);
+        (1.0 - charge.charge_efficiency) * solar_avg + load_w + full_lamp_heat_input_w(scenario);
     let t_eq = equilibrium_temperature(thermal_params, heat_w);
     thermal_params.heat_capacity * (t_eq - thermal_params.space_temperature)
 }
 
-/// The plant chamber's heat input (W): the lamp's whole averaged draw, light and waste heat
-/// alike (`docs/plans/post-roadmap-room-temperature.md` §23g; slice 2b-i counted the waste heat
-/// alone).
-pub fn chamber_heat_input_w(scenario: &SealedStationScenario) -> f64 {
-    lighting_average_power(scenario)
+/// The plant chamber's heat input (W) from the FULL lamp: its whole averaged draw, light and
+/// waste heat alike (`docs/plans/post-roadmap-room-temperature.md` §23g; slice 2b-i counted the
+/// waste heat alone). The warm phase's; the node's start ([`sealed_node_heat`]) reads it.
+///
+/// ⚠ Since slice 3b the cold phase's dimmed lamp sends less
+/// ([`SealedStationScenario::lamp_average_power_on_step`]). Renamed from `chamber_heat_input_w`
+/// so every reader re-decided: the chamber's START reads the program at step 0, not this.
+pub fn full_lamp_heat_input_w(scenario: &SealedStationScenario) -> f64 {
+    full_lamp_average_power(scenario)
 }
 
 /// Assemble the fully-coupled sealed station: `(state, bio_reg, fast_reg)`, with the crop's
@@ -280,11 +282,11 @@ pub fn build_sealed_station_unread(
         true,
     )?);
     fast_seq.push(node_stock(node0)?);
-    // Day 0's setpoint: the cold program's in the reference (§24c, "start values").
+    // Day 0's setpoint and lamp: the cold program's in the reference (§24c, "start values").
     fast_seq.push(chamber_stock(chamber_heat0(
         &chamber,
         scenario.chamber_setpoint_on_step(0, chamber.warm_setpoint),
-        chamber_heat_input_w(scenario),
+        scenario.lamp_average_power_on_step(0, lamp.photon_efficacy),
     ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
     if matches!(
@@ -512,7 +514,9 @@ fn assert_flow_ids_disjoint(bio_reg: &Registry, fast_reg: &Registry) -> Result<(
 }
 
 /// The biosphere forcing: weather-driven, with `PAR`, net radiation (since 2026-10-05; the
-/// weather's outdoor value before) and `daylength` from the lamp. The `weather` is tiled over
+/// weather's outdoor value before) and `daylength` from the lamp — which follows the cold
+/// program since slice 3b: dimmed to `cold.par` on a `cold.photoperiod_hours` day in the cold
+/// period ([`SealedStationScenario::is_cold_on_step`]). The `weather` is tiled over
 /// `scenario.years` seasons (so `_table` never end-clamps).
 ///
 /// **No temperature** since slice 3a: the plants read the chamber
@@ -524,21 +528,57 @@ pub fn sealed_bio_resolver(
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = weather_forcings(&scenario.bio, scenario.years)?;
     forcings.remove(TEMP_VAR);
-    let photoperiod_s = scenario.photoperiod_hours as f64 * 3600.0;
-    let par = sealed_lamp_par(lamp, scenario);
-    forcings.insert(PAR_VAR.to_string(), lamp_light_path(par, photoperiod_s));
+    // The lamp follows the cold program (slice 3b): dimmed, on a short day, in the cold period.
+    let (warm, cold) = (scenario.photoperiod_hours, scenario.cold.photoperiod_hours);
+    let (warm_s, cold_s) = (warm as f64 * 3600.0, cold as f64 * 3600.0);
+    let warm_par = scenario.full_lamp_par(lamp.photon_efficacy);
+    let cold_par = scenario.cold.par;
+    forcings.insert(
+        PAR_VAR.to_string(),
+        on_cold_program(
+            scenario,
+            lamp_light_path(warm_par, warm_s),
+            lamp_light_path(cold_par, cold_s),
+        ),
+    );
     // The crop's net radiation is the lamp's too, not the weather file's outdoor value (§21).
     forcings.insert(
         RN_VAR.to_string(),
-        lamp_net_radiation_path(par, photoperiod_s),
+        on_cold_program(
+            scenario,
+            lamp_net_radiation_path(warm_par, warm_s),
+            lamp_net_radiation_path(cold_par, cold_s),
+        ),
     );
-    forcings.insert(DAYLENGTH_VAR.to_string(), constant(photoperiod_s)?);
+    forcings.insert(
+        DAYLENGTH_VAR.to_string(),
+        on_cold_program(scenario, constant(warm_s)?, constant(cold_s)?),
+    );
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }
 
-/// The fast-domain forcing: crew intakes + lamp draw + constant solar/load, the outdoor
-/// temperature the chamber's walls face, and the chamber's setpoint program
-/// ([`chamber_setpoint`]).
+/// `cold` in the cold period, else `warm` — on the one clock
+/// ([`SealedStationScenario::is_cold_on_step`]). On the plant side `n` is the plants' own step;
+/// on the fast side it leads the plants' day by one plant step (§24c), as the setpoint does.
+fn on_cold_program(
+    scenario: &SealedStationScenario,
+    warm: simcore::environment::Schedule,
+    cold: simcore::environment::Schedule,
+) -> simcore::environment::Schedule {
+    let scenario = *scenario;
+    Box::new(move |n, dt| {
+        if scenario.is_cold_on_step(n) {
+            cold(n, dt)
+        } else {
+            warm(n, dt)
+        }
+    })
+}
+
+/// The fast-domain forcing: crew intakes + the lamp's daily-average draw on the cold program
+/// (since slice 3b; [`SealedStationScenario::lamp_average_power_on_step`]) + constant
+/// solar/load, the outdoor temperature the chamber's walls face, and the chamber's setpoint
+/// program ([`chamber_setpoint`]).
 pub fn sealed_fast_resolver(
     charge: &ChargeParams,
     scenario: &SealedStationScenario,
@@ -552,9 +592,14 @@ pub fn sealed_fast_resolver(
         WATER_INTAKE_VAR.to_string(),
         constant(scenario.cabin.water_intake_rate)?,
     );
+    // The lamp's draw follows the cold program (slice 3b). ⚠ The efficacy is `lamp.yaml`'s, as
+    // the plant side's PAR is built from the `LampParams` its caller passes: a caller passing a
+    // modified efficacy there would see cold PAR and cold draw disagree (none does).
+    let efficacy = crate::params::lamp().photon_efficacy;
+    let program = *scenario;
     forcings.insert(
         LAMP_POWER_VAR.to_string(),
-        constant(lighting_average_power(scenario))?,
+        Box::new(move |n, _fast_dt| program.lamp_average_power_on_step(n, efficacy)),
     );
     forcings.insert(
         SOLAR_POWER_VAR.to_string(),

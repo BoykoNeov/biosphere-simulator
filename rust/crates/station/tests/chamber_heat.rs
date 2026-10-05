@@ -33,7 +33,7 @@ use station::driver::run_master_day;
 use station::perturbations::ScaledFlow;
 use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScenario};
 use station::sealed::{
-    build_sealed_station, chamber_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
+    build_sealed_station, full_lamp_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
     sealed_node_heat, sealed_reset_hook,
 };
 
@@ -156,7 +156,7 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
     }
 
     // Failed: it warms at w / C_ch, exactly linear (the lamp's draw is the daily average).
-    let w = chamber_heat_input_w(&scenario);
+    let w = full_lamp_heat_input_w(&scenario);
     let per_day = w * 86_400.0 / ch.heat_capacity;
     assert!(
         (per_day - 76.8).abs() < 1e-9,

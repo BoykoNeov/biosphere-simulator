@@ -44,7 +44,10 @@ this contract's. See the unfreeze log.
 plant-step flow and aux process of `sealed_station` is wrapped to read `temp` from the plant
 chamber (`thermal.chamber`, `Q / C − 273.15`; `station::chamber::plants_read_chamber`), and the
 chamber runs the cold program of `cold_period.yaml`. The sealed plant resolver carries no
-temperature, and a plant-side one is refused. The temperature-dependent science stays the
+temperature, and a plant-side one is refused. Since slice 3b the same program dims the lamp in
+the cold period (`cold_par` 100 µmol m⁻² s⁻¹ for `cold_photoperiod_hours` 8, a 40 W draw): the
+crop's PAR, net radiation and day length and the lamp's draw all follow it. The
+temperature-dependent science stays the
 biosphere's; which temperature it reads is this contract's. The chamber's walls still read the
 weather file's daily temperature (the outdoors they face). `greenhouse` and `harvest` still feed
 their plants the weather's temperature; `lighting` the weather's, or its scenario's
@@ -355,6 +358,22 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-06 — the cold period's dimmed lamp, slice 3b: two keys added to a station PARAMETER
+  FILE; 1 golden moves (`sealed_station`).** `docs/plans/post-roadmap-room-temperature.md` §24g /
+  §24l (predictions, committed before the switch) and §24m (graded). `cold_period.yaml` gains
+  `cold_par` 100 µmol m⁻² s⁻¹ (CITED with a ⚠ LOCUS: Cha et al. 2022's own speed-vernalization
+  light, not the standard protocol's, which names none) and `cold_photoperiod_hours` 8 (CITED,
+  the standard protocol's short day). In the cold period the crop's PAR, net radiation and day
+  length and the lamp's draw follow the program; the lamp keeps its efficacy when dimmed (40 W,
+  a PWM-dimmed LED — DESIGN, the user's). **No flow-set change.** Built in two stages: the
+  plumbing with the cold lamp set to the full one reproduced all 20 goldens byte for byte, then
+  the switch. Graded against the independent re-simulation: battery **8.261426e9 J** (+2.32 GJ
+  of lamp saved, less the heater), the end chamber 288.3622829 K, the node's daily 163.1421 /
+  174.3095 / 171.44761 K, chill-days 55.926093595 and thermal time 5512.7606791 (the crop is
+  never water-stressed); flowering / maturity 105 / 139 days after sowing (from 103 / 137). The
+  seedling LOSES half its carbon in the dim cold weeks (0.160 → 0.077 mol C) and grain falls
+  36 % (37.87 → 24.26 mol C); no rationing, no events. The other 19 goldens are byte-identical;
+  the manifest moves by `cold_period.yaml`'s digest and the golden hash.
 - **2026-10-05 — the plants read the chamber, with the cited cold period, slice 3a: a station
   PARAMETER FILE added and the plant chamber's setpoint made a program; 1 golden moves
   (`sealed_station`).** `docs/plans/post-roadmap-room-temperature.md` §24 (design and predictions,

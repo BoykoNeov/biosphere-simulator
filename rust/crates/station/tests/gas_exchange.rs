@@ -208,9 +208,13 @@ fn the_wrapped_flow_is_the_inner_flow_on_a_minute_in_days() {
 
 /// THE TRAP THAT CHANGED THE DESIGN: a change made to the PLANT side's inputs must reach the
 /// crop's carbon budget on the minute step, with nothing else wired. Here the plant-side light
-/// is switched off: over two days the crop must fix nothing (it can only respire), where the
-/// same build with its light grows. A build-time copy of the plant resolver would keep fixing
-/// carbon in the dark — and conserve perfectly while doing it.
+/// is switched off: over two days the crop must fix nothing (it can only respire), and must end
+/// below the same build with its light. A build-time copy of the plant resolver would keep
+/// fixing carbon in the dark — and conserve perfectly while doing it.
+///
+/// ⚠ Since slice 3b (§24m) these two days are the cold phase's DIM lamp, under which the lit
+/// seedling shrinks too (measured −0.0042 mol C; the golden's seedling halves over the 56 days).
+/// So the pin is lit ABOVE dark — the difference a copied resolver would erase — not lit > 0.
 #[test]
 fn a_change_to_the_plant_side_light_reaches_the_minute_step() {
     let scenario = sealed_station_scenario();
@@ -251,8 +255,12 @@ fn a_change_to_the_plant_side_light_reaches_the_minute_step() {
     };
     let lit = run(false);
     let dark = run(true);
-    assert!(lit > 0.0, "the lit crop did not grow: {lit}");
+    assert!(
+        lit > dark,
+        "the light did not reach the minute step: lit {lit}, dark {dark}"
+    );
     assert!(dark <= 0.0, "the crop fixed {dark} mol C in the dark");
+    eprintln!("lit {lit} mol C, dark {dark} mol C over two days");
 }
 
 /// The temperature half of the same trap: a change to the CHAMBER — the plants' temperature

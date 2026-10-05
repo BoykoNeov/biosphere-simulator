@@ -312,9 +312,10 @@ pub const SEALED_STATION_POWER_SCENARIO: PowerScenario = PowerScenario {
     ..BOUNDED_SOC_SCENARIO
 };
 
-/// The plant chamber's cold period (`cold_period.yaml`; Step 3c slice 3a,
-/// `docs/plans/post-roadmap-room-temperature.md` §24c): the chamber is held at `setpoint` for the
-/// first `days` of each season, then at `chamber.yaml`'s (warm) setpoint. One home for the
+/// The plant chamber's cold period (`cold_period.yaml`; Step 3c slices 3a + 3b,
+/// `docs/plans/post-roadmap-room-temperature.md` §24c): for the first `days` of each season the
+/// chamber is held at `setpoint` and the lamp is dimmed to `par` for a `photoperiod_hours` day;
+/// after it, `chamber.yaml`'s (warm) setpoint and the scenario's full lamp. One home for the
 /// program — every reader takes it from [`SealedStationScenario::cold`] — so opting a fixture
 /// out of the cold is one edit (`days = 0`) and cannot be half-done.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -323,6 +324,10 @@ pub struct ColdProgram {
     pub days: usize,
     /// The chamber's held temperature during the cold period (K).
     pub setpoint: f64,
+    /// The lamp's on-window PAR during the cold period (µmol m⁻² s⁻¹).
+    pub par: f64,
+    /// The lamp's photoperiod during the cold period (whole hours).
+    pub photoperiod_hours: u64,
 }
 
 /// Step-7 sealed-station run data (the fully-coupled multi-year station).
@@ -384,6 +389,52 @@ impl SealedStationScenario {
             warm_k
         }
     }
+
+    /// The FULL lamp's on-window PAR (µmol m⁻² s⁻¹), `photon_efficacy · lamp_power_w /
+    /// ground_area` — the warm phase's.
+    pub fn full_lamp_par(&self, photon_efficacy: f64) -> f64 {
+        photon_efficacy * self.lamp_power_w / self.bio.ground_area
+    }
+
+    /// The lamp's on-window PAR (µmol m⁻² s⁻¹) at step `n`: the cold program's in the cold
+    /// period, else [`Self::full_lamp_par`].
+    pub fn lamp_par_on_step(&self, n: u64, photon_efficacy: f64) -> f64 {
+        if self.is_cold_on_step(n) {
+            self.cold.par
+        } else {
+            self.full_lamp_par(photon_efficacy)
+        }
+    }
+
+    /// The lamp's photoperiod (whole hours) at step `n`.
+    pub fn photoperiod_hours_on_step(&self, n: u64) -> u64 {
+        if self.is_cold_on_step(n) {
+            self.cold.photoperiod_hours
+        } else {
+            self.photoperiod_hours
+        }
+    }
+
+    /// The lamp's on-window draw (W) at step `n`: `lamp_power_w`, or in the cold period the
+    /// draw that delivers the cold PAR, `par · ground_area / photon_efficacy`.
+    ///
+    /// ⚠ DESIGN (the user, 2026-10-05, §24j): the lamp is a PWM-dimmed LED, so it keeps its
+    /// photon efficacy when dimmed (it runs at its rated current for a shorter share of each
+    /// cycle). No source read for dimming.
+    pub fn lamp_power_on_step(&self, n: u64, photon_efficacy: f64) -> f64 {
+        if self.is_cold_on_step(n) {
+            self.cold.par * self.bio.ground_area / photon_efficacy
+        } else {
+            self.lamp_power_w
+        }
+    }
+
+    /// The lamp's daily-average draw (W) at step `n`: [`Self::lamp_power_on_step`] ·
+    /// photoperiod / 24 — what the fast-side `lamp_power` forcing carries.
+    pub fn lamp_average_power_on_step(&self, n: u64, photon_efficacy: f64) -> f64 {
+        self.lamp_power_on_step(n, photon_efficacy) * self.photoperiod_hours_on_step(n) as f64
+            / 24.0
+    }
 }
 
 /// `SEALED_STATION_SCENARIO`: the fully-coupled sealed station over multiple annual cycles.
@@ -431,6 +482,28 @@ mod cold_clock_tests {
             ..s
         };
         assert!((0..2 * season).step_by(7).all(|n| !warm.is_cold_on_step(n)));
+    }
+
+    /// The cold lamp (slice 3b, §24c): 100 µmol on the 1 m² plot at 2.5 µmol/J (the PWM DESIGN:
+    /// the efficacy kept when dimmed) is a 40 W draw, 13.33 W averaged over an 8 h day; the
+    /// warm phase keeps the full 500 µmol, 200 W × 16 h. Same clock as the setpoint.
+    #[test]
+    fn the_cold_lamp_is_forty_watts_for_eight_hours() {
+        let s = sealed_station_scenario();
+        let eff = crate::params::lamp().photon_efficacy;
+        assert_eq!((eff, s.bio.ground_area), (2.5, 1.0));
+        let (cold, warm) = (0, 56 * s.bio_steps_per_day);
+        assert_eq!(s.lamp_par_on_step(cold, eff), 100.0);
+        assert_eq!(s.photoperiod_hours_on_step(cold), 8);
+        assert_eq!(s.lamp_power_on_step(cold, eff), 40.0);
+        assert_eq!(s.lamp_average_power_on_step(cold, eff), 40.0 * 8.0 / 24.0);
+        assert_eq!(s.lamp_par_on_step(warm, eff), 500.0);
+        assert_eq!(s.photoperiod_hours_on_step(warm), 16);
+        assert_eq!(s.lamp_power_on_step(warm, eff), 200.0);
+        assert_eq!(
+            s.lamp_average_power_on_step(warm, eff),
+            crate::sealed::full_lamp_average_power(&s)
+        );
     }
 }
 

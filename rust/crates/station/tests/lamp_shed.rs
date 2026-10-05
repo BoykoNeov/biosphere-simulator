@@ -59,6 +59,24 @@ fn warm_scenario(battery0: f64) -> SealedStationScenario {
     }
 }
 
+/// [`scenario`] with the cold period's lamp at FULL power (slice 3b, §24l): the cold setpoint
+/// kept, the dimmed lamp and short day undone. For the reserve-crossing tests, whose subject is
+/// shedding the full lamp — under the dim one (13 W) the small battery may never reach the
+/// reserve. Not `cold.days = 0`: a warm chamber would wake the heater, which is shed with the
+/// lamp (a second cause). This program is stage 1's, which reproduced 3a bit for bit, so these
+/// runs are slice 3a's.
+fn full_lamp_scenario(battery0: f64) -> SealedStationScenario {
+    let s = scenario(battery0);
+    SealedStationScenario {
+        cold: ColdProgram {
+            par: s.full_lamp_par(station::params::lamp().photon_efficacy),
+            photoperiod_hours: s.photoperiod_hours,
+            ..s.cold
+        },
+        ..s
+    }
+}
+
 fn build(scn: &SealedStationScenario) -> (State, Registry, Registry) {
     build_sealed_station(
         &domains::params::charge(),
@@ -237,7 +255,7 @@ fn assert_same_run(lab: &Run, plain: &Run) {
 fn small_lab_baseline() -> &'static Run {
     static RUN: OnceLock<Run> = OnceLock::new();
     RUN.get_or_init(|| {
-        let scn = scenario(SMALL_BATTERY);
+        let scn = full_lamp_scenario(SMALL_BATTERY);
         let (bio, fast) = resolvers(&scn, false);
         lab(&scn, &fast, &bio, reserve(&scn))
     })
@@ -290,7 +308,7 @@ fn a_run_resumed_from_a_saved_day_is_the_continuous_run_bit_for_bit() {
 fn small_lab_blackout() -> &'static Run {
     static RUN: OnceLock<Run> = OnceLock::new();
     RUN.get_or_init(|| {
-        let scn = scenario(SMALL_BATTERY);
+        let scn = full_lamp_scenario(SMALL_BATTERY);
         let (bio, fast) = resolvers(&scn, true);
         lab(&scn, &fast, &bio, reserve(&scn))
     })
@@ -323,7 +341,7 @@ fn the_small_battery_alone_does_not_reach_the_reserve() {
     let run = small_lab_baseline();
     assert!(run.log.delivery.iter().all(|&d| d == 1.0));
     assert_eq!(run.rationed, 0);
-    let scn = scenario(SMALL_BATTERY);
+    let scn = full_lamp_scenario(SMALL_BATTERY);
     assert!(run.states.last().unwrap().stocks[BATTERY].amount > reserve(&scn));
 }
 
@@ -339,7 +357,7 @@ fn the_plain_crop_does_not_see_a_blackout() {
     // small battery on day 6, the backstop then rations the lamp's draw (5 140 times, measured on
     // the first run of 3a), less lamp heat reaches the chamber, and the crop reads a colder room
     // from day 7. That is the plants reading the chamber, not the light defect this pins.
-    let scn = scenario(SMALL_BATTERY);
+    let scn = full_lamp_scenario(SMALL_BATTERY);
     let (bio, calm) = resolvers(&scn, false);
     let (_, dark) = resolvers(&scn, true);
     let calm = plain(&scn, &calm, &bio);
@@ -388,7 +406,7 @@ fn a_shed_lamp_on_the_sealed_station_never_comes_back() {
 fn cutting_only_the_lamps_power_darkens_the_lab_crop() {
     // The lighting-failure perturbation cuts the crop's light and the lamp's draw by hand,
     // together. The lab crop reads what the lamp drew, so the draw alone is enough.
-    let scn = scenario(sealed_station_scenario().battery0);
+    let scn = full_lamp_scenario(sealed_station_scenario().battery0);
     let (bio, fast) = resolvers(&scn, false);
     let cut = with_lamp_power_cut(
         sealed_fast_resolver(&domains::params::charge(), &scn).unwrap(),

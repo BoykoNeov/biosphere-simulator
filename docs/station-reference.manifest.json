@@ -120,7 +120,7 @@
   "param_files": {
     "chamber.yaml": "860c1fbf767b53d683021463f5aa0413eccb2e8aaa4d6e96ccfeb3bd8ba9777e",
     "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
-    "cold_period.yaml": "119a99d76aac6fe6af08560dec2bc228b73c73bca0e89ffb814207886e4d67de",
+    "cold_period.yaml": "8a583bc8b85583d4821ba1ce3537942c98acf36323a3cae599a9cb276c112154",
     "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
     "eclss.yaml": "6cc9e6eaac805a9d361637773ff4ca15858739342347604dc3614a911fee6c47",
     "harvest.yaml": "358ae0150f64cf67f5b83b2357af0f786ee657ab88d1cfbb87866ac1eb08ff05",
@@ -178,7 +178,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "7235cae04a5f37cca9bfb37bef41a4d5d4282156ad493fc3d639e29635aebdf6",
+      "golden_sha256": "f5b25016511762a836104b66ae7a655ae62374a9a8445f7e6fa9468b1d1083b4",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

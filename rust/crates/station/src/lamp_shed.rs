@@ -370,7 +370,9 @@ pub fn run_shedding(
         .ok_or_else(|| {
             SimError::Reference(format!("the fast resolver carries no {LAMP_POWER_VAR:?}"))
         })?;
-    let nominal_lamp_w = crate::sealed::lighting_average_power(scenario);
+    // The nominal is the lamp PROGRAM's draw on the same step `drawn` reads (§24i): the cold
+    // phase's dimmed lamp is not a 90 % failure of the full one.
+    let efficacy = crate::params::lamp().photon_efficacy;
 
     let mut state = initial;
     let mut states = vec![state.clone()];
@@ -396,7 +398,7 @@ pub fn run_shedding(
                 if lit {
                     drawn += lamp_power(before.n, fast_dt);
                 }
-                nominal += nominal_lamp_w;
+                nominal += scenario.lamp_average_power_on_step(before.n, efficacy);
                 rationed += report.rationed;
                 events.extend(report.events);
             }

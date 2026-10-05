@@ -26,7 +26,7 @@ use station::gas_exchange::GasExchangeStep;
 use station::perturbations::{with_lighting_failure, ScaledFlow};
 use station::scenario::sealed_station_scenario;
 use station::sealed::{
-    build_sealed_station_in, chamber_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
+    build_sealed_station_in, full_lamp_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
     sealed_reset_hook,
 };
 
@@ -242,7 +242,7 @@ fn a_dead_lamp_on_cold_days_fires_the_heater() {
     );
     // Against the nominal run: the lamp's energy not drawn, less the heater.
     let scenario = sealed_station_scenario();
-    let lamp_saved = chamber_heat_input_w(&scenario) * 5.0 * 86_400.0;
+    let lamp_saved = full_lamp_heat_input_w(&scenario) * 5.0 * 86_400.0;
     let gained = amount(h, BATTERY) - amount(n, BATTERY);
     assert!(
         (gained - (lamp_saved - drawn)).abs() <= 1e-6 * lamp_saved,
@@ -298,13 +298,15 @@ fn a_dead_lamp_on_cold_days_fires_the_heater() {
 /// L2 — the cabin, away from the zero-flow point, and the chamber held either way. Since slice
 /// 3a the first three days are the COLD period (4 °C), so both cabins are warmer than the
 /// chamber and both push heat IN — re-derived in closed form (§24h): the deadbeat cooler's
-/// steady state `T = (T_set + (P + UA·T_cab)·τ/C) / (1 + UA·τ/C)`, with `P` the lamp's 133.3 W,
-/// gives 277.2119 K / −21.409 W against 18 °C and 277.2174 K / −35.224 W against 27 °C.
+/// steady state `T = (T_set + (P + UA·T_cab)·τ/C) / (1 + UA·τ/C)`. With `P` the cold phase's
+/// DIMMED lamp since slice 3b, 40 W × 8/24 = 13.33 W (§24l C1; 133.3 W in 3a, −21.409 /
+/// −35.224 W), it gives 277.1639 K / −21.483 W against 18 °C and 277.1695 K / −35.298 W
+/// against 27 °C.
 #[test]
 fn a_cabin_hotter_or_colder_than_the_chamber() {
     let days = 3;
     let cold_set = sealed_station_scenario().cold.setpoint;
-    for (cabin_k, watts) in [(291.15, -21.409), (300.15, -35.224)] {
+    for (cabin_k, watts) in [(291.15, -21.483), (300.15, -35.298)] {
         let r = run(
             days,
             ChamberSurroundings::Cabin {
@@ -355,7 +357,9 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
 /// resim_structure.py`, run BEFORE this test): the cold chamber faces the node across 98 K
 /// instead of 116 K, so the heater gives 4.2689e9 J over the horizon, not 4.7293e9, and the
 /// battery ends near 5.9456e9 − 4.2689e9 = 1.6767e9 J. (Control: the same instrument without the
-/// cold period gives 1.2163e9, against this test's earlier measured 1.219e9.)
+/// cold period gives 1.2163e9, against this test's earlier measured 1.219e9.) Slice 3b (§24l
+/// C3, `W:\temp\claude\slice3b\resim.py`): the dimmed lamp saves 2.3224e9 J and the heater
+/// spends it again against the cold node, so the battery ends near **1.6808e9 J** (net +4.1 MJ).
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
@@ -364,15 +368,16 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
     let b = amount(r.states.last().unwrap(), BATTERY);
     eprintln!("L4 full horizon: battery ends at {b} J");
     assert!(
-        b > 0.0 && (b / 1.6767e9 - 1.0).abs() < 0.02,
+        b > 0.0 && (b / 1.6808e9 - 1.0).abs() < 0.02,
         "battery ends at {b} J"
     );
 }
 
 /// R3 / R4 — the reference trajectory: the node's daily range and mean, the chamber's range.
-/// Slice 3a's §24f A3/A4: the node 172.1755 / 176.2189 / 173.74488 K (min / max / mean of the
-/// day-end states); the chamber in the cold band (4.053–4.061 °C) or the warm one (to
-/// 295.2034 K) except at the transitions, and ending mid-cool-down at 292.5662711 K.
+/// Slice 3b's §24g B4 / §24l C4 (3a's A3/A4 before): the node 163.1421 / 174.3095 / 171.44761 K
+/// (min / max / mean of the day-end states; the dim lamp sends 120 W less through the cooler in
+/// the cold phase); the chamber in the cold band (277.1562–277.1628 K) or the warm one (to
+/// 295.2034 K) except at the transitions, and ending mid-cool-down at 288.3622829 K.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -385,20 +390,20 @@ fn the_reference_node_and_chamber_follow_the_weather() {
     let mean = nodes.iter().sum::<f64>() / nodes.len() as f64;
     eprintln!("node daily min {lo} max {hi} mean {mean}");
     assert!(
-        (lo - 172.1755).abs() < 0.01 && (hi - 176.2189).abs() < 0.01,
+        (lo - 163.1421).abs() < 0.01 && (hi - 174.3095).abs() < 0.01,
         "{lo} {hi}"
     );
-    assert!((mean - 173.74488).abs() < 0.01, "{mean}");
+    assert!((mean - 171.44761).abs() < 0.01, "{mean}");
     let ch: Vec<f64> = r.states.iter().skip(1).map(chamber_t).collect();
     let (clo, chi) = ch
         .iter()
         .fold((f64::MAX, f64::MIN), |(l, h), &x| (l.min(x), h.max(x)));
-    let in_band = |t: f64| (277.203..=277.212).contains(&t) || (295.188..=295.2035).contains(&t);
+    let in_band = |t: f64| (277.156..=277.163).contains(&t) || (295.188..=295.2035).contains(&t);
     let outside = ch.iter().filter(|&&t| !in_band(t)).count();
     eprintln!("chamber daily min {clo} max {chi}; {outside} day-end states between the bands");
-    assert!(clo >= 277.203 && chi <= 295.2035, "{clo} {chi}");
+    assert!(clo >= 277.156 && chi <= 295.2035, "{clo} {chi}");
     // One mid-warm-up and one mid-cool-down day-end state per season at most.
     assert!(outside <= 2 * sealed_station_scenario().years, "{outside}");
     let end = chamber_t(r.states.last().unwrap());
-    assert!((end - 292.5662711).abs() < 1e-6, "chamber ends {end} K");
+    assert!((end - 288.3622829).abs() < 1e-6, "chamber ends {end} K");
 }

@@ -143,14 +143,20 @@ pub fn chamber() -> ChamberParams {
     }
 }
 
-/// The plant chamber's cold period (`cold_period.yaml`, Step 3c slice 3a): the program the
-/// sealed scenario defaults its [`ColdProgram`] from. The setpoint is strictly positive; the
-/// length is a whole number of days, `>= 0` (0 is no cold period).
+/// The plant chamber's cold period (`cold_period.yaml`, Step 3c slices 3a + 3b): the program
+/// the sealed scenario defaults its [`ColdProgram`] from. The setpoint and the PAR are strictly
+/// positive; the length is a whole number of days, `>= 0` (0 is no cold period); the photoperiod
+/// a whole number of hours in `(0, 24]`.
 pub fn cold_period() -> ColdProgram {
     let f = file(COLD_PERIOD_YAML, "cold_period.yaml");
     let v = checked(
         f.guarded_set(
-            &[("cold_setpoint", "K"), ("cold_days", "day")],
+            &[
+                ("cold_setpoint", "K"),
+                ("cold_days", "day"),
+                ("cold_par", "umol/m^2/s"),
+                ("cold_photoperiod_hours", "h"),
+            ],
             "cold_period.yaml",
         ),
         "cold_period.yaml",
@@ -163,12 +169,25 @@ pub fn cold_period() -> ColdProgram {
         days.fract() == 0.0,
         "cold_period.yaml: cold_days must be a whole number of days, got {days}"
     );
+    let hours = checked(
+        require_positive(v[3], "cold_photoperiod_hours", "cold_period.yaml"),
+        "cold_period.yaml",
+    );
+    assert!(
+        hours.fract() == 0.0 && hours <= 24.0,
+        "cold_period.yaml: cold_photoperiod_hours must be a whole number of hours in (0, 24],          got {hours}"
+    );
     ColdProgram {
         days: days as usize,
         setpoint: checked(
             require_positive(v[0], "cold_setpoint", "cold_period.yaml"),
             "cold_period.yaml",
         ),
+        par: checked(
+            require_positive(v[2], "cold_par", "cold_period.yaml"),
+            "cold_period.yaml",
+        ),
+        photoperiod_hours: hours as u64,
     }
 }
 
