@@ -1848,3 +1848,49 @@ the chamber's start on the whole draw via `chamber_heat_input_w`; `lamp_shed.rs`
 
 **§2's first "gap in the heat books" is closed:** the lamp's light no longer leaves the station;
 it heats the chamber, and the node carries it to the radiator (+72.94 W, +7.54 K).
+
+### 23i. 2b-iii — the walls and the heater: design and predictions, before code (2026-10-05)
+
+**What is built.**
+* **`ChamberWall`** (`station.chamber_wall`): chamber ↔ its surroundings, either sign. Conductive
+  `UA·(T_ch − T_sur)` or radiative `ε*·σ·A·(T_ch⁴ − T_sur⁴)`. Surroundings, the user's four:
+  * **outdoor weather — the reference**: `T_sur` = the weather file's daily temperature (the one
+    the plants read), °C + 273.15, into a two-signed boundary `boundary.chamber_surroundings`;
+  * **cabin** (lab): a held temperature, settable hotter or cooler, same boundary;
+  * **space** (lab): radiative to `T_space` into `boundary.space`, ε* **WHAT-IF** (no source,
+    §23d) — a lab constant, never in `chamber.yaml`;
+  * **station structure** (lab): conductive to `thermal.node`.
+* **`ChamberHeater`** (`station.chamber_heater`): battery → chamber, the cooler's mirror —
+  `min(heater_capacity·dt, (C_ch·T_set − Q)·dt/τ)` while below the setpoint. Resistive, so every
+  joule drawn is heat.
+* **`chamber.yaml` gains three:** `wall_conductance` **0.30 W/m²·K** (CITED, class: BVAD Table 4-50
+  1/R_S 0.28–0.32, a freezer cabinet wall, §23d), `wall_area` **5.12 m²** (DESIGN: a 1 m × 1 m
+  box of Table 4-88's 0.78 m³), `heater_capacity` **200 W** (DESIGN: symmetric with the cooler;
+  must exceed the structure option's steady 44.8 W, below).
+* **⚠ The time base.** The fast operator keeps the **slow** step count `n` (16 a day) while it
+  runs at `dt = 60 s`, so the weather table's own indexing (`floor(n·dt)` with `dt` in days)
+  would read the wrong day there. The outdoor temperature is read as `floor(n·bio_dt)` — the
+  same day the plants read — and a test pins it at day boundaries.
+
+**Predictions — the reference golden** (an independent Python re-simulation of chamber + node on
+the 60 s step over the 1220-day weather, `W:\temp\claude\chamber-heat\`; not the Rust code):
+
+| # | Prediction |
+|---|---|
+| R1 | Every non-energy stock and every aux value **byte-identical** to 2b-ii; `power.battery` and `boundary.solar_source` **byte-identical** — the heater never fires (the lamp's 133.3 W exceeds the largest wall loss, 36.6 W), so it emits zero legs every step. Walls and heater share one golden diff **because** the heater is inert to the bit there |
+| R2 | `boundary.chamber_surroundings` ends at **+1.8417e9 J** (17.47 W mean out), within 1e-4 relative |
+| R3 | The node is no longer a fixed point: from 174.961 K it ends at **174.141 K**; its daily range **172.17–174.89 K**, mean **173.25 K**; end within 0.01 K |
+| R4 | The chamber varies with the weather: **295.1887–295.2034 K**, ends 295.1999 K (each step `T_set + (133.33 W − wall)·60/C_ch`) |
+| R5 | `boundary.space` = 2b-ii's − 1.8335e9 J (the wall's heat leaves through the walls, not the radiator, less the node's stored change), within 1e-4 relative |
+| R6 | Goldens: only `sealed_station` moves. Manifest: + `ChamberWall`, + `ChamberHeater` (flow set), `chamber.yaml`'s digest, the golden hash |
+| R7 | `tier1_node_is_period_1_fixed_point` and heat closure unmoved; the seven sealed examples identical apart from timings and energy rows |
+
+**Predictions — lab tests:**
+
+| # | Prediction |
+|---|---|
+| L1 | **The heater fires** (reference build, lamp failed over the coldest 5 days, 113–117, mean 0.04 °C): it draws **1.4574e7 J** (mean 33.7 W) within 1e-3; at the window's end the battery is **+4.3026e7 J** above the nominal run (the lamp's 5.76e7 J not drawn, less the heater); the chamber dips at most **0.0146 K** below 22 °C (`wall·dt/C_ch`) and never further. Control: the same failure with the heater's capacity at 0 — the chamber falls toward outdoors (liveness: the dip bound goes red), and the crop is byte-identical to the heated run (the plants read no chamber temperature) |
+| L2 | **Cabin** at 18 °C: 6.22 W out; at 27 °C: **7.59 W in** — the cooler takes it, the chamber stays held. The flow's sign and size pinned at both, away from the zero-flow point |
+| L3 | **Space**, ε* = 0.01 (WHAT-IF): 22.05 W out at 295.2 K |
+| L4 | **Station structure**, 1220 days: the heater runs continuously at **44.8 W**; the node settles near **179.15 K**; the battery, which nominally falls to 5.946e9 J (the sealed power budget pays life support, not the lamp — §6 of the lamp-shed record), ends near **1.22e9 J** — above zero, so no rationing within the horizon, barely |
+| L5 | The time base: the outdoor temperature read on the fast step equals the plants' for the same slow `n`, at the first and last minute of a day |
