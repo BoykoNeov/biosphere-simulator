@@ -1324,3 +1324,64 @@ events.
 Found on the way: at 22 °C the plant-step build transpired **1735 kg**, the minute build 1225 kg.
 On the plant step, the fan pulls the chamber toward the cabin's dryness for 90 minutes between
 transpiration steps. Transpiration then reads that drier air.
+
+## 21. The lamp-lit crop's net radiation comes from the LAMP — a station unfreeze (user, 2026-10-05; predictions before code)
+
+**The defect (found in §20, ruled on by the user the same day: "fix this, in its current state, it
+doesnt make sense").** In every lamp-lit build the crop's PAR is the lamp's, but transpiration's
+net radiation was still the weather file's outdoor daily value. A sealed crop lost more water on
+sunny outdoor days, and a lamp blackout left its water loss untouched.
+
+**The form — no new science, no new parameter.** Net radiation while lit = `(1 − α) ×` the lamp's
+radiant flux at the crop, and 0 while dark:
+* the radiant flux is the window's lamp PAR × `PAR_PHOTON_ENERGY_J_PER_UMOL` (McCree's 1/4.57 J per
+  µmol, the same conversion the lamp's own energy split uses, so all the lamp's radiant output is
+  PAR, as in its energy books);
+* `α` is FAO-56's 0.23, the SAME constant the outdoor form `weather::net_radiation` uses. **The
+  user's choice (2026-10-05)**, over holding the fix for a PAR-specific canopy reflectance.
+  ⚠ Locus: 0.23 is broadband sunlight on a grass reference. Leaves reflect less of an all-PAR
+  lamp's light (no PAR-specific value could be read on a page we can reach: Penning de Vries 1989
+  and Goudriaan & van Laar 1994 are not open; the open review Liu et al. 2021, *Plant Physiol.*
+  186:977, says only "very low reflectance"). So this probably UNDER-counts the absorbed energy by
+  up to ≈ 20 %. Recorded, replaceable.
+* It follows the lamp's own top-hat path (`lamp_light_path`), so it is per window and it follows
+  any dimming (the decided cold-phase 100 µmol).
+* Still left out, as outdoors: net long-wave, the lamp's waste heat (it goes to the thermal node),
+  and canopy size (transpiration ignores leaf area, §13b).
+
+**Where.** `sealed_bio_resolver` (the sealed station, its Godot session, the palette) and
+`lighting_bio_resolver`. The two lab paths that darken the lamp must darken this too:
+`lamp_shed`'s `LampLitEnv` (scales PAR by the delivered share → scales net radiation too) and
+`perturbations::with_lighting_failure` (PAR → 0 in the window → net radiation → 0 too). The
+sunlit builds (`greenhouse`, `harvest`, every biosphere scenario) keep the weather's value.
+`authoring` has no lamp.
+
+**Measured before predicting** (`W:\temp\claude\minute-transpiration\zz_scratch_lamp_rn.rs`,
+throwaway): lamp PAR 500 µmol m⁻² s⁻¹ → 109.41 W m⁻² radiant → **84.25 W m⁻² while lit**, 56.16
+as a daily mean (16 h). The outdoor daily mean over a season is 88.00. Penman–Monteith summed at the
+chamber's 75 % target: one season 708.0 → 557.2 kg (**× 0.787**); the lighting scenario's 7 days
+15.8 → 14.6 kg (**× 0.924**). The sealed station today never stresses its crop: lowest root-zone
+fill **0.7805** over the 4-season golden (stress onset 0.30).
+
+**Predictions:**
+* **L1 — which goldens move:** exactly `sealed_station_state` and `lighting_state` (2 of 20).
+  Unchanged: `greenhouse`, `harvest`, `sealed_energy_drift_summary`, all 7 biosphere goldens, the rest.
+* **L2 — what moves inside them: water only.** Soil, subsoil, condensate and vapour stocks move.
+  Every carbon, O₂ and nitrogen stock is byte-identical, as are the crew's and the energy stocks and
+  every aux value (`thermal_time`, `vernalization_days`, `rooted_depth`,
+  `station.plant_window.*`). The basis: no step reaches water stress (fill ≥ 0.78 with the higher
+  outdoor draw), and nothing on the carbon side reads water except through the stress factor
+  (allocation, leaf expansion, drought-accelerated development), which stays exactly 1. The precedent
+  is Step 3b's chamber dryness: water only.
+* **L3 — size:** the sealed station's transpiration over its golden's horizon falls by **21 % ± 5
+  points**, the lighting scenario's by **8 % ± 4 points**. Measured by an observer run on the two
+  builds before and after.
+* **L4 — books:** 0 rationing, no events, the tier-contract tests pass after the regeneration.
+* **L5 — the manifest:** exactly the two `golden_sha256` rows. `param_files` is unchanged, because
+  no parameter is added (the constant is reused).
+* **L6 — the blackout, which is what the user asked about:** in the lab's lamp-shedding blackout,
+  the crop transpires LESS than in the calm run over the same days (before this change, the same).
+  In `with_lighting_failure` the window's net radiation reads 0. Each is pinned, and each pin turns
+  red with the change reverted.
+* **L7 — the outdoor form is untouched:** `weather::net_radiation` is bit-identical (refactored to
+  share one `(1 − α)` helper with the lamp form). Held by the 7 biosphere goldens, plus a pin.
