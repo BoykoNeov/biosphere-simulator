@@ -40,6 +40,16 @@ they replaced PAR and day length but left transpiration on the weather file's ou
 The formula's science stays the biosphere's (`weather::net_shortwave`); which light it is fed is
 this contract's. See the unfreeze log.
 
+⚠ **Since 2026-10-05 (slice 3a) the sealed station also owns the crop's TEMPERATURE.** Every
+plant-step flow and aux process of `sealed_station` is wrapped to read `temp` from the plant
+chamber (`thermal.chamber`, `Q / C − 273.15`; `station::chamber::plants_read_chamber`), and the
+chamber runs the cold program of `cold_period.yaml`. The sealed plant resolver carries no
+temperature, and a plant-side one is refused. The temperature-dependent science stays the
+biosphere's; which temperature it reads is this contract's. The chamber's walls still read the
+weather file's daily temperature (the outdoors they face). `greenhouse` and `harvest` still feed
+their plants the weather's temperature; `lighting` the weather's, or its scenario's
+`habitat_temp_c` constant when set (`lighting_bio_resolver`).
+
 **Why whole-assembly, not station-layer-only** (advisor-reviewed, user-confirmed). A
 station-layer-only freeze (owning just the four seams + three params) would leave the
 sibling flows and params changeable with **no unfreeze ceremony — in exactly the layer
@@ -363,7 +373,11 @@ gate), so the discipline is enforced, not merely requested.
   warm-phase vapour ceiling was mis-rounded in the prediction (3.359 vs 3.3603, the ceiling at
   the measured 22.0534 °C). The crop flowers ≈ 102 days after sowing instead of 219. The other 19
   goldens are byte-identical; the manifest moves by the new file's digest, `chamber.yaml`'s
-  (header) and the golden hash.
+  (header) and the golden hash. ⚠ **Unpredicted, measured after the commit (§24k):** the
+  golden's soil carbon roughly halved (humus 24.6 → 12.9, litter 23.2 → 6.9 mol C) — the soil's
+  own processes read no temperature, but its income fell from 120 to 63 mol C a season as the
+  crop's season shortened; the crop's nitrogen, rooting depth and the water's split between
+  soil, subsoil and condensate moved too (§24k says why).
 
 - **2026-10-05 — the plant chamber's walls and heater, slice 2b-iii: two FLOWS and three
   PARAMETERS added; 1 golden moves (`sealed_station`), energy books only.** The third of three

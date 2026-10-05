@@ -2317,10 +2317,31 @@ for byte; litter closure exact in both** (observed net = stock change).
 income of 0.53×. Litter fell further (0.30×) by TIMING: the old crop shed late in the season, so
 its leaves were still litter at the day-1220 snapshot; the new one sheds early and they have
 decomposed. Grain fell only 6 % (it is filled late, and matures with the crop).
-**Why the crop produces less: measured, NOT isolated.** It matures 117 days earlier and spends
-its first 56 days at 4 °C. Production per growing day is about the same — 119.9 / ≈ 266 ≈ 0.45
-against 63.4 / ≈ 137 ≈ 0.46 mol C/day — which points to fewer growing days, not slower growth;
-an experiment that removes the cause has not been run. **Lesson:** a prediction table that
+**Why the crop produces less — the phases, measured** (a second temporary instrument splitting
+each season's net production = Δ crop carbon + what it shed; same controls, both end states
+byte-equal to their goldens; totals 119.9 and 63.4 as above). Season 2, mol C:
+
+| Phase | pre-3a | 3a |
+|---|---|---|
+| days 0–55 | 13.33 (0.238/d; outdoors) | **0.47** (0.008/d; 4 °C, a seedling) |
+| warm, before maturity | 87.49 over 210 d (0.417/d) | 39.44 over **80 d** (**0.493/d**) |
+| after maturity | 19.07 over 39 d (0.489/d) | 23.46 over 169 d (0.139/d, dying back) |
+
+⚠ **This CORRECTS a claim made first** (in the reply to the user and here): that production per
+growing day was "about the same, so fewer growing days" — a soft denominator, which counted the
+56 cold days as growing days (advisor). Measured, the 3a crop grows **18 % faster** per warm day
+before maturity (22 °C against the weather's cooler days), but almost nothing in the cold weeks
+and for 80 warm days instead of 210; the shorter window outweighs the faster rate. Still not an
+experiment that removes a cause — a decomposition of where the carbon was made.
+
+**The golden's other unpredicted moves, read against the same causes** (from the code, not
+isolated): `rooted_depth` 1.300 → 1.257 m — roots stop at flowering (`science::extension_rate`),
+which now comes at ≈ day 102 with 56 cold days in it, short of the 1.3 m reached before;
+`subsoil_water` +23 % — water below the roots stays out of reach as roots stop shallower;
+`water_vapor` +41 % and `condensate` +27 % — a warmer chamber holds more vapour (A10's ceiling)
+and cycles more through the air; `soil_water` −4.5 %; `plant_n` −34 % — the end-state crop is a
+smaller, dying-back one, and its nitrogen follows its tissue. None of them points to another
+cause. **Lesson:** a prediction table that
 grades only the quantities it names cannot see a large move elsewhere in the same golden — the
 diff of every stock should be read against the prediction BEFORE `--write`, not after.
 

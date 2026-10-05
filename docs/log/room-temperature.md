@@ -214,5 +214,7 @@ minute step, and a test now refuses the wrong order. Saved sessions keep loading
 Unpredicted and measured after the commit (§24k): the soil's carbon roughly halved (humus 24.6 →
 12.9 mol C). The soil itself did not change — its processes read no temperature — but its income
 did: the crop, maturing 117 days earlier, hands the soil 63 mol C a season instead of 120, and the
-soil's pools follow their income. Production per growing day is about the same in both runs, which
-points to fewer growing days; that link is measured, not isolated by an experiment.
+soil's pools follow their income. Split by phase, the new crop grows 18 % faster per warm day
+than the old, but almost nothing in its 8 cold weeks and for only 80 warm days before maturity
+instead of 210 — so it makes about half the carbon. (A first reading, that production per
+growing day was "about the same", counted the cold weeks as growing days and was corrected.)

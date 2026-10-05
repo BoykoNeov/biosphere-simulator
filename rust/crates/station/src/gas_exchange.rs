@@ -27,9 +27,11 @@
 //! * **The window.** The fast steps after a plant step lie in that step's window, and the
 //!   values were recorded at that step. There is no `n − 1` to get wrong.
 //! * **Whoever changes the plant's inputs reaches the crop's carbon budget.** A perturbed
-//!   resolver, a held room temperature, the lab's lamp shedding (which wraps every plant-step
-//!   aux, this recorder included) — all of them act on the plant step's environment, so they
-//!   are what gets recorded. ⚠ The first build (2026-10-03, same day) copied a plant resolver
+//!   resolver, a change to the plant chamber's temperature (since slice 3a the sealed plants
+//!   read the chamber, through a wrapper that also wraps this recorder; a plant-side `temp` is
+//!   refused), the lab's lamp shedding (which wraps every plant-step aux, this recorder
+//!   included) — all of them act on the plant step's environment, so they are what gets
+//!   recorded. ⚠ The first build (2026-10-03, same day) copied a plant resolver
 //!   into the adapter at build time instead; every one of those changes would then have missed
 //!   photosynthesis without a single red.
 //!
