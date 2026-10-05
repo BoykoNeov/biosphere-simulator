@@ -2347,3 +2347,76 @@ diff of every stock should be read against the prediction BEFORE `--write`, not 
 
 **Not removed (recorded):** `VPD_VAR` (outdoor deficit) stays in the sealed plant resolver, unread
 under `VpdRead::Chamber`. **Next:** 3b, the cold phase's dimmed 8 h lamp (§24g), on top of this.
+
+
+### 24l. Slice 3b — before switching the lamp: the plumbing's control, the roster revised, the predictions completed (2026-10-05)
+
+**Advisor review before code (2026-10-05), summarized.** (1) Build in two stages: the plumbing
+first with the cold lamp set EQUAL to the warm one (500 µmol, 16 h), which must reproduce 3a byte
+for byte, then the switch — the only way to show the three forcings turned into schedules add no
+second cause. (2) Rename the lamp's average-draw helpers so every reader re-decides between the
+FULL lamp (the node's start, two warm-window tests) and the PROGRAM at step `n` (the fast draw,
+the chamber's start, the shedding nominal). (3) List every plant-side reader of light, net
+radiation and daylength first. (4) Check no caller passes a modified lamp efficacy. (5) See the
+§24i fix go red once. (6) The `lamp_shed` reserve-crossing tests: a cold period with the FULL lamp
+keeps them in 3a's world exactly, where `cold.days = 0` would warm the chamber and wake the heater
+(a second cause). (7) Write the missing predictions — identical stocks, the crop's and soil's
+direction, `rationed == 0` at risk — and diff every golden stock before `--write`. (8) Grade the
+vapour ceiling at the MEASURED cold temperature (A10's miss). (9) Provenance: the 100 µmol has a
+locus problem (below). All taken.
+
+**What the build does.** `ColdProgram` gains `par` and `photoperiod_hours` (`cold_period.yaml`:
+`cold_par`, `cold_photoperiod_hours`). One clock, four new readers of it on
+`SealedStationScenario`: `full_lamp_par`, `lamp_par_on_step`, `photoperiod_hours_on_step`,
+`lamp_power_on_step` (cold: `par · ground_area / photon_efficacy`, the PWM DESIGN) and
+`lamp_average_power_on_step`. Plant side: `PAR`, `RN` and `daylength` switch on the clock. Fast
+side: `lamp_power` follows the program. The chamber starts at the program's step-0 lamp. Renamed
+so each reader re-decided: `lighting_average_power` → `full_lamp_average_power`,
+`chamber_heat_input_w` → `full_lamp_heat_input_w` (the node's start and the two warm-window tests
+keep the full lamp). `run_shedding`'s nominal is the program's draw at the same `before.n` as the
+draw it is divided into (§24i). Readers checked: `daylength` feeds only the development clock
+(`ThermalTimeAccumulation`); `PAR` only photosynthesis (and the window recorder); `RN` only
+transpiration. No test or example passes a modified `photon_efficacy`; the fast side reads
+`lamp.yaml`'s, written into its doc comment.
+
+**Stage 1, measured (cold lamp = warm lamp):** `regen_goldens` **20 of 20 identical**; the full
+suite green except `station::manifest_writer` (the yaml's digest — expected). The plumbing is
+inert.
+
+**The 100 µmol — locus, read on the page (`W:\temp\claude\cold-period\cha2022.txt`).** Line 384's
+100 µmol m⁻² s⁻¹ is Cha et al.'s OWN speed-vernalization light (22-h-light at 8 °C, one institute,
+RDA Korea), not the standard protocol's: that sentence (lines 40–42) gives no number, only "low
+light intensity", and their Supplementary Fig. 3B records 900 and 1300 µmol at the other two
+institutes during vernalization. So the value is CITED with a ⚠ LOCUS (a different protocol's
+light), the user's §12 choice standing. The 8 h is the standard protocol's own (lines 40–42).
+
+**Roster revisions for 3b (deviations from §24h, with reasons):**
+
+| Fixture | §24h said | Now | Why |
+|---|---|---|---|
+| `lamp_shed` reserve-crossing six | opt out (`cold.days = 0`) | a cold period with the **full** lamp (`cold.par` = the full PAR, 16 h) | the warm opt-out wakes the heater (shed with the lamp) — a second cause; the full-lamp cold period is stage 1's world, so these runs are 3a's **bit for bit** by construction |
+| `lamp_shed` rule-off / frozen battery / resume | keep in the dim cold | as §24h | the rule-off test is the §24i fix's liveness: mutated back to the constant nominal it must go **red** (a healthy dim lamp reads 10 % delivered) |
+| `warm_room_arrest` | — | unchanged | its warm run has no cold period (3b cannot reach it); its plain run is the reference, which still vernalizes and fills grain |
+
+**Re-derived before running** (the instrument `W:\temp\claude\slice3b\resim.py`, §24e's extended
+to the structure; controls in 3a mode reproduce the figures those tests pass with today: node at
+day 120 **179.14648 K**, heater **44.8425 W**, full-horizon battery **1.676676e9 J**):
+
+| # | Fixture | 3b prediction |
+|---|---|---|
+| C1 | `chamber_walls` L2 (cold, 3 d), closed form with `P` = 13.333 W | **277.1639 K / −21.483 W** (18 °C cabin), **277.1695 K / −35.298 W** (27 °C) — out of the test's 2e-3 W band, so re-pinned |
+| C2 | `chamber_walls` L4, 120 d | node **179.14647 K**, heater **44.8426 W**: unchanged at the test's resolution (the cold phase's tail is gone by day 120, as in 3a) |
+| C3 | L4 full horizon (ignored) | battery **1.680820e9 J** (the dim lamp's 2.32 GJ saved is spent again by the heater against the cold node; net +4.1 MJ) |
+| C4 | R3/R4 (ignored) | node **163.1421 / 174.3095 / 171.44761** (= B4); chamber day-ends cold band **277.1562–277.1628 K**, warm **295.1887–295.2034 K**, **8** between the bands (4 warm-ups, 4 cool-downs at ≈ 288.4 K), end **288.3622829 K** |
+| C5 | `lamp_net_radiation` | cold days 0 and 40: **0.77 × 100 / 4.57 = 16.849 W m⁻²**; warm days 150 and 250: 84.245; the failure test's recovered day 6 is cold, so dim |
+| C6 | `perturbations` matter (8 d, cold, now dim) | the signs hold (biomass down under a carbon leak and a lighting failure, UP under an O₂ leak; effort up; battery spared). The O₂ test's `|carbon| > |O₂|` is at risk again, less light, smaller fluxes — if red, a finding about the dim cold crop, re-derived not loosened |
+
+**The golden (`sealed_station`), beyond §24g's B1–B9:**
+
+| # | Prediction |
+|---|---|
+| B10 | **The same 10 stocks byte-identical to the 3a golden** (`chamber_inert`, `brine`, `fecal_waste`, `loss.carbon`, `n_source`, `solar_source`, `food_store`, `water_store`, `cabin_h2o`, `recovered_water`): none reads the crop, the lamp or the chamber. `thermal.chamber` = 1.5e5 × 288.3622829 = **43 254 342.4 J** (B3) |
+| B11 | Direction, not magnitude: the cold phase's net production falls below 3a's **0.47 mol C** per season — one-tenth the photons (a fifth the PAR for half the hours), the same 4 °C maintenance — and **may go negative**. The crop then enters the warm phase smaller, so its season production is **below 3a's 63.4 mol C** (partly offset by 2.75 more warm days to maturity, B8); soil income falls, so `humus_carbon`, `litter_carbon` and `microbial_carbon` end **below** 3a's 12.91 / 6.95 / 4.33; `storage_c` **≤** 3a's 37.87 |
+| B12 | ⚠ **A9 (`rationed == 0`, no extinction events) is at risk**, stated before running: a seedling at 4 °C under 100 µmol for 8 h may not cover its own upkeep for 56 days. If the backstop fires, that is a finding about the cold protocol's light on THIS crop — recorded, not tuned |
+| B13 | B9's vapour ceiling is graded at the **measured** cold maximum, not at 4.011 °C |
+| B14 | Manifest: `cold_period.yaml`'s digest and the golden hash only; no flow-set change; 19 of 20 goldens identical |
