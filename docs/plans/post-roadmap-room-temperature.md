@@ -2482,7 +2482,8 @@ NOT predicted, recorded:
    — it is not hungry enough for the chamber's CO₂ supply to bind. Moved, like `lamp_shed`'s
    reserve-crossing six, to the cold period with the full lamp (3a's world exactly, by stage 1);
    the dim-world figures are this record. ⚠ So under the reference's own cold program the
-   separate-air starvation is shallower at day 90 — a finding about 3b, not measured past day 90.
+   separate-air starvation is shallower at day 90. Over the whole season the `air_split` example
+   (run in the dim world, below) still starves it: 0.183 of shared air's plant carbon (3a 0.141).
 
 **The §24i fix's liveness:** with `run_shedding`'s nominal mutated back to the constant full
 lamp, `rule_off_the_lab_wiring_is_the_plain_sealed_run_bit_for_bit` and
@@ -2501,7 +2502,15 @@ do not make it up.
 day-ends 277.1562020–295.2034234 K with **8** between the bands, end 288.3622829 (C4); the sealed
 golden, session parity, resume and tier band tests green. Full suite and clippy green.
 
-**The seven examples, run after:** all complete. `draw_census`'s control 1 is byte-exact against
+**The seven examples, run after — graded against 3a's outputs** (`W:\temp\claude\slice3a\ex_*.txt`
+against `W:\temp\claude\slice3b\ex_*.txt`; second review, advisor): all complete. Separate air,
+whole season: the BVAD chamber's crop **0.183** of shared air (3a 0.141), still starved; with the
+gas exchange on the minute step **0.904** (3a 0.886); shared-air plant carbon 40.42 → **25.71** mol.
+`intraday_exchange`: the minute step's gain over the plant step **+1.75 %** (3a +2.45 %); peak leaf
+area **1.67** (3a 3.42). Water (`watering`, `minute_transpiration`): season transpiration 1309.7 →
+**1283.4** kg; watering on the minute step 369.5 → **367.0** kg; no water stress anywhere (FTSW min
+0.84 on the plant step), as before. `air_split_baseline`: the worst plant-step CO₂ draw 0.0174 →
+**0.0129** of the pool. `draw_census`'s control 1 is byte-exact against
 the regenerated golden. `lamp_shed` (the reference's own cold program, the SMALL battery): under
 the dim lamp's 13 W the blackout never brings the battery to the reserve (lowest 6.24e7 J against
 2.61e7), so nothing sheds and all four runs' crops are identical — §24h's 3b warning, measured.
@@ -2509,3 +2518,27 @@ That is why the tests moved to the full-lamp cold period.
 
 **Not removed (recorded):** `VPD_VAR` still in the sealed plant resolver, unread. **Next:** slice 4,
 re-sow on maturity (the clock moves into the state, §24c).
+
+**Why the seedling shrinks — MEASURED (second review, advisor: the first wording, "cannot keep
+itself under the dim light", was asserted).** A temporary example (not committed) replayed
+season 1's 56 cold days in the reference's step order and, before every step, evaluated each flow
+on the same snapshot, booking its carbon by flow type. Control: the booked legs close on the
+observed change EXACTLY (crop −0.082915651, litter −1.327087291), and day 56's crop equals the
+reference run's (0.077084). The same run with the cold period's lamp at full power (3a's world)
+reproduces 3a's day-56 crop (0.423597).
+
+| 56 cold days, mol C | 3b, dim | 3a's world, full lamp |
+|---|---|---|
+| growth into the organs (`Allocation`) | **+0.0089** | +0.4691 |
+| maintenance respiration | −0.0185 | −0.0165 |
+| leaves, stems, roots shed to litter (`Senescence`) | **−0.0734** | −0.1889 |
+| change | **−0.0829** | +0.2636 |
+
+So the loss is mostly SHEDDING, not respiration: the crop's net production (growth − upkeep) is
+only slightly negative (**−0.0096**), while it sheds 0.073. `Senescence` is a constant relative
+death rate (`rdr_leaf` × leaf, plus the shading term) and **reads no temperature** — at 4 °C the
+seedling sheds leaf at its 22 °C daily rate while its growth all but stops. ⚠ A CANDIDATE MODEL
+GAP, recorded, not acted on: in thermal-time crop models a leaf's life is counted in degree-days,
+so a cold leaf lives longer. Not measured further here; it matters for slice 4 and for the 6- / 10-
+week sensitivity checks. The leaf never nears die-off: lowest **0.0162** mol C, falling ≈ 15 % a
+week, against an extinction threshold of **0** (the organ is a population that cannot be zeroed).
