@@ -1419,6 +1419,8 @@ reproduces both goldens' final soil water before and after, to every digit.
   §18c's 21.2 kg drain and 0.66 lowest fill, and the instruments that print them
   (`examples/air_split.rs`, `examples/watering.rs`). None was re-run here. Read them as measured
   on the outdoor input. The carbon figures (§13b, §16a) do not read net radiation.
+  **Re-measured in §22 (2026-10-05): every conclusion still standing holds** — the weather
+  chamber gains 2.131 kg, the 22 °C chamber drains 21.248 kg byte for byte, watering 0 kg.
 
 ## 22. The separate-air water figures re-measured on the lamp's net radiation (predictions before the run, 2026-10-05)
 
@@ -1490,3 +1492,43 @@ every step stays capped, the air side, the fan, the cabin and the crew cannot se
 
 So the prediction is that **all four standing conclusions stand**; the only numbers to restate
 are transpiration and where the plants' water sits (soil versus condensate).
+
+### 22d. Graded (2026-10-05) — all four standing conclusions STAND
+
+Outputs in `W:\temp\claude\netrad-remeasure\`: `watering_pre2.txt` / `watering_head.txt`,
+`air_split_pre2.txt` / `air_split_head.txt`. The byte claims were checked by dumping each run's
+four end states from both trees (a temporary line in the instrument, removed; the dumping
+re-runs printed the same tables) and comparing all 38 stocks and every aux value.
+
+| Case | Transpired pre → HEAD (kg) | Capped steps pre → HEAD | Fan export (kg) | Lowest fill | End stocks that differ |
+|---|---|---|---|---|---|
+| weather chamber | 663.623 → **512.784** (−22.7 %) | 4880 → **4424** | −2.083 → **−2.131** | 0.8184 → 0.8356 | 5 of 38, all water: soil, subsoil, condensate, crew store, brine |
+| 22 °C chamber | 1735.062 → **1563.655** (−9.88 %) | 4880 → **4880** | 21.248 → 21.248 | 0.6623 → 0.6796 | 2 of 38: soil water, condensate |
+
+| # | Prediction | Result |
+|---|---|---|
+| N1 | 22 °C capped 4880/4880; weather ≥ 4636 | **HALF** — 22 °C **HELD** (4880); weather ✗ **FAILED**, **4424** (90.7 %): 456 steps where the leaves' flux is under the chamber's headroom. Which steps those are (dark, cold, humid was the guess) was **not measured** |
+| N2 | 22 °C cabin side byte-identical; weather export moves < 0.5 kg, still cabin → plants | **HELD** — 22 °C: chamber vapour, cabin vapour, crew store, brine byte-identical; only the plants' soil water and condensate differ. Weather: export moves **0.048 kg**, still cabin → plants (crew store −133.741 → −133.784, brine +131.540 → +131.535) |
+| N3 | plant carbon byte-identical, all four | **HELD** — no carbon stock and no aux value differs in any run |
+| N4 | weather −15 to −25 %, 22 °C −10 to −25 %; the fall lands in the soil | **HALF** — weather **HELD** (−22.7 %); 22 °C ✗ **MISSED** by a hair, **−9.88 %**. The fall lands in the soil (22 °C: soil +4.509 kg, condensate the same amount lower, plants' total unchanged; weather: soil +3.408, subsoil +0.379, total +0.048 = the export's move) |
+| N5 | lowest fill rises; watering 0; on/off byte-identical | **HELD** |
+| N6 | `air_split` at HEAD: carbon columns byte-identical; vapour-on rows move as N1–N4 | **HELD** — every co2 / plant C / cabin CO₂ column identical to pre-fix; the vapour-on row is the weather case above (to air 3.217 → 3.169, capped 4880 → 4424). Unpredicted but in line: the vapour-OFF split's transpiration 708.207 → 557.383 with the cap 4880 → 4877, and the shared rows 711.247 → 563.077 (−20.8 % in one season; the 1220-day golden fell 20.9 %) |
+
+**Tally: 4 held, 2 half.** The two misses are both the size of the night-time flux: I put it
+higher than it is, so more weather-chamber steps fall under the cap than predicted, and the warm
+chamber, where the vapour deficit dominates, fell a little less.
+
+**What the earlier conclusions now read as:**
+1. **The weather-temperature chamber still gains from the cabin: 2.131 kg** a season (was 2.083).
+2. **The 22 °C chamber still drains 21.248 kg** to the cabin, byte for byte, and the plant step's
+   cap is what sets it on every step. §18a R2's mechanism stands.
+3. **Watering still delivers 0 kg**; the root zone's lowest fill is 0.8356 / 0.6796 (was
+   0.8184 / 0.6623) — more margin above the 0.45 trigger, not less.
+4. **Plant carbon unchanged**: 53.263 / 28.314.
+5. **Restated:** the separate-air transpiration totals (512.784 / 1563.655 kg) and where the
+   plants' water sits. In the weather chamber the cap no longer sets every step, so its gain is
+   now partly the leaves' own flux.
+
+⚠ **Not covered here:** §20's minute-step transpiration numbers (the next item, re-predicted from
+scratch before its adoption question). §15a's shared-room "above saturation on 4 876 of 4 880"
+now reads **4 875** at HEAD (`air_split_head.txt`); max unchanged at 2.8798.

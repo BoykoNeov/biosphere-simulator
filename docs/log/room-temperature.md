@@ -135,3 +135,15 @@ only**; transpiration −20.9 % and −7.5 %; lamp shedding and the lighting fai
 each pinned. ⚠ Every earlier separate-air WATER figure (§13b, §15a, §18) was measured on the
 outdoor input and was not re-run. Still open, the same kind of defect: the chamber's temperature
 follows the outdoor weather too (the queued chamber heat store).
+
+**The separate-air water figures re-measured, 2026-10-05** (note §22). The same instruments ran
+on the commit before the lamp fix and on the fixed tree, so any difference has one cause. The
+pre-fix tree first reproduced the record exactly. All four conclusions still standing hold.
+The weather-temperature chamber still gains from the cabin (2.131 kg a season, was 2.083). The
+22 °C chamber still drains 21.248 kg, byte for byte, with the plant step's cap setting it on every
+step. Watering still delivers 0 kg, with more margin (lowest fill 0.836 / 0.680). Plant carbon is
+unchanged. Leaf water loss in the split build falls 22.7 % and 9.9 %. Graded 4 held, 2 half:
+night-time leaf water loss is smaller than predicted, so in the weather chamber 456 of 4 880
+steps now fall under the cap. Found on the way: `examples/air_split.rs` had crashed since the
+minute-step adoption, and its "shared" row had silently become the minute build before the crash.
+Nothing runs examples, and the 2026-10-04 sweep of stale instruments missed it. Repaired.
