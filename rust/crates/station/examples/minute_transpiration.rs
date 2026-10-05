@@ -224,7 +224,7 @@ fn main() {
     );
     let cases = [
         (
-            "weather | plant step | off",
+            "cold    | plant step | off",
             Case {
                 warm: false,
                 water_step: GasExchangeStep::PlantStep,
@@ -233,7 +233,7 @@ fn main() {
             },
         ),
         (
-            "weather | minute     | off",
+            "cold    | minute     | off",
             Case {
                 warm: false,
                 water_step: GasExchangeStep::Minute,
@@ -242,7 +242,7 @@ fn main() {
             },
         ),
         (
-            "weather | minute     | on ",
+            "cold    | minute     | on ",
             Case {
                 warm: false,
                 water_step: GasExchangeStep::Minute,
@@ -278,7 +278,7 @@ fn main() {
             },
         ),
         (
-            "weather | plant step | off | NO vapour crossing",
+            "cold    | plant step | off | NO vapour crossing",
             Case {
                 warm: false,
                 water_step: GasExchangeStep::PlantStep,
@@ -287,7 +287,7 @@ fn main() {
             },
         ),
         (
-            "weather | minute     | off | NO vapour crossing",
+            "cold    | minute     | off | NO vapour crossing",
             Case {
                 warm: false,
                 water_step: GasExchangeStep::Minute,

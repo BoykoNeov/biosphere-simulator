@@ -208,7 +208,7 @@ fn main() {
         ends.push(simcore::snapshot::from_engine(&end).to_json());
         let name = format!(
             "{} chamber, watering {}",
-            if warm { "22 °C" } else { "weather" },
+            if warm { "22 °C" } else { "cold prog" },
             if watering { "on " } else { "off" }
         );
         println!(
