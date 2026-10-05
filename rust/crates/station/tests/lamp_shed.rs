@@ -21,7 +21,6 @@ use station::lamp_shed::{
     rewire_for_shedding, run_shedding, what_if_reserve, with_lamp_power_cut, ShedLog,
     LAMP_DELIVERY_AUX,
 };
-use station::lighting::LIGHT_USED;
 use station::perturbations::with_brownout;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
@@ -268,7 +267,10 @@ fn a_blackout_sheds_the_lamp_and_the_crop_feels_it() {
     let (c, d) = (calm.states.last().unwrap(), dark.states.last().unwrap());
     // The lamp was shed: some group delivered less than its nominal power…
     assert!(dark.log.delivery.iter().any(|&x| x < 1.0));
-    assert!(d.stocks[LIGHT_USED].amount < c.stocks[LIGHT_USED].amount);
+    // …and over the run it delivered less in all (until 2026-10-05 this read the light that
+    // reached `boundary.light_used`; the sealed station's light now heats the plant chamber).
+    let total = |log: &[f64]| log.iter().sum::<f64>();
+    assert!(total(&dark.log.delivery) < total(&calm.log.delivery));
     // …life support was never short (the reserve held, the backstop never fired)…
     assert_eq!(dark.rationed, 0);
     // …and the crop grew less.

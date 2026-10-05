@@ -1,12 +1,13 @@
-//! The plant chamber's heat store, Step 3c slice 2b-i (`docs/plans/post-roadmap-room-temperature.md`
-//! §23e). The lamp's waste heat now passes through `thermal.chamber`, whose cooler hands it on
-//! to the node. The plants do not read the chamber yet.
+//! The plant chamber's heat store, Step 3c slice 2b (`docs/plans/post-roadmap-room-temperature.md`
+//! §23e–§23g). The lamp's whole draw — its waste heat (2b-i) and its light (2b-ii) — heats
+//! `thermal.chamber`, whose cooler hands it on to the node. The plants do not read the chamber
+//! yet.
 //!
-//! Nominally the chamber holds its steady state (P2) and the reference run did not move a single
-//! stock (graded in §23f). This file checks the side the reference run cannot show: the room
-//! **failing** (P9). With the cooler dead, the chamber warms at the lamp's waste heat over its
-//! heat capacity, the node — losing that input — relaxes toward the colder equilibrium of the
-//! remaining dissipation, and the crop, which reads no chamber temperature, is untouched.
+//! Nominally the chamber holds its steady state. This file checks the side the reference run
+//! cannot show: the room **failing** (2b-i's P9, 2b-ii's Q7). With the cooler dead, the chamber
+//! warms at the lamp's draw over its heat capacity, the node — losing that input — relaxes
+//! toward the colder equilibrium of the remaining dissipation, and the crop, which reads no
+//! chamber temperature, is untouched.
 
 use domains::biosphere::perturbations::{window_override, with_forcing};
 use domains::thermal::{equilibrium_temperature, ThermalParams, NODE};
@@ -21,7 +22,7 @@ use station::driver::run_master_day;
 use station::perturbations::ScaledFlow;
 use station::scenario::sealed_station_scenario;
 use station::sealed::{
-    build_sealed_station, lamp_waste_heat_w, sealed_bio_resolver, sealed_fast_resolver,
+    build_sealed_station, chamber_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
     sealed_node_heat, sealed_reset_hook,
 };
 
@@ -115,11 +116,11 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_leaves_the_crop_alone() {
     }
 
     // Failed: it warms at w / C_ch, exactly linear (the lamp's draw is the daily average).
-    let w = lamp_waste_heat_w(&lamp, &scenario);
+    let w = chamber_heat_input_w(&scenario);
     let per_day = w * 86_400.0 / ch.heat_capacity;
     assert!(
-        (per_day - 34.787).abs() < 1e-3,
-        "the hand rate 1.449 K/h: {per_day}"
+        (per_day - 76.8).abs() < 1e-9,
+        "the hand rate 3.2 K/h (133.33 W over 1.5e5 J/K): {per_day}"
     );
     let t1 = chamber_temperature(failed[1].stocks[CHAMBER].amount, &ch);
     assert!(
@@ -128,7 +129,7 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_leaves_the_crop_alone() {
         t1 - t0
     );
 
-    // The node, losing the waste heat, relaxes toward the colder closed-form equilibrium.
+    // The node, losing the lamp's heat, relaxes toward the colder closed-form equilibrium.
     let t_eq_nominal = node_t(&nominal[0], &th);
     let heat_now = sealed_node_heat(&domains::params::charge(), &th, &lamp, &scenario)
         / th.heat_capacity
@@ -149,9 +150,22 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_leaves_the_crop_alone() {
         );
         last = t;
     }
+    // How close, derived rather than banded: for T ≥ T_eq, T⁴ − T_eq⁴ ≥ 4·T_eq³·(T − T_eq), so
+    // the gap shrinks at least as fast as `exp(−t/τ_eq)`, τ_eq = C / (4εσA·T_eq³) — the
+    // relaxation time AT the target, the slowest on the way down. And it never overshoots.
+    // ⚠ A fixed 0.15 K band stood here in 2b-i, sized for that slice's 7.1 K starting gap; 2b-ii
+    // starts the node 14.65 K above the target and the band was not re-derived (§23h, Q7).
+    let tau_eq = th.heat_capacity
+        / (4.0
+            * th.emissivity
+            * domains::thermal::STEFAN_BOLTZMANN
+            * th.radiator_area
+            * t_eq_failed.powf(3.0));
+    let bound = (t_eq_nominal - t_eq_failed) * (-(DAYS as f64) * 86_400.0 / tau_eq).exp();
     assert!(
-        (last - t_eq_failed).abs() < 0.15,
-        "after {DAYS} days (4.7 time constants) the node is at {last}, not near {t_eq_failed}"
+        last > t_eq_failed && last - t_eq_failed <= bound,
+        "after {DAYS} days the node is {} K above {t_eq_failed}; the bound is {bound} K",
+        last - t_eq_failed
     );
     // Nominal node holds.
     let nominal_end = node_t(nominal.last().unwrap(), &th);

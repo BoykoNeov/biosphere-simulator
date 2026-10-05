@@ -162,3 +162,10 @@ node. Every existing stock in the reference run is byte-identical, the node incl
 only within 1e-9); 8 of 9 predictions held. A dead cooler heats the chamber 34.8 K a day with
 the crop untouched. ⚠ Flagged for slice 3: walls facing the weather do not make the plants feel
 the weather; which temperature the plants read is the calibration question.
+
+**Slice 2b-ii BUILT 2026-10-05 (a station unfreeze)** (note §23g–§23h). The lamp's light now
+heats the chamber too, instead of leaving the station: the station's heat store warms 7.5 K, to
+174.96 K, exactly the closed form; nothing outside the energy books moves. Graded 8 held, 1
+half: a lab test's tolerance, sized for 2b-i, was carried over without re-deriving it and went
+red; replaced by a derived bound. The lab's lamp shedding detects "lit" from the lamp's own draw,
+since its old detector's stock is gone.

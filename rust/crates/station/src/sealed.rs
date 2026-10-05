@@ -52,12 +52,12 @@ use crate::chamber::{
 use crate::driver::{run_master_day, OwnedResetHook};
 use crate::flows::{
     CrewRespiration, Harvest, HarvestParams, Lamp, LampParams, WaterRecovery, WaterRecoveryParams,
-    CREW_RESPIRATION, HARVEST, LAMP, LAMP_POWER_VAR, PAR_PHOTON_ENERGY_J_PER_UMOL, WATER_RECOVERY,
+    CREW_RESPIRATION, HARVEST, LAMP, LAMP_POWER_VAR, WATER_RECOVERY,
 };
 use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
 };
-use crate::lighting::{lamp_light_path, lamp_net_radiation_path, LIGHT_USED};
+use crate::lighting::{lamp_light_path, lamp_net_radiation_path};
 use crate::scenario::SealedStationScenario;
 use crate::stocks::{
     cabin_h2o_stock, co2_composition, food_store_stock, gas_boundary, o2_composition,
@@ -83,30 +83,31 @@ fn sealed_lamp_par(lamp: &LampParams, scenario: &SealedStationScenario) -> f64 {
 
 /// The node's initial heat `Q_eq = C·(T_eq − T_space)` (J), set by all forced dissipation.
 ///
-/// Op-order mirrors Python `sealed_node_heat`: charge-conversion loss `(1−η_c)·solar_avg` +
-/// the 100%-dissipative `LoadDraw` (`balanced_load`) + the lamp waste heat
-/// `(1−η_lamp)·lamp_avg` (the radiant η_lamp leg leaves as PAR, not to the node).
+/// The charge-conversion loss `(1−η_c)·solar_avg` + the 100%-dissipative `LoadDraw`
+/// (`balanced_load`) + the lamp's **whole** averaged draw, which reaches the node through the
+/// plant chamber's cooler (since 2026-10-05, Step 3c slice 2b-ii: the light is absorbed in the
+/// chamber; until then the radiant `η_lamp` leg left the station as PAR and only the waste heat
+/// `(1−η_lamp)·lamp_avg` was counted here). `_lamp` is kept so callers need not change; the
+/// whole draw does not depend on the lamp's efficacy.
 pub fn sealed_node_heat(
     charge: &ChargeParams,
     thermal_params: &ThermalParams,
-    lamp: &LampParams,
+    _lamp: &LampParams,
     scenario: &SealedStationScenario,
 ) -> f64 {
     let solar_avg = mean_solar_power(scenario);
     let load_w = balanced_load_w(charge, &scenario.power);
-    let lamp_avg = lighting_average_power(scenario);
-    let eta_lamp = lamp.photon_efficacy * PAR_PHOTON_ENERGY_J_PER_UMOL;
     let heat_w =
-        (1.0 - charge.charge_efficiency) * solar_avg + load_w + (1.0 - eta_lamp) * lamp_avg;
+        (1.0 - charge.charge_efficiency) * solar_avg + load_w + chamber_heat_input_w(scenario);
     let t_eq = equilibrium_temperature(thermal_params, heat_w);
     thermal_params.heat_capacity * (t_eq - thermal_params.space_temperature)
 }
 
-/// The lamp's averaged waste heat (W), `(1 − η_lamp)·lamp_avg` — the chamber's only heat
-/// input in slice 2b-i (`docs/plans/post-roadmap-room-temperature.md` §23e).
-pub fn lamp_waste_heat_w(lamp: &LampParams, scenario: &SealedStationScenario) -> f64 {
-    let eta_lamp = lamp.photon_efficacy * PAR_PHOTON_ENERGY_J_PER_UMOL;
-    (1.0 - eta_lamp) * lighting_average_power(scenario)
+/// The plant chamber's heat input (W): the lamp's whole averaged draw, light and waste heat
+/// alike (`docs/plans/post-roadmap-room-temperature.md` §23g; slice 2b-i counted the waste heat
+/// alone).
+pub fn chamber_heat_input_w(scenario: &SealedStationScenario) -> f64 {
+    lighting_average_power(scenario)
 }
 
 /// Assemble the fully-coupled sealed station: `(state, bio_reg, fast_reg)`, with the crop's
@@ -196,14 +197,9 @@ pub fn build_sealed_station_at(
     fast_seq.push(node_stock(node0)?);
     fast_seq.push(chamber_stock(chamber_heat0(
         &chamber,
-        lamp_waste_heat_w(lamp, scenario),
+        chamber_heat_input_w(scenario),
     ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
-    fast_seq.push(boundary::sink(
-        LIGHT_USED.to_string(),
-        Quantity::Energy,
-        0.0,
-    )?);
 
     let mut fast_stocks: BTreeMap<String, Stock> = BTreeMap::new();
     for s in fast_seq {
@@ -348,8 +344,8 @@ pub(crate) fn sealed_fast_flows(
         Box::new(Lamp::new(
             LAMP.to_string(),
             BATTERY.to_string(),
-            LIGHT_USED.to_string(),
-            CHAMBER.to_string(), // lamp heat → the plant chamber (Step 3c slice 2b-i)
+            CHAMBER.to_string(), // the light is absorbed in the chamber it lights (2b-ii)…
+            CHAMBER.to_string(), // …and the waste heat lands there too (2b-i)
             *lamp,
         )),
         Box::new(ChamberCooling::new(

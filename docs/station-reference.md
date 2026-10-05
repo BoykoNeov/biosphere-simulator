@@ -129,7 +129,8 @@ it. The 16 classes:
 - **crew** — `OxygenConsumption`, `FoodMetabolism`, `WaterBalance`
 - **station seams** — `CrewRespiration`, `WaterRecovery`, `Lamp`, `Harvest`, `ChamberCooling`
   (since 2026-10-05: the plant chamber's cooler, chamber → `thermal.node`; the sealed `Lamp`'s
-  waste heat goes to `thermal.chamber`, not to the node)
+  whole draw — waste heat and light — goes to `thermal.chamber`, and the sealed build has no
+  `boundary.light_used`)
 
 The five *dropped* stand-ins (`HeatInput`, `CrewMetabolism`, `OxygenConsumption`,
 `FoodMetabolism`, `SelfDischarge`) exist only in the **standalone** sibling builds — pinned
@@ -342,6 +343,20 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-05 — the plant chamber's heat store, slice 2b-ii: the lamp's LIGHT heats the
+  chamber too; 1 golden moves (`sealed_station`): the node warms 7.54 K, `boundary.light_used`
+  leaves the sealed build. No parameter, no flow type added.** The second of three diffs
+  (`docs/plans/post-roadmap-room-temperature.md` §23g–§23h). The light leg used to leave the
+  station at `boundary.light_used`; in a room, light absorbed by leaves and walls is heat (BVAD
+  Table 4-88 books every chamber watt as heat to reject; the ≤ 0.72 % fixed as sugar is the
+  recorded overcount). `Lamp` with both targets equal now emits one netted leg (simcore rejects
+  two legs on one stock); the `lighting` build, with two targets, is byte-identical.
+  `sealed_node_heat` counts the whole lamp draw, so the node starts and holds at **174.961 K**
+  (451.64 W; was 167.42 K). Predictions committed first; graded 8 held, 1 half: every
+  non-energy stock and aux value byte-identical, the chamber at 295.2033 K, `boundary.space`
+  within 1.8e-11 of the prediction. The half: the dead-cooler lab test's fixed band, sized for
+  2b-i's starting gap, was not re-derived and went red; replaced by a derived exponential bound.
+  The lab's lamp shedding now detects "lit" from the lamp's own draw.
 - **2026-10-05 — the plant chamber's heat store, slice 2b-i: a station PARAMETER FILE and a
   FLOW are added; 1 golden moves (`sealed_station`) by one added stock and nothing else.** The
   user's form B (*"a held room that can fail"*, 2026-10-01), the first of three diffs

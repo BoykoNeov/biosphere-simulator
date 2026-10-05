@@ -202,8 +202,13 @@ fn lamp_energy_split(draw_joules: f64, photon_efficacy: f64) -> (f64, f64) {
 
 /// ENERGY flow `battery → light_used (+η_lamp) + waste_heat (+(1−η_lamp))` (forced, 3-leg).
 /// `D = env.get(lamp_power)·dt`; the radiant fraction leaves as PAR light, the rest as
-/// waste heat (→ `boundary.waste_heat` standalone, → `thermal.chamber` sealed, since 2026-10-05;
-/// `thermal.node` before).
+/// waste heat (→ `boundary.waste_heat` standalone).
+///
+/// **One target for both** (the sealed station since 2026-10-05, Step 3c slice 2b-ii: both
+/// are `thermal.chamber`): the light is absorbed in the room it lights, so the whole draw is
+/// heat there — 2 legs, `battery −D`, target `+D`. simcore rejects two legs on one stock, so
+/// the flow nets them itself. (The sugar the crop fixes from that light, ≤ 0.72 % of it, is
+/// the recorded overcount: `docs/plans/post-roadmap-room-temperature.md` §23b.)
 pub struct Lamp {
     id: String,
     battery: String,
@@ -213,9 +218,10 @@ pub struct Lamp {
 }
 
 impl Lamp {
-    /// Construct a `Lamp` with the given ids (the sealed station re-points `waste_heat` at
-    /// `thermal.chamber`, the plant chamber — `thermal.node` until 2026-10-05; standalone lighting
-    /// uses `boundary.waste_heat`).
+    /// Construct a `Lamp` with the given ids (the sealed station points **both** `light_used`
+    /// and `waste_heat` at `thermal.chamber`, the plant chamber — until 2026-10-05 the light
+    /// went to `boundary.light_used` and the heat to `thermal.node`; standalone lighting uses
+    /// `boundary.light_used` and `boundary.waste_heat`).
     pub fn new(
         id: String,
         battery: String,
@@ -247,6 +253,12 @@ impl Flow for Lamp {
         dt: f64,
     ) -> Result<FlowResult, SimError> {
         let draw = env.get(LAMP_POWER_VAR)? * dt;
+        if self.light_used == self.waste_heat {
+            return FlowResult::new(vec![
+                Leg::new(self.battery.clone(), -draw)?,
+                Leg::new(self.waste_heat.clone(), draw)?,
+            ]);
+        }
         let (radiant, heat) = lamp_energy_split(draw, self.params.photon_efficacy);
         FlowResult::new(vec![
             Leg::new(self.battery.clone(), -draw)?,

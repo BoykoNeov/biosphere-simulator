@@ -311,19 +311,6 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.ca43b6c1ac944p+32",
-      "composition": {
-        "energy": "0x1.0000000000000p+0"
-      },
-      "domain": "boundary",
-      "extinction_threshold": "0x0.0p+0",
-      "id": "boundary.light_used",
-      "kind": "boundary",
-      "quantity": "energy",
-      "unclamped": false,
-      "unit": "J"
-    },
-    {
       "amount": "0x0.0p+0",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
@@ -376,7 +363,7 @@
       "unit": "J"
     },
     {
-      "amount": "0x1.296a371e2d10ep+35",
+      "amount": "0x1.62b2adf67e166p+35",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },
@@ -454,7 +441,7 @@
       "unit": "J"
     },
     {
-      "amount": "0x1.51cccdd0f1feep+25",
+      "amount": "0x1.51d55a0000000p+25",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },
@@ -467,7 +454,7 @@
       "unit": "J"
     },
     {
-      "amount": "0x1.88bb681977d89p+30",
+      "amount": "0x1.9ab3bb3671a49p+30",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },

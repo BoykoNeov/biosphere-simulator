@@ -1824,3 +1824,27 @@ prediction about a real chamber. Next: 2b-ii (the light leg into the chamber; th
 | Q7 | A dead cooler (`tests/chamber_heat.rs`, updated to the whole draw): the chamber warms **76.8 K a day**; the node relaxes toward the **same 160.308 K** as in 2b-i (it loses the whole lamp either way); crop byte-identical |
 | Q8 | `tier1_node_is_period_1_fixed_point` and every heat-closure figure unmoved (they read the heat-closure run) |
 | Q9 | The seven sealed examples: identical to 2b-i apart from timings, except `lamp_shed`'s printed `light_used` column, which is replaced |
+
+### 23h. 2b-ii BUILT — graded (2026-10-05)
+
+Built as §23g describes (`flows.rs`: `Lamp` nets its legs when both targets coincide;
+`sealed.rs`: both targets `thermal.chamber`, `boundary.light_used` dropped, `sealed_node_heat` and
+the chamber's start on the whole draw via `chamber_heat_input_w`; `lamp_shed.rs`: the
+`lamp_draws` detector). 2b-i's golden kept at `W:\temp\claude\chamber-heat\sealed_2bi.json`.
+
+| # | Result |
+|---|---|
+| Q1 | **HELD** — only three stocks differ from 2b-i's golden, all energy: `thermal.node`, `thermal.chamber`, `boundary.space`. `power.battery`, `boundary.solar_source`, every other stock and every aux value byte-identical |
+| Q2 | **HELD** — `boundary.light_used` gone; the chamber ends at **295.2033333333333 K** (start = end) |
+| Q3 | **HELD** — the node ends at **174.96093576109791 K**, the closed form's printed digits exactly |
+| Q4 | **HELD** — `boundary.space` 47 606 755 251.94 J against the predicted 47 606 755 251.08 J: **1.8e-11 relative** |
+| Q5 | **HELD** — `regen_goldens`: 19 of 20 identical (`lighting` among them); manifest diff = `sealed_station`'s `golden_sha256` only |
+| Q6 | **HELD** — the full suite's `lamp_shed` tests pass with the new detector: the rule-off build reproduces the plain sealed run bit for bit, the rule-on verdicts stand, and the blackout test now asserts the lab delivered less light in all (the sum of its delivery log) |
+| Q7 | **HALF** — the rates held: the dead-cooler chamber warms **76.8 K a day** (asserted to 1e-9) toward the same **160.308 K** node target, crop byte-identical. ✗ The test's fixed **0.15 K** "near the target after 60 days" band, sized in 2b-i for a 7.1 K starting gap, was carried over **without re-deriving** it: from 174.96 K the node ends **0.2095 K** above the target, and the suite went red. Replaced by a derived bound (for `T ≥ T_eq`, `T⁴ − T_eq⁴ ≥ 4T_eq³(T − T_eq)`, so the gap shrinks at least as fast as `exp(−t/τ_eq)`, τ_eq = 14.57 days at 160.3 K): bound **0.2387 K**, measured 0.2095 K, and no overshoot |
+| Q8 | **HELD** — `tier1_node_is_period_1_fixed_point` and the heat-closure figures pass unchanged (the suite) |
+| Q9 | **HELD** — the seven examples on this tree against 2b-i's outputs (`W:\temp\claude\chamber-heat\examples_2bii\` vs `…\examples\head_*.txt`), timings stripped: `air_split`, `air_split_baseline`, `watering`, `minute_transpiration` identical; `draw_census` differs only in the energy rows (`thermal.chamber`'s worst draw 0.000082 → 0.000181, `thermal.node` 0.000014 → 0.000016); `intraday_exchange` counts 18 bit-identical stocks instead of 19 (`light_used` gone); `lamp_shed` differs **only** in the replaced last column — crop, battery, rationing and the "first shed in group 74 (day 4.625), share 0.1667, dark to the end" line are identical. Cross-check of the new detector: the blackout run's old light ratio 2.9212e7 / 5.0416e7 = **0.5794** = its new mean delivered share |
+
+**Tally: 8 held, 1 half (Q7: the rates held, a carried-over test band did not).**
+
+**§2's first "gap in the heat books" is closed:** the lamp's light no longer leaves the station;
+it heats the chamber, and the node carries it to the radiator (+72.94 W, +7.54 K).

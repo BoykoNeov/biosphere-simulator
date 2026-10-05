@@ -36,7 +36,9 @@
 //! cannot sample the battery itself. [`run_shedding`] counts, over each power group, the lamp
 //! power actually drawn against the nominal draw and writes the ratio into
 //! `State.aux[`[`LAMP_DELIVERY_AUX`]`]` before the next plant step; a power step counts as lit
-//! when the lamp's light actually arrived in `boundary.light_used`. Every slow flow and aux
+//! when the lamp draws from the battery on the step's starting state ([`lamp_draws`]; until
+//! 2026-10-05, when its light arrived in `boundary.light_used`, a stock the sealed station no
+//! longer has — its light now heats the plant chamber). Every slow flow and aux
 //! process is wrapped ([`LampLitFlow`], [`LampLitAux`]) so that reading `par` (and, since
 //! 2026-10-05, the lamp's `net_radiation`) returns the
 //! schedule's value times that ratio. With nothing shed the two sums are the same numbers
@@ -44,9 +46,10 @@
 //! build reproduces the plain sealed run bit for bit (tested). The crop reads the light of
 //! the **previous** group: a lag of one plant step (1/16 day).
 //!
-//! ⚠ A power step counts as lit when ANY light arrived, so a lamp cut only partly by the
-//! arbitration backstop would count as fully lit. The reserve exists so that
-//! the backstop never reaches the lamp; the tests assert `rationed == 0` where they rely on it.
+//! ⚠ A power step counts as lit when the lamp asks the battery for power, BEFORE arbitration,
+//! so a lamp the backstop cut — partly or (since the 2026-10-05 detector) wholly — would count
+//! as fully lit. The reserve exists so that the backstop never reaches the lamp; the tests
+//! assert `rationed == 0` where they rely on it.
 
 use std::collections::BTreeMap;
 
@@ -64,7 +67,6 @@ use simcore::state::State;
 
 use crate::driver::{day_groups, DAYS_PER_MASTER_DAY, SECONDS_PER_DAY};
 use crate::flows::{LAMP, LAMP_POWER_VAR};
-use crate::lighting::LIGHT_USED;
 use crate::scenario::SealedStationScenario;
 
 /// The aux slot carrying the share of the nominal lamp power drawn over the last power group.
@@ -133,12 +135,31 @@ fn battery(state: &State) -> Result<f64, SimError> {
         .ok_or_else(|| SimError::Reference(format!("no {BATTERY:?} stock to shed the lamp on")))
 }
 
-fn light_used(state: &State) -> Result<f64, SimError> {
-    state
-        .stocks
-        .get(LIGHT_USED)
-        .map(|s| s.amount)
-        .ok_or_else(|| SimError::Reference(format!("no {LIGHT_USED:?} stock to read the lamp by")))
+/// Whether the fast registry's lamp draws from the battery on `state` — the lit detector.
+///
+/// ⚠ Until 2026-10-05 a step counted as lit when light arrived in `boundary.light_used`; the
+/// sealed station's light now heats the plant chamber and that stock is gone (Step 3c slice
+/// 2b-ii, `docs/plans/post-roadmap-room-temperature.md` §23g). The lamp is evaluated on the
+/// step's starting state with the step's own environment, so a shed lamp ([`SheddingLamp`]
+/// zeroes every leg) and a failed one (`lamp_power` 0) both read dark.
+fn lamp_draws(
+    fast_integrator: &EulerIntegrator,
+    state: &State,
+    fast_resolver: &SourceResolver,
+    fast_dt: f64,
+) -> Result<bool, SimError> {
+    let lamp = fast_integrator
+        .registry()
+        .flows()
+        .iter()
+        .find(|f| f.id() == LAMP)
+        .ok_or_else(|| SimError::Reference(format!("the fast registry carries no {LAMP:?}")))?;
+    let env = fast_resolver.bind(state, fast_dt);
+    let result = lamp.evaluate(state, &env, fast_dt)?;
+    Ok(result
+        .legs
+        .iter()
+        .any(|leg| leg.stock == BATTERY && leg.amount < 0.0))
 }
 
 fn delivery(state: &State) -> Result<f64, SimError> {
@@ -296,11 +317,11 @@ pub struct ShedLog {
 /// Per group: run the group's slow steps (reading the share the state carries), then its
 /// fast sub-steps — asserting conservation after each, as the reference driver does
 /// — while summing the lamp power drawn against the nominal draw. A sub-step counts as lit
-/// when the lamp's light actually arrived (`boundary.light_used` rose), and then adds the
-/// `lamp_power` forcing it was asked for; the new share is the ratio, written into the state
-/// at once. So the crop follows
-/// what the lamp **did**, not what the rule predicts — a failed lamp darkens it too, and a
-/// lamp the rule should have shed but did not leaves it lit.
+/// when the lamp, evaluated on the sub-step's starting state, draws from the battery
+/// ([`lamp_draws`]; until 2026-10-05, when light arrived in `boundary.light_used`), and then
+/// adds the `lamp_power` forcing it was asked for; the new share is the ratio, written into
+/// the state at once. So the crop follows what the lamp **does**, not the rule's formula — a
+/// failed lamp darkens it too, and a lamp the rule should have shed but did not leaves it lit.
 #[allow(clippy::too_many_arguments)]
 pub fn run_shedding(
     bio_integrator: &EulerIntegrator,
@@ -353,10 +374,11 @@ pub fn run_shedding(
             let (mut drawn, mut nominal) = (0.0_f64, 0.0_f64);
             for _ in 0..groups.fast {
                 let before = state.clone();
+                let lit = lamp_draws(fast_integrator, &before, fast_resolver, fast_dt)?;
                 let report = fast_integrator.substep(&state, fast_resolver, fast_dt)?;
                 state = report.state;
                 assert_conserved_default(&before, &state)?;
-                if light_used(&state)? > light_used(&before)? {
+                if lit {
                     drawn += lamp_power(before.n, fast_dt);
                 }
                 nominal += nominal_lamp_w;

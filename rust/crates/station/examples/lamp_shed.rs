@@ -12,7 +12,6 @@ use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
 use station::driver::run_master_day;
 use station::lamp_shed::{rewire_for_shedding, run_shedding, what_if_reserve};
-use station::lighting::LIGHT_USED;
 use station::perturbations::with_brownout;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
@@ -92,7 +91,7 @@ fn main() {
     let calm_plain = run(&scn, false, false);
     println!(
         "{:<26} {:>12} {:>12} {:>12} {:>9} {:>14}",
-        "run", "crop mol C", "vs calm", "battery J", "rationed", "lamp light J"
+        "run", "crop mol C", "vs calm", "battery J", "rationed", "lamp share"
     );
     for (name, blackout, shed) in [
         ("plain, calm", false, false),
@@ -103,14 +102,25 @@ fn main() {
         let (states, rationed, delivery) = run(&scn, blackout, shed);
         let last = states.last().unwrap();
         let rel = crop(last) / crop(calm_plain.0.last().unwrap()) - 1.0;
+        // The lamp's mean delivered share over the run (the lab's own log). Until 2026-10-05
+        // this column was the light that reached `boundary.light_used`, a stock the sealed
+        // station no longer has: its light now heats the plant chamber (room-temperature §23g).
+        let share = if delivery.is_empty() {
+            "nameplate".to_string()
+        } else {
+            format!(
+                "{:.4}",
+                delivery.iter().sum::<f64>() / delivery.len() as f64
+            )
+        };
         println!(
-            "{:<26} {:>12.6} {:>+11.3}% {:>12.4e} {:>9} {:>14.4e}",
+            "{:<26} {:>12.6} {:>+11.3}% {:>12.4e} {:>9} {:>14}",
             name,
             crop(last),
             100.0 * rel,
             last.stocks[BATTERY].amount,
             rationed,
-            last.stocks[LIGHT_USED].amount
+            share
         );
         if let Some(first) = delivery.iter().position(|&x| x < 1.0) {
             let groups = delivery.len() / DAYS;
