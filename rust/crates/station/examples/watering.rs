@@ -33,6 +33,8 @@ use station::scenario::sealed_station_scenario;
 use station::sealed::{sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook};
 use station::water::BRINE;
 
+const TRANSPIRATION: &str = "biosphere.transpiration";
+
 fn plant_c(s: &State) -> f64 {
     [LEAF_C, STEM_C, ROOT_C, STORAGE_C]
         .iter()
@@ -61,6 +63,12 @@ struct Reading {
     /// The root zone's lowest fill, `ATSW / TTSW` (FTSW), at plant-step starts.
     ftsw_min: f64,
     stressed_steps: u64,
+    /// Σ transpiration (kg), Σ the part that reached the chamber's air, and the plant steps
+    /// where the chamber's headroom held some back (the cap R2 names).
+    transpired: f64,
+    to_air: f64,
+    capped_steps: u64,
+    plant_steps: u64,
     rationed: (u64, u64),
     events: usize,
 }
@@ -134,7 +142,24 @@ fn season(warm: bool, watering: bool) -> (State, State, Reading) {
             r.stress_min = r.stress_min.min(f);
             r.stressed_steps += u64::from(f < 1.0);
             let env = bio_r.bind(before, scenario.bio_dt);
+            r.plant_steps += 1;
             for flow in bio.registry().flows() {
+                if flow.id() == TRANSPIRATION {
+                    let res = flow
+                        .evaluate(before, &env, scenario.bio_dt)
+                        .expect("transpiration");
+                    let (mut flux, mut air) = (0.0, 0.0);
+                    for leg in &res.legs {
+                        if leg.amount < 0.0 {
+                            flux -= leg.amount;
+                        } else if leg.stock == WATER_VAPOR {
+                            air += leg.amount;
+                        }
+                    }
+                    r.transpired += flux;
+                    r.to_air += air;
+                    r.capped_steps += u64::from(air < flux);
+                }
                 if flow.id() == WATERING {
                     let res = flow
                         .evaluate(before, &env, scenario.bio_dt)
@@ -190,7 +215,7 @@ fn main() {
         println!(
             "{name:<30} | watered {:8.3} kg | fan export {:8.3} kg | plant water {:8.3} → {:8.3} \
              (soil {:7.3}→{:7.3}, subsoil {:7.3}→{:7.3}) | crew store {:+9.3} kg, brine {:+7.3} kg \
-             | FTSW min {:.4} | stress min {:.4} on {} steps | plant C {:7.3} | rationed {:?}, events {}",
+             | transp {:8.3} kg, to air {:6.3} kg, capped on {} of {} plant steps              | FTSW min {:.4} | stress min {:.4} on {} steps | plant C {:7.3} | rationed {:?}, events {}",
             r.watered,
             r.exported,
             plant_water(&s0),
@@ -201,6 +226,10 @@ fn main() {
             end.stocks[SUBSOIL_WATER].amount,
             end.stocks[WATER_STORE].amount - s0.stocks[WATER_STORE].amount,
             end.stocks[BRINE].amount - s0.stocks[BRINE].amount,
+            r.transpired,
+            r.to_air,
+            r.capped_steps,
+            r.plant_steps,
             r.ftsw_min,
             r.stress_min,
             r.stressed_steps,

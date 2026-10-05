@@ -1419,3 +1419,74 @@ reproduces both goldens' final soil water before and after, to every digit.
   §18c's 21.2 kg drain and 0.66 lowest fill, and the instruments that print them
   (`examples/air_split.rs`, `examples/watering.rs`). None was re-run here. Read them as measured
   on the outdoor input. The carbon figures (§13b, §16a) do not read net radiation.
+
+## 22. The separate-air water figures re-measured on the lamp's net radiation (predictions before the run, 2026-10-05)
+
+§21a left every separate-air WATER figure measured on the outdoor input. This batch re-runs them
+and changes no simulation code. **Method (advisor, 2026-10-05):** the same instrument runs on two
+trees, `57688da` (the commit before §21's fix; a git worktree under `W:\temp\claude\netrad-remeasure\pre`)
+and HEAD, so every difference has one cause. The pre-fix tree is first checked to REPRODUCE the
+record, so nothing else between the record and the fix is mistaken for it.
+
+**Superseded, so not re-graded.** §13b's 23.3 kg drain (reversed by the cabin humidity, §15a) and
+its 0.144 starvation (ended by the minute-step gas exchange, §17a). Re-running them would grade
+numbers no conclusion rests on.
+
+**Still standing, and graded here:**
+1. the weather-temperature chamber GAINS ≈ 2.08 kg a season from the cabin (§15a H5, §18a row 1);
+2. the 22 °C chamber drains ≈ 21.2 kg a season to the cabin, and that drain is the PLANT STEP's
+   cap — each 90-minute step sends the chamber's air only its headroom (§18a R2, §18c);
+3. the root zone never falls below 0.8184 / 0.6623 full, so triggered watering delivers 0 kg and
+   on/off end states are byte-identical (§18c T1);
+4. plant carbon 53.263 / 28.314, untouched by water.
+
+### 22a. Instruments — one repaired, one extended
+
+* ⚠ **`examples/air_split.rs` had crashed since the 2026-10-03 adoption (`49adbc6`).** Its shared
+  comparison built the station with `build_sealed_station` — whose default became the minute
+  step — then wrapped the minute step on again, which found no carbon-budget flows left and
+  panicked. Worse, before the panic its plain `shared` row had silently become the MINUTE build
+  (130.4561 mol instead of 129.5564). `cargo test` compiles examples but runs none, and §17c's
+  sweep of stale instruments did not include it. Repaired: the case asks
+  `build_sealed_station_at(…, gas)` for its step.
+* `examples/watering.rs` now also prints each season's transpiration, the part that reached the
+  chamber's air, and the plant steps where the headroom held some back (the cap claim 2 rests
+  on). Advisor's point: the cap cannot be argued from the season's MEAN transpiration — with the
+  lamp's net radiation at 0 in the dark, night steps run on the vapour-deficit term alone.
+
+### 22b. The pre-fix baseline (tree `57688da`, output `W:\temp\claude\netrad-remeasure\`)
+
+* `watering` (unmodified) reproduces `W:\temp\claude\watering_run3.txt` **byte for byte**; the
+  extended instrument prints the same figures plus the new counts (`watering_pre2.txt`).
+* The repaired `air_split` reproduces `W:\temp\claude\air_split_run6.txt` **value for value**
+  (column spacing only differs) — `air_split_pre2.txt`.
+* New, pre-fix: transpiration **663.623 kg** (weather) / **1735.062 kg** (22 °C), to the air
+  **3.217 / 22.076 kg**, the cap holding some back on **4880 of 4880** plant steps in both.
+
+### 22c. Predictions (committed before the HEAD run)
+
+The mechanism they rest on: a capped step sends the air exactly its headroom, `target − v +
+condensed`, a function of the chamber's vapour and temperature alone — not of the leaves' flux
+(`flows.rs`, `Transpiration::evaluate`). Net radiation reaches nothing but that flux. So while
+every step stays capped, the air side, the fan, the cabin and the crew cannot see the fix.
+
+* **N1 — the cap still binds.** 22 °C: capped on **4880 of 4880** (night flux from the
+  vapour-deficit term is ≈ 0.02–0.1 kg a step against a ≈ 0.004 kg headroom). Weather chamber:
+  capped on **≥ 4636 (95 %)**; it is the one at risk, its air sitting at ≈ 0.91 RH, where a
+  cold dark step's flux is smallest.
+* **N2 — the cabin side cannot see it.** If N1 holds at 4880 in a case: fan export, to-air,
+  crew-store Δ and brine Δ are **byte-identical** to pre-fix in that case (−2.083 / 21.248 kg
+  export). If the weather chamber has uncapped steps: its export moves by under 0.5 kg and stays
+  cabin → plants.
+* **N3 — plant carbon byte-identical** in all four runs (no run reaches water stress either way;
+  §21a L2 saw the same in the goldens).
+* **N4 — transpiration falls:** weather **−15 to −25 %**, 22 °C **−10 to −25 %** (the sealed
+  golden fell 20.9 %); the fall moves from condensate into the soil, with the plants' total water
+  unchanged where N2 holds.
+* **N5 — the root zone's lowest fill RISES** in both (less drawn), so watering still delivers
+  **0 kg** and on/off stay byte-identical.
+* **N6 — the repaired `air_split` at HEAD:** carbon columns byte-identical to pre-fix; the
+  vapour-on rows move only in transpiration, as N1–N4.
+
+So the prediction is that **all four standing conclusions stand**; the only numbers to restate
+are transpiration and where the plants' water sits (soil versus condensate).

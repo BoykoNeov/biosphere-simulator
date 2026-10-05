@@ -37,11 +37,11 @@ use station::air_split::{
     CABIN_AIR_MOL, CABIN_INERT,
 };
 use station::driver::{DayOrder, Side, TwoRate};
-use station::gas_exchange::{gas_exchange_on_fast_step, GasExchangeStep, CARBON_BUDGET_FLOWS};
+use station::gas_exchange::{GasExchangeStep, CARBON_BUDGET_FLOWS};
 use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
-    build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
+    build_sealed_station_at, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
 };
 
 const TRANSPIRATION: &str = "biosphere.transpiration";
@@ -243,7 +243,9 @@ fn season(
 }
 
 fn shared(scenario: &SealedStationScenario, days: usize, gas: GasExchangeStep) -> Reading {
-    let (state, bio, fast) = build_sealed_station(
+    // The builder takes the step itself: since the 2026-10-03 adoption its default IS the
+    // minute step, and wrapping that again found no carbon-budget flows left to move (§22).
+    let (state, bio, fast) = build_sealed_station_at(
         &params::charge(),
         &params::thermal(),
         &params::crew(),
@@ -254,18 +256,9 @@ fn shared(scenario: &SealedStationScenario, days: usize, gas: GasExchangeStep) -
         scenario,
         false,
         false,
+        gas,
     )
-    .expect("build_sealed_station");
-    let (bio, fast) = match gas {
-        GasExchangeStep::PlantStep => (bio, fast),
-        GasExchangeStep::Minute => gas_exchange_on_fast_step(
-            &state.stocks,
-            bio,
-            fast,
-            &domains::biosphere::system::weather_shared(&scenario.bio),
-        )
-        .expect("gas exchange on the minute step"),
-    };
+    .expect("build_sealed_station_at");
     season(
         scenario,
         state,
