@@ -1534,3 +1534,115 @@ chamber, where the vapour deficit dominates, fell a little less.
 ⚠ **Not covered here:** §20's minute-step transpiration numbers (the next item, re-predicted from
 scratch before its adoption question). §15a's shared-room "above saturation on 4 876 of 4 880"
 now reads **4 875** at HEAD (`air_split_head.txt`); max unchanged at 2.8798.
+
+## 23. Slice 2b — the plant chamber's heat store: design, priced before code (2026-10-05)
+
+The user, offered the minute-step adoption question or this: *"2"* (this). §10's slice 2 / §11's
+2b, on the default build, a station unfreeze. **The plants do NOT read the chamber yet** (that is
+slice 3, with the cold period). No code in this section.
+
+### 23a. Advisor review (2026-10-05), summarized
+
+1. **Two golden diffs, not one.** 2b-i: the chamber store inserted as a pass-through on the
+   lamp's *waste-heat* leg only (lamp → chamber → exchanger → node); the light leg stays on
+   `boundary.light_used`. Every non-energy stock byte-identical (dump all stocks, as §22d); the
+   node *not* necessarily byte-identical (the exchanger lags, the arithmetic path differs) —
+   predict the size, not zero. 2b-ii: the light leg re-pointed into the chamber; this is where
+   the node warms, and `sealed_node_heat` (whose doc says the radiant leg "leaves as PAR, not to
+   the node") must start the node at its new equilibrium.
+2. **"Nominal chamber = setpoint" is not a prediction a lagged controller can meet.** Pick the
+   control law, then commit the steady offset in closed form. The sealed station's lamp draw is
+   the daily **average** (`lighting_average_power`), so the chamber gets a constant input and no
+   day/night swing although the crop's light switches — recorded, not fixed here.
+3. **Check that B delivers the failure the user chose it for.** With no heater and no heat-loss
+   path, a dead lamp leaves the chamber at its temperature forever; a radiator fault reaches the
+   chamber only if the exchanger is gated on the node being colder, and then after ~a month.
+   These are the user's calls.
+4. **Price the sugar-fixed share of the light** from the golden, with a cited energy content.
+5. **Look for sources** for the chamber's heat capacity and the exchanger's capacity before
+   labelling them DESIGN (BVAD Table 4-88's page image, owed since §11).
+6. **What breaks:** `lamp_shed` counts a step as lit when light reaches `boundary.light_used`
+   (`lamp_shed.rs:359`) — after 2b-ii it never does; `air_split` inherits the chamber through
+   `sealed_fast_flows`; Godot may carry a stock list; manifest + completeness gates.
+   `tier1_node_is_period_1_fixed_point` reads the heat-closure run and should not move.
+
+### 23b. Measured and sourced
+
+**BVAD Table 4-88, page image READ** (PDF page index 183, printed p. 170;
+`W:\temp\claude\chamber-heat\bvad_t4-88.png`). §11's extract reading holds. Rows (mass kg/m²,
+volume m³/m², power kW/m², thermal control kW/m²): Crops 20.0 / – / – / –; Shoot Zone 3.6 / 0.67 /
+0.3 / 0.3; Root Zone Water and Nutrients 36.8 / 0.11 / 0.14 / 0.14; Lamps 22.9 / 0.25 / 2.1 / 2.1;
+Ballasts 8.4 / TBD / 0.075 / 0.075; Mechanization 4.1; Secondary Structure 5.7; Total 101.5 /
+1.03 / 2.6 / 2.6. Footnote 183: *"Power consumption and thermal control within the shoot zone
+reflect fans for gas movement."* (Drysdale 1999b.)
+* **The table books every watt as heat to reject — the lamps' 2.1 kW/m² included.** Thermal
+  control equals power, row by row. A class citation for sending the lamp's light into the
+  chamber as heat, and for **sizing the exchanger to the chamber's installed power**.
+* It gives **no** specific heat and **no** controller rate.
+
+**The sugar-fixed share of the light — priced from the frozen golden.** Energy content: α-D-glucose
+ΔcH°solid = **−2805.0 ± 1.3 kJ/mol** (NIST Chemistry WebBook SRD 69, CAS 492-62-6, condensed-phase
+data; Ponomarev & Migarskaya 1960, reanalysed by Cox & Pilcher 1970; opened 2026-10-05) →
+**467.5 kJ per mol C**. In `sealed_station_state.json` (n = 19 520, 1220 days) the organic carbon
+standing at the end (leaf, stem, root, grain, stem reserve, litter, humus, microbes) is
+**117.80 mol** — an upper bound on what the run stored chemically, since its start is not
+subtracted and respiration in the chamber returns the rest as heat. 117.80 × 467.5 kJ =
+**55.1 MJ** against `boundary.light_used` = **7.688 GJ**: **≤ 0.72 %**. (The per-season reading,
+the whole standing crop at a harvest — 59.71 mol — against one season's light, 1.922 GJ, is
+1.45 %.) **So all the light goes to the chamber as heat; the overcount is recorded, ≤ 0.72 %.**
+Coupling the fast `Lamp` to the crop's assimilation would be a cross-domain seam; not taken.
+
+**The chamber's heat capacity — no source fixes it; a plausibility anchor, not a derivation.**
+Air alone (27.66 mol × 29.1 J/mol·K ≈ 0.80 kJ/K) heats **9.9 K per minute step** at the lamp's
+133.3 W: unusable. Anchor: Table 4-88's root-zone water and nutrients, 36.8 kg/m², taken as water
+(NIST WebBook, liquid water Shomate fit, Chase 1998: Cp = 75.375 J/mol·K at 298.15 K =
+4 184 J/kg·K) → 1.54e5 J/K for our 1 m². **Proposed: C_ch = 1.5e5 J/K, DESIGN** — the
+`radiator.yaml` precedent ("a post-hoc plausibility anchor … NOT a derivation"). One minute step's
+full input over it: 133.3 × 60 / 1.5e5 = **0.053 K** — the Euler bound holds.
+
+**The exchanger's capacity — a class sizing rule, a DESIGN number.** Table 4-88 sizes thermal
+control to the installed power; ours is the lamp's nameplate **200 W** (fans unmodelled). Margin
+over the averaged input 133.3 W: 1.5×.
+
+**The node, closed form** (`equilibrium_temperature`; today's heat recomputed from the golden's
+end node, 167.4238 K → 378.703 W):
+* 2b-i: the same heat reaches the node → **167.4238 K**, unchanged in steady state.
+* 2b-ii: + the light leg 72.939 W → 451.643 W → **174.961 K (−98.19 °C), +7.537 K.**
+* The node's own relaxation time today: 12.8 days.
+
+**The failure directions — what B can and cannot show, priced:**
+* **Exchanger fault** (capacity → 0): the chamber heats at 133.3 / 1.5e5 = **3.2 K per hour**
+  (waste heat alone, 2b-i: 1.45 K/h). The hot direction works with no new number.
+* **Radiator total loss:** the node gains 451.6 W / 1e7 J/K = **3.90 K per day**, and passes
+  22 °C after **≈ 31 days** (2b-i: 3.27 K/day, ≈ 39 days). It reaches the chamber **only if** the
+  exchanger refuses to move heat into a warmer node (the second law: no heat pump is modelled).
+* **Lamp off** (failure, shedding): with no heater and no heat-loss path the chamber **holds its
+  temperature indefinitely** — B shows nothing in the cold direction. A loss path needs a wall
+  conductance (DESIGN) toward something: the node (−98 °C in this model — a chamber leaking to it
+  would freeze and need a heater) or the cabin (no temperature in the default build).
+
+**The control law — the precedent is the cabin condenser:** first-order toward a setpoint,
+one-sided, a DESIGN rate (`eclss.yaml` `condense_rate` 5e-4 /s, "a solver-stability choice").
+Proposed: removed per step = `min(capacity·dt, k·(Q − Q_set)·dt)` when `Q > Q_set`, else 0.
+Proportional, so the chamber settles **above** the setpoint by `input / (k·C_ch)`:
+
+| k (1/s) | τ | k·dt | offset, 2b-i (60.39 W) | offset, 2b-ii (133.33 W) |
+|---|---|---|---|---|
+| 5e-4 (the condenser's) | 33 min | 0.03 | 0.81 K | 1.78 K |
+| 1/600 | 10 min | 0.1 | 0.24 K | **0.53 K** |
+| 1/60 | 1 min | 1.0 | 0.024 K | 0.053 K (at the Euler edge) |
+
+The chamber starts at its own closed-form steady state (setpoint + offset), so a nominal run is
+flat from step 0. The stock is referenced to absolute zero (`T = Q / C_ch`), not to `T_space`.
+
+### 23c. Decisions owed to the user (asked 2026-10-05)
+
+1. **A dead lamp:** keep the chamber at its temperature (hot direction only), or add a wall loss
+   (toward what) — *recommended: hot only, revisit with the cabin heat store (2c).*
+2. **The radiator:** the exchanger works only while the station structure is colder than the
+   chamber — *recommended: yes (physics; costs nothing nominally; a radiator loss reaches the
+   chamber after ≈ 31 days).*
+3. **How tightly the chamber is held:** *recommended: τ = 10 min, 0.53 °C above 22 °C.*
+
+Not asked, defaulted (say so to override): all the light becomes chamber heat (≤ 0.72 %
+overcount); C_ch = 1.5e5 J/K and capacity = 200 W, both DESIGN with the anchors above.
