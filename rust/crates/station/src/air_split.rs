@@ -395,6 +395,7 @@ pub fn build_split_station(
         lamp,
         harvest,
         &crate::params::chamber(),
+        crate::chamber::ChamberSurroundings::Outdoor,
         CabinAir {
             co2: CABIN_CO2,
             o2: CABIN_O2,

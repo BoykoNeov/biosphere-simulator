@@ -1894,3 +1894,41 @@ the 60 s step over the 1220-day weather, `W:\temp\claude\chamber-heat\`; not the
 | L3 | **Space**, ε* = 0.01 (WHAT-IF): 22.05 W out at 295.2 K |
 | L4 | **Station structure**, 1220 days: the heater runs continuously at **44.8 W**; the node settles near **179.15 K**; the battery, which nominally falls to 5.946e9 J (the sealed power budget pays life support, not the lamp — §6 of the lamp-shed record), ends near **1.22e9 J** — above zero, so no rationing within the horizon, barely |
 | L5 | The time base: the outdoor temperature read on the fast step equals the plants' for the same slow `n`, at the first and last minute of a day |
+
+### 23j. 2b-iii BUILT — graded (2026-10-05)
+
+Built as §23i describes: `ChamberWall`, `ChamberHeater` and `ChamberSurroundings` in
+`rust/crates/station/src/chamber.rs`; `build_sealed_station_in` (the surroundings option) and
+`outdoor_temperature` (the time base) in `sealed.rs`; three parameters in `chamber.yaml`; lab
+tests `rust/crates/station/tests/chamber_walls.rs` (four, plus two full-horizon ones behind
+`--ignored`, run for this grading). 2b-ii's golden kept at
+`W:\temp\claude\chamber-heat\sealed_2bii.json`; run outputs in
+`W:\temp\claude\chamber-heat\run_2biii\`.
+
+| # | Result |
+|---|---|
+| R1 | **HELD** — against 2b-ii's golden only `thermal.node`, `thermal.chamber`, `boundary.space` differ, plus the added `boundary.chamber_surroundings`; `power.battery`, `boundary.solar_source`, every other stock and every aux value byte-identical — the heater never fired |
+| R2 | **HELD** — `boundary.chamber_surroundings` **1.841730e9 J** against 1.841731e9 (5.4e-7) |
+| R3 | **HELD** — node end **174.14080 K** (predicted 174.14086); daily min **172.1720**, max **174.8881**, mean **173.24720** against 172.169 / 174.889 / 173.247 |
+| R4 | **HELD, to 7 figures** — chamber end **295.1999296 K**; daily range **295.1886868–295.2034234 K**, the re-simulation's exactly |
+| R5 | **HELD** — `boundary.space` fell **1.833528e9 J** against 1.833530e9 (1.1e-6) |
+| R6 | **HELD** — `regen_goldens`: only `sealed_station`; manifest diff = + `ChamberHeater`, + `ChamberWall`, `chamber.yaml`'s digest, the golden hash |
+| R7 | **HALF** — the seven examples against 2b-ii's outputs (`W:\temp\claude\chamber-heat\run_2biii\` vs `…\examples_2bii\`), timings stripped: `air_split`, `air_split_baseline`, `watering`, `minute_transpiration` identical; `draw_census` differs in the energy rows only (`thermal.chamber` worst 0.000195, on day 197.9). ✗ Two differences I did not foresee: **(1)** `lamp_shed`'s blackout run ends with **3.9 MJ less battery** (1.8219e7 → 1.4355e7 J; crop, shed timing and shares identical): once the lamp is shed the chamber cools and the **heater draws on the very battery the shedding protects** — about a fifth of what was left. A finding about the design, recorded, not changed. **(2)** `intraday_exchange`'s day-order comparison now moves 3 energy stocks: the walls read the outdoor temperature by `n`, and the fast minutes after plant step `k` carry `n = k + 1`, so under the retired slow-first order they read the next day's weather all day, under the reference order for the last 90 minutes of each day — the one-plant-step lead every fast-side forcing keyed on `n` already has (L1's lamp window). Documented at `outdoor_temperature`; not special-cased |
+| L1 | **HELD** — the heater drew **1.45653e7 J** (predicted 1.4574e7, −0.06 %); battery vs nominal **+4.30347e7 J** (4.3026e7, +0.02 %); chamber within 0.015 K under 22 °C on every day-end inside the window; without the heater it fell below 280 K; crop byte-identical between the two. ⚠ **Found, not predicted — an instrument lag:** the fast operator runs after its group's plant step has advanced `n`, so a lamp window keyed `[113·16, 118·16)` goes dark in the **last 90 minutes of day 112** and comes back 90 minutes before day 118 ends. The test first compared at `states[113]` and went red on its own control; it now compares at `states[112]` and asserts the lag is where it says (a red there means the lag moved). The same one-plant-step lag the lamp-shed record carries for the crop's light |
+| L2 | **HELD** — cabin 18 °C: **6.2221 W** out; 27 °C: **7.5934 W in**; chamber held (295.201 / 295.206 K) |
+| L3 | **HELD** — space, ε* = 0.01: **22.047 W** at 295.2 K (unit test) |
+| L4 | **HELD** — 120 days on the structure: node **179.1486 K** (179.151), heater **44.817 W** (44.84); the full 1220 days: battery ends **1.2163e9 J** (≈ 1.219e9), no rationing |
+| L5 | **HELD** — the walls read the plants' day at the first and last plant step of seven days, bit for bit. Liveness: indexing the table by the fast `dt` instead turns it red at day 1 |
+
+**Tally: R1–R6 held, R7 half (two unforeseen example differences); L1–L5 held, L1 with an instrument lag found on the way.**
+
+**Not predicted — an existing test went red.** `tests/chamber_heat.rs` (2b-i/2b-ii) asserted a
+flat nominal chamber and a linear dead-cooler rise; with walls the nominal chamber follows the
+weather (R4 itself says so) and a dead cooler's chamber climbs toward its walls' equilibrium.
+The roster in §23i should have listed it. Fixed by switching the walls **off** in that file (scaled
+by 0, as its cooler is), so it keeps isolating the cooler; the walls have their own file.
+
+**What B now shows, end to end.** Hot direction: a dead cooler heats the chamber (toward
+`T_out + 133.3 W / UA` ≈ 87 K above outdoors with walls). Cold direction: a dead lamp on cold
+days pulls the chamber toward outdoors at a 27 h time constant, and the battery heater holds it.
+A radiator loss reaches it after ≈ 31 days through the cooler's second-law gate.

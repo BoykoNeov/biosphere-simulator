@@ -72,6 +72,8 @@
     "Allocation",
     "CO2Scrubber",
     "ChamberCooling",
+    "ChamberHeater",
+    "ChamberWall",
     "Condenser",
     "CrewMetabolism",
     "CrewRespiration",
@@ -116,7 +118,7 @@
   },
   "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/16 day, 16 slow sub-steps per master day, each followed by its sixteenth of the everything-fast dt=60 s sub-steps (90 of them; interleaved since 2026-09-30, slow-first before); Tier-1 energy single-rate dt=3600 s.",
   "param_files": {
-    "chamber.yaml": "a4835c62c3f7e318fe29d27d749a36d12b537221897f064bacd5d702a1d4d66a",
+    "chamber.yaml": "874c895954b21c725ecab815a4bcb3004290b056fc384ac26f36f6dac4854972",
     "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
     "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
     "eclss.yaml": "6cc9e6eaac805a9d361637773ff4ca15858739342347604dc3614a911fee6c47",
@@ -175,7 +177,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "4ea66b80500ac3bdbeeda5b59edc893b22cd6c8ee6d54e9fc14a279aa75ad0ff",
+      "golden_sha256": "9edd9e34d2f208ac1ecd1d6fbf1a1a23e0bf1da9fea212dfbcd26c42f3015147",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

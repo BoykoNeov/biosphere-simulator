@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
     CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, RN_VAR, ROOTED_DEPTH, STORAGE_C,
-    THERMAL_TIME,
+    TEMP_VAR, THERMAL_TIME,
 };
 use domains::biosphere::system::{annual_reset, build_season, weather_forcings, weather_shared};
 use domains::biosphere::STEPS_PER_DAY;
@@ -46,8 +46,9 @@ use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 use crate::chamber::{
-    chamber_heat0, chamber_stock, require_step_within_response, ChamberCooling, ChamberParams,
-    CHAMBER, CHAMBER_COOLING,
+    chamber_heat0, chamber_stock, require_step_within_response, ChamberCooling, ChamberHeater,
+    ChamberParams, ChamberSurroundings, ChamberWall, CHAMBER, CHAMBER_COOLING, CHAMBER_HEATER,
+    CHAMBER_SURROUNDINGS, CHAMBER_WALL, OUTDOOR_TEMP_VAR,
 };
 use crate::driver::{run_master_day, OwnedResetHook};
 use crate::flows::{
@@ -158,6 +159,40 @@ pub fn build_sealed_station_at(
     close_feces: bool,
     gas: GasExchangeStep,
 ) -> Result<(State, Registry, Registry), SimError> {
+    build_sealed_station_in(
+        charge,
+        thermal_params,
+        crew,
+        eclss,
+        recovery,
+        lamp,
+        harvest,
+        scenario,
+        with_harvest,
+        close_feces,
+        gas,
+        ChamberSurroundings::Outdoor,
+    )
+}
+
+/// [`build_sealed_station_at`] with the plant chamber's walls facing `surroundings`
+/// (`docs/plans/post-roadmap-room-temperature.md` §23i). [`ChamberSurroundings::Outdoor`] is
+/// the reference; the other three are the lab's options.
+#[allow(clippy::too_many_arguments)]
+pub fn build_sealed_station_in(
+    charge: &ChargeParams,
+    thermal_params: &ThermalParams,
+    crew: &CrewParams,
+    eclss: &EclssParams,
+    recovery: &WaterRecoveryParams,
+    lamp: &LampParams,
+    harvest: &HarvestParams,
+    scenario: &SealedStationScenario,
+    with_harvest: bool,
+    close_feces: bool,
+    gas: GasExchangeStep,
+    surroundings: ChamberSurroundings,
+) -> Result<(State, Registry, Registry), SimError> {
     // --- biosphere (slow) — build_season verbatim ---
     let (bio_state, bio_reg) = build_season(&scenario.bio)?;
     let bio_stocks = bio_state.stocks.clone();
@@ -200,6 +235,18 @@ pub fn build_sealed_station_at(
         chamber_heat_input_w(scenario),
     ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
+    if matches!(
+        surroundings,
+        ChamberSurroundings::Outdoor | ChamberSurroundings::Cabin { .. }
+    ) {
+        // Two-signed: a hotter outside sends heat in.
+        fast_seq.push(boundary::source(
+            CHAMBER_SURROUNDINGS.to_string(),
+            Quantity::Energy,
+            0.0,
+            true,
+        )?);
+    }
 
     let mut fast_stocks: BTreeMap<String, Stock> = BTreeMap::new();
     for s in fast_seq {
@@ -243,6 +290,7 @@ pub fn build_sealed_station_at(
         lamp,
         harvest,
         &chamber,
+        surroundings,
         CabinAir {
             co2: CARBON_POOL, // the greenhouse seam: crew exhales into the bio CO₂
             o2: O2_POOL,      // the greenhouse seam: crew breathes the bio O₂
@@ -284,6 +332,7 @@ pub(crate) fn sealed_fast_flows(
     lamp: &LampParams,
     harvest: &HarvestParams,
     chamber: &ChamberParams,
+    surroundings: ChamberSurroundings,
     air: CabinAir<'_>,
     fecal_target: &str,
     with_harvest: bool,
@@ -354,6 +403,26 @@ pub(crate) fn sealed_fast_flows(
             NODE.to_string(), // the chamber's cooler hands the lamp heat on to the node
             *chamber,
             *thermal_params,
+        )),
+        Box::new(ChamberWall::new(
+            CHAMBER_WALL.to_string(),
+            CHAMBER.to_string(),
+            match surroundings {
+                ChamberSurroundings::Outdoor | ChamberSurroundings::Cabin { .. } => {
+                    CHAMBER_SURROUNDINGS.to_string()
+                }
+                ChamberSurroundings::Space { .. } => SPACE.to_string(),
+                ChamberSurroundings::Structure => NODE.to_string(),
+            },
+            surroundings,
+            *chamber,
+            *thermal_params,
+        )),
+        Box::new(ChamberHeater::new(
+            CHAMBER_HEATER.to_string(),
+            BATTERY.to_string(),
+            CHAMBER.to_string(),
+            *chamber,
         )),
         Box::new(RadiatorReject::new(
             RADIATOR_REJECT.to_string(),
@@ -436,7 +505,31 @@ pub fn sealed_fast_resolver(
         LOAD_POWER_VAR.to_string(),
         constant(balanced_load_w(charge, &scenario.power))?,
     );
+    forcings.insert(OUTDOOR_TEMP_VAR.to_string(), outdoor_temperature(scenario)?);
     SourceResolver::new(forcings, std::collections::HashMap::new())
+}
+
+/// The outdoor temperature (°C) the chamber's walls face on the fast step: the weather file's
+/// daily value, tiled over `scenario.years` — the table the plants read.
+///
+/// ⚠ **The time base** (§23i). The fast operator keeps the SLOW step count `n` (16 a day) while
+/// it runs at `dt = 60 s`, so the weather table's own indexing, `floor(n·dt)` with `dt` in days,
+/// would read the wrong day there. The day is `floor(n·bio_dt)` — the plants' day for the same
+/// `n` — whatever `dt` the fast side passes.
+///
+/// ⚠ The fast minutes after plant step `k` run with `n = k + 1`, so in the reference's
+/// interleaved day the walls read the NEXT day's temperature for the last 90 minutes of each
+/// day — the one-plant-step lead every fast-side forcing keyed on `n` has (a lamp window keyed
+/// on day 113 goes dark 90 minutes before it, §23j). Under the retired slow-first order the
+/// lead is the whole day.
+pub fn outdoor_temperature(
+    scenario: &SealedStationScenario,
+) -> Result<simcore::environment::Schedule, SimError> {
+    let temp = weather_forcings(&scenario.bio, scenario.years)?
+        .remove(TEMP_VAR)
+        .ok_or_else(|| SimError::Reference(format!("the weather carries no {TEMP_VAR:?}")))?;
+    let bio_dt = scenario.bio_dt;
+    Ok(Box::new(move |n, _fast_dt| temp(n, bio_dt)))
 }
 
 /// The sealed station's annual re-sow hook, **owned** (boxed) so a caller-driven

@@ -8,6 +8,11 @@
 //! warms at the lamp's draw over its heat capacity, the node — losing that input — relaxes
 //! toward the colder equilibrium of the remaining dissipation, and the crop, which reads no
 //! chamber temperature, is untouched.
+//!
+//! ⚠ **The walls (2b-iii) are switched off in every run here** (scaled by 0), so this file keeps
+//! checking the cooler alone: with walls the nominal chamber follows the weather and a dead
+//! cooler's chamber climbs toward its walls' equilibrium, not linearly (§23j). The walls and
+//! the heater have their own file, `tests/chamber_walls.rs`.
 
 use domains::biosphere::perturbations::{window_override, with_forcing};
 use domains::thermal::{equilibrium_temperature, ThermalParams, NODE};
@@ -17,7 +22,7 @@ use simcore::integrator::EulerIntegrator;
 use simcore::quantities::Quantity;
 use simcore::registry::Registry;
 use simcore::state::State;
-use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_COOLING};
+use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_COOLING, CHAMBER_WALL};
 use station::driver::run_master_day;
 use station::perturbations::ScaledFlow;
 use station::scenario::sealed_station_scenario;
@@ -28,6 +33,8 @@ use station::sealed::{
 
 const DAYS: usize = 60;
 const COOLER_HEALTH: &str = "test.chamber_cooler_health";
+/// The chamber's walls (2b-iii), switched OFF in every run here (see the module doc).
+const WALL_HEALTH: &str = "test.chamber_wall_health";
 
 /// Run the sealed station `DAYS` master days, the chamber's cooler at `health` throughout.
 fn run(health: f64) -> Vec<State> {
@@ -55,14 +62,17 @@ fn run(health: f64) -> Vec<State> {
             if f.id() == CHAMBER_COOLING {
                 wrapped += 1;
                 Box::new(ScaledFlow::new(f, COOLER_HEALTH.to_string())) as Box<dyn Flow>
+            } else if f.id() == CHAMBER_WALL {
+                wrapped += 10;
+                Box::new(ScaledFlow::new(f, WALL_HEALTH.to_string())) as Box<dyn Flow>
             } else {
                 f
             }
         })
         .collect();
     assert_eq!(
-        wrapped, 1,
-        "the sealed build wires exactly one chamber cooler"
+        wrapped, 11,
+        "the sealed build wires exactly one chamber cooler and one set of walls"
     );
     let fast_reg = Registry::new(flows, &state.stocks, aux).unwrap();
     let fast_resolver = with_forcing(
@@ -71,6 +81,7 @@ fn run(health: f64) -> Vec<State> {
         window_override(constant(1.0).unwrap(), 0, u64::MAX, health),
     )
     .unwrap();
+    let fast_resolver = with_forcing(fast_resolver, WALL_HEALTH, constant(0.0).unwrap()).unwrap();
     let bio_resolver = sealed_bio_resolver(&lamp, &scenario).unwrap();
     let reset = sealed_reset_hook(&scenario);
     let (states, rationed, events) = run_master_day(

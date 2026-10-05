@@ -36,6 +36,15 @@
 #   [C] NIST Chemistry WebBook, SRD 69, water (CAS 7732-18-5), liquid-phase Shomate equation
 #       (Chase 1998), 298–500 K: Cp = 75.375 J/mol·K at 298.15 K = 4184 J/kg·K (opened
 #       2026-10-05).
+#   [D] BVAD Rev 2, Table 4-50 "Frozen Food Storage on a Property per Frozen-Food-Mass Basis",
+#       printed p. 112 (page image read 2026-10-05; Ewert 2002), row 1/R_S; and p. 144,
+#       "Passive Thermal Control", with footnote 161.
+#
+# Slice 2b-iii (2026-10-05) added the walls and the heater:
+#   wall_conductance → CITED, class [D];  wall_area → DESIGN;  heater_capacity → DESIGN.
+# The walls face the outdoor weather in the reference (the user's choice). The lab's other
+# surroundings — a held cabin, space (blanket emittance WHAT-IF, no source), the station
+# structure — carry no number here.
 
 name: chamber
 process: chamber_heat
@@ -53,6 +62,18 @@ parameters:
     value: 60.0
     unit: "s"
     source: "DESIGN — the user's choice of a 1-minute response (2026-10-05, §23c), over the cabin condenser's 2000 s precedent (eclss.yaml condense_rate). At the station's 60 s fast step dt/τ = 1.0 exactly: the cooler removes the whole excess each step, and the chamber settles one step's input above the setpoint (0.024 K on the waste heat alone). No source can fix a controller's time constant for this chamber. Not calibrated."
+  wall_conductance:
+    value: 0.30
+    unit: "W/m^2/K"
+    source: "[D], Table 4-50 p. 112 (page image read 2026-10-05): 1/R_S = 0.28 / 0.32 / 0.32 × 10⁻³ kW/m²·K low / nominal / high (Ewert 2002) — the composite resistance 'through the cabinet wall accounting for insulation, door seals, and any other pathways for heat transfer' (text, p. 111) of an ISS-class cooled food cabinet. Taken: 0.30, mid-range. ⚠ LOCUS: a freezer cabinet inside a crew cabin, not a plant chamber — a CLASS citation. Slice 2b-iii, the user's walls (§23d)."
+  wall_area:
+    value: 5.12
+    unit: "m^2"
+    source: "DESIGN — the chamber's geometry: a 1 m × 1 m box (the station's 1 m² crop) holding [B]'s shoot + root zone volume, 0.67 + 0.11 = 0.78 m³ per m² of crop, so 0.78 m tall; walls, floor and roof 2·1 + 4·0.78 = 5.12 m². No source fixes a chamber's shape. With wall_conductance it gives UA = 1.536 W/K and, against heat_capacity, a 27 h time constant. Not calibrated."
+  heater_capacity:
+    value: 200.0
+    unit: "W"
+    source: "DESIGN — the user chose a heater (2026-10-05, §23d); sized symmetric with cooling_capacity. [D] p. 144: passive thermal control 'generally takes the form of insulation and resistive heaters' — a precedent for the device, not its size. Must exceed the largest steady loss of any surroundings option: 44.8 W against the station structure (§23i), 36.6 W to the coldest outdoor day with the lamp off. Not calibrated."
   setpoint:
     value: 295.15
     unit: "K"

@@ -284,6 +284,19 @@
       "unit": "kg"
     },
     {
+      "amount": "0x1.b71a484ad3fabp+30",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.chamber_surroundings",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": true,
+      "unit": "J"
+    },
+    {
       "amount": "0x1.86a387d5aeac7p+18",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
@@ -363,7 +376,7 @@
       "unit": "J"
     },
     {
-      "amount": "0x1.62b2adf67e166p+35",
+      "amount": "0x1.55098083088adp+35",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },
@@ -441,7 +454,7 @@
       "unit": "J"
     },
     {
-      "amount": "0x1.51d55a0000000p+25",
+      "amount": "0x1.51d45ab854cddp+25",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },
@@ -454,7 +467,7 @@
       "unit": "J"
     },
     {
-      "amount": "0x1.9ab3bb3671a49p+30",
+      "amount": "0x1.98bf294e00bf3p+30",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },

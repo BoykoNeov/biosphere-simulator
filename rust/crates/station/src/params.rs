@@ -99,8 +99,9 @@ pub fn harvest() -> HarvestParams {
 
 /// The plant chamber's heat coefficients (`chamber.yaml`, Step 3c slice 2b).
 ///
-/// Capacity, response time and setpoint are strictly positive; the cooler's capacity is
-/// `>= 0` (zero is a valid, failed cooler).
+/// Heat capacity, response time, setpoint and wall area are strictly positive; the cooler's
+/// and the heater's capacities and the wall conductance are `>= 0` (zero is a valid, failed
+/// device, or a perfectly insulated wall).
 pub fn chamber() -> ChamberParams {
     let f = file(CHAMBER_YAML, "chamber.yaml");
     let v = checked(
@@ -110,6 +111,9 @@ pub fn chamber() -> ChamberParams {
                 ("cooling_capacity", "W"),
                 ("response_time", "s"),
                 ("setpoint", "K"),
+                ("wall_conductance", "W/m^2/K"),
+                ("wall_area", "m^2"),
+                ("heater_capacity", "W"),
             ],
             "chamber.yaml",
         ),
@@ -125,6 +129,15 @@ pub fn chamber() -> ChamberParams {
         ),
         response_time: positive(v[2], "response_time"),
         setpoint: positive(v[3], "setpoint"),
+        wall_conductance: checked(
+            require_non_negative(v[4], "wall_conductance", "chamber.yaml"),
+            "chamber.yaml",
+        ),
+        wall_area: positive(v[5], "wall_area"),
+        heater_capacity: checked(
+            require_non_negative(v[6], "heater_capacity", "chamber.yaml"),
+            "chamber.yaml",
+        ),
     }
 }
 

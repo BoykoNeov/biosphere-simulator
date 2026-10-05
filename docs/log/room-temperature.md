@@ -175,3 +175,14 @@ runtime file names it (searched every non-Rust file). An older saved sealed sess
 match" error (`SimSession::load_state`'s set-equality guard — read, not run); no migration is
 offered. `lamp.yaml`'s header still draws the two-target `Lamp` form, which the `lighting` build
 uses; left as is (editing it would move its frozen digest for a comment).
+
+**Slice 2b-iii BUILT 2026-10-05 (a station unfreeze)** (note §23i–§23j). The chamber has walls
+and a battery heater. In the reference the walls face the outdoor weather (the user's choice);
+a held cabin, space and the station structure are lab options. Nothing outside the energy books
+moved, the battery included: the heater never fires there, because the lamp's 133 W outweighs
+the walls' largest 37 W loss. The station's heat store now follows the seasons (172.2–174.9 K).
+Its lab test fires the heater (a dead lamp on the coldest days: 14.6 MJ, as predicted). Found on
+the way: fast-side forcings keyed on the step count lead the plants by 90 minutes (a lamp window
+on "day 113" goes dark in the last group of day 112); and in the lab's lamp shedding the heater
+spends 3.9 MJ of the battery the shedding was protecting. An existing test that assumed a flat
+chamber went red, unpredicted; it now runs with the walls off.

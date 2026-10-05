@@ -127,10 +127,12 @@ it. The 16 classes:
 - **thermal** — `HeatInput`, `RadiatorReject`
 - **eclss** — `CrewMetabolism`, `CO2Scrubber`, `Condenser`, `O2Makeup`
 - **crew** — `OxygenConsumption`, `FoodMetabolism`, `WaterBalance`
-- **station seams** — `CrewRespiration`, `WaterRecovery`, `Lamp`, `Harvest`, `ChamberCooling`
+- **station seams** — `CrewRespiration`, `WaterRecovery`, `Lamp`, `Harvest`, `ChamberCooling`,
+  `ChamberWall`, `ChamberHeater`
   (since 2026-10-05: the plant chamber's cooler, chamber → `thermal.node`; the sealed `Lamp`'s
   whole draw — waste heat and light — goes to `thermal.chamber`, and the sealed build has no
-  `boundary.light_used`)
+  `boundary.light_used`; since 2b-iii the chamber's walls exchange heat with the outdoor
+  weather through `boundary.chamber_surroundings`, and a battery heater holds its floor)
 
 The five *dropped* stand-ins (`HeatInput`, `CrewMetabolism`, `OxygenConsumption`,
 `FoodMetabolism`, `SelfDischarge`) exist only in the **standalone** sibling builds — pinned
@@ -343,6 +345,25 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-05 — the plant chamber's walls and heater, slice 2b-iii: two FLOWS and three
+  PARAMETERS added; 1 golden moves (`sealed_station`), energy books only.** The third of three
+  diffs (`docs/plans/post-roadmap-room-temperature.md` §23i–§23j), on the user's design: walls
+  that lose heat to surroundings that may be hotter or cooler, a heater on the battery, the
+  reference walls facing the outdoor weather (the user's choice, for calibration against field
+  data); a held cabin, space and the station structure are lab options. `ChamberWall`
+  (`UA·ΔT` against the weather file's daily temperature, into a two-signed
+  `boundary.chamber_surroundings`), `ChamberHeater` (the cooler's mirror, below the setpoint).
+  `chamber.yaml`: `wall_conductance` 0.30 W/m²·K (CITED, class: BVAD Table 4-50's freezer-cabinet
+  1/R_S 0.28–0.32), `wall_area` 5.12 m² (DESIGN), `heater_capacity` 200 W (DESIGN). The
+  outdoor temperature is read on the plants' day (`floor(n·bio_dt)`; the fast operator keeps
+  the slow `n`), pinned at day boundaries. Predicted first (an independent re-simulation),
+  graded: every non-energy stock, every aux value and `power.battery` byte-identical (the
+  heater never fires in the reference — the lamp's 133 W exceeds the walls' largest 36.6 W);
+  the walls carry 1.8417e9 J outdoors (5.4e-7 of the prediction); the node is no longer a
+  fixed point (daily 172.17–174.89 K, ends 174.141 K); the chamber 295.1887–295.2034 K to 7
+  figures. The heater has its own lab test that fires it (a dead lamp on the coldest days).
+  Unforeseen, recorded: in the lab's lamp shedding the heater draws on the battery the
+  shedding protects (3.9 MJ in its blackout run).
 - **2026-10-05 — the plant chamber's heat store, slice 2b-ii: the lamp's LIGHT heats the
   chamber too; 1 golden moves (`sealed_station`): the node warms 7.54 K, `boundary.light_used`
   leaves the sealed build. No parameter, no flow type added.** The second of three diffs
