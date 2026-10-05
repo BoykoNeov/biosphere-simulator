@@ -1712,3 +1712,46 @@ range 1.43–1.64). Time constant `C_ch/UA` = **27 h**.
 
 **A heater** (a battery load, resistive, DESIGN capacity) matters only where the lamp cannot hold
 the chamber: always for the structure, and with the lamp dead for outdoors and space.
+
+**ANSWERED 2026-10-05 (verbatim):**
+1. Reference surroundings: *"since we have most data from experiments, when plants grow on natural
+   light, maybe the standard should stay as outdoor weather, becasue we will have most data to
+   calibrate. but the model should be able to run realistically (even if not proven) all
+   variants."* — **outdoor weather** in the reference (the recommendation, the cabin, declined).
+2. The other three: *"Yes, as experimental (Recommended)"* — cabin (held, settable hotter or
+   cooler), space (radiative; ε* unsourced → WHAT-IF), station structure: **lab options**.
+3. Heater: *"Yes"* — a resistive heater on the battery, DESIGN capacity.
+
+⚠ **Flagged to the user, to be re-asked before slice 3:** walls facing the weather do not make
+the plants feel the weather — the chamber is still held at its setting, so the walls only change
+how hard the heater and cooler work. What decides calibration against field data is **which
+temperature the plants read**: today the weather; slice 3 (as planned) the held chamber.
+
+### 23e. 2b-i — predictions, committed before code (2026-10-05)
+
+**What is built.** A chamber heat store `thermal.chamber` (ENERGY POOL, `T = Q / C_ch`, 0 K
+reference); the `Lamp`'s waste-heat leg re-pointed node → chamber; one new flow
+`station.chamber_cooling` (`ChamberCooling`): chamber → node,
+`min(capacity·dt, (Q − C_ch·T_set)·dt/τ)` when `Q > C_ch·T_set` **and** `T_node < T_ch`, else
+0. New station param file `chamber.yaml`: `heat_capacity` 1.5e5 J/K (DESIGN, the water anchor),
+`cooling_capacity` 200 W (DESIGN, Table 4-88's class sizing rule), `response_time` τ = 60 s
+(DESIGN, the user's "1-minute response"), `setpoint` 295.15 K (BVAD Table 4-73, by analogy; the
+user's 22 °C). The build **hard-errors** when the fast step `dt > τ`. The chamber starts at its
+closed-form steady state `C_ch·T_set + w·dt`, `w` = the lamp's averaged waste heat. No walls, no
+heater, light leg unchanged (2b-ii, 2b-iii).
+
+**Predictions (the frozen `sealed_station` golden, regenerated):**
+
+| # | Prediction |
+|---|---|
+| P1 | Every **non-energy** stock and **every aux value** in the end state is **byte-identical** to HEAD's golden. Of the energy stocks, `power.battery`, `boundary.solar_source` and `boundary.light_used` are byte-identical too (the lamp draws the same; its light leg is untouched) |
+| P2 | `thermal.chamber` starts at `C_ch·T_set + w·dt` with w = 60.39387 W: **T = 295.174158 K** (offset `w·dt/C_ch` = 0.024158 K), and stays there to within **1e-9 K** on every step (deadbeat: `dt/τ` = 1.0 exactly, so each step removes the whole excess) |
+| P3 | `thermal.node` is **NOT predicted byte-identical**: its increment now arrives through the cooler (`(Q − Q_set)·1.0`, equal to `w·dt` within a few ULP of Q ≈ 4.4e7 J) and in a different sum. End-state node within **1e-9 relative** of HEAD's 1.6472e9 J (T = 167.4238 K to 6 figures); `boundary.space` within 1e-9 relative |
+| P4 | Energy conservation holds every step; `rationed == 0` (the cooler's draw is ≤ 12 kJ against a 4.4e7 J store) |
+| P5 | The second-law gate never binds in nominal running (node ≈ 167 K ≪ 295 K): a test either side of `T_node = T_ch` (reference points differ: node from `T_space`, chamber from 0 K) — heat moves just below, none just above |
+| P6 | Unmoved: every biosphere golden, `lighting`, heat closure, `sealed_energy_drift_summary`, the perturbed brown-out, `tier1_node_is_period_1_fixed_point` (all read runs without the chamber) |
+| P7 | Manifest diff: + flow type `ChamberCooling`, + param file `chamber.yaml` and its four params, `sealed_station`'s `golden_sha256` row; nothing else |
+| P8 | The lab builds inheriting `sealed_fast_flows` (`air_split`, `lamp_shed`, the Godot sealed session): carbon and water unchanged; `lamp_shed`'s rule-off bit-identity test stays green (the light leg is untouched in 2b-i) |
+| P9 | A cooler fault (capacity → 0, lab test): the chamber warms at `w/C_ch` = **1.45 K per hour**, and the node, losing that input, relaxes toward the colder equilibrium of 317.6 W ≈ **160.3 K** on its 12.8-day time scale |
+
+P9's 160.3 K is computed with the closed form `equilibrium_temperature` from 378.703 − 60.394 W.
