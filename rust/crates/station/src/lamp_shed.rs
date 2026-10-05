@@ -1,5 +1,6 @@
-//! **LAB-ONLY** — the grow lamp is shed at a battery reserve, and the crop's light follows
-//! what the lamp actually got (the 2026-09-29 review's Step 3, slice 3a, option B).
+//! **LAB-ONLY** — the grow lamp (and, since 2026-10-05, the plant chamber's heater) is shed at a
+//! battery reserve, and the crop's light follows what the lamp actually got (the 2026-09-29
+//! review's Step 3, slice 3a, option B).
 //!
 //! Plan and record: `docs/plans/post-roadmap-light-from-delivered-power.md`. Nothing in the
 //! reference calls anything here: not a runner, not the session, not the bridge, not a golden.
