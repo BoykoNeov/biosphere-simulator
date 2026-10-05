@@ -127,7 +127,9 @@ it. The 16 classes:
 - **thermal** — `HeatInput`, `RadiatorReject`
 - **eclss** — `CrewMetabolism`, `CO2Scrubber`, `Condenser`, `O2Makeup`
 - **crew** — `OxygenConsumption`, `FoodMetabolism`, `WaterBalance`
-- **station seams** — `CrewRespiration`, `WaterRecovery`, `Lamp`, `Harvest`
+- **station seams** — `CrewRespiration`, `WaterRecovery`, `Lamp`, `Harvest`, `ChamberCooling`
+  (since 2026-10-05: the plant chamber's cooler, chamber → `thermal.node`; the sealed `Lamp`'s
+  waste heat goes to `thermal.chamber`, not to the node)
 
 The five *dropped* stand-ins (`HeatInput`, `CrewMetabolism`, `OxygenConsumption`,
 `FoodMetabolism`, `SelfDischarge`) exist only in the **standalone** sibling builds — pinned
@@ -143,11 +145,11 @@ is empty because every aux process lives in the excluded slow registry — the b
 not because the station carries none (it carries that one). The *set* is frozen so a future
 aux on a fast registry is caught.
 
-### The eight param files
+### The nine param files
 
 `rust/crates/domains/params/{power,thermal,eclss,crew}/*.yaml` + `rust/crates/station/params/*.yaml` (both moved out of the Python packages in Stage-3 slice S1, 2026-08-18; a pure rename — the manifest keys on basenames, so not one hash moved):
 `charge`, `self_discharge` (power); `radiator` (thermal); `eclss` (eclss); `crew` (crew);
-`water_recovery`, `lamp`, `harvest` (station). Each is clean-room from primary literature
+`water_recovery`, `lamp`, `harvest`, `chamber` (station; `chamber` added 2026-10-05). Each is clean-room from primary literature
 or illustrative sizing per the frozen-but-illustrative caveat above; the manifest records a
 newline-normalized sha-256 of each as **provenance**. Biosphere param files are **not**
 recorded here (delegated).
@@ -230,7 +232,7 @@ Tests of record: `tests/test_sealed_station_stability.py` (Tier 1 + Tier 2, mark
 `docs/station-reference.manifest.json` is the machine-readable surface, **generated** by
 `tests/test_station_freeze_manifest.py` (`uv run python
 tests/test_station_freeze_manifest.py`). It names the integrator, the two sealed horizons,
-the derived flow set + aux set, the eight param files (+ provenance hashes), each scenario
+the derived flow set + aux set, the nine param files (+ provenance hashes), each scenario
 → golden (+ hash), and the `delegates_to` pointer to the biosphere manifest.
 
 ⚠⚠ **Since 2026-08-16 (slice 7 of the reference flip) this file has MIXED AUTHORITY, and

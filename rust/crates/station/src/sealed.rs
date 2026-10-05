@@ -3,8 +3,10 @@
 //! Composes **every** Phase-6 shared-stock seam over one shared stock dict + two registries
 //! (biosphere-slow / everything-fast) and runs it multi-year. The fast registry holds the 5
 //! cabin flows re-pointed at the biosphere gas pools (the greenhouse reverse seam) +
-//! `SolarCharge`/`LoadDraw`/`Lamp` (all waste-heat → `thermal.node`, the Step-1 inward move)
-//! plus `RadiatorReject`, `WaterRecovery` (and `Harvest` iff `with_harvest`); the biosphere
+//! `SolarCharge`/`LoadDraw` (waste heat → `thermal.node`, the Step-1 inward move), `Lamp`
+//! (waste heat → `thermal.chamber`, the plant chamber, since 2026-10-05) and `ChamberCooling`
+//! (chamber → node), plus `RadiatorReject`, `WaterRecovery` (and `Harvest` iff
+//! `with_harvest`); the biosphere
 //! registry is `build_season` verbatim, re-sown yearly by `annual_reset` via the driver's
 //! `slow_reset` hook. `with_harvest` / `close_feces` default **off** (the Tier-2 scope).
 //! Tier-2 (FvCB + `T⁴`). Euler-only.

@@ -202,7 +202,8 @@ fn lamp_energy_split(draw_joules: f64, photon_efficacy: f64) -> (f64, f64) {
 
 /// ENERGY flow `battery → light_used (+η_lamp) + waste_heat (+(1−η_lamp))` (forced, 3-leg).
 /// `D = env.get(lamp_power)·dt`; the radiant fraction leaves as PAR light, the rest as
-/// waste heat (→ `boundary.waste_heat` standalone, → `thermal.node` sealed).
+/// waste heat (→ `boundary.waste_heat` standalone, → `thermal.chamber` sealed, since 2026-10-05;
+/// `thermal.node` before).
 pub struct Lamp {
     id: String,
     battery: String,
@@ -213,7 +214,8 @@ pub struct Lamp {
 
 impl Lamp {
     /// Construct a `Lamp` with the given ids (the sealed station re-points `waste_heat` at
-    /// `thermal.node`; standalone lighting uses `boundary.waste_heat`).
+    /// `thermal.chamber`, the plant chamber — `thermal.node` until 2026-10-05; standalone lighting
+    /// uses `boundary.waste_heat`).
     pub fn new(
         id: String,
         battery: String,

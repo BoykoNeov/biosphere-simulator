@@ -1773,8 +1773,15 @@ regenerated. HEAD's golden kept for the comparison at
 | P5 | **HELD** — `chamber::tests::heat_moves_only_into_a_colder_node`: heat moves with the node 1e-6 K below the chamber, none at equality, 1e-6 K above or 50 K above |
 | P6 | **HELD** — `regen_goldens` report: 19 of 20 identical, `sealed_station_state.json` alone changed |
 | P7 | **HELD** — manifest diff is three lines: + `ChamberCooling` in the flow set, + `chamber.yaml`'s digest, `sealed_station`'s `golden_sha256`. (The manifest carries a file digest, not a per-parameter list, so "its four params" appear only through that digest.) |
-| P8 | **HELD** — the full suite is green apart from the stale-manifest gate before regeneration; `air_split`, `lamp_shed` (its rule-off bit-identity included), session parity and save/load all pass |
+| P8 | **HELD, by running the instruments, not only the suite** (advisor: green tests are not "carbon and water unchanged", and nothing runs examples — §22's crash). The seven examples that build the sealed station (`air_split`, `air_split_baseline`, `draw_census`, `intraday_exchange`, `lamp_shed`, `watering`, `minute_transpiration`) ran on `1ae2c93` (the commit before) and on `14101a4`; outputs in `W:\temp\claude\chamber-heat\examples\`. Byte-identical: `air_split_baseline`, `lamp_shed`, `watering`. The rest differ **only** in run times, and in `draw_census` a new `thermal.chamber` row (worst draw 0.000082) and `intraday_exchange` counting "19 stocks bit-identical" instead of 18 — the added stock. `draw_census` control 1 reads `sealed_station_state.json: byte-exact` against the new golden. `air_split`'s output equals the §22 record `W:\temp\claude\netrad-remeasure\air_split_head.txt` apart from timing lines. The suite: green apart from the stale-manifest gate before regeneration; `air_split`, `lamp_shed` (rule-off bit-identity included), session parity and save/load pass. CI on `14101a4`: green |
 | P9 | **HELD** — `tests/chamber_heat.rs`, 60 days, the cooler scaled to 0: the chamber's first-day rise equals `w·86400/C_ch` = 34.787 K to 1e-9 relative; the node falls on every day and ends within 0.15 K of the closed-form **160.308 K**; every non-energy stock and every aux value byte-identical to the nominal run on all 61 days |
+
+**The cross-port tier contract** (`rust/data/tiers.json`) carries a band per **golden**, not a
+stock list, so `thermal.chamber` is compared with every other stock of `sealed_station`; no
+action. **Prose made false by the change, corrected** (advisor): `sealed.rs`'s module header,
+the `Lamp` docs in `flows.rs`, and `docs/station-reference.md`'s flow list and param-file
+count. `sealed_node_heat`'s doc ("the radiant leg leaves as PAR, not to the node") is still
+true and changes in 2b-ii.
 
 **Tally: 8 held, 1 missed (P3, conservative).** Liveness: re-pointing the lamp's heat leg back
 to the node (the pre-2b-i wiring) turns `tests/chamber_heat.rs` red at P2's assertion
