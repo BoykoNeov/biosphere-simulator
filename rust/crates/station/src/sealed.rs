@@ -84,6 +84,10 @@ fn sealed_lamp_par(lamp: &LampParams, scenario: &SealedStationScenario) -> f64 {
 
 /// The node's initial heat `Q_eq = C·(T_eq − T_space)` (J), set by all forced dissipation.
 ///
+/// ⚠ Since the chamber's walls (2b-iii) this is a START, not the node's equilibrium: the walls
+/// send a seasonal 0–37 W out of the station before it reaches the node, so the node follows
+/// the weather (daily 172.17–174.89 K in the reference, from this 174.961 K; §23j).
+///
 /// The charge-conversion loss `(1−η_c)·solar_avg` + the 100%-dissipative `LoadDraw`
 /// (`balanced_load`) + the lamp's **whole** averaged draw, which reaches the node through the
 /// plant chamber's cooler (since 2026-10-05, Step 3c slice 2b-ii: the light is absorbed in the

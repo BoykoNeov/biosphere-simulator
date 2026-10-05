@@ -186,3 +186,6 @@ the way: fast-side forcings keyed on the step count lead the plants by 90 minute
 on "day 113" goes dark in the last group of day 112); and in the lab's lamp shedding the heater
 spends 3.9 MJ of the battery the shedding was protecting. An existing test that assumed a flat
 chamber went red, unpredicted; it now runs with the walls off.
+
+Saved sealed sessions from before 2b-iii also lack `boundary.chamber_surroundings`, so the same
+`load_state` set-equality guard refuses them with the same error (read, not run).

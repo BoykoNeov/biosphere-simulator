@@ -13,8 +13,10 @@
 //!
 //! The cooler acts on the step's starting state, so the chamber settles one step's input
 //! above the setpoint when `dt = τ` (deadbeat), and `input·τ / C_ch` above it in general.
-//! The station starts the chamber at that steady state ([`chamber_heat0`]), so a nominal run
-//! is flat from step 0.
+//! The station starts the chamber at the steady state of the lamp alone ([`chamber_heat0`]).
+//! With the walls (2b-iii) the input is the lamp less the walls' loss, which follows the
+//! outdoor weather, so the nominal chamber follows it too — 295.1887–295.2034 K in the
+//! reference (§23j); without walls it would be flat from step 0.
 //!
 //! ⚠ `dt > τ` overshoots the setpoint and oscillates **without any error**, so the station
 //! build refuses it ([`require_step_within_response`]).
@@ -102,7 +104,7 @@ pub fn chamber_temperature(heat_joules: f64, params: &ChamberParams) -> f64 {
 /// The chamber's starting heat (J): the setpoint plus the steady offset a constant input
 /// `input_w` leaves under the first-order cooler, `C_ch·T_set + input·τ`. At `dt = τ` that
 /// offset is one step's input, and the cooler (removing the whole excess each step) holds it
-/// there.
+/// there while the input stays constant — with walls it does not (the module doc).
 pub fn chamber_heat0(params: &ChamberParams, input_w: f64) -> f64 {
     params.heat_capacity * params.setpoint + input_w * params.response_time
 }
