@@ -26,27 +26,33 @@
 //! "Ventilation" row is an air speed. The plant chamber's size is BVAD Table 4-88's 0.67 m³
 //! of shoot zone per m² of crop (page image owed), an upper bound on free air.
 
+use std::collections::{BTreeMap, HashMap};
+
 use domains::biosphere::flows::Irrigation;
 use domains::biosphere::science::N2_MOLAR_MASS_KG_PER_MOL;
 use domains::biosphere::science::{fraction_transpirable, transpirable_capacity};
 use domains::biosphere::stocks::{
-    CARBON_POOL, CHAMBER_INERT, IRRIGATION_VAR, O2_POOL, ROOTED_DEPTH, SOIL_WATER, WATER_VAPOR,
+    CARBON_POOL, CHAMBER_INERT, IRRIGATION_VAR, O2_POOL, RN_VAR, ROOTED_DEPTH, SOIL_WATER,
+    TEMP_VAR, WATER_VAPOR,
 };
 use domains::biosphere::system::weather_shared;
 use domains::crew::{CrewParams, FECAL_WASTE, WATER_STORE};
 use domains::eclss::{EclssParams, CABIN_CO2, CABIN_H2O, CABIN_O2, ECLSS_DOMAIN};
 use domains::power::ChargeParams;
 use domains::thermal::ThermalParams;
+use simcore::auxiliary::AuxProcess;
 use simcore::environment::Environment;
 use simcore::error::SimError;
 use simcore::flow::{Flow, FlowResult, Leg};
+use simcore::ids::StockId;
 use simcore::quantities::Quantity;
 use simcore::registry::Registry;
-use simcore::state::State;
+use simcore::state::{State, Stock};
 
 use crate::flows::{HarvestParams, LampParams, WaterRecoveryParams};
 use crate::gas_exchange::{
-    gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
+    gas_exchange_on_fast_step, require_one_plant_step_per_group, window_key, GasExchangeStep,
+    OnFastStep, PLANT_WINDOW_RECORDER,
 };
 use crate::scenario::SealedStationScenario;
 use crate::sealed::{build_sealed_station_at, sealed_fast_flows, CabinAir};
@@ -83,6 +89,91 @@ pub struct AirSplit {
     /// refill (`Irrigation`, [F] Eqn 14.8), its source re-pointed at `crew.water_store`, gated
     /// by FAO-56's depletion trigger ([`TriggeredWatering`]).
     pub watering: bool,
+    /// Which step the plants' water loss is taken on (§20): `Minute` moves `Transpiration` and
+    /// the chamber's `Condensation` onto the fast step together ([`water_on_fast_step`]). Needs
+    /// `gas_exchange: Minute`, whose recorder holds the window's temperature.
+    pub transpiration: GasExchangeStep,
+}
+
+/// The chamber's water-loss pair (§20): transpiration's split between air and condensate counts
+/// the condenser's same-step draw, so the two move together or not at all.
+pub const WATER_LOSS_FLOWS: [&str; 2] = ["biosphere.transpiration", "biosphere.condensation"];
+
+/// The forcings the water-loss pair reads, as recorded by the plant step: temperature (by
+/// [`PlantWindowRecorder`](crate::gas_exchange::PlantWindowRecorder)) and net radiation (by [`NetRadiationRecorder`]).
+pub const WATER_LOSS_WINDOW: [&str; 2] = [TEMP_VAR, RN_VAR];
+
+/// The lab recorder's aux-process id.
+pub const NET_RADIATION_RECORDER: &str = "station.plant_window_rn";
+
+/// **LAB-ONLY** — the plant-step aux process that records the window's net radiation under
+/// [`window_key`]`(RN_VAR)`, as [`PlantWindowRecorder`](crate::gas_exchange::PlantWindowRecorder) records PAR and temperature. A recorder of
+/// its own so the reference's aux keys do not change; it records net radiation ONLY, since the
+/// aux channel is additive and a second writer of the temperature key would double it.
+pub struct NetRadiationRecorder;
+
+impl AuxProcess for NetRadiationRecorder {
+    fn type_name(&self) -> &'static str {
+        "NetRadiationRecorder"
+    }
+
+    fn id(&self) -> &str {
+        NET_RADIATION_RECORDER
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        _dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
+        let key = window_key(RN_VAR);
+        let old = snapshot.aux.get(&key).copied().unwrap_or(0.0);
+        Ok(BTreeMap::from([(key, env.get(RN_VAR)? - old)]))
+    }
+}
+
+/// Move the plants' water loss onto the fast step of a build whose gas exchange is already there
+/// (§20): [`WATER_LOSS_FLOWS`] out of the plant registry and wrapped into the fast one, reading
+/// [`WATER_LOSS_WINDOW`]; [`NetRadiationRecorder`] added to the plant step. An error unless the
+/// plant step already carries [`PlantWindowRecorder`](crate::gas_exchange::PlantWindowRecorder) and both flows are found.
+pub fn water_on_fast_step(
+    stocks: &BTreeMap<StockId, Stock>,
+    bio_reg: Registry,
+    fast_reg: Registry,
+    shared: &HashMap<String, StockId>,
+) -> Result<(Registry, Registry), SimError> {
+    let (flows, mut bio_aux) = bio_reg.into_parts();
+    if !bio_aux.iter().any(|a| a.id() == PLANT_WINDOW_RECORDER) {
+        return Err(SimError::Validation(
+            "water loss on the fast step reads the window's temperature, which only the minute \
+             gas exchange's recorder holds: set gas_exchange to Minute"
+                .into(),
+        ));
+    }
+    let (moved, rest): (Vec<_>, Vec<_>) = flows
+        .into_iter()
+        .partition(|f| WATER_LOSS_FLOWS.contains(&f.id()));
+    if moved.len() != WATER_LOSS_FLOWS.len() {
+        let found: Vec<&str> = moved.iter().map(|f| f.id()).collect();
+        return Err(SimError::Validation(format!(
+            "water loss on the fast step: the plant registry holds {found:?} of \
+             {WATER_LOSS_FLOWS:?}; they move together or not at all"
+        )));
+    }
+    bio_aux.push(Box::new(NetRadiationRecorder));
+    let (mut fast_flows, fast_aux) = fast_reg.into_parts();
+    for inner in moved {
+        fast_flows.push(Box::new(OnFastStep::reading(
+            inner,
+            shared.clone(),
+            &WATER_LOSS_WINDOW,
+        )));
+    }
+    Ok((
+        Registry::new(rest, stocks, bio_aux)?,
+        Registry::new(fast_flows, stocks, fast_aux)?,
+    ))
 }
 
 /// The watering flow's id (§18).
@@ -318,19 +409,19 @@ pub fn build_split_station(
         fan_mol_per_s: split.fan_mol_per_s,
     }));
     let fast_reg = Registry::flows_only(fast_flows, &state.stocks)?;
-    match split.gas_exchange {
-        GasExchangeStep::PlantStep => Ok((state, bio_reg, fast_reg)),
+    let shared = weather_shared(&resized.bio);
+    let (bio_reg, fast_reg) = match split.gas_exchange {
+        GasExchangeStep::PlantStep => (bio_reg, fast_reg),
         GasExchangeStep::Minute => {
             require_one_plant_step_per_group(resized.steps_per_day, resized.bio_steps_per_day)?;
-            let (bio_reg, fast_reg) = gas_exchange_on_fast_step(
-                &state.stocks,
-                bio_reg,
-                fast_reg,
-                &weather_shared(&resized.bio),
-            )?;
-            Ok((state, bio_reg, fast_reg))
+            gas_exchange_on_fast_step(&state.stocks, bio_reg, fast_reg, &shared)?
         }
-    }
+    };
+    let (bio_reg, fast_reg) = match split.transpiration {
+        GasExchangeStep::PlantStep => (bio_reg, fast_reg),
+        GasExchangeStep::Minute => water_on_fast_step(&state.stocks, bio_reg, fast_reg, &shared)?,
+    };
+    Ok((state, bio_reg, fast_reg))
 }
 
 /// The cabin's gas books, for readers: `(co2 mol, o2 mol, inert kg)`.

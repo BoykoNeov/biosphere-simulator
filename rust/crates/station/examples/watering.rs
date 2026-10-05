@@ -73,6 +73,7 @@ fn season(warm: bool, watering: bool) -> (State, State, Reading) {
         vapour_crosses: true,
         gas_exchange: GasExchangeStep::Minute,
         watering,
+        transpiration: GasExchangeStep::PlantStep,
     };
     let (state, bio, fast) = build_split_station(
         &params::charge(),

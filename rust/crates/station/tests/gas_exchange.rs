@@ -395,6 +395,7 @@ fn every_crop_build_steps_the_carbon_budget_exactly_once() {
             vapour_crosses: true,
             gas_exchange: gas,
             watering: false,
+            transpiration: GasExchangeStep::PlantStep,
         };
         let (_, bio, fast) = build_split_station(
             &params::charge(),

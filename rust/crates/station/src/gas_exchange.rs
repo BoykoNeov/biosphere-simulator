@@ -125,11 +125,12 @@ impl AuxProcess for PlantWindowRecorder {
 struct WindowEnv<'a> {
     snapshot: &'a State,
     shared: &'a HashMap<String, StockId>,
+    window: &'a [&'a str],
 }
 
 impl Environment for WindowEnv<'_> {
     fn get(&self, var: &str) -> Result<f64, SimError> {
-        if WINDOW_VARS.contains(&var) {
+        if self.window.contains(&var) {
             let key = window_key(var);
             return self.snapshot.aux.get(&key).copied().ok_or_else(|| {
                 SimError::Validation(format!(
@@ -151,8 +152,9 @@ impl Environment for WindowEnv<'_> {
                 });
         }
         Err(SimError::Reference(format!(
-            "gas exchange on the fast step reads {var:?}, which the plant step does not record \
-             ({WINDOW_VARS:?}) and is not a shared stock"
+            "a plant flow on the fast step reads {var:?}, which is not in its recorded window \
+             ({:?}) and is not a shared stock",
+            self.window
         )))
     }
 }
@@ -162,12 +164,28 @@ impl Environment for WindowEnv<'_> {
 pub struct OnFastStep {
     inner: Box<dyn Flow>,
     shared: HashMap<String, StockId>,
+    window: &'static [&'static str],
 }
 
 impl OnFastStep {
-    /// Wrap `inner`; `shared` is the plant side's shared-stock wiring (var → stock).
+    /// Wrap `inner`, reading [`WINDOW_VARS`]; `shared` is the plant side's shared-stock wiring
+    /// (var → stock).
     pub fn new(inner: Box<dyn Flow>, shared: HashMap<String, StockId>) -> Self {
-        OnFastStep { inner, shared }
+        Self::reading(inner, shared, &WINDOW_VARS)
+    }
+
+    /// Wrap `inner`, reading the forcings in `window` from their [`window_key`]s. Nothing here
+    /// checks that the plant step records them: a missing key errors at the first read.
+    pub fn reading(
+        inner: Box<dyn Flow>,
+        shared: HashMap<String, StockId>,
+        window: &'static [&'static str],
+    ) -> Self {
+        OnFastStep {
+            inner,
+            shared,
+            window,
+        }
     }
 }
 
@@ -189,6 +207,7 @@ impl Flow for OnFastStep {
         let env = WindowEnv {
             snapshot,
             shared: &self.shared,
+            window: self.window,
         };
         self.inner.evaluate(snapshot, &env, dt / SECONDS_PER_DAY)
     }

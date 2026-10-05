@@ -1279,3 +1279,48 @@ plant-step run" = §18c's same case):**
   * a plant-side 22 °C reaches minute-step condensation;
   * the refused combinations error.
 * **M10 — cost:** measured. Expected within 1.3× of the ≈ 26 s minute-gas-exchange season.
+
+### 20a. Built (lab) — graded, on the OUTDOOR-radiation tree (2026-10-05)
+
+**What landed.** `station::air_split::{water_on_fast_step, NetRadiationRecorder, WATER_LOSS_FLOWS,
+WATER_LOSS_WINDOW}` and the `AirSplit.transpiration` switch; `OnFastStep::reading` (the window's
+variable list is now a field; `OnFastStep::new` keeps the carbon budget's list, so the reference
+path is unchanged). Pins in `rust/crates/station/tests/minute_transpiration.rs`. Instrument
+`rust/crates/station/examples/minute_transpiration.rs`, output
+`W:\temp\claude\minute-transpiration\run1.txt`.
+
+⚠ **Every number below was measured with the crop's net radiation taken from the OUTDOOR weather
+file** (the §20 finding). The user ruled that wrong the same day (§21), so this table records
+the move's behaviour on the old input. It is not a forecast of the fixed tree. After §21, §20 is
+re-predicted from scratch, not re-graded.
+
+| Case (one season) | Watered | Fan → cabin | Transpired | Plants' water 195 → | Lowest root-zone fill | Stressed minutes | Plant C | Brine Δ |
+|---|---|---|---|---|---|---|---|---|
+| weather, plant step (§18c control) | 0 | −2.083 | 663.6 | 197.083 | 0.8184 | 0 % | 53.263 | +131.540 |
+| weather, minute, watering off | 0 | **−55.117** | 671.8 | 250.117 | 0.6490 | 0 % | 53.263 | +126.234 |
+| weather, minute, watering on | 0 | −55.117 | 671.8 | 250.117 | 0.6490 | 0 % | 53.263 | +126.234 |
+| 22 °C, plant step (§18c control) | 0 | +21.248 | 1735.1 | 173.753 | 0.6623 | 0 % | 28.314 | +133.873 |
+| 22 °C, minute, watering off | 0 | **+169.085** | 257.8 | **25.915** | 0.0001 | **81.4 %** | **0.058** | +148.657 |
+| 22 °C, minute, watering on | **477.000** | **+562.168** | 1225.1 | 109.832 | 0.4489 | 0 % | 28.314 | +187.959 |
+| weather, plant step, no vapour crossing | 0 | 0 | 708.21 | 195.0000 | 0.8492 | 0 % | 53.263 | +131.748 |
+| weather, minute, no vapour crossing | 0 | 0 | 708.03 | 195.0000 | 0.8507 | 0 % | 53.263 | +131.748 |
+
+Both controls reproduce §18c's figures to every printed digit. Every run rationed 0 / 0 with no
+events.
+
+| # | Prediction | Result |
+|---|---|---|
+| M1 | weather chamber gains 20–45 kg; watering 0; plant C ±1 % | ✗ **FAILED on size** — gains **55.1 kg** (direction held; watering 0 and plant C 53.263 held). Candidate cause, an ESTIMATE and not measured: the basis took the cabin at exactly its 40 % setting, but the cabin's proportional condenser holds it above that by crew output ÷ rate = 2e-5 / 5e-4 = 0.04 kg (+2.2 %). Over the season at the 0.697 coupling that is ≈ −16 kg, giving ≈ −47 kg; ≈ 8 kg is left unexplained |
+| M2 | 22 °C, no watering: loses ≥ 100 kg, stressed ≥ 20 % of minutes, plant C below 28.314 by > 1 % | **HELD, harder than predicted** — loses 169.1 kg, stressed 81.4 %, and the crop is **dead of drought** (0.058 mol C). §18a's failed R2 was the plant step's cap, as §18a said |
+| M3 | watering 300–650 kg, export 400–650 kg, fill ≥ 0.40, no stressed minute, plant C ±2 % | **HELD** — 477.0 / 562.2 kg, 0.4489, none, 28.314 (to every printed digit) |
+| M4 | brine +0.10 × (export − 21.248) ± 10 % over 133.873 | **HELD** — predicted +54.09, measured +54.086 |
+| M5 | transpiration 650–900 (weather), 1000–1500 (22 °C, watering) | **HELD** — 671.8, 1225.1 |
+| M6 | no vapour crossing: water 195.000, transpiration ±2 %, plant C ±0.5 % | **HELD** — 195.0000, −0.03 %, 53.263 |
+| M7 | books | **HELD** — 0 / 0, no events, every run |
+| M8 | reference untouched | **HELD** — `regen_goldens`: **20 of 20 identical**; clippy clean; `cargo test --release --no-fail-fast` **1280 passed, 0 failed**, 4 ignored (1275 + the 5 new pins) |
+| M9 | pins turn red when broken | **HELD** — five mutations, each run `--no-fail-fast` on the pin file, restored and `cmp`-checked: `dt` in seconds → 2 red; no net-radiation recorder → 4 red; the recorder also writing temperature (the additive double) → 2 red; the refusal of plant-step gas exchange removed → 1 red; only transpiration moved, its count check off → 4 red |
+| M10 | cost | **not cleanly measured** — runs took 25–36 s against 23 s for the plant-step control, but a test build ran alongside. Open |
+
+Found on the way: at 22 °C the plant-step build transpired **1735 kg**, the minute build 1225 kg.
+On the plant step, the fan pulls the chamber toward the cabin's dryness for 90 minutes between
+transpiration steps. Transpiration then reads that drier air.

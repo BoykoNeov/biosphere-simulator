@@ -418,6 +418,7 @@ fn main() {
                 vapour_crosses: vapour,
                 gas_exchange: gas,
                 watering: false,
+                transpiration: GasExchangeStep::PlantStep,
             },
             days,
         );
