@@ -169,3 +169,9 @@ heats the chamber too, instead of leaving the station: the station's heat store 
 half: a lab test's tolerance, sized for 2b-i, was carried over without re-deriving it and went
 red; replaced by a derived bound. The lab's lamp shedding detects "lit" from the lamp's own draw,
 since its old detector's stock is gone.
+Removing `boundary.light_used` from the sealed build: no Godot script, authored scenario or
+runtime file names it (searched every non-Rust file). An older saved sealed session (without
+`thermal.chamber`, with `boundary.light_used`) is refused at load with a "stock-id set does not
+match" error (`SimSession::load_state`'s set-equality guard — read, not run); no migration is
+offered. `lamp.yaml`'s header still draws the two-target `Lamp` form, which the `lighting` build
+uses; left as is (editing it would move its frozen digest for a comment).

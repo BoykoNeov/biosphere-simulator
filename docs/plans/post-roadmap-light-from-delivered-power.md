@@ -240,3 +240,14 @@ enter the reference, and promoting either is a station unfreeze (§2.4).
 
 **Next, per the review plan:** 3b (the crop feels the chamber's own humidity). Open and not
 taken here: §6, the sealed station's power budget pays for life support only.
+
+**Forward note, 2026-10-05 — the lit detector changed under this record** (room-temperature
+plan §23g–§23h, slice 2b-ii). The sealed station's lamp light now heats the plant chamber, so
+`boundary.light_used` is gone from the sealed build and the detector this record describes
+("a sub-step counts as lit when light arrived in `boundary.light_used`") no longer exists.
+`run_shedding` now counts a sub-step lit when the lamp, evaluated on the sub-step's starting
+state, draws from the battery (`lamp_shed::lamp_draws`) — before arbitration, so a lamp the
+backstop cut wholly would also count as lit (the tests assert `rationed == 0` where they rely
+on it). Every figure `examples/lamp_shed.rs` prints is unchanged except its last column, now
+the mean delivered share; cross-check: the blackout run's old light ratio 2.9212e7 / 5.0416e7 =
+0.5794 = its new share.
