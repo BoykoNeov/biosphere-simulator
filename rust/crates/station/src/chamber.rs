@@ -6,14 +6,23 @@
 //! (absolute Kelvin, referenced to 0 K — **not** to `T_space` like `thermal.node`), and
 //! [`ChamberCooling`] moves it on to the station's thermal node: first-order toward the
 //! setpoint, capped at a capacity, and only into a node that is colder than the chamber (the
-//! second law — no heat pump is modelled). **The plants do not read this temperature yet**
-//! (slice 3).
+//! second law — no heat pump is modelled). **The plants read this temperature** since slice 3a
+//! ([`plants_read_chamber`], §24): every plant-step flow and aux process is answered `temp`
+//! from this store, and a temperature wired on the plant side is refused.
+//!
+//! # The setpoint is a program, not a constant (slice 3a)
+//!
+//! The cooler and the heater read their setpoint from the fast forcing
+//! [`CHAMBER_SETPOINT_VAR`]: the cold period's (`cold_period.yaml`, the first 56 days of each
+//! season) and `chamber.yaml`'s warm one after it. `ChamberParams` carries only the warm value,
+//! named so ([`ChamberParams::warm_setpoint`]); no reader can take it for *the* setpoint.
 //!
 //! # The controller's offset is a property of the form, not an error
 //!
 //! The cooler acts on the step's starting state, so the chamber settles one step's input
 //! above the setpoint when `dt = τ` (deadbeat), and `input·τ / C_ch` above it in general.
-//! The station starts the chamber at the steady state of the lamp alone ([`chamber_heat0`]).
+//! The station starts the chamber at the steady state of the lamp alone ([`chamber_heat0`]),
+//! at day 0's setpoint.
 //! With the walls (2b-iii) the input is the lamp less the walls' loss, which follows the
 //! outdoor weather, so the nominal chamber follows it too — 295.1887–295.2034 K in the
 //! reference (§23j); without walls it would be flat from step 0.
@@ -26,15 +35,20 @@
 //! [`ChamberWall`] exchanges heat with the chamber's surroundings, either way — the user's four
 //! ([`ChamberSurroundings`]): the outdoor weather (the reference), a held cabin, space, or the
 //! station structure. [`ChamberHeater`] is the cooler's mirror, on the battery, below the
-//! setpoint. In the reference the lamp outweighs the walls, so the heater never fires there.
+//! setpoint. Until slice 3a the lamp outweighed the walls, so the heater never fired in the
+//! reference; with the cold period it fires at each warm-up (§24f A2).
 
 use std::collections::BTreeMap;
 
+use domains::biosphere::stocks::TEMP_VAR;
 use domains::thermal::{temperature, ThermalParams, THERMAL_DOMAIN};
+use simcore::auxiliary::AuxProcess;
 use simcore::environment::Environment;
 use simcore::error::SimError;
 use simcore::flow::{Flow, FlowResult, Leg};
+use simcore::ids::StockId;
 use simcore::quantities::{Quantity, StockKind};
+use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 /// The chamber's sensible-heat POOL (ENERGY, J), `T = Q / C_ch`.
@@ -51,6 +65,9 @@ pub const CHAMBER_SURROUNDINGS: &str = "boundary.chamber_surroundings";
 /// Fast forcing var: the outdoor air temperature (°C) the chamber's walls face — the weather
 /// file's daily value, the same one the plants read.
 pub const OUTDOOR_TEMP_VAR: &str = "chamber_outdoor_temp";
+/// Fast forcing var: the chamber's setpoint (K) — the cold program's or the warm one
+/// (`SealedStationScenario::chamber_setpoint_on_step`). The cooler and the heater read it.
+pub const CHAMBER_SETPOINT_VAR: &str = "chamber_setpoint";
 /// Celsius → Kelvin.
 const ZERO_CELSIUS_K: f64 = 273.15;
 
@@ -63,8 +80,9 @@ pub struct ChamberParams {
     pub cooling_capacity: f64,
     /// τ — the cooler's first-order time constant (s), > 0.
     pub response_time: f64,
-    /// The chamber's held temperature (K), > 0.
-    pub setpoint: f64,
+    /// The chamber's held temperature outside the cold period (K), > 0 — `chamber.yaml`'s
+    /// `setpoint`. The live setpoint is the fast forcing [`CHAMBER_SETPOINT_VAR`].
+    pub warm_setpoint: f64,
     /// U — the walls' conductance per area (W/m²·K), ≥ 0.
     pub wall_conductance: f64,
     /// A — the walls' area (m²), > 0.
@@ -101,12 +119,12 @@ pub fn chamber_temperature(heat_joules: f64, params: &ChamberParams) -> f64 {
     heat_joules / params.heat_capacity
 }
 
-/// The chamber's starting heat (J): the setpoint plus the steady offset a constant input
-/// `input_w` leaves under the first-order cooler, `C_ch·T_set + input·τ`. At `dt = τ` that
+/// The chamber's starting heat (J): `setpoint_k` (day 0's) plus the steady offset a constant
+/// input `input_w` leaves under the first-order cooler, `C_ch·T_set + input·τ`. At `dt = τ` that
 /// offset is one step's input, and the cooler (removing the whole excess each step) holds it
 /// there while the input stays constant — with walls it does not (the module doc).
-pub fn chamber_heat0(params: &ChamberParams, input_w: f64) -> f64 {
-    params.heat_capacity * params.setpoint + input_w * params.response_time
+pub fn chamber_heat0(params: &ChamberParams, setpoint_k: f64, input_w: f64) -> f64 {
+    params.heat_capacity * setpoint_k + input_w * params.response_time
 }
 
 /// The station build's guard: the fast step must not exceed the cooler's time constant.
@@ -149,11 +167,12 @@ fn donor_amount(snapshot: &State, id: &str) -> Result<f64, SimError> {
 fn cooling(
     chamber_joules: f64,
     node_joules: f64,
+    setpoint_k: f64,
     params: &ChamberParams,
     node: &ThermalParams,
     dt: f64,
 ) -> f64 {
-    let excess = chamber_joules - params.heat_capacity * params.setpoint;
+    let excess = chamber_joules - params.heat_capacity * setpoint_k;
     let t_chamber = chamber_temperature(chamber_joules, params);
     let t_node = temperature(node_joules, node.heat_capacity, node.space_temperature);
     if excess <= 0.0 || t_node >= t_chamber {
@@ -201,12 +220,13 @@ impl Flow for ChamberCooling {
     fn evaluate(
         &self,
         snapshot: &State,
-        _env: &dyn Environment,
+        env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
         let removed = cooling(
             donor_amount(snapshot, &self.chamber)?,
             donor_amount(snapshot, &self.node)?,
+            env.get(CHAMBER_SETPOINT_VAR)?,
             &self.params,
             &self.node_params,
             dt,
@@ -317,8 +337,8 @@ impl Flow for ChamberWall {
 
 /// The heat the heater gives over one step (J): the cooler's mirror, zero at or above the
 /// setpoint.
-fn heating(chamber_joules: f64, params: &ChamberParams, dt: f64) -> f64 {
-    let deficit = params.heat_capacity * params.setpoint - chamber_joules;
+fn heating(chamber_joules: f64, setpoint_k: f64, params: &ChamberParams, dt: f64) -> f64 {
+    let deficit = params.heat_capacity * setpoint_k - chamber_joules;
     if deficit <= 0.0 {
         return 0.0;
     }
@@ -356,15 +376,157 @@ impl Flow for ChamberHeater {
     fn evaluate(
         &self,
         snapshot: &State,
-        _env: &dyn Environment,
+        env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let given = heating(donor_amount(snapshot, &self.chamber)?, &self.params, dt);
+        let given = heating(
+            donor_amount(snapshot, &self.chamber)?,
+            env.get(CHAMBER_SETPOINT_VAR)?,
+            &self.params,
+            dt,
+        );
         FlowResult::new(vec![
             Leg::new(self.battery.clone(), -given)?,
             Leg::new(self.chamber.clone(), given)?,
         ])
     }
+}
+
+// --- the plants read the chamber (slice 3a, §24b) ---------------------------------------
+
+/// What a plant-step flow reads once the plants read the chamber: `temp` is the chamber's
+/// (`Q / C_ch − 273.15`, °C, off the snapshot the flow is evaluated on), every other variable
+/// the inner environment's.
+///
+/// ⚠ **The guard.** If the inner environment answers `temp` itself, that is an error, not a
+/// value to ignore: a lab resolver that holds the plants at 22 °C, a forcing left on the plant
+/// side, or a flow moved onto the fast step after it was wrapped (whose window answers `temp`)
+/// would otherwise be silently overridden. An inner `Err` for `temp` means "not wired" — the
+/// state the sealed plant resolver is in since this slice.
+struct ChamberEnv<'a> {
+    inner: &'a dyn Environment,
+    snapshot: &'a State,
+    heat_capacity: f64,
+}
+
+impl Environment for ChamberEnv<'_> {
+    fn get(&self, var: &str) -> Result<f64, SimError> {
+        if var != TEMP_VAR {
+            return self.inner.get(var);
+        }
+        if let Ok(wired) = self.inner.get(TEMP_VAR) {
+            return Err(SimError::Validation(format!(
+                "the plants read the chamber's temperature, but their environment also answers \
+                 {TEMP_VAR:?} ({wired} °C): a temperature wired on the plant side would be \
+                 silently ignored. Hold the CHAMBER instead (its program), or wrap after any \
+                 flow is moved onto the fast step"
+            )));
+        }
+        Ok(donor_amount(self.snapshot, CHAMBER)? / self.heat_capacity - ZERO_CELSIUS_K)
+    }
+}
+
+/// A plant-step flow that reads the chamber's temperature ([`plants_read_chamber`]). Keeps the
+/// inner flow's type name, id and priority — it is the same flow reading a different room, and
+/// the station manifest's flow set is keyed on type names.
+pub struct PlantsReadChamberFlow {
+    inner: Box<dyn Flow>,
+    heat_capacity: f64,
+}
+
+impl Flow for PlantsReadChamberFlow {
+    fn type_name(&self) -> &'static str {
+        self.inner.type_name()
+    }
+
+    fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    fn priority(&self) -> i64 {
+        self.inner.priority()
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let env = ChamberEnv {
+            inner: env,
+            snapshot,
+            heat_capacity: self.heat_capacity,
+        };
+        self.inner.evaluate(snapshot, &env, dt)
+    }
+}
+
+/// A plant-step aux process that reads the chamber's temperature ([`plants_read_chamber`]).
+/// Keeps the inner process's type name and id.
+pub struct PlantsReadChamberAux {
+    inner: Box<dyn AuxProcess>,
+    heat_capacity: f64,
+}
+
+impl AuxProcess for PlantsReadChamberAux {
+    fn type_name(&self) -> &'static str {
+        self.inner.type_name()
+    }
+
+    fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
+        let env = ChamberEnv {
+            inner: env,
+            snapshot,
+            heat_capacity: self.heat_capacity,
+        };
+        self.inner.evaluate(snapshot, &env, dt)
+    }
+}
+
+/// Make every flow and aux process of the plant registry read the chamber
+/// ([`PlantsReadChamberFlow`], [`PlantsReadChamberAux`]).
+///
+/// ⚠ Apply it **last**, after anything that moves plant flows onto the fast step
+/// (`gas_exchange_on_fast_step`, the lab's `water_on_fast_step`): a moved flow reads its
+/// recorded window, which answers `temp`, so a flow wrapped before the move is refused at its
+/// first read. The window's recorder, being a plant-step aux process, is wrapped here too, so
+/// what it records is the chamber.
+pub fn plants_read_chamber(
+    bio_reg: Registry,
+    stocks: &BTreeMap<StockId, Stock>,
+    params: &ChamberParams,
+) -> Result<Registry, SimError> {
+    let heat_capacity = params.heat_capacity;
+    let (flows, aux) = bio_reg.into_parts();
+    let flows: Vec<Box<dyn Flow>> = flows
+        .into_iter()
+        .map(|inner| {
+            Box::new(PlantsReadChamberFlow {
+                inner,
+                heat_capacity,
+            }) as Box<dyn Flow>
+        })
+        .collect();
+    let aux: Vec<Box<dyn AuxProcess>> = aux
+        .into_iter()
+        .map(|inner| {
+            Box::new(PlantsReadChamberAux {
+                inner,
+                heat_capacity,
+            }) as Box<dyn AuxProcess>
+        })
+        .collect();
+    Registry::new(flows, stocks, aux)
 }
 
 #[cfg(test)]
@@ -379,7 +541,7 @@ mod tests {
         heat_capacity: 1.5e5,
         cooling_capacity: 200.0,
         response_time: 60.0,
-        setpoint: 295.15,
+        warm_setpoint: 295.15,
         wall_conductance: 0.30,
         wall_area: 5.12,
         heater_capacity: 200.0,
@@ -407,7 +569,28 @@ mod tests {
         State::new(0, stocks, 0, BTreeMap::new()).expect("state")
     }
 
+    /// A resolver answering only the setpoint forcing, at `setpoint_k`.
+    fn setpoint_resolver(setpoint_k: f64) -> SourceResolver {
+        let mut forcings: HashMap<String, simcore::environment::Schedule> = HashMap::new();
+        forcings.insert(
+            CHAMBER_SETPOINT_VAR.to_string(),
+            simcore::environment::constant(setpoint_k).expect("constant"),
+        );
+        SourceResolver::new(forcings, HashMap::new()).expect("resolver")
+    }
+
     fn legs(chamber: f64, node: f64, dt: f64, params: ChamberParams) -> (f64, f64) {
+        legs_at(chamber, node, dt, params, params.warm_setpoint)
+    }
+
+    /// The cooler's legs with the setpoint forcing at `setpoint_k`.
+    fn legs_at(
+        chamber: f64,
+        node: f64,
+        dt: f64,
+        params: ChamberParams,
+        setpoint_k: f64,
+    ) -> (f64, f64) {
         let flow = ChamberCooling::new(
             CHAMBER_COOLING.to_string(),
             CHAMBER.to_string(),
@@ -416,7 +599,7 @@ mod tests {
             NODE_P,
         );
         let s = state(chamber, node);
-        let r = SourceResolver::new(HashMap::new(), HashMap::new()).expect("resolver");
+        let r = setpoint_resolver(setpoint_k);
         let env = r.bind(&s, dt);
         let result = flow.evaluate(&s, &env, dt).expect("evaluate");
         assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
@@ -440,7 +623,7 @@ mod tests {
     fn deadbeat_at_dt_equal_tau_removes_the_whole_excess() {
         let excess = 3600.0;
         let (ch, node) = legs(
-            P.heat_capacity * P.setpoint + excess,
+            P.heat_capacity * P.warm_setpoint + excess,
             node_at(170.0),
             60.0,
             P,
@@ -454,7 +637,7 @@ mod tests {
         // dt = τ/2 removes half the excess.
         let excess = 3600.0;
         let (ch, _) = legs(
-            P.heat_capacity * P.setpoint + excess,
+            P.heat_capacity * P.warm_setpoint + excess,
             node_at(170.0),
             30.0,
             P,
@@ -465,7 +648,7 @@ mod tests {
     #[test]
     fn capacity_caps_the_removal() {
         let (ch, _) = legs(
-            P.heat_capacity * (P.setpoint + 10.0),
+            P.heat_capacity * (P.warm_setpoint + 10.0),
             node_at(170.0),
             60.0,
             P,
@@ -476,8 +659,8 @@ mod tests {
     #[test]
     fn nothing_moves_at_or_below_the_setpoint() {
         for q in [
-            P.heat_capacity * P.setpoint,
-            P.heat_capacity * (P.setpoint - 1.0),
+            P.heat_capacity * P.warm_setpoint,
+            P.heat_capacity * (P.warm_setpoint - 1.0),
         ] {
             assert_eq!(legs(q, node_at(170.0), 60.0, P), (0.0, 0.0));
         }
@@ -490,7 +673,7 @@ mod tests {
             ..P
         };
         let (ch, _) = legs(
-            P.heat_capacity * (P.setpoint + 1.0),
+            P.heat_capacity * (P.warm_setpoint + 1.0),
             node_at(170.0),
             60.0,
             failed,
@@ -503,7 +686,7 @@ mod tests {
     /// above it, none does.
     #[test]
     fn heat_moves_only_into_a_colder_node() {
-        let t_ch = P.setpoint + 0.5;
+        let t_ch = P.warm_setpoint + 0.5;
         let q = P.heat_capacity * t_ch;
         let (below, _) = legs(q, node_at(t_ch - 1e-6), 60.0, P);
         assert!(
@@ -521,8 +704,51 @@ mod tests {
 
     #[test]
     fn the_steady_start_is_setpoint_plus_input_times_tau() {
-        let q0 = chamber_heat0(&P, 60.0);
-        assert_eq!(q0, P.heat_capacity * P.setpoint + 60.0 * P.response_time);
+        let q0 = chamber_heat0(&P, 277.15, 60.0);
+        assert_eq!(q0, P.heat_capacity * 277.15 + 60.0 * P.response_time);
+    }
+
+    /// Slice 3a: the cooler holds the setpoint the FORCING names, not `warm_setpoint`. A chamber
+    /// at 280 K is below the warm setpoint (nothing moves) and above the cold one (the cooler
+    /// removes the whole excess at `dt = τ`).
+    #[test]
+    fn the_cooler_holds_the_programs_setpoint() {
+        let q = P.heat_capacity * 280.0;
+        assert_eq!(
+            legs_at(q, node_at(170.0), 60.0, P, P.warm_setpoint),
+            (0.0, 0.0)
+        );
+        let (ch, node) = legs_at(q, node_at(170.0), 60.0, P, 277.15);
+        let excess = P.heat_capacity * (280.0 - 277.15);
+        assert!(
+            (-ch - excess.min(P.cooling_capacity * 60.0)).abs() < 1e-6,
+            "{ch}"
+        );
+        assert_eq!(node, -ch);
+    }
+
+    /// The cooler and the heater refuse to run without the setpoint forcing — no silent
+    /// fallback to `warm_setpoint`.
+    #[test]
+    fn the_cooler_and_heater_need_the_setpoint_forcing() {
+        let s = state(P.heat_capacity * 280.0, node_at(170.0));
+        let r = SourceResolver::new(HashMap::new(), HashMap::new()).expect("resolver");
+        let env = r.bind(&s, 60.0);
+        let cooler = ChamberCooling::new(
+            CHAMBER_COOLING.to_string(),
+            CHAMBER.to_string(),
+            NODE.to_string(),
+            P,
+            NODE_P,
+        );
+        assert!(cooler.evaluate(&s, &env, 60.0).is_err());
+        let heater = ChamberHeater::new(
+            CHAMBER_HEATER.to_string(),
+            NODE.to_string(),
+            CHAMBER.to_string(),
+            P,
+        );
+        assert!(heater.evaluate(&s, &env, 60.0).is_err());
     }
 
     #[test]
@@ -621,17 +847,125 @@ mod tests {
 
     #[test]
     fn the_heater_mirrors_the_cooler_below_the_setpoint_only() {
-        let s_set = P.heat_capacity * P.setpoint;
-        assert_eq!(heating(s_set, &P, 60.0), 0.0);
-        assert_eq!(heating(s_set + 1.0, &P, 60.0), 0.0);
-        assert!((heating(s_set - 3600.0, &P, 60.0) - 3600.0).abs() < 1e-6);
-        assert!((heating(s_set - 3600.0, &P, 30.0) - 1800.0).abs() < 1e-6);
+        let t = P.warm_setpoint;
+        let s_set = P.heat_capacity * t;
+        assert_eq!(heating(s_set, t, &P, 60.0), 0.0);
+        assert_eq!(heating(s_set + 1.0, t, &P, 60.0), 0.0);
+        assert!((heating(s_set - 3600.0, t, &P, 60.0) - 3600.0).abs() < 1e-6);
+        assert!((heating(s_set - 3600.0, t, &P, 30.0) - 1800.0).abs() < 1e-6);
         // Capped at its capacity; a failed heater gives nothing.
-        assert_eq!(heating(s_set - 1e6, &P, 60.0), P.heater_capacity * 60.0);
+        assert_eq!(heating(s_set - 1e6, t, &P, 60.0), P.heater_capacity * 60.0);
         let failed = ChamberParams {
             heater_capacity: 0.0,
             ..P
         };
-        assert_eq!(heating(s_set - 1e6, &failed, 60.0), 0.0);
+        assert_eq!(heating(s_set - 1e6, t, &failed, 60.0), 0.0);
+        // The cold setpoint: a chamber at 280 K is above it, so the heater gives nothing.
+        assert_eq!(heating(P.heat_capacity * 280.0, 277.15, &P, 60.0), 0.0);
+    }
+
+    // --- the plants read the chamber (slice 3a) ------------------------------------------
+
+    /// An aux process that records the `temp` it is given, so the tests can see what a
+    /// wrapped plant reads.
+    struct ReadsTemp;
+
+    impl AuxProcess for ReadsTemp {
+        fn type_name(&self) -> &'static str {
+            "ReadsTemp"
+        }
+        fn id(&self) -> &str {
+            "test.reads_temp"
+        }
+        fn evaluate(
+            &self,
+            _snapshot: &State,
+            env: &dyn Environment,
+            _dt: f64,
+        ) -> Result<BTreeMap<String, f64>, SimError> {
+            Ok(BTreeMap::from([("seen".to_string(), env.get(TEMP_VAR)?)]))
+        }
+    }
+
+    fn wrapped() -> PlantsReadChamberAux {
+        PlantsReadChamberAux {
+            inner: Box::new(ReadsTemp),
+            heat_capacity: P.heat_capacity,
+        }
+    }
+
+    /// Without a plant-side temperature the wrapped plant reads `Q / C_ch − 273.15` exactly.
+    #[test]
+    fn a_wrapped_plant_reads_the_chamber() {
+        let q = P.heat_capacity * 277.2;
+        let s = state(q, node_at(170.0));
+        let r = SourceResolver::new(HashMap::new(), HashMap::new()).expect("resolver");
+        let seen = wrapped()
+            .evaluate(&s, &r.bind(&s, 1.0), 1.0)
+            .expect("reads")["seen"];
+        assert_eq!(seen, q / P.heat_capacity - 273.15);
+        assert_eq!(
+            wrapped().type_name(),
+            "ReadsTemp",
+            "the inner type name is kept"
+        );
+        assert_eq!(wrapped().id(), "test.reads_temp");
+    }
+
+    /// The guard: a temperature wired on the plant side is refused, not ignored.
+    #[test]
+    fn a_plant_side_temperature_is_refused() {
+        let s = state(P.heat_capacity * 277.2, node_at(170.0));
+        let mut forcings: HashMap<String, simcore::environment::Schedule> = HashMap::new();
+        forcings.insert(
+            TEMP_VAR.to_string(),
+            simcore::environment::constant(22.0).expect("constant"),
+        );
+        let r = SourceResolver::new(forcings, HashMap::new()).expect("resolver");
+        let err = wrapped()
+            .evaluate(&s, &r.bind(&s, 1.0), 1.0)
+            .expect_err("a plant-side temp is refused");
+        assert!(err.to_string().contains("silently ignored"), "{err}");
+    }
+
+    /// Composition with the lab's lamp shedding, which wraps OUTSIDE this one: its
+    /// environment passes `temp` through to the bound resolver (which does not answer it), so
+    /// the plant still reads the chamber.
+    #[test]
+    fn under_the_lamp_shedding_wrapper_the_plant_still_reads_the_chamber() {
+        let q = P.heat_capacity * 290.0;
+        let mut s = state(q, node_at(170.0));
+        s.aux
+            .insert(crate::lamp_shed::LAMP_DELIVERY_AUX.to_string(), 0.5);
+        let r = SourceResolver::new(HashMap::new(), HashMap::new()).expect("resolver");
+        let bio = Registry::new(Vec::new(), &s.stocks, vec![Box::new(wrapped())]).expect("reg");
+        // The shedding re-wire needs the two loads it sheds in the fast registry.
+        let loads: Vec<Box<dyn Flow>> = vec![
+            Box::new(crate::flows::Lamp::new(
+                crate::flows::LAMP.to_string(),
+                NODE.to_string(),
+                CHAMBER.to_string(),
+                CHAMBER.to_string(),
+                crate::flows::LampParams {
+                    photon_efficacy: 2.5,
+                },
+            )),
+            Box::new(ChamberHeater::new(
+                CHAMBER_HEATER.to_string(),
+                NODE.to_string(),
+                CHAMBER.to_string(),
+                P,
+            )),
+        ];
+        let fast = Registry::new(loads, &s.stocks, Vec::new()).expect("reg");
+        let (s, bio, _) = crate::lamp_shed::rewire_for_shedding(s, bio, fast, 0.0).expect("rewire");
+        let aux = &bio.aux_processes()[0];
+        assert_eq!(
+            aux.type_name(),
+            "LampLitAux",
+            "the lamp-lit wrapper is outside"
+        );
+        let seen = aux.evaluate(&s, &r.bind(&s, 1.0), 1.0).expect("reads")["seen"];
+        assert_eq!(seen, q / P.heat_capacity - 273.15);
     }
 }

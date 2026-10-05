@@ -312,6 +312,19 @@ pub const SEALED_STATION_POWER_SCENARIO: PowerScenario = PowerScenario {
     ..BOUNDED_SOC_SCENARIO
 };
 
+/// The plant chamber's cold period (`cold_period.yaml`; Step 3c slice 3a,
+/// `docs/plans/post-roadmap-room-temperature.md` §24c): the chamber is held at `setpoint` for the
+/// first `days` of each season, then at `chamber.yaml`'s (warm) setpoint. One home for the
+/// program — every reader takes it from [`SealedStationScenario::cold`] — so opting a fixture
+/// out of the cold is one edit (`days = 0`) and cannot be half-done.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ColdProgram {
+    /// The cold period's length (whole days); 0 is no cold period.
+    pub days: usize,
+    /// The chamber's held temperature during the cold period (K).
+    pub setpoint: f64,
+}
+
 /// Step-7 sealed-station run data (the fully-coupled multi-year station).
 #[derive(Debug, Clone, Copy)]
 pub struct SealedStationScenario {
@@ -339,12 +352,37 @@ pub struct SealedStationScenario {
     pub bio_dt: f64,
     /// Slow (biosphere) sub-steps per master day — mirrors `STEPS_PER_DAY`.
     pub bio_steps_per_day: u64,
+    /// The plant chamber's cold period ([`ColdProgram`]).
+    pub cold: ColdProgram,
 }
 
 impl SealedStationScenario {
     /// The Tier-2 master-day horizon (`years · season_days`).
     pub fn days(&self) -> usize {
         self.years * self.season_days
+    }
+
+    /// Is step `n` in the cold period? **The one clock** every reader of the program calls:
+    /// `floor(n·bio_dt) mod season_days < cold.days`. With the calendar kept, the season start
+    /// is the sowing; ⚠ slice 4 (re-sow on maturity) must move this clock into the state.
+    ///
+    /// ⚠ **The time base** (§23i, §24c). `n` is the SLOW step count on both sides. The fast
+    /// minutes after plant step `k` run with `n = k + 1`, so the chamber's setpoint changes in
+    /// the last 90 minutes of the day before the plants' day changes — the lead every
+    /// fast-side forcing keyed on `n` has (the walls' too). Kept, not special-cased.
+    pub fn is_cold_on_step(&self, n: u64) -> bool {
+        let day = (n as f64 * self.bio_dt).floor() as usize;
+        day % self.season_days < self.cold.days
+    }
+
+    /// The chamber's setpoint (K) at step `n`: the cold program's in the cold period, else
+    /// `warm_k` (`chamber.yaml`'s setpoint).
+    pub fn chamber_setpoint_on_step(&self, n: u64, warm_k: f64) -> f64 {
+        if self.is_cold_on_step(n) {
+            self.cold.setpoint
+        } else {
+            warm_k
+        }
     }
 }
 
@@ -363,6 +401,36 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         cabin_dt: 60.0,
         bio_dt: BIO_DT,
         bio_steps_per_day: STEPS_PER_DAY as u64,
+        cold: crate::params::cold_period(),
+    }
+}
+
+#[cfg(test)]
+mod cold_clock_tests {
+    use super::*;
+
+    /// The clock's edges, by step: day 55's last plant step is still cold, day 56's first is
+    /// warm, and the next season's first step is cold again. `cold.days = 0` is never cold.
+    #[test]
+    fn the_cold_clock_counts_whole_days_from_each_season_start() {
+        let s = sealed_station_scenario();
+        assert_eq!(s.cold.days, 56);
+        let per_day = s.bio_steps_per_day;
+        let season = s.season_days as u64 * per_day;
+        assert!(s.is_cold_on_step(0));
+        assert!(s.is_cold_on_step(56 * per_day - 1));
+        assert!(!s.is_cold_on_step(56 * per_day));
+        assert!(!s.is_cold_on_step(season - 1));
+        assert!(s.is_cold_on_step(season));
+        assert!(s.is_cold_on_step(3 * season + 56 * per_day - 1));
+        assert!(!s.is_cold_on_step(3 * season + 56 * per_day));
+        assert_eq!(s.chamber_setpoint_on_step(0, 295.15), 277.15);
+        assert_eq!(s.chamber_setpoint_on_step(56 * per_day, 295.15), 295.15);
+        let warm = SealedStationScenario {
+            cold: ColdProgram { days: 0, ..s.cold },
+            ..s
+        };
+        assert!((0..2 * season).step_by(7).all(|n| !warm.is_cold_on_step(n)));
     }
 }
 
@@ -438,7 +506,11 @@ mod water_geometry_tests {
             }
         }
         out.sort();
-        assert!(out.len() > 40, "the walk found almost nothing: {}", out.len());
+        assert!(
+            out.len() > 40,
+            "the walk found almost nothing: {}",
+            out.len()
+        );
         out
     }
 
@@ -698,7 +770,10 @@ mod water_geometry_tests {
                 "{name}: wssg = {} would make every crop permanently unstressed",
                 scenario.wssg
             );
-            assert!(scenario.ground_area > 0.0, "{name}: non-positive ground_area");
+            assert!(
+                scenario.ground_area > 0.0,
+                "{name}: non-positive ground_area"
+            );
             assert!(
                 scenario.soil_extractable_water > 0.0,
                 "{name}: a zero EXTR is a zero TTSW, hence FTSW = 0 everywhere"

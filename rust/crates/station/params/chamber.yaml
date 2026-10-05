@@ -8,7 +8,12 @@
 # thermal node, first-order toward the setpoint and capped:
 #     removed = min(cooling_capacity·dt, (Q − C_ch·setpoint)·dt/response_time)
 # only while Q > C_ch·setpoint AND the node is colder than the chamber (the second law: no
-# heat pump is modelled). The PLANTS DO NOT READ THIS TEMPERATURE YET (that is slice 3).
+# heat pump is modelled). THE PLANTS READ THIS TEMPERATURE since slice 3a (2026-10-05, §24):
+# every plant process is answered the chamber's T_ch − 273.15 °C.
+#
+# ⚠ `setpoint` here is the WARM one. Since slice 3a the live setpoint is a PROGRAM: the cold
+# period's (cold_period.yaml, the first 56 days of each season) and this value after it. The
+# Rust field is named `warm_setpoint` so no reader can take it for THE setpoint.
 #
 # heat_capacity (C_ch) — the chamber's lumped heat capacity (J/K), > 0.
 # cooling_capacity — the most heat the cooler moves (W), >= 0. 0 is a valid, failed cooler.
@@ -16,7 +21,8 @@
 #   fast step must satisfy dt <= τ, or the cooler overshoots the setpoint and oscillates
 #   without any error; the station build hard-errors on dt > τ. At τ = dt = 60 s the cooler
 #   removes the whole excess each step (deadbeat).
-# setpoint — the chamber's held temperature (K), > 0. Absolute Kelvin, like radiator.yaml.
+# setpoint — the chamber's held temperature outside the cold period (K), > 0. Absolute Kelvin,
+#   like radiator.yaml.
 #
 # PROVENANCE. One value is a class citation; three are DESIGN.
 #   setpoint         → CITED by ANALOGY [A] (a crew-cabin figure applied to a plant chamber)

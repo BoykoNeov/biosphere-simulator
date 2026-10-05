@@ -20,12 +20,11 @@ use std::time::Instant;
 use domains::biosphere::science::{soil_water_stress, transpirable_capacity};
 use domains::biosphere::stocks::{
     CONDENSATE, LEAF_C, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C, SUBSOIL_WATER,
-    TEMP_VAR, WATER_SOURCE, WATER_VAPOR,
+    WATER_SOURCE, WATER_VAPOR,
 };
 use domains::crew::WATER_STORE;
 use domains::eclss::CABIN_H2O;
 use domains::params;
-use simcore::environment::{constant, SourceResolver};
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
@@ -107,7 +106,12 @@ fn withdrawn(
 }
 
 fn season(case: Case) -> (State, State, Reading) {
-    let base = sealed_station_scenario();
+    // The warm case (since slice 3a): the chamber with no cold period, held at 22 °C from day 0
+    // (22.05 °C as the plants read it). Until 3a it was a plant-side 22 °C forcing, now refused.
+    let mut base = sealed_station_scenario();
+    if case.warm {
+        base.cold.days = 0;
+    }
     let split = AirSplit {
         chamber_air_mol: BVAD_CHAMBER_AIR_MOL,
         fan_mol_per_s: 0.2,
@@ -130,12 +134,7 @@ fn season(case: Case) -> (State, State, Reading) {
     .expect("build_split_station");
     let scenario = split_scenario(&base, &split);
     let start = state.clone();
-    let mut bio_r = sealed_bio_resolver(&station_params::lamp(), &scenario).expect("bio");
-    if case.warm {
-        let (mut forcings, shared) = bio_r.into_parts();
-        forcings.insert(TEMP_VAR.to_string(), constant(22.0).expect("22 °C"));
-        bio_r = SourceResolver::new(forcings, shared).expect("bio");
-    }
+    let bio_r = sealed_bio_resolver(&station_params::lamp(), &scenario).expect("bio");
     let fast_r = sealed_fast_resolver(&params::charge(), &scenario).expect("fast");
     let reset = sealed_reset_hook(&scenario);
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));

@@ -11,7 +11,9 @@
 use std::sync::OnceLock;
 
 use domains::biosphere::perturbations::{window_override, with_forcing};
-use domains::biosphere::stocks::{CONDENSATE, LEAF_C, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C};
+use domains::biosphere::stocks::{
+    CONDENSATE, LEAF_C, PAR_VAR, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C,
+};
 use domains::power::BATTERY;
 use simcore::environment::{constant, SourceResolver};
 use simcore::flow::Flow;
@@ -20,12 +22,13 @@ use simcore::registry::Registry;
 use simcore::state::State;
 use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_HEATER};
 use station::driver::run_master_day;
+use station::gas_exchange::window_key;
 use station::lamp_shed::{
     rewire_for_shedding, run_shedding, what_if_reserve, with_lamp_power_cut, ShedLog,
     LAMP_DELIVERY_AUX,
 };
 use station::perturbations::{with_brownout, ScaledFlow};
-use station::scenario::{sealed_station_scenario, SealedStationScenario};
+use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScenario};
 use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
 
 const DAYS: usize = 8;
@@ -41,6 +44,18 @@ fn scenario(battery0: f64) -> SealedStationScenario {
         season_days: 305,
         battery0,
         ..sealed_station_scenario()
+    }
+}
+
+/// [`scenario`] without the cold period (slice 3a, §24h): for the heater tests, whose subject is
+/// the heater of a WARM chamber. In the cold period the walls bring heat in and the heater
+/// never fires, so those tests would lose their subject (H1 trivially true, H4 drew 0 J on the
+/// first run of 3a, H2's liveness compared against the warm setpoint and passed meaninglessly).
+fn warm_scenario(battery0: f64) -> SealedStationScenario {
+    let s = scenario(battery0);
+    SealedStationScenario {
+        cold: ColdProgram { days: 0, ..s.cold },
+        ..s
     }
 }
 
@@ -198,6 +213,19 @@ fn without_slot(state: &State) -> State {
     s
 }
 
+/// The plain build's light is the lamp's nameplate: the PAR its plant step records is the same
+/// in `a` and `b`, bit for bit, at every day's end.
+fn assert_same_recorded_light(a: &Run, b: &Run) {
+    let key = window_key(PAR_VAR);
+    for (day, (x, y)) in a.states.iter().zip(&b.states).enumerate().skip(1) {
+        assert_eq!(
+            x.aux[&key].to_bits(),
+            y.aux[&key].to_bits(),
+            "day {day}: the plain crop's recorded light differs"
+        );
+    }
+}
+
 fn assert_same_run(lab: &Run, plain: &Run) {
     assert_eq!(lab.rationed, plain.rationed);
     assert_eq!(lab.states.len(), plain.states.len());
@@ -302,9 +330,15 @@ fn the_small_battery_alone_does_not_reach_the_reserve() {
 // --- the defect, as the reference has it --------------------------------------------------
 
 #[test]
-fn the_plain_crop_does_not_feel_a_blackout() {
-    // Today: the blackout drains the battery, and the crop is bit-identical to the run
-    // without it, because its light is the lamp's nameplate.
+fn the_plain_crop_does_not_see_a_blackout() {
+    // The blackout drains the battery, and the plain crop's LIGHT is the lamp's nameplate: the
+    // light its plant step records is bit-identical to the run without it.
+    //
+    // ⚠ Until slice 3a the whole crop was bit-identical. Since the plants read the chamber
+    // (§24) the plain crop FEELS the blackout through the room: the unshed lamp empties the
+    // small battery on day 6, the backstop then rations the lamp's draw (5 140 times, measured on
+    // the first run of 3a), less lamp heat reaches the chamber, and the crop reads a colder room
+    // from day 7. That is the plants reading the chamber, not the light defect this pins.
     let scn = scenario(SMALL_BATTERY);
     let (bio, calm) = resolvers(&scn, false);
     let (_, dark) = resolvers(&scn, true);
@@ -312,7 +346,14 @@ fn the_plain_crop_does_not_feel_a_blackout() {
     let dark = plain(&scn, &dark, &bio);
     let (c, d) = (calm.states.last().unwrap(), dark.states.last().unwrap());
     assert!(d.stocks[BATTERY].amount < c.stocks[BATTERY].amount);
-    assert_eq!(crop(d).to_bits(), crop(c).to_bits());
+    assert_same_recorded_light(&calm, &dark);
+    assert!(dark.rationed > 0 && calm.rationed == 0);
+    assert!(
+        chamber_t(d) < chamber_t(c),
+        "the rationed lamp left the chamber no colder: {} vs {}",
+        chamber_t(d),
+        chamber_t(c)
+    );
 }
 
 // --- the lab answer ---------------------------------------------------------------------
@@ -359,13 +400,13 @@ fn cutting_only_the_lamps_power_darkens_the_lab_crop() {
     let off = lab(&scn, &cut, &bio, reserve(&scn));
     assert!(off.log.delivery.contains(&0.0));
     assert!(crop(off.states.last().unwrap()) < crop(lit.states.last().unwrap()));
-    // The plain build cannot see it: its crop is lit by the nameplate.
+    // The plain build cannot see it: its crop is lit by the nameplate. (Since slice 3a it does
+    // feel the cut lamp's missing HEAT, through the chamber — so the pin is on the light it
+    // records, and the room is shown colder inside the cut, on day 4.)
     let plain_cut = plain(&scn, &cut, &bio);
     let plain_lit = plain(&scn, &fast, &bio);
-    assert_eq!(
-        crop(plain_cut.states.last().unwrap()).to_bits(),
-        crop(plain_lit.states.last().unwrap()).to_bits()
-    );
+    assert_same_recorded_light(&plain_cut, &plain_lit);
+    assert!(chamber_t(&plain_cut.states[4]) < chamber_t(&plain_lit.states[4]));
 }
 
 #[test]
@@ -397,9 +438,9 @@ fn a_shed_heater_is_the_heaterless_run_bit_for_bit() {
     // H1: lit, the lamp holds the chamber above its setpoint, so the heater gives nothing; shed,
     // the heater goes with the lamp on the same reading; and this station never restores. So
     // the blackout run is the run with no heater at all, in every stock on every day.
-    let dark = small_lab_blackout();
-    let scn = scenario(SMALL_BATTERY);
+    let scn = warm_scenario(SMALL_BATTERY);
     let (bio, fast) = resolvers(&scn, true);
+    let dark = &lab(&scn, &fast, &bio, reserve(&scn));
     let heaterless = lab_with_heater(&scn, fast, &bio, reserve(&scn), 0.0);
     assert!(
         dark.log.delivery.iter().any(|&x| x < 1.0),
@@ -413,7 +454,7 @@ fn a_shed_heater_is_the_heaterless_run_bit_for_bit() {
     }
     // H2, the liveness: the chamber did fall well below its setpoint, so a heater left on would
     // have drawn (3.9 MJ before §23l).
-    let setpoint = station::params::chamber().setpoint;
+    let setpoint = station::params::chamber().warm_setpoint;
     let end = chamber_t(dark.states.last().unwrap());
     eprintln!(
         "H1/H2: dark chamber ends {end} K, {} K below the setpoint",
@@ -429,7 +470,7 @@ fn a_shed_heater_is_the_heaterless_run_bit_for_bit() {
 fn a_lamp_failure_with_a_healthy_battery_keeps_its_heater() {
     // H4: the heater is cut by the battery rule, not by the lamp being dark. With only the lamp's
     // power cut and the frozen battery (never near the reserve), the heater holds the chamber.
-    let scn = scenario(sealed_station_scenario().battery0);
+    let scn = warm_scenario(sealed_station_scenario().battery0);
     let (bio, _) = resolvers(&scn, false);
     let cut = || {
         with_lamp_power_cut(

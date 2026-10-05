@@ -53,6 +53,18 @@ fn run(
         simcore::registry::Registry,
     ),
 ) -> State {
+    run_all(scenario, built).last().expect("a day").clone()
+}
+
+/// [`run`], every day's end state (`states[0]` is the start).
+fn run_all(
+    scenario: &SealedStationScenario,
+    built: (
+        State,
+        simcore::registry::Registry,
+        simcore::registry::Registry,
+    ),
+) -> Vec<State> {
     let (state, bio, fast) = built;
     let lamp = station_params::lamp();
     let bio_r = sealed_bio_resolver(&lamp, scenario).expect("bio resolver");
@@ -74,7 +86,7 @@ fn run(
     .expect("run");
     assert_eq!(rationed, 0, "the backstop fired");
     assert!(events.is_empty(), "events: {events:?}");
-    states.last().expect("a day").clone()
+    states
 }
 
 fn shared() -> State {
@@ -110,6 +122,19 @@ fn split_with(
     vapour_crosses: bool,
     gas_exchange: GasExchangeStep,
 ) -> State {
+    split_all(chamber_air_mol, fan_mol_per_s, vapour_crosses, gas_exchange)
+        .last()
+        .expect("a day")
+        .clone()
+}
+
+/// [`split_with`], every day's end state.
+fn split_all(
+    chamber_air_mol: f64,
+    fan_mol_per_s: f64,
+    vapour_crosses: bool,
+    gas_exchange: GasExchangeStep,
+) -> Vec<State> {
     let scenario = sealed_station_scenario();
     let s = AirSplit {
         chamber_air_mol,
@@ -131,7 +156,7 @@ fn split_with(
         &s,
     )
     .expect("build_split_station");
-    run(&split_scenario(&scenario, &s), built)
+    run_all(&split_scenario(&scenario, &s), built)
 }
 
 /// Prediction 3: at the BVAD chamber the crop starves by the slow step — well under half of
@@ -174,39 +199,68 @@ fn a_cabin_sized_chamber_recovers_shared_air() {
 /// crossing, water moves between the plants' books and the crew's. A REDISTRIBUTION —
 /// conservation alone cannot see it.
 ///
-/// ⚠ **The direction is a fact about the two rooms' air, and it reversed on 2026-10-03.** Until
-/// then the cabin sat at ≈ 1.5 % RH and the plants lost water to the crew. With the cabin's
-/// condenser holding BVAD's 40 % at 22 °C (1.95e-4 kg of vapour per mol of air), the cabin is
-/// WETTER per mol than a chamber at 75 % of the weather's colder saturation, so over these 90
-/// days the crew's water flows INTO the plants (`docs/plans/post-roadmap-room-temperature.md`
-/// §15, H5). It should flip back once the chamber is held at 22 °C (75 % vs 40 % at one
-/// temperature); this pin will then go red, and that red is the expected one.
+/// ⚠ **The direction is a fact about the two rooms' air, and it has reversed twice.** Until
+/// 2026-10-03 the cabin sat at ≈ 1.5 % RH and the plants lost water to the crew. With the
+/// cabin's condenser holding BVAD's 40 % at 22 °C (1.95e-4 kg of vapour per mol of air), the
+/// cabin was WETTER per mol than a chamber at 75 % of the weather's colder saturation, so the
+/// crew's water flowed INTO the plants (`docs/plans/post-roadmap-room-temperature.md` §15, H5).
+/// This pin said it should flip back once the chamber is held at 22 °C — and since slice 3a
+/// (§24) the chamber runs a PROGRAM: 4 °C for 56 days (75 % of a cold saturation, drier per mol
+/// than the cabin: the plants gain), then 22 °C (75 % vs 40 % at one temperature, wetter: the
+/// plants lose). Over the 90 days the two nearly cancel (measured −0.22 kg on the first run of
+/// 3a, a net loss), so the pin is now per PHASE, each with a direction and no magnitude.
 #[test]
 fn vapour_crossing_moves_water_between_the_plants_and_the_crew() {
+    const WARM_FROM: usize = 56;
     let base = shared();
-    let off = split(BVAD_CHAMBER_AIR_MOL, 0.2, false);
-    let on = split(BVAD_CHAMBER_AIR_MOL, 0.2, true);
+    let off_all = split_all(BVAD_CHAMBER_AIR_MOL, 0.2, false, GasExchangeStep::PlantStep);
+    let on_all = split_all(BVAD_CHAMBER_AIR_MOL, 0.2, true, GasExchangeStep::PlantStep);
+    let off = off_all.last().unwrap();
     // A total folded from five stocks, so rounding in the last place is allowed, not more.
     assert!(
-        (plant_water(&off) - plant_water(&base)).abs() < 1e-9,
+        (plant_water(off) - plant_water(&base)).abs() < 1e-9,
         "vapour off: the plants' water loop {} should hold the shared one's {}",
-        plant_water(&off),
+        plant_water(off),
         plant_water(&base)
     );
-    let plants_gained = plant_water(&on) - plant_water(&off);
-    let crew_lost = off.stocks[WATER_STORE].amount - on.stocks[WATER_STORE].amount;
+    // What crossing moved by day `d`: (the plants' gain, the crew store's loss).
+    let moved = |d: usize| {
+        (
+            plant_water(&on_all[d]) - plant_water(&off_all[d]),
+            off_all[d].stocks[WATER_STORE].amount - on_all[d].stocks[WATER_STORE].amount,
+        )
+    };
+    // The cold phase: the plants gain, the crew's store pays.
+    let (plants_gained, crew_lost) = moved(WARM_FROM);
+    eprintln!("cold phase: plants +{plants_gained} kg, crew store −{crew_lost} kg");
     assert!(
-        plants_gained > 1.0,
-        "vapour on: the plants gained only {plants_gained} kg from the cabin"
+        plants_gained > 0.0,
+        "cold phase: the plants gained {plants_gained} kg from the cabin"
     );
     assert!(
         crew_lost > 0.0,
-        "vapour on: the crew's store lost {crew_lost} kg"
+        "cold phase: the crew's store lost {crew_lost} kg"
     );
     assert!(
         crew_lost <= plants_gained,
         "the cabin's own vapour and the recovery buffer make up the rest, never more \
          ({crew_lost} > {plants_gained})"
+    );
+    // The warm phase: the flow reverses — the plants lose, the crew's store gains.
+    let (end_gained, end_lost) = moved(DAYS);
+    let (warm_plants, warm_crew) = (end_gained - plants_gained, end_lost - crew_lost);
+    eprintln!(
+        "warm phase: plants {warm_plants:+} kg, crew store {:+} kg",
+        -warm_crew
+    );
+    assert!(
+        warm_plants < 0.0,
+        "warm phase: the plants gained {warm_plants} kg; at one temperature 75 % holds more \
+         per mol than 40 %, so they should lose"
+    );
+    assert!(
+        warm_crew < 0.0,
+        "warm phase: the crew's store lost {warm_crew} kg; it should gain"
     );
 }
 

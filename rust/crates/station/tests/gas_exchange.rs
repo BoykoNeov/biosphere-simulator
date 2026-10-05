@@ -16,6 +16,7 @@ use simcore::flow::Flow;
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
+use station::chamber::{plants_read_chamber, CHAMBER};
 use station::driver::run_master_day;
 use station::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, split_carbon_budget, window_key,
@@ -24,12 +25,15 @@ use station::gas_exchange::{
 use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
-    build_sealed_station, build_sealed_station_at, sealed_bio_resolver, sealed_fast_resolver,
+    build_sealed_station, build_sealed_station_at, build_sealed_station_unread,
+    sealed_bio_resolver, sealed_fast_resolver,
 };
 
-/// The PLANT-STEP sealed build (this file moves the gas exchange itself, onto that).
+/// The PLANT-STEP sealed build, **unread** — its plants not yet wrapped to read the chamber —
+/// because this file moves the gas exchange itself, and the wrap must come after the move
+/// (slice 3a, §24b; [`a_wrap_before_the_move_is_refused`]).
 fn built(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
-    build_sealed_station_at(
+    build_sealed_station_unread(
         &params::charge(),
         &params::thermal(),
         &params::crew(),
@@ -41,17 +45,35 @@ fn built(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
         false,
         false,
         GasExchangeStep::PlantStep,
+        station::chamber::ChamberSurroundings::Outdoor,
     )
-    .expect("build_sealed_station_at")
+    .expect("build_sealed_station_unread")
 }
 
-/// The sealed build with the crop's gas exchange on the minute step.
+/// The sealed build with the crop's gas exchange on the minute step, the plants then wrapped
+/// to read the chamber — the reference's order.
 fn built_minute(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
     let (state, bio, fast) = built(scenario);
     let (bio, fast) =
         gas_exchange_on_fast_step(&state.stocks, bio, fast, &weather_shared(&scenario.bio))
             .expect("minute gas exchange");
+    let bio = plants_read_chamber(bio, &state.stocks, &station_params::chamber()).expect("wrap");
     (state, bio, fast)
+}
+
+/// The plants' temperature (°C) on `state`: the chamber's, `Q / C_ch − 273.15` — the wrapper's
+/// own expression.
+fn chamber_c(state: &State) -> f64 {
+    state.stocks[CHAMBER].amount / station_params::chamber().heat_capacity - 273.15
+}
+
+/// What the plant step reads for `var` on `state`: the chamber for `temp`, the resolver else.
+fn plant_reads(r: &SourceResolver, state: &State, var: &str, dt: f64) -> f64 {
+    if var == TEMP_VAR {
+        chamber_c(state)
+    } else {
+        r.bind(state, dt).get(var).expect("forcing")
+    }
 }
 
 fn resolver(scenario: &SealedStationScenario) -> SourceResolver {
@@ -74,7 +96,8 @@ fn plant_c(s: &State) -> f64 {
 }
 
 /// THE WINDOW. The plant step records PAR and temperature for its OWN window: after the step
-/// from `n`, the recorded values are the resolver's at `n`, exactly or within an ULP (the aux
+/// from `n`, the recorded values are what it read at `n` — the resolver's PAR, the chamber's
+/// temperature (slice 3a) — exactly or within an ULP (the aux
 /// channel is additive, so the record is `old + (X − old)`). Over three days of windows, and
 /// the pin is meaningful only because consecutive windows' light differs somewhere (asserted).
 #[test]
@@ -90,7 +113,7 @@ fn the_plant_step_records_its_own_window() {
         assert_eq!(s.n, n);
         let want: Vec<f64> = WINDOW_VARS
             .iter()
-            .map(|v| reference.bind(&s, scenario.bio_dt).get(v).expect("forcing"))
+            .map(|v| plant_reads(&reference, &s, v, scenario.bio_dt))
             .collect();
         s = plant
             .step(&s, &reference, scenario.bio_dt)
@@ -128,7 +151,11 @@ fn the_wrapped_flow_is_the_inner_flow_on_a_minute_in_days() {
     );
     assert_eq!(raw_allocation.id(), "biosphere.allocation");
     assert_eq!(wrapped.id(), "biosphere.allocation");
-    let reference = resolver(&scenario);
+    // The raw flow reads `temp` from its environment: the plants' resolver, plus the chamber's
+    // temperature on this state as a forcing (the unread build's resolver carries none).
+    let (mut forcings, shared) = resolver(&scenario).into_parts();
+    forcings.insert(TEMP_VAR.to_string(), constant(chamber_c(&state)).unwrap());
+    let reference = SourceResolver::new(forcings, shared).unwrap();
     let fast_dt = scenario.cabin_dt;
     let mut lit = 0;
     for n in 0..scenario.bio_steps_per_day {
@@ -228,19 +255,58 @@ fn a_change_to_the_plant_side_light_reaches_the_minute_step() {
     assert!(dark <= 0.0, "the crop fixed {dark} mol C in the dark");
 }
 
-/// The temperature half of the same trap: a plant-side temperature override is what the
-/// plant step records for the minute step's respiration to read.
+/// The temperature half of the same trap: a change to the CHAMBER — the plants' temperature
+/// since slice 3a — is what the plant step records for the minute step's respiration to read.
+/// (Until 3a this held a plant-side 22 °C forcing, which the wrapper now refuses.)
 #[test]
-fn a_change_to_the_plant_side_temperature_is_what_gets_recorded() {
+fn a_change_to_the_chamber_is_what_gets_recorded() {
     let scenario = sealed_station_scenario();
     let (state, bio, _) = built_minute(&scenario);
-    let (mut forcings, shared) = resolver(&scenario).into_parts();
-    forcings.insert(TEMP_VAR.to_string(), constant(22.0).unwrap());
-    let held = SourceResolver::new(forcings, shared).unwrap();
-    let after = EulerIntegrator::new(bio)
-        .step(&state, &held, scenario.bio_dt)
-        .expect("plant step");
-    assert_eq!(after.aux[&window_key(TEMP_VAR)], 22.0);
+    let plant = EulerIntegrator::new(bio);
+    let mut stocks = state.stocks.clone();
+    stocks.get_mut(CHAMBER).unwrap().amount = station_params::chamber().heat_capacity * 295.15;
+    let held = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).unwrap();
+    let r = resolver(&scenario);
+    let after = plant.step(&held, &r, scenario.bio_dt).expect("plant step");
+    let recorded = after.aux[&window_key(TEMP_VAR)];
+    assert_eq!(recorded, chamber_c(&held));
+    assert!((recorded - 22.0).abs() < 1e-9, "{recorded}");
+    // Control: the unchanged chamber (day 0, the cold period) records its own value.
+    let plain = plant.step(&state, &r, scenario.bio_dt).expect("plant step");
+    assert_eq!(plain.aux[&window_key(TEMP_VAR)], chamber_c(&state));
+    assert!(plain.aux[&window_key(TEMP_VAR)] < 5.0);
+}
+
+/// THE ORDER (slice 3a): wrapping the plants to read the chamber BEFORE moving the gas exchange
+/// puts a wrapped flow on the minute step, whose recorded window answers `temp` — refused at
+/// the first read, rather than silently reading the chamber live where the reference reads the
+/// window.
+#[test]
+fn a_wrap_before_the_move_is_refused() {
+    let scenario = sealed_station_scenario();
+    let (state, bio, fast) = built(&scenario);
+    let bio = plants_read_chamber(bio, &state.stocks, &station_params::chamber()).expect("wrap");
+    let (bio, fast) =
+        gas_exchange_on_fast_step(&state.stocks, bio, fast, &weather_shared(&scenario.bio))
+            .expect("move");
+    let after = EulerIntegrator::new(bio).step(&state, &resolver(&scenario), scenario.bio_dt);
+    // The recorder joined the plant step after the wrap, so it is unwrapped and finds no `temp`
+    // in the plants' resolver; had it found one, the moved flows would refuse it.
+    let err = match after {
+        Err(e) => e.to_string(),
+        Ok(s) => {
+            let budget = fast
+                .flows()
+                .iter()
+                .find(|f| f.id() == CARBON_BUDGET_FLOWS[0])
+                .unwrap();
+            budget
+                .evaluate(&s, &SourceResolver::empty().bind(&s, 60.0), 60.0)
+                .expect_err("a wrapped flow on the minute step is refused")
+                .to_string()
+        }
+    };
+    assert!(err.contains("temp"), "{err}");
 }
 
 /// THE DOUBLE COUNT: the three move whole — out of the plant registry, into the fast one, ids

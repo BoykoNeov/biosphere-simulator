@@ -1,0 +1,48 @@
+# cold_period — the winter wheat's cold period in the plant chamber (Step 3c, slice 3a,
+# 2026-10-05; docs/plans/post-roadmap-room-temperature.md §12, §24).
+# Currency/units: a temperature (K) and a length (whole days). The chamber's PROGRAM, read by
+# the chamber's cooler and heater (their setpoint) and by the chamber's starting heat.
+#
+# The plants read the chamber (slice 3), so a winter wheat held at 22 °C all season never
+# vernalizes and never flowers (slice 1, `tests/warm_room_arrest.rs`). The chamber is therefore
+# held COLD for the first cold_days of each season, then at chamber.yaml's setpoint:
+#     cold  ⇔  floor(n·bio_dt) mod season_days < cold_days
+# — one clock (`SealedStationScenario::is_cold_on_step`), read by every consumer. With the
+# calendar kept (re-sow every season_days), the season start IS the sowing. Slice 4 (re-sow on
+# maturity) must move this clock into the state.
+#
+# The scenario carries the program (`SealedStationScenario::cold`), defaulting from this file;
+# a fixture opts out of the cold with one edit, `cold.days = 0`.
+#
+# cold_setpoint — the chamber's held temperature during the cold period (K), > 0. Absolute
+#   Kelvin, like chamber.yaml's setpoint.
+# cold_days — the cold period's length (days), a whole number >= 0. 0 is a valid "no cold
+#   period" (the warm control).
+#
+# PROVENANCE. Both CITED [A], a statement of standard practice; the POINT in its range is the
+# user's choice (2026-10-03, §12: "the middle: 8 weeks at 4 °C"), made without the model.
+#
+# Sources:
+#   [A] Cha et al. (2022). "Speed vernalization to accelerate generation advance in winter
+#       cereal crops." Molecular Plant 15(8):1300–1309, doi 10.1016/j.molp.2022.06.012. Opened as
+#       the author-accepted manuscript (White Rose eprint 188442), manuscript lines 40–42, read
+#       2026-10-03: "the agronomic and academic standard cereal vernalization protocol entails
+#       6–10 weeks at a low temperature of 2–6°C under short-day (8-h-light: 16-h-dark)
+#       photoperiod, where the lighting conditions are low light intensity". ⚠ LOCUS: standard
+#       practice for winter cereals generally (it cites four sources), on growing plants — not
+#       cultivar-specific. A CLASS citation.
+#
+# NOT here yet (slice 3b adds them): the cold period's dimmed lamp and short day.
+
+name: cold_period
+process: chamber_program
+
+parameters:
+  cold_setpoint:
+    value: 277.15
+    unit: "K"
+    source: "[A], AAM lines 40–42: the standard protocol's 2–6 °C; taken 4 °C = 277.15 K, the centre of the range (the user's choice, §12, made without the model). ⚠ LOCUS: winter-cereal standard practice, a class citation."
+  cold_days:
+    value: 56
+    unit: "day"
+    source: "[A], AAM lines 40–42: the standard protocol's 6–10 weeks; taken 8 weeks = 56 days, the centre of the range (the user's choice, §12, made without the model). The 6- and 10-week ends are lab sensitivity checks, not the reference."

@@ -38,9 +38,9 @@
 //!   unfreeze with its own ceremony, not a rider on this one. Recorded in the manifest's
 //!   `_authority` entry for `numerics_note`.
 //! * `param_files` — the frozen param-file census, `filename -> newline-normalized sha-256`,
-//!   over the **nine** files this contract spans: five from `domains::params` (power × 2,
-//!   thermal, eclss, crew) and four from `station::params` (`chamber.yaml` added 2026-10-05,
-//!   Step 3c slice 2b-i). **New in slice C8**, which reverses what this file said for two
+//!   over the **ten** files this contract spans: five from `domains::params` (power × 2,
+//!   thermal, eclss, crew) and five from `station::params` (`chamber.yaml` added 2026-10-05,
+//!   Step 3c slice 2b-i; `cold_period.yaml` the same day, slice 3a). **New in slice C8**, which reverses what this file said for two
 //!   slices.
 //!
 //!   ⚠⚠ **What re-anchored is the RULE, not the number.** Both sides digest the same bytes,
@@ -422,7 +422,7 @@ const COMMENT: &str = "Phase-6 Step-10 station freeze manifest (P6.10). Names th
 
 const NUMERICS_NOTE: &str = "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/16 day, 16 slow sub-steps per master day, each followed by its sixteenth of the everything-fast dt=60 s sub-steps (90 of them; interleaved since 2026-09-30, slow-first before); Tier-1 energy single-rate dt=3600 s.";
 
-/// The flow and aux inventories, and the nine-file param census — walked ONCE and read
+/// The flow and aux inventories, and the ten-file param census — walked ONCE and read
 /// by **both** halves of this program, the dump and the manifest writer.
 ///
 /// ⚠ The biosphere half's first draft had the writer re-walk the registries, which put
@@ -456,7 +456,7 @@ fn inventory() -> (
     }
     assert!(!flows.is_empty(), "canonical station builds wired no flows");
 
-    // The nine the station contract spans, sorted by basename. Every basename is unique
+    // The ten the station contract spans, sorted by basename. Every basename is unique
     // across the six directories (asserted in `crate::params`'s tests, because the
     // manifest keys on basenames and a collision would silently collapse two entries).
     let mut files: Vec<(&str, &str)> = params::param_files();
@@ -464,8 +464,8 @@ fn inventory() -> (
     files.sort_by_key(|(name, _)| *name);
     assert_eq!(
         files.len(),
-        9,
-        "the frozen station param census is 9 files, got {}",
+        10,
+        "the frozen station param census is 10 files, got {}",
         files.len()
     );
     (flows, aux, files)

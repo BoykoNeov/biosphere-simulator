@@ -1,10 +1,14 @@
 //! The plant chamber's walls and heater, Step 3c slice 2b-iii
 //! (`docs/plans/post-roadmap-room-temperature.md` §23i). The reference's walls face the outdoor
-//! weather; the cabin, space and the station structure are lab options. In the reference the
-//! lamp outweighs the walls, so the heater never fires there — this file is what makes it fire.
+//! weather; the cabin, space and the station structure are lab options. Until slice 3a the lamp
+//! outweighed the walls, so the heater never fired in the reference — this file is what made it
+//! fire. Since slice 3a (§24) the reference heater fires at each warm-up after the cold period,
+//! and the plants read the chamber, so L1's "the crop is identical with and without the heater"
+//! INVERTED by design (§24h): it now asserts the direction the colder chamber moves the crop.
 
 use domains::biosphere::perturbations::{window_override, with_forcing};
-use domains::biosphere::stocks::TEMP_VAR;
+use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C, TEMP_VAR, THERMAL_TIME};
+use domains::biosphere::system::weather_forcings;
 use domains::power::BATTERY;
 use domains::thermal::NODE;
 use simcore::environment::{constant, Environment, SourceResolver};
@@ -30,13 +34,17 @@ const PER_DAY: u64 = domains::biosphere::STEPS_PER_DAY as u64;
 const HEATER_HEALTH: &str = "test.chamber_heater_health";
 /// The coldest five days of the weather file (§23i, L1): days 113–117, mean 0.04 °C.
 const COLD: (u64, u64) = (113, 118);
+/// L1's heater-less run loses its heater from this day on: after the day-56 warm-up (slice 3a),
+/// so both runs share it and differ only in the lamp-failure window.
+const HEATER_CUT_FROM: u64 = 100;
 
 struct Run {
     states: Vec<State>,
 }
 
 /// Run the sealed station `days` master days with the walls facing `surroundings`; the lamp
-/// failed over `lamp_off` (days) if given; the heater scaled by `heater`.
+/// failed over `lamp_off` (days) if given; the heater scaled by `heater` from day
+/// [`HEATER_CUT_FROM`] on (whole at 1.0 before it).
 fn run(
     days: usize,
     surroundings: ChamberSurroundings,
@@ -77,7 +85,12 @@ fn run(
     let mut fast = with_forcing(
         sealed_fast_resolver(&charge, &scenario).unwrap(),
         HEATER_HEALTH,
-        window_override(constant(1.0).unwrap(), 0, u64::MAX, heater),
+        window_override(
+            constant(1.0).unwrap(),
+            HEATER_CUT_FROM * PER_DAY,
+            u64::MAX,
+            heater,
+        ),
     )
     .unwrap();
     if let Some((a, b)) = lamp_off {
@@ -130,13 +143,34 @@ fn crop_identical(a: &State, b: &State) {
     }
 }
 
+fn veg(s: &State) -> f64 {
+    amount(s, LEAF_C) + amount(s, STEM_C) + amount(s, ROOT_C)
+}
+
 /// L5 — the time base. The fast operator keeps the SLOW step count; the walls must read the
-/// plants' day for the same `n`, at the first and the last plant step of a day.
+/// weather's day the plants' clock names for the same `n` (`floor(n·bio_dt)`), at the first and
+/// the last plant step of a day. Since slice 3a the plants read the chamber, so the table is
+/// read straight from the weather (`weather_forcings`), not through the plant resolver.
 #[test]
 fn the_walls_read_the_plants_day_on_the_fast_step() {
     let scenario = sealed_station_scenario();
     let fast = sealed_fast_resolver(&domains::params::charge(), &scenario).unwrap();
-    let bio = sealed_bio_resolver(&station::params::lamp(), &scenario).unwrap();
+    let bio = SourceResolver::new(
+        weather_forcings(&scenario.bio, scenario.years).unwrap(),
+        std::collections::HashMap::new(),
+    )
+    .unwrap();
+    assert!(
+        sealed_bio_resolver(&station::params::lamp(), &scenario)
+            .unwrap()
+            .bind(
+                &State::new(0, Default::default(), 0, Default::default()).unwrap(),
+                1.0
+            )
+            .get(TEMP_VAR)
+            .is_err(),
+        "the plant resolver still carries a temperature"
+    );
     let blank = |n: u64| {
         State::new(
             n,
@@ -218,7 +252,8 @@ fn a_dead_lamp_on_cold_days_fires_the_heater() {
     eprintln!("L1: heater drew {drawn} J; battery vs nominal {gained} J");
 
     // The chamber held: never more than one step's wall loss below the setpoint (≤ 0.0146 K).
-    let set = station::params::chamber().setpoint;
+    // Days 113–117 are in the warm phase, so the setpoint is the warm one.
+    let set = station::params::chamber().warm_setpoint;
     // Day-end states inside the window: `states[113..118)` (the 118th is 90 lit minutes past it).
     for s in &heated.states[before..end] {
         let t = chamber_t(s);
@@ -234,18 +269,42 @@ fn a_dead_lamp_on_cold_days_fires_the_heater() {
         "the unheated chamber is at {} K",
         chamber_t(c)
     );
-    // The plants read no chamber temperature.
-    for (a, b) in heated.states.iter().zip(&cold.states) {
+    // The plants read the chamber (slice 3a). Identical until the window opens — both runs
+    // share the warm-up; the heater-less run's heater is idle from day 100 to the window anyway.
+    for (a, b) in heated.states[..before].iter().zip(&cold.states[..before]) {
         crop_identical(a, b);
     }
+    // Inverted, with directions (§24h): without the heater the plants read a colder chamber,
+    // so they accrue LESS thermal time; and in the dark (no photosynthesis) they burn less in
+    // maintenance, so they keep MORE leaf + stem + root than the heated run.
+    let (tt_h, tt_c) = (h.aux[THERMAL_TIME], c.aux[THERMAL_TIME]);
+    eprintln!(
+        "L1: thermal time heated {tt_h}, unheated {tt_c}; veg {} vs {}",
+        veg(h),
+        veg(c)
+    );
+    assert!(
+        tt_c < tt_h,
+        "unheated thermal time {tt_c} not below heated {tt_h}"
+    );
+    assert!(
+        veg(c) > veg(h),
+        "unheated leaf + stem + root {} not above heated {}",
+        veg(c),
+        veg(h)
+    );
 }
 
-/// L2 — the cabin, away from the zero-flow point: 18 °C pulls heat out, 27 °C pushes it in, and
-/// the chamber stays held either way.
+/// L2 — the cabin, away from the zero-flow point, and the chamber held either way. Since slice
+/// 3a the first three days are the COLD period (4 °C), so both cabins are warmer than the
+/// chamber and both push heat IN — re-derived in closed form (§24h): the deadbeat cooler's
+/// steady state `T = (T_set + (P + UA·T_cab)·τ/C) / (1 + UA·τ/C)`, with `P` the lamp's 133.3 W,
+/// gives 277.2119 K / −21.409 W against 18 °C and 277.2174 K / −35.224 W against 27 °C.
 #[test]
 fn a_cabin_hotter_or_colder_than_the_chamber() {
     let days = 3;
-    for (cabin_k, watts) in [(291.15, 6.222), (300.15, -7.593)] {
+    let cold_set = sealed_station_scenario().cold.setpoint;
+    for (cabin_k, watts) in [(291.15, -21.409), (300.15, -35.224)] {
         let r = run(
             days,
             ChamberSurroundings::Cabin {
@@ -261,7 +320,7 @@ fn a_cabin_hotter_or_colder_than_the_chamber() {
             "cabin {cabin_k} K: {mean_w} W out, predicted {watts}"
         );
         let t = chamber_t(&r.states[days]);
-        assert!((t - 295.15).abs() < 0.1, "cabin {cabin_k} K: chamber {t}");
+        assert!((t - cold_set).abs() < 0.1, "cabin {cabin_k} K: chamber {t}");
         eprintln!("L2: cabin {cabin_k} K: {mean_w} W out, chamber {t} K");
     }
 }
@@ -285,14 +344,18 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
         "heater {heater_w} W, predicted 44.84"
     );
     eprintln!("L4: node {t} K, heater {heater_w} W");
-    let set = station::params::chamber().setpoint;
+    let set = station::params::chamber().warm_setpoint;
     let tc = chamber_t(&r.states[days]);
     assert!(tc < set && tc > set - 0.05, "chamber {tc}");
 }
 
-/// L4, the full horizon — slow (~1 min release). The battery, which nominally falls to 5.946e9 J
-/// over the 1220 days, ends near 1.22e9 J with the heater on the structure: above zero, so no
-/// rationing (asserted by `run`).
+/// L4, the full horizon — slow (~1 min release). With the heater on the structure the battery
+/// ends above zero, so no rationing (asserted by `run`). Re-derived for slice 3a with the
+/// independent re-simulation extended to the structure (`W:\temp\claude\slice3a\
+/// resim_structure.py`, run BEFORE this test): the cold chamber faces the node across 98 K
+/// instead of 116 K, so the heater gives 4.2689e9 J over the horizon, not 4.7293e9, and the
+/// battery ends near 5.9456e9 − 4.2689e9 = 1.6767e9 J. (Control: the same instrument without the
+/// cold period gives 1.2163e9, against this test's earlier measured 1.219e9.)
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
@@ -301,12 +364,15 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
     let b = amount(r.states.last().unwrap(), BATTERY);
     eprintln!("L4 full horizon: battery ends at {b} J");
     assert!(
-        b > 0.0 && (b / 1.219e9 - 1.0).abs() < 0.02,
+        b > 0.0 && (b / 1.6767e9 - 1.0).abs() < 0.02,
         "battery ends at {b} J"
     );
 }
 
 /// R3 / R4 — the reference trajectory: the node's daily range and mean, the chamber's range.
+/// Slice 3a's §24f A3/A4: the node 172.1755 / 176.2189 / 173.74488 K (min / max / mean of the
+/// day-end states); the chamber in the cold band (4.053–4.061 °C) or the warm one (to
+/// 295.2034 K) except at the transitions, and ending mid-cool-down at 292.5662711 K.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -319,14 +385,20 @@ fn the_reference_node_and_chamber_follow_the_weather() {
     let mean = nodes.iter().sum::<f64>() / nodes.len() as f64;
     eprintln!("node daily min {lo} max {hi} mean {mean}");
     assert!(
-        (lo - 172.169).abs() < 0.01 && (hi - 174.889).abs() < 0.01,
+        (lo - 172.1755).abs() < 0.01 && (hi - 176.2189).abs() < 0.01,
         "{lo} {hi}"
     );
-    assert!((mean - 173.247).abs() < 0.01, "{mean}");
+    assert!((mean - 173.74488).abs() < 0.01, "{mean}");
     let ch: Vec<f64> = r.states.iter().skip(1).map(chamber_t).collect();
     let (clo, chi) = ch
         .iter()
         .fold((f64::MAX, f64::MIN), |(l, h), &x| (l.min(x), h.max(x)));
-    eprintln!("chamber daily min {clo} max {chi}");
-    assert!(clo >= 295.1886 && chi <= 295.2035, "{clo} {chi}");
+    let in_band = |t: f64| (277.203..=277.212).contains(&t) || (295.188..=295.2035).contains(&t);
+    let outside = ch.iter().filter(|&&t| !in_band(t)).count();
+    eprintln!("chamber daily min {clo} max {chi}; {outside} day-end states between the bands");
+    assert!(clo >= 277.203 && chi <= 295.2035, "{clo} {chi}");
+    // One mid-warm-up and one mid-cool-down day-end state per season at most.
+    assert!(outside <= 2 * sealed_station_scenario().years, "{outside}");
+    let end = chamber_t(r.states.last().unwrap());
+    assert!((end - 292.5662711).abs() < 1e-6, "chamber ends {end} K");
 }

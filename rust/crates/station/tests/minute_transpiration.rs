@@ -23,6 +23,7 @@ use station::air_split::{
     build_split_station, split_scenario, water_on_fast_step, AirSplit, BVAD_CHAMBER_AIR_MOL,
     NET_RADIATION_RECORDER, WATER_LOSS_FLOWS,
 };
+use station::chamber::CHAMBER;
 use station::driver::run_master_day;
 use station::gas_exchange::{
     window_key, GasExchangeStep, CARBON_BUDGET_FLOWS, PLANT_WINDOW_RECORDER,
@@ -68,14 +69,22 @@ fn minute_build() -> (SealedStationScenario, State, Registry, Registry) {
     )
 }
 
-fn plant_resolver(scenario: &SealedStationScenario, held_22: bool) -> SourceResolver {
-    let r = sealed_bio_resolver(&station_params::lamp(), scenario).expect("bio resolver");
-    if !held_22 {
-        return r;
-    }
-    let (mut forcings, shared) = r.into_parts();
-    forcings.insert(TEMP_VAR.to_string(), constant(22.0).unwrap());
-    SourceResolver::new(forcings, shared).unwrap()
+fn plant_resolver(scenario: &SealedStationScenario) -> SourceResolver {
+    sealed_bio_resolver(&station_params::lamp(), scenario).expect("bio resolver")
+}
+
+/// The plants' temperature (°C) on `state` since slice 3a: the chamber's, `Q / C_ch − 273.15`.
+fn chamber_c(state: &State) -> f64 {
+    state.stocks[CHAMBER].amount / station_params::chamber().heat_capacity - 273.15
+}
+
+/// The water-loss pair as `build_season` makes it — the raw flows, NOT wrapped to read the
+/// chamber, so a test can hand them a temperature. The same flows the split build starts from
+/// (its base is `build_season` of the resized scenario).
+fn raw_plant_registry(scenario: &SealedStationScenario) -> Registry {
+    domains::biosphere::system::build_season(&scenario.bio)
+        .expect("build_season")
+        .1
 }
 
 /// A resolver serving exactly `temp` and `net radiation` — what the raw flows read on the
@@ -118,15 +127,23 @@ fn assert_bits(got: &FlowResult, want: &FlowResult, what: &str) {
 fn the_plant_step_records_the_windows_net_radiation_and_nothing_twice() {
     let (scenario, state, bio, _) = minute_build();
     let plant = EulerIntegrator::new(bio);
-    let reference = plant_resolver(&scenario, false);
+    let reference = plant_resolver(&scenario);
     let mut s = state;
     let mut changes = 0;
     let mut previous = None;
     for n in 0..(2 * scenario.bio_steps_per_day) {
         let env = reference.bind(&s, scenario.bio_dt);
+        // The temperature is the chamber's since slice 3a; the light and radiation the resolver's.
         let want: Vec<(String, f64)> = [RN_VAR, TEMP_VAR, domains::biosphere::stocks::PAR_VAR]
             .iter()
-            .map(|v| (window_key(v), env.get(v).expect("forcing")))
+            .map(|v| {
+                let value = if *v == TEMP_VAR {
+                    chamber_c(&s)
+                } else {
+                    env.get(v).expect("forcing")
+                };
+                (window_key(v), value)
+            })
             .collect();
         s = plant
             .step(&s, &reference, scenario.bio_dt)
@@ -151,7 +168,7 @@ fn the_plant_step_records_the_windows_net_radiation_and_nothing_twice() {
 #[test]
 fn the_wrapped_pair_is_the_raw_pair_on_a_minute_in_days() {
     let (scenario, state, bio, fast) = minute_build();
-    let plant_r = plant_resolver(&scenario, false);
+    let plant_r = plant_resolver(&scenario);
     let fast_r = sealed_fast_resolver(&params::charge(), &scenario).unwrap();
     let (states, rationed, _) = run_master_day(
         &EulerIntegrator::new(bio),
@@ -169,8 +186,7 @@ fn the_wrapped_pair_is_the_raw_pair_on_a_minute_in_days() {
     .expect("one day");
     assert_eq!(rationed, 0);
     let s = states.last().unwrap();
-    let (_, raw_bio, _) =
-        build(&split(GasExchangeStep::Minute, GasExchangeStep::PlantStep)).expect("raw build");
+    let raw_bio = raw_plant_registry(&scenario);
     let (_, _, _, wrapped_fast) = minute_build();
     let window = window_resolver(s.aux[&window_key(TEMP_VAR)], s.aux[&window_key(RN_VAR)]);
     let fast_dt = scenario.cabin_dt;
@@ -189,24 +205,30 @@ fn the_wrapped_pair_is_the_raw_pair_on_a_minute_in_days() {
     }
 }
 
-/// THE OVERRIDE: a plant-side 22 °C is what the minute step's condenser reads. After one plant
-/// step under a held 22 °C, the wrapped `Condensation` equals the raw one at 22 °C bit for bit,
-/// and differs from the raw one at the weather's temperature for that window (asserted ≠ 22).
+/// THE OVERRIDE: a chamber held at 22 °C is what the minute step's condenser reads. After one
+/// plant step from a chamber set to 22 °C, the wrapped `Condensation` equals the raw one at the
+/// recorded 22 °C bit for bit, and differs from the raw one at the chamber's own (cold-period)
+/// temperature for that window. (Until slice 3a the hold was a plant-side 22 °C forcing, which
+/// the plants' wrapper now refuses; §24h.)
 #[test]
-fn a_plant_side_22c_reaches_the_minute_steps_condenser() {
+fn a_chamber_held_at_22c_reaches_the_minute_steps_condenser() {
     let (scenario, state, bio, fast) = minute_build();
-    let held = plant_resolver(&scenario, true);
-    let weather_t = plant_resolver(&scenario, false)
-        .bind(&state, scenario.bio_dt)
-        .get(TEMP_VAR)
-        .unwrap();
-    assert_ne!(
-        weather_t, 22.0,
-        "the weather already reads 22 °C: the pin would prove nothing"
+    let r = plant_resolver(&scenario);
+    let own_t = chamber_c(&state);
+    let mut stocks = state.stocks.clone();
+    stocks.get_mut(CHAMBER).unwrap().amount = station_params::chamber().heat_capacity * 295.15;
+    let held_state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).unwrap();
+    let held_t = chamber_c(&held_state);
+    assert!((held_t - 22.0).abs() < 1e-9, "{held_t}");
+    assert!(
+        (own_t - held_t).abs() > 10.0,
+        "the chamber already reads {own_t} °C: the pin would prove nothing"
     );
     let s = EulerIntegrator::new(bio)
-        .step(&state, &held, scenario.bio_dt)
+        .step(&held_state, &r, scenario.bio_dt)
         .expect("plant step");
+    assert_eq!(s.aux[&window_key(TEMP_VAR)], held_t);
+    let weather_t = own_t;
     // Below its target the condenser's draw does not read temperature at all (`rate·dt·v`), so
     // the chamber's vapour is set BETWEEN the two temperatures' targets, where it does.
     let target = |t: f64| {
@@ -217,10 +239,9 @@ fn a_plant_side_22c_reaches_the_minute_steps_condenser() {
         )
     };
     let mut stocks = s.stocks.clone();
-    stocks.get_mut(WATER_VAPOR).unwrap().amount = 0.5 * (target(weather_t) + target(22.0));
+    stocks.get_mut(WATER_VAPOR).unwrap().amount = 0.5 * (target(weather_t) + target(held_t));
     let s = State::new(s.n, stocks, s.rng_seed, s.aux.clone()).unwrap();
-    let (_, raw_bio, _) =
-        build(&split(GasExchangeStep::Minute, GasExchangeStep::PlantStep)).expect("raw build");
+    let raw_bio = raw_plant_registry(&scenario);
     let rn = s.aux[&window_key(RN_VAR)];
     let fast_dt = scenario.cabin_dt;
     let condensation = WATER_LOSS_FLOWS[1];
@@ -236,7 +257,7 @@ fn a_plant_side_22c_reaches_the_minute_steps_condenser() {
             )
             .expect("raw")
     };
-    assert_bits(&got, &at(22.0), "condensation at the held 22 °C");
+    assert_bits(&got, &at(held_t), "condensation at the held 22 °C");
     let weather = at(weather_t);
     assert!(
         got.legs

@@ -55,7 +55,7 @@ use crate::gas_exchange::{
     OnFastStep, PLANT_WINDOW_RECORDER,
 };
 use crate::scenario::SealedStationScenario;
-use crate::sealed::{build_sealed_station_at, sealed_fast_flows, CabinAir};
+use crate::sealed::{build_sealed_station_unread, sealed_fast_flows, CabinAir};
 use crate::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
 
 /// The cabin's reference air (mol) — the frozen sealed station's `chamber_air_capacity_mol`,
@@ -320,7 +320,10 @@ pub fn build_split_station(
     // ⚠ The PLANT-STEP base, always: this build discards the shared fast registry and keeps the
     // plant one, so a minute-step base would throw the crop's carbon budget away with it. The
     // minute step is applied below, onto THIS build's own fast registry.
-    let (state, bio_reg, _shared_fast) = build_sealed_station_at(
+    // ⚠ And UNREAD (slice 3a, §24b): the plants are wrapped to read the chamber at the very end,
+    // after this build's own moves — a flow wrapped before it is moved meets its window's `temp`
+    // and is refused.
+    let (state, bio_reg, _shared_fast) = build_sealed_station_unread(
         charge,
         thermal_params,
         crew,
@@ -332,6 +335,7 @@ pub fn build_split_station(
         false,
         false,
         GasExchangeStep::PlantStep,
+        crate::chamber::ChamberSurroundings::Outdoor,
     )?;
 
     // The cabin's own air, charged with the shared room's starting gases.
@@ -423,6 +427,8 @@ pub fn build_split_station(
         GasExchangeStep::PlantStep => (bio_reg, fast_reg),
         GasExchangeStep::Minute => water_on_fast_step(&state.stocks, bio_reg, fast_reg, &shared)?,
     };
+    let bio_reg =
+        crate::chamber::plants_read_chamber(bio_reg, &state.stocks, &crate::params::chamber())?;
     Ok((state, bio_reg, fast_reg))
 }
 

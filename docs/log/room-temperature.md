@@ -198,3 +198,16 @@ that fails while the battery is healthy keeps its heater (3.57 MJ over three day
 predictions, six held; nothing frozen moved. Unbuilt and recorded: on a station whose battery
 recovers, switching back on brings up to 200 W of re-warming with the lamp, and the rule has no
 latch, so the restore could chatter.
+
+**Slice 3a BUILT 2026-10-05 (a station unfreeze)** (note §24, graded in §24k). The plants read the
+chamber, and the chamber runs the cited cold period: 4 °C for the first 8 weeks of each season,
+22 °C after (Cha et al. 2022's standard protocol; `cold_period.yaml`). The lamp is unchanged —
+dimming it for the cold weeks is 3b, a separate golden change by the user's choice. Eleven
+predictions, made with an independent re-simulation before the code: ten held, most to the printed
+digit; the eleventh (the warm-phase humidity ceiling) was mis-rounded in the prediction itself.
+The crop now flowers about 102 days after sowing instead of 219 and is never short of water; the
+heater fires once a season, at the warm-up. Found on the way: in the plain build a blackout now
+reaches the crop through the room (an empty battery rations the lamp, so its heat stops); five
+tests read the plants' temperature off their inputs, which the plan's search missed; and the
+order matters — the plants must be wrapped to read the chamber after any flow is moved onto the
+minute step, and a test now refuses the wrong order. Saved sessions keep loading (no stock added).

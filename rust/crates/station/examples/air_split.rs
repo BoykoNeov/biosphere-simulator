@@ -22,12 +22,11 @@ use domains::biosphere::science::{
 };
 use domains::biosphere::stocks::{
     CARBON_POOL, CHAMBER_INERT, CONDENSATE, LEAF_C, O2_POOL, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C,
-    SUBSOIL_WATER, TEMP_VAR, WATER_SOURCE, WATER_VAPOR,
+    SUBSOIL_WATER, WATER_SOURCE, WATER_VAPOR,
 };
 use domains::crew::WATER_STORE;
 use domains::eclss::{CABIN_CO2, CABIN_H2O, CABIN_O2};
 use domains::params;
-use simcore::environment::Environment;
 use simcore::flow::FlowResult;
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
@@ -152,7 +151,8 @@ fn season(
                 .collect();
             let demand = withdrawal_demand(&results, &before.stocks);
             r.co2_gross += demand.get(CARBON_POOL).copied().unwrap_or(0.0);
-            let temp = bound.get(TEMP_VAR).expect("temp");
+            // The plants read the chamber since slice 3a; the plant resolver carries no `temp`.
+            let temp = chamber_c(before);
             r.rh += before.stocks[WATER_VAPOR].amount / saturation_vapour_kg(temp, chamber_air_mol);
             r.slow_steps += 1;
             if !before.stocks.contains_key(CABIN_INERT) {
@@ -421,4 +421,10 @@ fn main() {
             t0.elapsed().as_secs_f64()
         );
     }
+}
+
+/// The plants' temperature (°C) on `state` since slice 3a: the chamber's, `Q / C_ch − 273.15`.
+fn chamber_c(state: &State) -> f64 {
+    state.stocks[station::chamber::CHAMBER].amount / station_params::chamber().heat_capacity
+        - 273.15
 }

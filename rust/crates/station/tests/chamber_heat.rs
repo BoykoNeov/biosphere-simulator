@@ -1,13 +1,19 @@
 //! The plant chamber's heat store, Step 3c slice 2b (`docs/plans/post-roadmap-room-temperature.md`
 //! §23e–§23g). The lamp's whole draw — its waste heat (2b-i) and its light (2b-ii) — heats
-//! `thermal.chamber`, whose cooler hands it on to the node. The plants do not read the chamber
-//! yet.
+//! `thermal.chamber`, whose cooler hands it on to the node.
 //!
 //! Nominally the chamber holds its steady state. This file checks the side the reference run
 //! cannot show: the room **failing** (2b-i's P9, 2b-ii's Q7). With the cooler dead, the chamber
-//! warms at the lamp's draw over its heat capacity, the node — losing that input — relaxes
-//! toward the colder equilibrium of the remaining dissipation, and the crop, which reads no
-//! chamber temperature, is untouched.
+//! warms at the lamp's draw over its heat capacity and the node — losing that input — relaxes
+//! toward the colder equilibrium of the remaining dissipation.
+//!
+//! ⚠ **Since slice 3a the plants read the chamber** (`docs/plans/post-roadmap-room-temperature.md`
+//! §24h), so P9's "the crop is untouched" INVERTED, by design: it is now this file's liveness
+//! for the plants reading the room — the overheated crop's leaf, stem and root fall below the
+//! nominal crop's over day 1. With the walls off a dead cooler drives the chamber without bound
+//! (thousands of kelvin by day 60, outside every plant formula's range), so the failed run's
+//! rationing is recorded as found, not asserted zero. **The cold period is opted out**
+//! (`cold.days = 0`): this file's subject is the cooler of a warm chamber.
 //!
 //! ⚠ **The walls (2b-iii) are switched off in every run here** (scaled by 0), so this file keeps
 //! checking the cooler alone: with walls the nominal chamber follows the weather and a dead
@@ -25,7 +31,7 @@ use simcore::state::State;
 use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_COOLING, CHAMBER_WALL};
 use station::driver::run_master_day;
 use station::perturbations::ScaledFlow;
-use station::scenario::sealed_station_scenario;
+use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScenario};
 use station::sealed::{
     build_sealed_station, chamber_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
     sealed_node_heat, sealed_reset_hook,
@@ -36,9 +42,19 @@ const COOLER_HEALTH: &str = "test.chamber_cooler_health";
 /// The chamber's walls (2b-iii), switched OFF in every run here (see the module doc).
 const WALL_HEALTH: &str = "test.chamber_wall_health";
 
-/// Run the sealed station `DAYS` master days, the chamber's cooler at `health` throughout.
-fn run(health: f64) -> Vec<State> {
-    let scenario = sealed_station_scenario();
+/// The sealed scenario without the cold period: the chamber held warm from day 0.
+fn warm_scenario() -> SealedStationScenario {
+    let s = sealed_station_scenario();
+    SealedStationScenario {
+        cold: ColdProgram { days: 0, ..s.cold },
+        ..s
+    }
+}
+
+/// Run the sealed station `DAYS` master days, the chamber's cooler at `health` throughout:
+/// `(states, rationed)`.
+fn run(health: f64) -> (Vec<State>, u64) {
+    let scenario = warm_scenario();
     let charge = domains::params::charge();
     let lamp = station::params::lamp();
     let (state, bio_reg, fast_reg) = build_sealed_station(
@@ -98,9 +114,14 @@ fn run(health: f64) -> Vec<State> {
         Some(&*reset),
     )
     .unwrap();
-    assert_eq!(rationed, 0);
     assert!(events.is_empty());
-    states
+    (states, rationed)
+}
+
+/// Leaf + stem + root carbon (mol).
+fn veg(s: &State) -> f64 {
+    use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C};
+    s.stocks[LEAF_C].amount + s.stocks[STEM_C].amount + s.stocks[ROOT_C].amount
 }
 
 fn node_t(s: &State, th: &ThermalParams) -> f64 {
@@ -108,13 +129,21 @@ fn node_t(s: &State, th: &ThermalParams) -> f64 {
 }
 
 #[test]
-fn a_dead_cooler_heats_the_chamber_cools_the_node_and_leaves_the_crop_alone() {
+fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
     let th = domains::params::thermal();
     let ch = station::params::chamber();
-    let scenario = sealed_station_scenario();
+    let scenario = warm_scenario();
     let lamp = station::params::lamp();
-    let nominal = run(1.0);
-    let failed = run(0.0);
+    let (nominal, nominal_rationed) = run(1.0);
+    let (failed, failed_rationed) = run(0.0);
+    assert_eq!(nominal_rationed, 0, "the nominal run rationed");
+    // §24h's prediction: maintenance doubles every 10 K and soon asks for more than the organs
+    // hold, so the backstop fires. Recorded, not a target.
+    eprintln!("the failed run rationed {failed_rationed} times over {DAYS} days");
+    assert!(
+        failed_rationed > 0,
+        "a crop in a chamber thousands of kelvin hot never rationed"
+    );
 
     // Nominal: the chamber holds its steady state on every day (P2).
     let t0 = chamber_temperature(nominal[0].stocks[CHAMBER].amount, &ch);
@@ -182,23 +211,22 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_leaves_the_crop_alone() {
     let nominal_end = node_t(nominal.last().unwrap(), &th);
     assert!((nominal_end - t_eq_nominal).abs() < 1e-6, "{nominal_end}");
 
-    // The crop reads no chamber temperature: every non-energy stock and every aux value is
-    // byte-identical between the two runs, on every day.
-    let mut compared = 0;
-    for (a, b) in nominal.iter().zip(&failed) {
-        assert_eq!(a.aux, b.aux, "day {}: aux differs", a.n);
-        for (id, sa) in &a.stocks {
-            if sa.quantity == Quantity::Energy {
-                continue;
-            }
+    // The crop reads the chamber (slice 3a): identical at the start, and over day 1 — the
+    // chamber 76.8 K above nominal by its end — the overheated crop burns more than it fixes,
+    // so its leaf + stem + root fall below the nominal crop's.
+    for (id, sa) in &nominal[0].stocks {
+        if sa.quantity != Quantity::Energy {
             assert_eq!(
                 sa.amount.to_bits(),
-                b.stocks[id].amount.to_bits(),
-                "day {}: {id} moved with the cooler",
-                a.n
+                failed[0].stocks[id].amount.to_bits(),
+                "{id}"
             );
-            compared += 1;
         }
     }
-    assert!(compared > 30 * DAYS, "compared only {compared} stock-days");
+    let (v_nominal, v_failed) = (veg(&nominal[1]), veg(&failed[1]));
+    eprintln!("day 1: leaf + stem + root nominal {v_nominal}, overheated {v_failed}");
+    assert!(
+        v_failed < v_nominal,
+        "the overheated crop's leaf + stem + root {v_failed} is not below the nominal {v_nominal}"
+    );
 }

@@ -148,11 +148,11 @@ is empty because every aux process lives in the excluded slow registry — the b
 not because the station carries none (it carries that one). The *set* is frozen so a future
 aux on a fast registry is caught.
 
-### The nine param files
+### The ten param files
 
 `rust/crates/domains/params/{power,thermal,eclss,crew}/*.yaml` + `rust/crates/station/params/*.yaml` (both moved out of the Python packages in Stage-3 slice S1, 2026-08-18; a pure rename — the manifest keys on basenames, so not one hash moved):
 `charge`, `self_discharge` (power); `radiator` (thermal); `eclss` (eclss); `crew` (crew);
-`water_recovery`, `lamp`, `harvest`, `chamber` (station; `chamber` added 2026-10-05). Each is clean-room from primary literature
+`water_recovery`, `lamp`, `harvest`, `chamber`, `cold_period` (station; `chamber` and `cold_period` added 2026-10-05). Each is clean-room from primary literature
 or illustrative sizing per the frozen-but-illustrative caveat above; the manifest records a
 newline-normalized sha-256 of each as **provenance**. Biosphere param files are **not**
 recorded here (delegated).
@@ -235,7 +235,7 @@ Tests of record: `tests/test_sealed_station_stability.py` (Tier 1 + Tier 2, mark
 `docs/station-reference.manifest.json` is the machine-readable surface, **generated** by
 `tests/test_station_freeze_manifest.py` (`uv run python
 tests/test_station_freeze_manifest.py`). It names the integrator, the two sealed horizons,
-the derived flow set + aux set, the nine param files (+ provenance hashes), each scenario
+the derived flow set + aux set, the ten param files (+ provenance hashes), each scenario
 → golden (+ hash), and the `delegates_to` pointer to the biosphere manifest.
 
 ⚠⚠ **Since 2026-08-16 (slice 7 of the reference flip) this file has MIXED AUTHORITY, and
@@ -344,6 +344,26 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-10-05 — the plants read the chamber, with the cited cold period, slice 3a: a station
+  PARAMETER FILE added and the plant chamber's setpoint made a program; 1 golden moves
+  (`sealed_station`).** `docs/plans/post-roadmap-room-temperature.md` §24 (design and predictions,
+  committed before code) and §24k (graded). `station/params/cold_period.yaml`: `cold_setpoint`
+  277.15 K and `cold_days` 56 (CITED, class: Cha et al. 2022's standard winter-cereal protocol,
+  6–10 weeks at 2–6 °C; the centre is the user's choice). The chamber is held at 4 °C for the
+  first 56 days of each season, then at `chamber.yaml`'s 22 °C (`setpoint`, now the WARM one;
+  the Rust field is `warm_setpoint`); the cooler and heater read the fast forcing
+  `chamber_setpoint`. Every plant-step flow and aux process is wrapped to read `temp` from the
+  chamber (`Q/C − 273.15`), type names kept, so **no flow-set change**; the plant resolver
+  carries no temperature, and a plant-side one is refused. The lamp is unchanged (full, 16 h; the
+  dimmed cold-phase lamp is 3b). Predicted with an independent re-simulation and graded: the
+  battery 5.939020485e9 J (3e-11), the heater 1.6449e6 J at each warm-up, the node's daily
+  172.1755 / 176.2189 / 173.74488 K, the end chamber 292.5662711 K (mid-cool-down), chill-days
+  55.712671868 and thermal time 5573.6508642 (the crop is never water-stressed) — all held; the
+  warm-phase vapour ceiling was mis-rounded in the prediction (3.359 vs 3.3603, the ceiling at
+  the measured 22.0534 °C). The crop flowers ≈ 102 days after sowing instead of 219. The other 19
+  goldens are byte-identical; the manifest moves by the new file's digest, `chamber.yaml`'s
+  (header) and the golden hash.
 
 - **2026-10-05 — the plant chamber's walls and heater, slice 2b-iii: two FLOWS and three
   PARAMETERS added; 1 golden moves (`sealed_station`), energy books only.** The third of three

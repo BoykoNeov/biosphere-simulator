@@ -2203,3 +2203,97 @@ leaf, stem and root only. So within a season grain never falls; the crop matures
 2. Defaulted unless overridden: the dimmed lamp keeps its efficiency (40 W for 100 µmol, DESIGN);
    the cold phase keyed to the calendar until slice 4; the minute-step photosynthesis reads the
    chamber at each 90-minute window's opening; the per-fixture choices in §24h.
+
+**ANSWERED 2026-10-05 (the user):** (1) *"two changes — ok"*: 3a, then 3b. (2) The dimmed lamp's
+efficiency: *"it depends on the type of lamp; if we assume it is an LED dimmed by PWM, then it
+keeps its efficiency."* So the lamp is a **PWM-dimmed LED** and keeps 2.5 µmol/J when dimmed — still
+**DESIGN** (the user's reason, the physics of PWM: the LED runs at its rated current for a shorter
+share of each cycle), not a citation; no source read. It matters in 3b only. The other defaults
+stand.
+
+**Checked before code (advisor, 2026-10-05):** the sealed plant resolver's only other
+weather-derived key is `VPD_VAR` (the outdoor deficit). The reference reads the chamber's own
+(`VpdRead::Chamber`, `biosphere/params.rs`), so it is unread there; left in place and recorded,
+not removed (a second cause). No display / Godot code reads `"temp"`.
+
+### 24k. Slice 3a BUILT (2026-10-05, a station unfreeze) — the predictions graded
+
+**What landed.** `station/params/cold_period.yaml` (new: `cold_setpoint` 277.15 K, `cold_days` 56,
+both CITED [Cha 2022], class); `SealedStationScenario::cold` (`ColdProgram`) with **one clock**,
+`is_cold_on_step` / `chamber_setpoint_on_step` (`scenario.rs`); `ChamberParams::setpoint` renamed
+`warm_setpoint` and `cooling()` / `heating()` / `chamber_heat0()` given the setpoint as an argument
+(advisor: every old reader became a compile error — three, all in tests); the cooler and heater
+read the fast forcing `CHAMBER_SETPOINT_VAR` (no fallback: a resolver without it errors);
+`chamber::plants_read_chamber` (`PlantsReadChamberFlow` / `PlantsReadChamberAux`, type names, ids
+and priority kept) applied **last** in `build_sealed_station_in`; `build_sealed_station_unread`
+(public) for a build that moves plant flows itself (`air_split`, `tests/gas_exchange.rs`), which
+wraps after its moves; `TEMP_VAR` removed from `sealed_bio_resolver`. Prose 3a made false,
+corrected: `chamber.yaml`'s header, `chamber.rs` / `sealed.rs` module docs, `station-reference.md`
+(ten param files).
+
+**Instrument:** the §24e re-simulation, plus a temporary day-by-day example (not committed;
+grader `W:\temp\claude\slice3a\grade.py`, output `grade.txt`). The golden diff:
+`W:\temp\claude\slice3a\compare_golden.py`.
+
+| # | Prediction | Measured | Grade |
+|---|---|---|---|
+| A1 | `solar_source` byte-identical; battery 5.939020485e9 | identical; **5.939020484818e9** (3e-11) | HELD |
+| A2 | heater 1.6449e6 J per warm-up, 6.5795e6 in all | **1.64488e6** each season; **6.57950e6** | HELD |
+| A3 | cold 4.053–4.061 °C; warm to 295.2034 K; day 305's first readings ≈ 19.4 °C; end 292.5662711 K | day-ends **4.0542–4.0608 °C**; warm **295.1886868–295.2034234**; day-305 end 19.41 °C; end **292.5662711** | HELD |
+| A4 | node end 174.18129; daily 172.1755 / 176.2189 / 173.74488 | **174.18129**; **172.1755 / 176.2189 / 173.74488** | HELD (to the printed digit) |
+| A5 | surroundings 1.308367e9; space 46 310 460 294.6 | **1.3083665e9** (−4e-7); **46 310 460 294.59** | HELD |
+| A6 | chill-days 55.712671868 | **55.712671868320** | HELD |
+| A7 | thermal time 5573.6508642 if unstressed | **5573.6508641726** (5e-12) | HELD — **the drought detector stayed silent: the crop is never water-stressed** |
+| A8 | flowering / maturity 102.06 / 136.06 (season 1), 102.125 / 136.125 after | first day-end past each: **103 / 137** in all four seasons (day resolution; A7 pins the clock) | HELD |
+| A9 | completes; re-sow finds grain; rationed 0, no events | rationed **0**, events **0**; grain at the re-sows 37.70 / 37.87 / 37.87 mol | HELD |
+| A10 | cold vapour ≤ 1.035 kg; warm ≤ 3.359 | cold max **1.0347**; warm max **3.3603** | **MISSED as written — the prediction's own rounding.** 3.359 was the ceiling at 22.05 °C (3.35956, truncated); the warm chamber reaches 22.0534 °C, whose ceiling is **3.36026** — the measured maximum sits on it. The cold-phase figure, computed the same way at 4.0608 °C, is 1.03466. No mechanism miss; recorded, not re-fitted |
+| A11 | only `sealed_station` moves; manifest + `cold_period.yaml`, `chamber.yaml`, golden hash; no flow-set change | **19 of 20 identical**; manifest diff exactly those three lines | HELD |
+
+The end state: 10 of 36 stocks byte-identical (the crew's books, `solar_source`, the inert fill);
+the crop much smaller at the end (leaf 2.30 → 0.068 mol C: it matures 117 days earlier and stands
+169 days); grain 40.37 → 37.87 mol; the plants' recorded window temperature 16.51 → 22.05 °C.
+
+**The roster (§24h), graded on the first full run (`--no-fail-fast`, 21 reds).** Every red matched
+the roster in cause except four, recorded:
+
+1. **`chamber_walls` L1** — the roster said the heater figures were unchanged because "both runs
+   share the day-56 warm-up". **Wrong:** the heaterless run's heater was scaled 0 for the WHOLE
+   run, so it skipped the warm-up and the two batteries differed before the window. Fixed by
+   cutting that heater from day 100 (`HEATER_CUT_FROM`); then the window figures held unchanged
+   (14.565 MJ against 14.574 predicted in 2b-iii) and the inversion held: unheated, thermal time
+   1365.5 against 1451.7, leaf + stem + root 14.28 against 13.53 mol.
+2. **`lamp_shed::the_plain_crop_does_not_feel_a_blackout`** (and the plain half of
+   `cutting_only_the_lamps_power_darkens_the_lab_crop`) — the roster expected "crop figures move"
+   only in the lab runs. **The plain crop now feels a blackout through the ROOM**: the unshed lamp
+   empties the small battery on day 6, the backstop rations the lamp (5 140 times), less lamp heat
+   reaches the chamber, and the crop reads a colder room from day 7 (diagnosed with a temporary
+   per-stock diff). Re-expressed: the plain crop's recorded LIGHT is bit-identical (the defect
+   the test pins), and the chamber ends colder. Renamed `..._does_not_see_a_blackout`.
+3. **`tests/gas_exchange.rs` (three more) and `minute_transpiration.rs` (two)** — the roster's
+   search found tests that INSERT a plant-side temperature, not tests that READ one off the plant
+   resolver to compute an expected value. Five did. Re-expressed against the chamber's
+   `Q / C − 273.15`; the raw flows the minute-step pins compare against now come from
+   `build_season` (unwrapped). New pin `a_wrap_before_the_move_is_refused` (the guard on the
+   order the advisor named).
+4. **`chamber_walls` L4 (120 days) stayed green** where the roster said "re-derive". Checked, not
+   assumed: the node's relaxation time at 179 K is ≈ 10.5 days and the cold phase ends 64 days
+   before day 120, so its tail is gone (e⁻⁶). Its full-horizon twin was re-derived with the
+   instrument extended to the structure (`W:\temp\claude\slice3a\resim_structure.py`, run before
+   the test): battery ≈ **1.6767e9** (control without the cold: 1.2163e9 against the test's old
+   measured 1.219e9).
+
+Also as found: `chamber_heat`'s dead-cooler run did not hard-error (no fallback needed); it
+rationed **878** times over 60 days, and the overheated crop's leaf + stem + root was 0.093 against
+0.173 mol after day 1. `lamp_shed` H1/H2 **passed** in the cold, meaninglessly (H2 compared a 4 °C
+chamber against the warm setpoint) — opted out as the roster said, after which H2 reads 8.8 K and
+H4 3.57 MJ, as in §23m. `air_split`'s vapour pin went red as its own comment foresaw; per phase it
+holds both ways: cold phase plants **+2.16 kg** (crew store −1.94), warm phase **−2.38 kg** (crew
++2.14) — the two nearly cancel over 90 days.
+
+**The slow (ignored) station tests, run:** all pass. `chamber_walls` L4's full horizon: battery
+**1.676675658e9** against the instrument's 1.676675985e9 (2e-7); R3/R4: node **172.17546 /
+176.21889 / 173.74488**, chamber day-ends 277.2042–295.2034 K with 8 between the bands (one warm-up,
+one cool-down per season), end 292.5662711 K. Full suite and clippy green.
+
+**Not removed (recorded):** `VPD_VAR` (outdoor deficit) stays in the sealed plant resolver, unread
+under `VpdRead::Chamber`. **Next:** 3b, the cold phase's dimmed 8 h lamp (§24g), on top of this.

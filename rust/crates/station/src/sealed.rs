@@ -7,9 +7,14 @@
 //! (waste heat → `thermal.chamber`, the plant chamber, since 2026-10-05) and `ChamberCooling`
 //! (chamber → node), plus `RadiatorReject`, `WaterRecovery` (and `Harvest` iff
 //! `with_harvest`); the biosphere
-//! registry is `build_season` verbatim, re-sown yearly by `annual_reset` via the driver's
+//! registry is `build_season`'s, re-sown yearly by `annual_reset` via the driver's
 //! `slow_reset` hook. `with_harvest` / `close_feces` default **off** (the Tier-2 scope).
 //! Tier-2 (FvCB + `T⁴`). Euler-only.
+//!
+//! **Since slice 3a (2026-10-05) the plants read the chamber**: every plant-step flow and aux
+//! process is wrapped ([`crate::chamber::plants_read_chamber`], type names kept) so `temp` is
+//! the chamber's, the plant resolver carries no temperature, and the chamber runs the cold
+//! program (`cold_period.yaml`; [`SealedStationScenario::is_cold_on_step`]).
 
 use std::collections::BTreeMap;
 
@@ -46,9 +51,10 @@ use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 use crate::chamber::{
-    chamber_heat0, chamber_stock, require_step_within_response, ChamberCooling, ChamberHeater,
-    ChamberParams, ChamberSurroundings, ChamberWall, CHAMBER, CHAMBER_COOLING, CHAMBER_HEATER,
-    CHAMBER_SURROUNDINGS, CHAMBER_WALL, OUTDOOR_TEMP_VAR,
+    chamber_heat0, chamber_stock, plants_read_chamber, require_step_within_response,
+    ChamberCooling, ChamberHeater, ChamberParams, ChamberSurroundings, ChamberWall, CHAMBER,
+    CHAMBER_COOLING, CHAMBER_HEATER, CHAMBER_SETPOINT_VAR, CHAMBER_SURROUNDINGS, CHAMBER_WALL,
+    OUTDOOR_TEMP_VAR,
 };
 use crate::driver::{run_master_day, OwnedResetHook};
 use crate::flows::{
@@ -182,8 +188,48 @@ pub fn build_sealed_station_at(
 /// [`build_sealed_station_at`] with the plant chamber's walls facing `surroundings`
 /// (`docs/plans/post-roadmap-room-temperature.md` §23i). [`ChamberSurroundings::Outdoor`] is
 /// the reference; the other three are the lab's options.
+///
+/// The plant registry is wrapped to read the chamber ([`plants_read_chamber`]) **last**, after
+/// the gas exchange has moved, so the window recorder records the chamber (§24b).
 #[allow(clippy::too_many_arguments)]
 pub fn build_sealed_station_in(
+    charge: &ChargeParams,
+    thermal_params: &ThermalParams,
+    crew: &CrewParams,
+    eclss: &EclssParams,
+    recovery: &WaterRecoveryParams,
+    lamp: &LampParams,
+    harvest: &HarvestParams,
+    scenario: &SealedStationScenario,
+    with_harvest: bool,
+    close_feces: bool,
+    gas: GasExchangeStep,
+    surroundings: ChamberSurroundings,
+) -> Result<(State, Registry, Registry), SimError> {
+    let (state, bio_reg, fast_reg) = build_sealed_station_unread(
+        charge,
+        thermal_params,
+        crew,
+        eclss,
+        recovery,
+        lamp,
+        harvest,
+        scenario,
+        with_harvest,
+        close_feces,
+        gas,
+        surroundings,
+    )?;
+    let bio_reg = plants_read_chamber(bio_reg, &state.stocks, &crate::params::chamber())?;
+    Ok((state, bio_reg, fast_reg))
+}
+
+/// [`build_sealed_station_in`] **without** the plants reading the chamber: for a build that
+/// moves plant flows onto the fast step itself (the lab's separate air, [`crate::air_split`])
+/// and must wrap after its own moves. ⚠ A run of this build's plant registry as it stands
+/// errors at the first `temp` read: the plant resolver carries no temperature.
+#[allow(clippy::too_many_arguments)]
+pub fn build_sealed_station_unread(
     charge: &ChargeParams,
     thermal_params: &ThermalParams,
     crew: &CrewParams,
@@ -234,8 +280,10 @@ pub fn build_sealed_station_in(
         true,
     )?);
     fast_seq.push(node_stock(node0)?);
+    // Day 0's setpoint: the cold program's in the reference (§24c, "start values").
     fast_seq.push(chamber_stock(chamber_heat0(
         &chamber,
+        scenario.chamber_setpoint_on_step(0, chamber.warm_setpoint),
         chamber_heat_input_w(scenario),
     ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
@@ -466,11 +514,16 @@ fn assert_flow_ids_disjoint(bio_reg: &Registry, fast_reg: &Registry) -> Result<(
 /// The biosphere forcing: weather-driven, with `PAR`, net radiation (since 2026-10-05; the
 /// weather's outdoor value before) and `daylength` from the lamp. The `weather` is tiled over
 /// `scenario.years` seasons (so `_table` never end-clamps).
+///
+/// **No temperature** since slice 3a: the plants read the chamber
+/// ([`crate::chamber::plants_read_chamber`]), whose guard refuses a plant-side `temp`. The walls
+/// still read the weather's, through [`outdoor_temperature`].
 pub fn sealed_bio_resolver(
     lamp: &LampParams,
     scenario: &SealedStationScenario,
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = weather_forcings(&scenario.bio, scenario.years)?;
+    forcings.remove(TEMP_VAR);
     let photoperiod_s = scenario.photoperiod_hours as f64 * 3600.0;
     let par = sealed_lamp_par(lamp, scenario);
     forcings.insert(PAR_VAR.to_string(), lamp_light_path(par, photoperiod_s));
@@ -483,7 +536,9 @@ pub fn sealed_bio_resolver(
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }
 
-/// The fast-domain forcing: crew intakes + lamp draw + constant solar/load.
+/// The fast-domain forcing: crew intakes + lamp draw + constant solar/load, the outdoor
+/// temperature the chamber's walls face, and the chamber's setpoint program
+/// ([`chamber_setpoint`]).
 pub fn sealed_fast_resolver(
     charge: &ChargeParams,
     scenario: &SealedStationScenario,
@@ -510,7 +565,24 @@ pub fn sealed_fast_resolver(
         constant(balanced_load_w(charge, &scenario.power))?,
     );
     forcings.insert(OUTDOOR_TEMP_VAR.to_string(), outdoor_temperature(scenario)?);
+    forcings.insert(
+        CHAMBER_SETPOINT_VAR.to_string(),
+        chamber_setpoint(scenario, &crate::params::chamber()),
+    );
     SourceResolver::new(forcings, std::collections::HashMap::new())
+}
+
+/// The chamber's setpoint (K) on the fast step: the cold program's in the cold period, else
+/// `chamber.yaml`'s warm one — [`SealedStationScenario::chamber_setpoint_on_step`], the one
+/// clock. ⚠ Keyed on `n` like [`outdoor_temperature`], so it leads the plants' day by one plant
+/// step (the setpoint changes 90 minutes before the plants' day does, §24c).
+pub fn chamber_setpoint(
+    scenario: &SealedStationScenario,
+    chamber: &ChamberParams,
+) -> simcore::environment::Schedule {
+    let scenario = *scenario;
+    let warm = chamber.warm_setpoint;
+    Box::new(move |n, _fast_dt| scenario.chamber_setpoint_on_step(n, warm))
 }
 
 /// The outdoor temperature (°C) the chamber's walls face on the fast step: the weather file's

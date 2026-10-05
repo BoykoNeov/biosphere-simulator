@@ -21,10 +21,9 @@
 use domains::biosphere::params as bio_params;
 use domains::biosphere::readouts::withdrawal_demand;
 use domains::biosphere::science::{humidity_target_kg, saturation_vapour_kg};
-use domains::biosphere::stocks::{CARBON_POOL, TEMP_VAR, WATER_VAPOR};
+use domains::biosphere::stocks::{CARBON_POOL, WATER_VAPOR};
 use domains::eclss::CABIN_H2O;
 use domains::params;
-use simcore::environment::Environment;
 use simcore::flow::FlowResult;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
@@ -170,7 +169,8 @@ fn main() {
                 worst = (gross, pool, slow_k as f64 / slow_per_day as f64);
             }
             // Water.
-            let temp = bound.get(TEMP_VAR).expect("temp");
+            // The plants read the chamber since slice 3a; the plant resolver carries no `temp`.
+            let temp = chamber_c(before);
             let vapour = before.stocks[WATER_VAPOR].amount;
             let cabin = before.stocks[CABIN_H2O].amount;
             let (mut flux, mut air) = (0.0, 0.0);
@@ -329,4 +329,10 @@ fn main() {
             d.pool_max
         );
     }
+}
+
+/// The plants' temperature (°C) on `state` since slice 3a: the chamber's, `Q / C_ch − 273.15`.
+fn chamber_c(state: &State) -> f64 {
+    state.stocks[station::chamber::CHAMBER].amount / station_params::chamber().heat_capacity
+        - 273.15
 }

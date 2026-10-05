@@ -20,11 +20,13 @@ use domains::biosphere::weather::PAR_UMOL_PER_J;
 
 use crate::chamber::ChamberParams;
 use crate::flows::{HarvestParams, LampParams, WaterRecoveryParams};
+use crate::scenario::ColdProgram;
 
 const WATER_RECOVERY_YAML: &str = include_str!("../params/water_recovery.yaml");
 const LAMP_YAML: &str = include_str!("../params/lamp.yaml");
 const HARVEST_YAML: &str = include_str!("../params/harvest.yaml");
 const CHAMBER_YAML: &str = include_str!("../params/chamber.yaml");
+const COLD_PERIOD_YAML: &str = include_str!("../params/cold_period.yaml");
 
 fn file(text: &str, name: &'static str) -> ParamFile {
     ParamFile::parse(text, name).unwrap_or_else(|e| panic!("{name} is malformed: {e}"))
@@ -128,7 +130,7 @@ pub fn chamber() -> ChamberParams {
             "chamber.yaml",
         ),
         response_time: positive(v[2], "response_time"),
-        setpoint: positive(v[3], "setpoint"),
+        warm_setpoint: positive(v[3], "setpoint"),
         wall_conductance: checked(
             require_non_negative(v[4], "wall_conductance", "chamber.yaml"),
             "chamber.yaml",
@@ -141,15 +143,45 @@ pub fn chamber() -> ChamberParams {
     }
 }
 
-/// The **frozen station param-file census**: `(filename, embedded text)` for the four files
+/// The plant chamber's cold period (`cold_period.yaml`, Step 3c slice 3a): the program the
+/// sealed scenario defaults its [`ColdProgram`] from. The setpoint is strictly positive; the
+/// length is a whole number of days, `>= 0` (0 is no cold period).
+pub fn cold_period() -> ColdProgram {
+    let f = file(COLD_PERIOD_YAML, "cold_period.yaml");
+    let v = checked(
+        f.guarded_set(
+            &[("cold_setpoint", "K"), ("cold_days", "day")],
+            "cold_period.yaml",
+        ),
+        "cold_period.yaml",
+    );
+    let days = checked(
+        require_non_negative(v[1], "cold_days", "cold_period.yaml"),
+        "cold_period.yaml",
+    );
+    assert!(
+        days.fract() == 0.0,
+        "cold_period.yaml: cold_days must be a whole number of days, got {days}"
+    );
+    ColdProgram {
+        days: days as usize,
+        setpoint: checked(
+            require_positive(v[0], "cold_setpoint", "cold_period.yaml"),
+            "cold_period.yaml",
+        ),
+    }
+}
+
+/// The **frozen station param-file census**: `(filename, embedded text)` for the five files
 /// this module loads, in filename order (slice C8 of the reference flip).
 ///
-/// The station manifest's `param_files` is these four plus the five
+/// The station manifest's `param_files` is these five plus the five
 /// [`domains::params::param_files`] owns. No exclusion rule — `crates/station/params/` holds
 /// nothing but frozen files.
 pub fn param_files() -> Vec<(&'static str, &'static str)> {
     let mut files = vec![
         ("chamber.yaml", CHAMBER_YAML),
+        ("cold_period.yaml", COLD_PERIOD_YAML),
         ("harvest.yaml", HARVEST_YAML),
         ("lamp.yaml", LAMP_YAML),
         ("water_recovery.yaml", WATER_RECOVERY_YAML),
@@ -258,7 +290,7 @@ mod tests {
             census, on_disk,
             "the loaded station param-file census and the directory disagree. A ROSTER              finding, not a value one: do NOT 'fix' it by editing whichever list is shorter."
         );
-        assert_eq!(census.len(), 4, "the frozen station param set is 4 files");
+        assert_eq!(census.len(), 5, "the frozen station param set is 5 files");
     }
 
     /// Every basename is unique across the SIX directories the station manifest spans.
@@ -289,8 +321,8 @@ mod tests {
         );
         assert_eq!(
             all.len(),
-            9,
-            "the frozen station contract names 9 param files"
+            10,
+            "the frozen station contract names 10 param files"
         );
     }
 
