@@ -1995,3 +1995,187 @@ Outputs in `W:\temp\claude\heater-shed\`.
 `assert_same_run`, which strips the lab's bookkeeping slot from one side only (it compares a lab
 run against a plain one), so it went red at day 0 on identical runs; it now compares the two lab
 runs directly.
+
+## 24. Slice 3 — the plants read the chamber, with the cited cold period: design and predictions, before code (2026-10-05)
+
+§23k item 2, the user's call: the plants read **the chamber**. §10's slice 3, with §12's cold
+period (8 weeks at 4 °C, the lamp dimmed to 100 µmol m⁻² s⁻¹ for an 8 h day). The 305-day
+calendar is **kept** (slice 4 re-sows on maturity). **No code in this section.** A station
+unfreeze; the biosphere is untouched (the plants' formulas do not change, only what they read).
+
+### 24a. Advisor review (2026-10-05), summarized
+
+1. **The mechanism is a station-side environment wrapper** (the `OnFastStep` / `LampLitFlow`
+   precedent). Wrap inside `build_sealed_station_in`, **after** `gas_exchange_on_fast_step`, so the
+   plant-window recorder is wrapped too and every caller inherits it. Keep the inner `type_name`
+   and forward `priority()` (as `OnFastStep` does — **not** `LampLitFlow`'s rename: the manifest's
+   flow set is keyed on type names). **Remove `TEMP_VAR` from `sealed_bio_resolver`** so an
+   unwrapped reader errors loudly, and refuse a lab-inserted one rather than ignore it. The
+   minute-step carbon budget reading the plant step's recorded value is fine for this slice. State
+   the start values (the re-simulation assumes them).
+2. **The roster: days 0–55 are where the lab fixtures live.** Record each sealed fixture's start
+   and horizon before running; classify all-cold / crosses day 56 / warm only. Controls that hold
+   only because the plants read no chamber (`chamber_walls` L1, `chamber_heat` P9) **invert by
+   design** — rewrite them as the opposite prediction with a direction; they become this slice's
+   liveness. Per fixture whose subject is not the cold: opt out (no cold phase) or re-derive, with
+   the reason written down — **not all opted out to stay green**.
+3. **Split the golden diff in two.** The dimmed lamp and 8 h day are separable from reading the
+   chamber; the cold setpoint is not (slice 1 shows the warm chamber arrests the crop).
+4. Commit the predictions from the validated instrument, conditioned where they depend on water.
+5. Strengthen "re-sow cannot fail" beyond a grep — done, §24e.
+
+### 24b. How the plants read the chamber
+
+* **`PlantsReadChamber`** (station-side): wraps each plant-step flow and aux process. Its
+  environment answers `TEMP_VAR` as `Q_chamber / C_ch − 273.15` (°C) from the snapshot it is
+  evaluated on, and delegates every other variable. Inner `type_name`, `id` and `priority`
+  forwarded, so no manifest key moves for the wrapper.
+* **Where.** Once, in `build_sealed_station_in`, on the plant registry **after**
+  `gas_exchange_on_fast_step` — so the `PlantWindowRecorder` records the chamber, and the
+  minute-step carbon budget (`OnFastStep`) reads that recorded value through its window: the
+  chamber at the opening of each 90-minute window, the resolution the light already has. Live
+  minute-by-minute temperature for the carbon budget is a possible later refinement; it differs
+  only while the chamber moves (a warm-up, a fault).
+* **`TEMP_VAR` leaves `sealed_bio_resolver`.** The walls keep reading the weather through
+  `outdoor_temperature` (unchanged — it builds its own table). **The guard:** the wrapper's
+  environment first asks the inner environment for `TEMP_VAR`; if the inner one answers, it
+  **errors** ("the plants read the chamber; a temperature wired on the plant side would be
+  silently ignored"). This turns three silent failures loud: a lab resolver that holds the plants
+  at 22 °C (`warm_room_arrest`, the `watering` and `minute_transpiration` examples and tests); an
+  unwrapped reader; and **a build that moves flows after wrapping** — `air_split` builds a
+  plant-step station and moves the carbon budget itself (`air_split.rs:419`), so a wrapped flow
+  inside `OnFastStep` would meet `WindowEnv`, which answers `TEMP_VAR` → error, rather than
+  silently reading the chamber live while the reference reads the window.
+* **No new stock, no new aux.** Saved sessions keep loading (the stock set is unchanged).
+
+### 24c. The cold program
+
+* **`cold_period.yaml`** (new station param file), one source for all four: Cha et al. 2022
+  (*Molecular Plant* 15:1300, the AAM opened 2026-10-03): `cold_setpoint` **277.15 K** and
+  `cold_days` **56** (the standard 6–10 weeks at 2–6 °C, AAM lines 40–42 — the centre, the
+  user's choice §12); `cold_par` **100 µmol m⁻² s⁻¹** (their vernalization light, AAM line 384)
+  and `cold_photoperiod_hours` **8** (the standard's short day). 3a carries the first two, 3b adds
+  the other two.
+* **The clock.** The cold phase is the first `cold_days` of each season:
+  `floor(n·bio_dt) mod season_days < cold_days`. With the calendar kept, the season start **is**
+  the sowing. ⚠ Slice 4 (re-sow on maturity) must move this clock into the state — recorded here so
+  it is not rediscovered.
+* **Fast side:** `ChamberCooling` and `ChamberHeater` read their setpoint from a new fast forcing
+  (the program), not from `chamber.yaml`'s constant, which stays as the warm value (295.15 K). 3b:
+  `LAMP_POWER_VAR` follows the program — the cold-phase draw is `cold_par · area / photon_efficacy`
+  = 100 / 2.5 = **40 W**, × 8/24 = **13.33 W** averaged. ⚠ DESIGN assumption: a dimmed lamp keeps
+  its photon efficacy (2.5 µmol/J) — no source read for dimming.
+* **Plant side (3b):** `PAR_VAR`, `RN_VAR` and `DAYLENGTH_VAR` switch to the dim, 8 h lamp on the
+  same clock (`lamp_light_path` / `lamp_net_radiation_path` with the cold values).
+* **⚠ The time base** (§23i/§23j): the fast side keys on `n`, which leads the plants by one plant
+  step. So the chamber starts to warm (or cool) in the **last 90 minutes** of the day before the
+  plants' day changes. Kept, as for the walls — not special-cased. Consequences predicted below:
+  the plants' first reading on day 56 is mid-warm-up, and the golden's last 90 minutes read
+  day 1220 (≡ day 0 of a fifth season), so the end state's chamber is **mid-cool-down**.
+* **Start values.** The chamber starts at day 0's setpoint and lamp:
+  `C_ch·T_cold + lamp_avg(day 0)·τ`. The node start (`sealed_node_heat`) is **unchanged** (the full
+  lamp; it has not been an equilibrium since the walls). The re-simulation assumes exactly this.
+
+### 24d. The split — two golden diffs, one cause each
+
+* **3a — the plants read the chamber, with the cold setpoint; the lamp unchanged** (full, 16 h,
+  all year). The cooler's 200 W holds 4 °C against the lamp's 133.3 W plus the walls' ≈ 11 W
+  inflow (outdoors is 5.4–16.4 °C over days 0–55, always warmer than the chamber).
+* **3b — the cold phase's lamp:** 100 µmol, 8 h. The daylength factor 0.28
+  (`1 − 0.09·(16 − 8)`, Eqn 7.6) and the ≈ 2.3 GJ battery change belong to this diff alone.
+
+### 24e. The instrument, and its controls
+
+`W:\temp\claude\slice3\resim.py` and `endstate.py` — an independent Python re-simulation (not the
+Rust code) of the chamber, node and battery on the 60 s step over 1220 days, with the plants'
+clock (thermal time + chill-days, Eqns 7.4/8.3/8.6/7.6) read off the chamber at each plant-step
+opening. Outputs beside it (`ref.txt`, `slice3a_56.txt`, `slice3_56.txt`, `endstate.txt`).
+**Controls, run in `ref` mode against the frozen golden:**
+* the heat books: node end **174.14080 K**, daily min/max/mean **172.1720 / 174.8881 / 173.24720**,
+  chamber end **295.1999296 K**, surroundings **1.841730e9 J** — §23j's graded values to the
+  printed digits; `boundary.space` **45 773 227 032.2669 J** against the golden's
+  45 773 227 032.266945 (16 digits);
+* the crop's clock: thermal time **2490.6033461672773** and chill-days **143.37249999999898** —
+  the golden's end-state aux **bit for bit**. So drought-hastened development (WSSD 0.40,
+  configured for this crop) never fired in today's run.
+
+**"Re-sow cannot fail" — checked by listing every writer of `storage_c`, not by a grep pattern.**
+`Allocation` (partition fraction × `available_for_growth`, which is `max(0, ·)`: ≥ 0),
+`StemReserveRemobilization` (rate × reserve ≥ 0), `Harvest` (station; **off** in the reference,
+`with_harvest = false`), and `reset_crop` (zeroes it at the re-sow). `organ_stock` builds it as a
+POPULATION with extinction threshold **0**, so the die-off pass cannot zero it. Maintenance burns
+leaf, stem and root only. So within a season grain never falls; the crop matures on day ≈ 139
+(below), long before the day-305 re-sow.
+
+### 24f. Predictions — 3a (the `sealed_station` golden, regenerated)
+
+| # | Prediction |
+|---|---|
+| A1 | `boundary.solar_source` **byte-identical** to the 2b-iii golden. `power.battery` = golden − the heater: **5.939020485e9 J** (5.9456e9 − 6.5795e6), within 1e-6 relative. Every other stock moves (the plants read a different temperature) — magnitudes **not predicted** except below |
+| A2 | The heater fires **once per season, at the warm-up**: **1.6449e6 J** each, 6.5795e6 J in all, within 1e-3. (Until now it never fired in the reference.) It fires nowhere else: the cold phase's walls bring heat in |
+| A3 | The chamber: cold phase **4.053–4.061 °C**; warm phase as 2b-iii's (to 295.2034 K); the warm-up is ≈ 2.25 h (the plants' first reading on day 56 is **≈ 16.0 °C**, then 22.045); the re-sow cool-down ≈ 11 h (the lamp's 133 W against the cooler's 200 W; plant readings on day 305 ≈ 19.4, 12.3, 6.3 °C at 0, 4.5 and 9 h, then 4.06). End state **292.5662711 K** (mid-cool-down: the last 90 minutes read day 1220), within 1e-6 K |
+| A4 | The node: end **174.18129 K**; daily min / max / mean **172.1755 / 176.2189 / 173.74488**, within 0.01 K (the walls bring heat in during the cold phase, so the node runs warmer then) |
+| A5 | `boundary.chamber_surroundings` **1.308367e9 J**, `boundary.space` **46 310 460 294.6 J**, within 1e-5 relative |
+| A6 | Chill-days at the end **55.712671868** (the plants' first readings after the day-305 re-sow are above 12 °C while the chamber cools). **Exact to 1e-9 relative whatever the crop does** — vernalization reads only the temperature, and the chamber's heat books do not read the crop |
+| A7 | Thermal time at the end **5573.6508642** — **if the crop is never water-stressed**. Any excess means drought-hastened development fired: that is the detector for the open water question (§8 item 3), not a miss to tune away |
+| A8 | Flowering / maturity (days after sowing, unstressed): season 1 **102.0625 / 136.0625**, seasons 2–4 **102.125 / 136.125**. Today's crop: 219.25 / 266.31. So ≈ 117 days earlier, then ≈ 169 days standing until the calendar re-sows |
+| A9 | The run completes: every re-sow finds grain ≥ the seedling's 0.16 (§24e). `rationed == 0`, no events |
+| A10 | Water: during each cold phase the plants' vapour store ends every plant step at or under the 4.06 °C ceiling, **1.035 kg** (75 % of saturation, 9500 mol); in the warm phase under **3.359 kg**. Up to ≈ 2.3 kg condenses in the hours after each re-sow (if the store was at its warm ceiling). Transpiration and the crop's carbon: **direction not predicted** (hotter, drier air in the warm phase against a crop that matures 117 days earlier) |
+| A11 | Goldens: only `sealed_station` moves (19 of 20 identical). Manifest: + `cold_period.yaml`'s digest, the golden hash; **no** flow-set change (the wrapper keeps type names) |
+
+### 24g. Predictions — 3b (on top of 3a)
+
+| # | Prediction |
+|---|---|
+| B1 | `boundary.solar_source` byte-identical. `power.battery` = the 2b-iii golden + the lamp saved − the heater: **8.261426e9 J** (5.9456e9 + 2.322432e9 − 6.6060e6), within 1e-6 relative |
+| B2 | Heater **1.6515e6 J** per warm-up (6.6060e6 in all), within 1e-3 |
+| B3 | Chamber: cold phase **4.005–4.013 °C**; the plants' first reading on day 56 **≈ 15.97 °C**; the re-sow cool-down ≈ 4 h (plants read ≈ 15.2 °C at the first step of day 305, then 4.01). End state **288.3622829 K**, within 1e-6 K |
+| B4 | Node: end **174.18129 K**; daily min / max / mean **163.1421 / 174.3095 / 171.44761** (the dim lamp sends 120 W less heat through the cooler for 56 days a season), within 0.01 K |
+| B5 | `boundary.chamber_surroundings` **1.305818e9 J**; `boundary.space` **43 991 226 753.0 J**, within 1e-5 relative |
+| B6 | Chill-days at the end **55.926093595** (exact to 1e-9, as A6) |
+| B7 | Thermal time at the end **5512.7606791**, if unstressed (A7's detector). The cold phase contributes only **23.62 °C·day** (4 °C × the daylength factor 0.28 × the vernalization factor, which is 0 until ≈ 19.7 chill-days) |
+| B8 | Flowering / maturity, unstressed: **104.875 / 138.875** days after sowing, every season. Sensitivity (lab, not golden): 6 weeks → 109.25 / 143.31 (the factor stays 0.736 all season); 10 weeks → 118.19 / 152.19 |
+| B9 | Vapour ceiling in the cold phase **1.031 kg** (4.011 °C); A9, A10's other parts and A11 unchanged (`cold_period.yaml`'s digest moves again) |
+
+### 24h. The roster — every sealed fixture, before running (start day 0 unless noted)
+
+| Fixture | Window | Class | Expected | Decision (why) |
+|---|---|---|---|---|
+| `goldens.rs` `sealed_station` | 1220 d | all phases | §24f / §24g | regenerate |
+| `tests/chamber_heat.rs` | 60 d, walls off | crosses 56 | the flat-chamber claim fails; P9's "crop byte-identical under a dead cooler" **inverts**; with walls off a dead cooler drives the chamber without bound, and the plants now read it (thousands of K — outside every plant formula's range; `q10^(ΔT/10)` stays finite, the crop's maintenance does not stay plausible) | **opt out of the cold** (its subject is the cooler); keep the day-1 rate and the 60-day node claim; P9's crop claim **inverted to a direction over day 1** (the overheated crop's leaf + stem + root below nominal); what the crop does further out is a finding, recorded and asserted as found |
+| `tests/chamber_walls.rs` L5 | 7 d | cold | premise gone (the plants no longer read the weather) | re-point: the walls read the day the plants' `floor(n·bio_dt)` names, from the weather table |
+| `chamber_walls` L1 | days 113–117 | warm (after a warm-up) | heater figures unchanged in the window (both runs share the day-56 warm-up); "crop identical with and without the heater" **inverts** | **invert, with directions**: without the heater the plants read a colder chamber → **less thermal time**, and (dark lamp, no photosynthesis) **less maintenance burn → more leaf + stem + root** than the heated run |
+| `chamber_walls` L2 | 3 d | cold | the wall law's sign flips: the chamber is at 4 °C, so the 18 °C cabin sends heat **in** (≈ 21.4 W), the 27 °C cabin ≈ 35.3 W in | **re-derive** in closed form (the subject — the wall law either way — is testable at the cold setpoint) |
+| `chamber_walls` L4 (+ its full-horizon twin, ignored) | 120 d / 1220 d | crosses 56 | the cold chamber faces a −98 °C node: the heater runs harder (3b) or softer (3a) in the cold phase; the 120-day node and last-30-day heater figures shift by the cold phase's tail | **re-derive** with the instrument extended to the structure surroundings, before running |
+| `tests/lamp_shed.rs` | 8 d, blackout 2–5 | cold | heater-subject tests lose their subject (the walls bring heat **in**, so the heater never fires: H1 trivially true, H2's −3 K and H4's 3.5 MJ fail); in 3b the dim lamp's 13 W may never bring the battery to the reserve | **opt out of the cold** (their subject is shedding a warm chamber's loads) |
+| `tests/perturbations.rs` matter | 8 d, window 2–7 | cold | directional claims (biomass down, effort up, battery spared) predicted to **hold** in a 4 °C chamber | **keep in the cold** (directional; their subject is the response, not the temperature) |
+| `tests/air_split.rs` | 90 d | crosses 56 | builds through `build_sealed_station_at` (plant step) and moves the carbon budget itself → the §24b guard **errors**; its ratios (0.144, 0.999, …) shift | apply the wrapper after its own move; **keep the cold** (both arms run the same program); **re-derive** its figures |
+| `tests/gas_exchange.rs` | units | — | `a_change_to_the_plant_side_temperature_is_what_gets_recorded` inserts `TEMP_VAR` → refused | re-express: a change to the **chamber** is what gets recorded |
+| `tests/minute_transpiration.rs` | units | — | `plant_resolver(held_22)` inserts `TEMP_VAR` → refused | re-express through a chamber held at 22 °C |
+| `tests/lamp_net_radiation.rs` | spot days | cold days, in 3b | the sealed crop's net radiation is the **dim** lamp's in the cold phase (3b) | 3b: **re-derive**, and assert both phases |
+| `tests/warm_room_arrest.rs` | 1 season | — | its 22 °C resolver is refused | re-express as **a program with no cold phase** (`cold_days` 0); it stays the control for the cold period; its 8 °C liveness becomes a cold program held all season |
+| `tests/session_parity.rs`, `session_save_load.rs`, `day_order.rs` | short + ignored full | all | self-consistency (one build two ways) — **hold** | keep; run the ignored ones for grading |
+| examples `air_split`, `air_split_baseline` | season | crosses 56 | `bound.get(TEMP_VAR)` → **crash** (intended) | re-point their temperature readout at the chamber |
+| examples `watering`, `minute_transpiration` | season | — | 22 °C inserts refused | re-express via a warm chamber; their records were made at 22.0 °C, a held chamber reads 22.05 °C → small shifts, recorded |
+| examples `draw_census`, `intraday_exchange`, `lamp_shed` | various | all | `draw_census`'s byte-exact control passes against the regenerated golden; `lamp_shed` as its tests | run all seven before and after, as §23f |
+| Godot sealed session (`palette.rs`, `godot_bridge`) | — | — | inherits the build; no stock-set change, so saves still load | none |
+
+### 24i. Traps found while designing
+
+* **`run_shedding`'s delivered share** (`lamp_shed.rs`) divides the lamp's draw by
+  `lighting_average_power(scenario)` — the constant full lamp. In 3b's cold phase a healthy dim
+  lamp would read **10 % delivered**, and `LampLitEnv` would darken the crop a second time. 3b must
+  take the nominal from the lamp program (the unperturbed schedule). Lab only; silent otherwise.
+* `with_lighting_failure` and `with_lamp_power_cut` **wrap** the existing schedule
+  (`window_override(base, …)`), so they compose with the program. Checked, no change.
+* `build_sealed_station` still omits `vernalization_days` at the first sowing (slice 1's finding):
+  read as 0, inert, unfixed here — seeding it would add a second cause to the diff.
+
+### 24j. Decisions owed to the user
+
+1. **Two golden changes (3a, then 3b), or one?** *Recommended: two* (advisor) — the dim lamp moves
+   the battery by 2.3 GJ and the crop's clock through the 0.28 daylength factor, and in one diff
+   neither could be told apart from the chamber reading.
+2. Defaulted unless overridden: the dimmed lamp keeps its efficiency (40 W for 100 µmol, DESIGN);
+   the cold phase keyed to the calendar until slice 4; the minute-step photosynthesis reads the
+   chamber at each 90-minute window's opening; the per-fixture choices in §24h.
