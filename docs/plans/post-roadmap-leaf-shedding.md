@@ -410,3 +410,46 @@ Next: the drought-shedding study, sources first.
 ⚠ **Lesson:** §10a classified 13 reds from their messages without reading the SIZE of each move;
 a two-sided pin failing at 1.03 against 11.1..13.0 was a claim collapsing, not a number drifting.
 
+## 12. The drought question, measured — the precondition cannot be met from the shelf (2026-10-06)
+
+**The shelf, searched for drought-driven leaf death.** Soltani & Sinclair Ch. 15–16 (their
+water-limited model): drought slows leaf expansion (WSFL — refused here 2026-08-12 on the source's
+own reason: it applies to a node-driven branch this canopy does not have, and would double-count
+WSFG) and growth (WSFG, built), hastens development (WSFD, built), and **kills no leaf before seed
+growth even under drought**; the only drought kill is crop TERMINATION after Sinclair & Amir
+(1996), their Table 15.4 (FTSW < 0.10 with VPD > 2.20 kPa for 3 days; FTSW < 0.02 with VPD > 1.75
+for 1; FTSW ≤ 0 with VPD > 2.20 for 1). Penning de Vries §4.3.4 p. 141 names Van Keulen (1982):
+biomass reduced 0.1–0.2 d⁻¹ "when water stress exceeds a certain level" — not on the shelf, a
+LEAD. Teh: nothing.
+
+**Measured in the deep-water scenario** (a temporary probe, not committed; frozen-flat vs the
+agreed half, each with and without the deep store):
+
+| | frozen, with deep store | frozen, without | agreed half, with | agreed half, without |
+|---|---|---|---|---|
+| peak leaf carbon (mol C) | 5.672 | 0.480 | 9.836 | 9.555 |
+| grain at MATURITY (mol C, day) | 7.42 (283) | 0.85 (276) | 10.09 (283) | 6.35 (276) |
+| grain at the season's end | 9.60 | 1.24 | 12.52 | 10.26 |
+| growth-stress factor WSFG: median / min / days < 0.5 | 1.00 / 0.27 / 62 | 0.81 / 0.26 / 100 | same as frozen | same as frozen |
+| max VPD over the season | 0.75 kPa | 0.75 | 0.75 | 0.75 |
+
+* **Termination can never fire here:** the Dutch weather's VPD never passes 0.75 kPa; the rule
+  needs 1.75–2.20.
+* **The soil water does not depend on the crop.** FTSW and VPD are IDENTICAL between the two
+  forms, though the crops differ ~20× in leaf: transpiration does not read the canopy (§21 of the
+  room-temperature plan, and slice 3b's water-ring finding). So the control's drought from day 11
+  — October, a seedling — is set by weather and irrigation, not by what a seedling uses; a real
+  seedling would barely dry the soil. Both forms are judged against a drought the model invents.
+  **A second gap**, separate from shedding.
+* **The rescue at maturity:** 8.7× grain (frozen) → **1.59×** (agreed half). Removing the flat
+  rate is what removes the control's collapse; whether that collapse was REALISTIC is not shown
+  either way — the control sits at a median WSFG 0.81 with 100 days under half rate, real stress.
+
+⚠ **Owning the earlier framing.** §11 said "the flat rate was also standing in for drought-driven
+leaf death" as a finding, and the user's pause rests on it. What is measured is narrower: the flat
+rate produces a collapse in this scenario, and no cited mechanism on the shelf reproduces it.
+
+**The decision returns to the user** (options in the reply): resume the parked adoption with the
+deep-water claim re-expressed and two gaps recorded; stay paused for Van Keulen (1982); stay paused
+to make transpiration read the canopy first (a separate, larger unfreeze); or abandon.
+
