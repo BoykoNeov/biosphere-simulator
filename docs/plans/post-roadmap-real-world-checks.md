@@ -256,3 +256,7 @@ checked — each gets this check before a number from it is committed.
    first — would compare a crop the trial did not grow.
 3. **Whether to go after the unopened sources** (the BPC programme papers for potato; LMLSTP Phase
    I for crew + crop) now, or after the first row.
+
+**ANSWERED 2026-10-07 (the user), all three as recommended:** (1) TM 102788 first; (2) the frozen
+wheat with vernalization off, read on rates and amounts, not dates — after the cultivar's spring
+habit is checked against a source; (3) the unopened sources after the first row.
