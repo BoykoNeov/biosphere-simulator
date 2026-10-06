@@ -260,3 +260,109 @@ checked — each gets this check before a number from it is committed.
 **ANSWERED 2026-10-07 (the user), all three as recommended:** (1) TM 102788 first; (2) the frozen
 wheat with vernalization off, read on rates and amounts, not dates — after the cultivar's spring
 habit is checked against a source; (3) the unopened sources after the first row.
+
+**The cultivar's habit, checked (2026-10-07):** Golden State Grains' variety page — *"short-statured,
+hard red spring wheat"*, developed by CIMMYT with Mexico's agriculture ministry, received in
+California in 1970. A seed-company page, so a secondary source; the UC Davis Foundation Seed page it
+appears to restate returned 403. Enough for the habit (spring, no cold requirement), which is what
+the crop decision rests on.
+
+---
+
+## 7. Slice 3, row 1 — TM 102788: the design (2026-10-07, before code)
+
+### 7a. Advisor review (2026-10-07), summarized
+
+Split the readouts into **rates at a closed canopy** (comparable) and **season totals** (dominated by
+how fast the canopy closes, which the model's seedling sets: 0.16 mol C m⁻² and no plant count,
+against the trial's ~1500 plants m⁻²) — keep the frozen seedling and label the totals; resizing it
+would be fitting. Book CO₂ flow by flow and prove the books close on the observed change. Prove
+every outdoor forcing is replaced. Prove the crop is never short of water or nitrogen, and fix the
+conditions — not the science — before reading any score. Check the unit conversion against the
+TM's own arithmetic. Read night respiration on fully dark steps only; use the day-34 night-
+temperature drop as a rate test. Fix the CO₂ input first and run two levels. Label the water row
+twice (leaf-area-blind; a fixed surface resistance that does not close at high CO₂). Put it in
+`station/tests` to reuse the lamp conversion. Assert only books and conditions; pin no ratio. The
+advisor's own guesses (season totals < 1, water > 1, peak uptake nearest 1) are for checking, not
+adopting — and on water this plan disagrees (§8, W1).
+
+### 7b. What the model is given
+
+`rust/crates/station/tests/scorecard_tm102788.rs`, lab-only. The frozen wheat, open build
+(`DEFAULT_SCENARIO`, `sealed: false`), `vernalization: false`; every weather-derived forcing replaced:
+
+| forcing | the trial (page) | the model |
+|---|---|---|
+| day 0 | planted; 72 h dark; then 20 h light (pp. 4–5) | model day 0 = **TM day 3**, lamp on from step 0; run 83 days, to TM day 86. Emergence is not modelled; the seedling is the frozen one |
+| PAR | 695 µmol m⁻² s⁻¹ until day 28, then 480 (p. 11); study mean 534 (p. 5) | **695 to TM day 28, 480 after** (mean 552, +3 % on the page's 534 — stated); a 20-h top-hat centred on midday (`light_path::top_hat_window_mean`), lights 02:00–22:00 |
+| daylength | 20 h | 72 000 s (the photoperiod factor is 1 above 16 h, so photoperiod sensitivity is inert) |
+| net radiation | — | `station::lighting::lamp_net_radiation` of the window's PAR, on the same top-hat |
+| temperature | 20 °C to day 34; then 20 light / 16 dark (p. 5) | 20 °C to TM day 34; then per step `16 + 4 × lit fraction` |
+| VPD | RH 81 % light / 82 % dark (p. 5) | `es(T) × (1 − 0.81)` per step, from the step's temperature |
+| CO₂ | held at 1000 ppm; light-period mean 1160 (p. 5) | `ci = 0.7 × Ca` (the frozen sealed `ci_ratio`): **Ca = 1160 → ci 812** as the row; Ca = 1000 → ci 700 as the sensitivity |
+| water, nutrients | hydroponic, replenished daily / twice weekly (p. 4) | irrigation 8 mm/day (default); soil N default. Asserted non-limiting (below) |
+
+The open build has **no soil carbon** (the litter–microbe–humus cascade is sealed-only), so its CO₂
+exchange is the crop's alone — the trial's nutrient solution had no soil.
+
+### 7c. The instrument's own checks (asserted; none is a score)
+
+* **Weather gone:** every key `weather_forcings` supplies is replaced, except the three the scenario
+  sets as constants (`ci`, `irrigation`, `fertilization`).
+* **Books:** for every step, the CO₂ legs of every flow, evaluated on the step's state as the engine
+  does, sum to the observed change in `boundary.co2_atmos`; 0 rationed; no events; a re-run
+  bit-identical.
+* **Conditions:** root-zone FTSW ≥ 0.30 on every step; the nitrogen factor = 1 on every step. If
+  either fails, the condition is fixed (more water, fertilization) and recorded BEFORE any score is
+  read.
+* **Units:** the converter reproduces the TM's own arithmetic — 440 ppm × 4692 µmol/ppm ÷ 20 m² ÷
+  14 400 s = 7.17 (TM: 7.2, p. 6 and abstract), and 15 µmol m⁻² s⁻¹ × 20 m² × 72 000 s = 21.6 mol (p. 10).
+
+### 7d. The readouts
+
+**Rates (comparable):**
+* **U1** peak net daytime CO₂ uptake (fully lit steps), µmol m⁻² s⁻¹ — TM 27 at day 25.
+* **N1** night respiration on fully dark steps — TM ~13 near day 20 (Fig. 4, text p. 9); mean 7.2.
+* **N2** the day-34 night-temperature step: model night respiration on the last 20 °C night over the
+  first 16 °C night — TM: 16 → 20 °C raised respiration 65 % at 5 weeks (Fig. 5, p. 9).
+* **W1** transpiration at full cover (TM days 25–80), L m⁻² d⁻¹ — TM peak 6.0, "relatively constant"
+  after (pp. 12–13).
+
+**Totals (dominated by the starting seedling — labelled so):**
+* **U2** mean net uptake over TM days 10–84 — TM 15 µmol m⁻² s⁻¹.
+* **C1** net carbon fixed over TM days 10–84 — TM 19.5 mol CO₂ d⁻¹ × 75 d ÷ 20 m² = **73 mol C m⁻²**.
+* **B1** plant carbon at TM day 86 — TM ~40 kg dry ÷ 20 m² = 2.0 kg m⁻² = **67 mol C m⁻²** on the
+  TM's own CH₂O basis (p. 10), 75 at a 45 % carbon fraction.
+* **W2** mean transpiration — TM 4.5 L m⁻² d⁻¹.
+
+**Sensitivity:** **S1** C1 at ci 812 over ci 700.
+
+## 8. Slice 3, row 1 — predictions (before the test exists)
+
+Hand arithmetic behind the sure ones: maintenance respiration is 0.02 d⁻¹ × 2^((T − 25)/10) of
+leaf + stem + root carbon, and at night the model has no assimilate, so it grows nothing — **night
+respiration is maintenance alone**. Water: Penman–Monteith with the frozen 50 / 70 s m⁻¹ and the
+lamp's PAR-only net radiation gives ~74 W m⁻² lit and ~31–36 dark at 480 µmol, ~92 lit at 695:
+**2.4–2.9 mm d⁻¹**, whatever the canopy.
+
+| | direction | range | confidence |
+|---|---|---|---|
+| U1 peak daytime uptake | below 27 (the model's canopy closes after the day-28 dimming) | 15–35 µmol m⁻² s⁻¹ (ratio 0.55–1.3) | low |
+| N1 night respiration near day 20 | far below | ratio 0.01–0.15 | medium |
+| N1 night respiration, season mean | below | ratio 0.15–0.6 | low |
+| N2 night temperature step | below the TM's 1.65 | 1.20–1.32 (2^0.4 = 1.32, less ~2 days' growth) | medium-high |
+| W1 transpiration at full cover | **below** (the advisor guessed above) | 2.3–3.0 L m⁻² d⁻¹ (ratio 0.38–0.5) | medium-high |
+| W2 mean transpiration | below | ratio 0.5–0.67 (the model's rate is flat from day 0) | medium-high |
+| U2 mean daytime uptake | below | ratio 0.3–0.9 | low |
+| C1 net carbon fixed | below | 25–65 mol C m⁻² (ratio 0.35–0.9) | low |
+| B1 plant carbon at day 86 | below | ratio 0.3–0.9 | low |
+| S1 ci 812 / ci 700 on C1 | above 1, small | 1.005–1.05 (electron-transport-limited FvCB at high Ci is nearly flat: (Ci − Γ*)/(4Ci + 8Γ*) rises 2.4 %) | medium-high |
+| conditions | FTSW ≥ 0.30 everywhere (8 mm/day against ≤ 3 drawn) | — | high |
+| | nitrogen factor 1 everywhere | — | low |
+| books | close to rounding on every step; 0 rationed; bit-identical | — | high |
+
+**Why W1 disagrees with the advisor's guess.** The guess reasoned from stomata (the model's fixed
+surface resistance does not close at high CO₂, which would push water use UP). The arithmetic
+above says the energy term dominates: the model's lamp heats the crop with its PAR only, while an
+HPS lamp's radiant output is mostly outside PAR, and the BPC moved its air hard. If W1 comes out
+above 1, the arithmetic was wrong and that is the finding.
