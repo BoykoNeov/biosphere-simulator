@@ -2709,3 +2709,53 @@ twins; it now dims `par@cold`/`par@warm` (`sowing::untwin`). Tested
 this clock into the state". A comment edit in a param file moves its manifest digest (an
 unfreeze of its own); corrected the next time that file's entry moves for a real reason, the
 `senescence.yaml` precedent.
+
+### 25f. Stage 2 — the predictions, completed before code (2026-10-06)
+
+**Advisor review of stage 1 / before stage 2 (2026-10-06), summarized.** Stage 1 complete, every
+instrument able to fail. Before stage-2 code, add what the record already implies: (1) grain per
+crop falls by about two thirds — the frozen crop has 14.58 mol C at maturity but 41.02 on the
+day-305 re-sow eve, so ≈ 65 % forms in the ≈ 166 days AFTER its own maturity, which re-sowing at
+maturity removes; book which flow fills it before naming it, and report it as a finding, not a
+re-ask; (2) the cold weeks more than double (9 sowings × 56 = 504 days against 224) — battery,
+heater and gas-regulator directions; (3) the end state changes character (a crop 108 days old,
+not one 305 days old); (4) list the tests red by design; (5) seed bank — every `with_harvest`
+run that crosses day 139; (6) the threshold from the crop's own phenology, and a check that the
+hook fires at the first master-day start after the biosphere's DVS reaches 2. If the lab twin
+shows a seed-bank failure or grain far from ≈ 14.6, stop and report rather than regenerate.
+
+**Checked before code.** Seed bank: no sealed build with `with_harvest = true` is RUN across a
+re-sow (`palette`, `godot_bridge`, the golden and every sealed session pass `false`; the one
+`true` sealed build, `tests/gas_exchange.rs`, inspects its registries and never steps). The
+threshold: `build_season` builds every sealed crop from `params::biosphere()`, whose `pheno` is
+`params::phenology()` — the scenario carries that.
+
+**The predictions (stage 2), the `sealed_station` golden:**
+
+| # | Prediction |
+|---|---|
+| Q1 | Re-sows at the starts of days **139, 278, 417, 556, 695, 834, 973, 1112** (B8: maturity 138.875 days after sowing, so the first day-start with DVS = 2 is day 139 after it); 9 crops; the end state's `station.sown_step` = 1112 × 16 = **17792** (`0x1.1600000000000p+14`). The hook fires on the first master-day start after the biosphere's own DVS reaches 2, never earlier, never later (checked day by day in the lab twin). A ±1-day drift in a cycle is recorded, not tuned |
+| Q2 | Grain at each re-sow **≈ 14.6–15 mol C** (crop 1: 14.58 at maturity plus ≤ 2 plant steps of fill), every crop well above the 0.16 seedling — no "seed bank too small". Later crops not predicted beyond "the same order" (their soil and air differ). **Grain per crop falls ≈ 64 %** against the frozen 41.02 |
+| Q3 | The post-maturity grain is booked flow by flow on the frozen tree (crop 1, days 139–305) before the record names its source. Expected, not asserted: `Allocation` partitioning to storage at DVS capped at 2 |
+| Q4 | The END state is a crop **108 days** after sowing: past flowering (104.875) and filling, so `storage_c` small (**< 5 mol C**, against today's 41.0 on the 305-day crop); `thermal_time` ≈ 1100 + 3.1 × 22 ≈ **1170 (1150–1190)**; `vernalization_days` ≈ **55.9** (every crop sees the same program); DVS between 1 and 1.1 |
+| Q5 | Cold days **504** (9 × 56) against 224. Dim-lamp days +280 at (133.33 − 13.33) W averaged = **+2.90 GJ** of lamp not drawn; less the heater's extra cold-week draw. The battery ends **2.4–2.9 GJ fuller** than today's 8.261e9 J |
+| Q6 | The station's heat store (node) ends and averages **colder** (less lamp heat reaches it through the cooler) |
+| Q7 | Crop carbon over the horizon: more warm days with a YOUNG canopy (≈ 716 warm days, all before maturity, at the pre-maturity rate) against today's 4 × 249 with ≈ 169 a crop past maturity (dying back). Net fixation over the horizon **up**, so the scrubber's `co2_removed` and the O₂ makeup's draw **down** — ⚠ low confidence: the re-sown residue (8 crops' litter instead of 3) feeds decomposition |
+| Q8 | Every other golden byte-identical (only `sealed_station` runs the sealed hook); manifest: that golden's hash only |
+
+**Tests red by design (listed before running):**
+
+* `scenario::cold_clock_tests::the_cold_clock_counts_whole_days_from_the_sowing` — asserts cold
+  again at `season` steps after a sowing (the dropped `mod season_days`). Restated: cold through
+  day 55 after a sowing, warm ever after (also at `season`).
+* `warm_room_arrest::warm_room_first_resow_fails_for_want_of_seed` — a crop held at 22 °C never
+  reaches DVS 2, so the hook never fires and the "seed bank too small" refusal is unreachable
+  from the warm room; the warm crop stands. Restated to that (no re-sow over two seasons, grain
+  0 throughout); the refusal itself stays covered in `domains` (`reset_crop`'s own tests).
+* Not red but **made inert**, so re-pointed: `session_save_load::sealed_resume_across_a_season_
+  boundary_is_bit_identical` saves at day 304 and resumes past 305 — no re-sow there any more.
+  Re-pointed to the first maturity re-sow (day 139), with an assertion that the sowing clock
+  moved inside the window (so it cannot go inert silently again).
+* The lab shedding driver (`run_shedding`) runs no hook and refuses horizons past
+  `season_days`. Changed to run the sealed re-sow hook as the reference driver does, and the
+  guard goes; every lab shedding test runs 8–10 days, so nothing moves.
