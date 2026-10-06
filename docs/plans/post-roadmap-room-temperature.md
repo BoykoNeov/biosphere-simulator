@@ -2554,3 +2554,118 @@ predictions before code), ahead of slice 4.
 the flat tissue shedding; after the leaf-shedding unfreeze (`post-roadmap-leaf-shedding.md`) the
 seedling ends the cold weeks at 0.146 mol C and grain at maturity is 14.58 mol C (9.51). §24m's
 numbers are a dated record of the tree before it.
+
+## 25. Slice 4 — re-sow on maturity: design and stage 1's predictions, before code (2026-10-06)
+
+The user's "go" (2026-10-06) on the recommendation: open slice 4's design, predictions first, the
+plumbing before the switch (the slice-3 shape). Decision 3 of §10 (*"re sow as soon as the crop
+matures"*) is already the user's; nothing here re-asks it.
+
+### 25a. Advisor review (2026-10-06), summarized
+
+1. **The clock is written by the STATION's hook, not `annual_reset`/`reset_crop`** — those also
+   re-sow the perennial biosphere runs, so an entry written there would land in the biosphere
+   goldens (a second unfreeze). Seed it at the sealed build too (the missing day-0
+   `vernalization_days`, §10 slice 1, is the precedent not to repeat).
+2. **Stage 1 is not "nothing frozen moves"** — the goldens serialize `aux`, so
+   `sealed_station_state.json` gains one key. (The recommendation given to the user said
+   otherwise; corrected in the reply.) Predict exactly one new key, diff with it stripped.
+3. **Stage 1's bit-identity cannot see a reader left on the calendar** — while the re-sow stays on
+   the calendar the state clock and the calendar agree everywhere. Two guards: an off-calendar
+   sowing test (both sides, all program variables), and **deleting** the n-only
+   `is_cold_on_step` family so every calendar reader is a compile error.
+4. **No simcore change** without checking the freeze — checked: both the biosphere and station
+   unfreeze steps require `git diff rust/crates/simcore/` empty. So the station-side wrapper
+   pattern (`ChamberEnv`, with its guard), its order against the other wrappers written down
+   and tested.
+5. **Stage 2 timing, predicted**: the hook runs once per master day, before the plant steps; the
+   fast side's 90-minute lead into each cold phase disappears; stage 1 KEEPS `mod season_days`
+   (so the lead's bytes reproduce), stage 2 DROPS it (else `season_days` survives as a hidden
+   second clock); maturity through `science::development_stage`; the threshold on
+   `SealedStationScenario`, so the hook's signature is unchanged for `godot_bridge`, `palette`
+   and the session tests.
+6. **Seed bank**: grain at maturity ~14.6 vs the seedling's 0.16 — check any `with_harvest`
+   fixture against "seed bank too small".
+
+### 25b. Why the readers cannot simply read the state
+
+A forcing is `Fn(n, dt)` — it cannot see the state (`simcore::environment::Schedule`), and
+simcore is outside both unfreeze paths. Five variables follow the cold program: on the plant
+step `par`, `net_radiation`, `daylength`; on the fast step `lamp_power` and `chamber_setpoint`.
+Three options were weighed:
+
+* **A state-aware forcing in simcore** — refused: a simcore byte change, outside the freeze.
+* **The wrapper owns the program's schedules** (the resolver carries none) — refused: the
+  perturbations (`with_lighting_failure`, the lab's `with_lamp_power_cut`) compose schedules
+  *in the resolver*; they could no longer reach the program.
+* **CHOSEN — twins in the resolver, selected by a wrapper.** Each program variable `v` is
+  carried as two plain schedules, `v@warm` and `v@cold`; a wrapper on every flow and aux process
+  answers `v` with one of them, chosen by the state's sowing clock. **The plain name `v` is in
+  no sealed resolver**, so a reader that escaped the wrapper errors at its first read ("unknown
+  env var") instead of silently reading one phase. The guard: the wrapper **refuses** an inner
+  environment that answers plain `v` (a forcing that would otherwise be silently overridden),
+  as `ChamberEnv` refuses a plant-side `temp`.
+
+### 25c. Stage 1 — the plumbing (calendar kept)
+
+* **The clock**: aux `station.sown_step`, the slow step count `n` at the current crop's sowing
+  (an integer held in an f64; exact below 2⁵³). Seeded `0` by the sealed build; set to `n` by the
+  sealed re-sow hook, on the state the reset returns (`sealed_reset_hook` wraps `annual_reset`).
+  Missing → a hard error, never 0.
+* **Cold or warm**: `floor((n − sown)·bio_dt) mod season_days < cold.days`. In stage 1 every
+  sowing is a multiple of `season_days · 16`, so this equals today's `floor(n·bio_dt) mod
+  season_days` exactly (an integer difference, times 1/16, floored), including the fast side's
+  one-plant-step lead at each season start. `n < sown` is refused.
+* **The wrapper**: `SowingClockFlow` / `SowingClockAux` (type names, ids, priorities kept — the
+  station manifest's flow set is keyed on type names). Plant side answers `par`, `net_radiation`,
+  `daylength`; fast side answers `lamp_power`, `chamber_setpoint`.
+* **Its order** against the other wrappers — it must be the OUTERMOST (applied last), so that
+  the environment it builds is the one every inner wrapper reads through:
+  * `LampLitEnv` (lab lamp shed) scales `par`/`net_radiation` as read from *its* inner
+    environment; with the clock outside, `LampLit` asks the clock for `par` and scales the
+    selected phase. With the clock inside, the clock would ask `LampLit` for `par@cold`, which
+    `LampLit` does not scale — the shed lamp would silently stop dimming the crop. Tested.
+  * `ChamberEnv` answers only `temp` — disjoint, order free.
+  * `OnFastStep` (gas exchange, the lab's water loss) ignores the outer environment entirely
+    (it reads the recorded window and shared stocks), so the fast-side clock around it is inert;
+    the window **recorder** is a plant-step aux process and is wrapped, so the window records
+    the selected `par`.
+* **The perturbations**: `map_forcing` (station) applies its change to `v`, or to both twins when
+  the resolver carries them, and refuses a resolver carrying both `v` and a twin.
+  `run_shedding`'s direct read of the `lamp_power` schedule and its nominal draw read the program
+  through the state.
+* **The n-only API is deleted**: `is_cold_on_step`, `chamber_setpoint_on_step`,
+  `lamp_par_on_step`, `photoperiod_hours_on_step`, `lamp_power_on_step`,
+  `lamp_average_power_on_step` → state-taking forms, plus a steps-since-sowing form for the
+  chamber's start (`chamber_heat0`, sown at 0).
+
+**Predictions (stage 1):**
+
+| # | Prediction |
+|---|---|
+| P1 | Every golden byte-identical but `sealed_station_state.json`, which gains exactly ONE aux key, `station.sown_step` = 14640 (the day-915 re-sow, 915 × 16) = `0x1.c980000000000p+13`; with that line removed, the file is byte-identical to today's |
+| P2 | Station manifest: only `sealed_station`'s golden hash moves; flow set, aux set (empty — no aux PROCESS writes the clock), params unchanged. Biosphere manifest, authoring manifest, `tiers.json`: untouched. `git diff rust/crates/simcore/` empty; `rust/crates/domains/` untouched |
+| P3 | Off-calendar sowing (a state sown at day 10): all five variables shift their cold window by exactly 10 days — plant side read through the wrapped registry, fast side likewise |
+| P4 | A sealed resolver carrying plain `par` beside the wrapper → refused at the first read; a sealed registry run WITHOUT the wrapper → errors at the first read (unknown `par`) |
+| P5 | `with_lighting_failure` and `with_lamp_power_cut` tests stay green; a mutation mapping only the warm twin turns at least one red (they run from day 0, i.e. inside the cold phase) |
+| P6 | Session save/load and two-rate parity tests unchanged and green (the clock is state) |
+| P7 | `cargo test` + `clippy -D warnings` green with the n-only API gone; every former reader re-pointed (listed in the outcome) |
+
+### 25d. Stage 2 — the switch (written now; re-checked against stage 1 before its code)
+
+* The hook re-sows when `development_stage(thermal_time) ≥ 2` (the threshold's phenology on
+  `SealedStationScenario`), at the first master-day start after maturity; the calendar condition
+  goes. The clock drops `mod season_days`. `season_days` stays the weather's tiling period and the
+  horizon's unit (`days() = years · season_days = 1220`), and nothing else.
+* **Predicted**, from B8 (maturity 138.875 days after sowing, every season): maturity falls in
+  day 138, the re-sow at the start of day **139** after each sowing → re-sows on days 139, 278,
+  417, 556, 695, 834, 973, 1112 (8 re-sows, 9 crops; the 9th sown on day 1112 stands 108 days at
+  the horizon — past flowering, 104.875, not mature). A ±1-day drift in any one cycle shifts the
+  rest; a measured mismatch is recorded, not tuned.
+* The fast side's 90-minute lead at a re-sow disappears (the setpoint and lamp switch at the
+  day's start, with the plants); the lead at the warm switch (day 56 after sowing) stays.
+* Every re-sow finds grain far above the seedling (~14.6 vs 0.16, unstressed); the
+  `with_harvest` fixtures are checked against "seed bank too small" before the golden.
+* The lab shedding driver's "inside one season" guard becomes "inside one crop" (it runs no
+  hook) — re-decided in stage 2.
+* The golden moves; its numbers are predicted from a lab run of stage 2 before the regeneration.
