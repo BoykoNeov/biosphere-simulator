@@ -8,7 +8,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.282d94d5cabd3p+2",
+      "amount": "0x1.3369ab42db6c9p+2",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -21,7 +21,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.0d71749f34feep-6",
+      "amount": "0x1.7a7eb53ef7c46p-6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -34,7 +34,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.ec84f5bd0a9d0p+2",
+      "amount": "0x1.70e2817f151b7p+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -47,7 +47,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8fef68aff3283p+6",
+      "amount": "0x1.8fe897dbe92cdp+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -73,7 +73,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.4fac3869a9f2ep+3",
+      "amount": "0x1.7bbad95d5e31fp+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -86,7 +86,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.87b01ba76744fp-1",
+      "amount": "0x1.8d89499aa3801p-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -99,7 +99,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.0b3af1004c65cp+5",
+      "amount": "0x1.1a666b6afb41cp+5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -125,7 +125,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.02b9ccf663131p+7",
+      "amount": "-0x1.5ebd0f6a5e8cap+7",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -138,7 +138,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.91be1f3c46a2ap+5",
+      "amount": "0x1.2bf9a587b0d7ap+6",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -151,7 +151,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.652b63ac22c22p+4",
+      "amount": "0x1.221783fdb5529p+5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },

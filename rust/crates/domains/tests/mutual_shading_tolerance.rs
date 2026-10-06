@@ -50,6 +50,7 @@
 
 use domains::biosphere::params::BiosphereParams;
 use domains::biosphere::readouts::{peak_lai, peak_w, trajectory};
+use domains::biosphere::science_gates::VKS_LAI_THRESHOLD;
 use domains::biosphere::system::{
     consumer_chamber_scenario, perennial_chamber_scenario, sealed_chamber_scenario,
     CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
@@ -305,11 +306,18 @@ fn the_loss_is_one_sided_and_cannot_reach_below_its_threshold() {
 /// against that assertion; the shared lab report carries no chamber peak-LAI row, so it was
 /// unmeasurable from the harness.
 ///
-/// Measured: 0.5425 / 0.4927 / 0.5849 frozen, still under 1.0 at ×2.5 (0.9305 / 0.8439 /
-/// 0.9634), all three over it by ×3.5 (1.2061 / 1.0908 / 1.1873). So the chamber assertion is
-/// the **second** detector on this knob — later than the LAI ceiling (×2.01), earlier than the
-/// biomass cap (×3.81) — and it is not the loss's doing: the chambers never reach the
-/// threshold, so the term cannot act there at any rung run here.
+/// Measured (until 2026-10-06): 0.5425 / 0.4927 / 0.5849 frozen, still under 1.0 at ×2.5
+/// (0.9305 / 0.8439 / 0.9634), all three over it by ×3.5 (1.2061 / 1.0908 / 1.1873). So the
+/// chamber assertion was the **second** detector on this knob — later than the LAI ceiling
+/// (×2.01), earlier than the biomass cap (×3.81).
+///
+/// ⚠ **RESTATED 2026-10-06** (the leaf-shedding note §10a; the user's decision). With no leaf
+/// shed from age before anthesis the jar peaks at 1.024 at the frozen params, so the gate now
+/// asserts the claim itself — chambers below the source's 6.0 threshold — and this sweep says
+/// what that costs: measured 1.0245 / 0.8818 / 0.7670 at ×1, 2.5667 / 2.2153 / 1.8258 at ×2.5,
+/// 3.5940 / 3.1027 / 2.5478 at ×3.5 (sealed / perennial / consumer). The restated bound is NOT a
+/// detector anywhere in the recorded span; that role is lost, recorded rather than kept by a
+/// fitted number.
 ///
 /// ⚠ **Why the report cannot show this, and it is not an oversight to add a row for.**
 /// `ReadoutSpec::informs` resolves a gate *under the same scenario*, and this gate's scenario
@@ -341,10 +349,17 @@ fn the_chamber_half_of_the_gate() {
     for (name, scenario, years, perennial) in runs {
         let quiet = peak_lai(&trajectory(scenario, years, perennial, &params(2.50, true)));
         let loud = peak_lai(&trajectory(scenario, years, perennial, &params(3.50, true)));
+        let frozen = peak_lai(&trajectory(scenario, years, perennial, &params(1.0, true)));
+        // The chambers' canopy follows the knob (a sweep, not three unrelated numbers)…
         assert!(
-            quiet < 1.0,
-            "{name} still inside the gate's bound at x2.5 — {quiet}"
+            frozen < quiet && quiet < loud,
+            "{name}: {frozen} / {quiet} / {loud}"
         );
-        assert!(loud > 1.0, "{name} must break it by x3.5 — {loud}");
+        // …and stays under the source's threshold across the whole recorded span: the
+        // restated bound is NO detector of a `specific_leaf_area` error up to ×3.5.
+        assert!(
+            loud < VKS_LAI_THRESHOLD,
+            "{name} reached the mutual-shading regime at x3.5 — {loud}"
+        );
     }
 }

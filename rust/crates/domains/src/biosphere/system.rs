@@ -744,6 +744,8 @@ fn build_plants(
             lai_threshold: p.senesc.lai_threshold,
             sla_per_mol_c: p.canopy.sla_per_mol_c,
             ground_area: scenario.ground_area,
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: p.pheno,
         }),
         Box::new(Transpiration {
             id: "biosphere.transpiration".to_string(),
@@ -825,6 +827,8 @@ fn build_plants(
             lai_threshold: p.senesc.lai_threshold,
             sla_per_mol_c: p.canopy.sla_per_mol_c,
             ground_area: scenario.ground_area,
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: p.pheno,
         }));
     }
     // Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,

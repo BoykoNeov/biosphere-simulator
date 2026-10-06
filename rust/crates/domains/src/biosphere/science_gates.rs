@@ -396,6 +396,12 @@ science_gates! {
 
             // The half of the original claim that is UNCHANGED, and still worth freezing:
             // the chambers are carbon-limited by design and cannot reach the regime.
+            // ⚠ RESTATED 2026-10-06 (the user's decision, the leaf-shedding note §10a): this
+            // read `chambers < 1.0` — the project's own stand-in for "cannot reach the regime",
+            // never a sourced bound (docs/log/mutual-shading-tolerance.md, FINDING 5) — and with
+            // no leaf shed from age before anthesis the jar peaks at LAI 1.024. It now asserts
+            // the claim itself, against the source's threshold. The 1.0 also served as the
+            // second detector of a `specific_leaf_area` error; that role is lost, recorded.
             let chambers = folds::segment_max(
                 &peaks
                     .iter()
@@ -403,7 +409,10 @@ science_gates! {
                     .map(|(_, peak)| *peak)
                     .collect::<Vec<f64>>(),
             );
-            assert!(chambers < 1.0, "chamber peak LAI {chambers} — {peaks:?}");
+            assert!(
+                chambers < VKS_LAI_THRESHOLD,
+                "chamber peak LAI {chambers} reached the mutual-shading regime — {peaks:?}"
+            );
 
             // The restated guarantee, for EVERY scenario: be below the threshold, or
             // model the loss the source prescribes above it. Never in the regime,
@@ -976,12 +985,21 @@ mod margins {
     /// the air the step leaves). All five rose further, the jar most: 11.665179 → 14.152401
     /// (+21.3 %), perennial 1.189982 → 1.224157 (+2.9 %), consumer 1.217510 → 1.235336 (+1.5 %).
     /// The jar's low point is where the explicit step overdrew most, so that is where C lifts it.
+    ///
+    /// ⚠⚠ **RE-PINNED 2026-10-06 for the leaf-shedding unfreeze, and this time all five FELL** —
+    /// the direction that matters, and the opposite of the two re-pins above
+    /// (`docs/plans/post-roadmap-leaf-shedding.md` §10). With no leaf or root shed from age
+    /// before anthesis the chambers carry more standing tissue, which holds carbon the air would
+    /// have had: jar 14.152401 → 5.001446 (−64.7 %), perennial 1.224157 → 1.096531 (−10.4 %),
+    /// consumer 1.235336 → 1.166103 (−5.6 %); the long horizons still equal their short runs.
+    /// All five stay above 1.0 (the band holds); the perennial chamber's margin is now 9.7 %.
+    /// Predicted before the build from the lab twin (`shedding_switch`), to every printed digit.
     const PINNED: &[(&str, f64)] = &[
-        ("sealed_chamber", 14.152401),
-        ("perennial_chamber", 1.224157),
-        ("consumer_chamber", 1.235336),
-        ("perennial_long_horizon", 1.224157),
-        ("consumer_long_horizon", 1.235336),
+        ("sealed_chamber", 5.001446),
+        ("perennial_chamber", 1.096531),
+        ("consumer_chamber", 1.166103),
+        ("perennial_long_horizon", 1.096531),
+        ("consumer_long_horizon", 1.166103),
     ];
 
     /// The measured margins, in `PINNED`'s order.
@@ -1108,7 +1126,13 @@ mod margins {
     /// ⚠ Kept OUT of [`PINNED`]: that list is tied to the compensation-band roster by
     /// `every_banded_scenario_has_a_pinned_margin`, and this is not a band. And not a
     /// `science_gates!` row — that would be a manifest entry, i.e. an unfreeze.
-    const JAR_CO2_STEP_DRAW: f64 = 0.165230;
+    ///
+    /// ⚠⚠ **RE-PINNED 2026-10-06 for the leaf-shedding unfreeze: 0.341961**, step 3347 (was
+    /// 0.165230 at 3108). It ROSE — the jar closing on rationing, the direction this pin exists
+    /// to make loud: a crop that keeps its pre-anthesis leaves draws twice the share of the
+    /// jar's CO₂ in its heaviest step. Headroom 0.835 → 0.658; the backstop still never fires
+    /// (`rationed == 0` in the golden). Told to the user with the decision (the note §10a).
+    const JAR_CO2_STEP_DRAW: f64 = 0.341961;
 
     /// ⚠⚠ **The tolerance is on the HEADROOM, `1 − draw` — and, since the 1/16 step, on the
     /// draw as well.** The question is how close the jar comes to running out. At the
