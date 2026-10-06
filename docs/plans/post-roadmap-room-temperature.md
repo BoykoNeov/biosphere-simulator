@@ -2535,7 +2535,9 @@ reproduces 3a's day-56 crop (0.423597).
 | change | **−0.0829** | +0.2636 |
 
 So the loss is mostly SHEDDING, not respiration: the crop's net production (growth − upkeep) is
-only slightly negative (**−0.0096**), while it sheds 0.073. `Senescence` is a constant relative
+only slightly negative (**−0.0096**), while it sheds 0.073 — split by organ (same instrument,
+same closure): **leaf 0.0338, root 0.0327, stem 0.0069** (3a's world: 0.1153 / 0.0636 / 0.0100).
+⚠ First reported to the user as "leaves"; roots shed nearly as much (corrected 2026-10-06). `Senescence` is a constant relative
 death rate (`rdr_leaf` × leaf, plus the shading term) and **reads no temperature** — at 4 °C the
 seedling sheds leaf at its 22 °C daily rate while its growth all but stops. ⚠ A CANDIDATE MODEL
 GAP, recorded, not acted on: in thermal-time crop models a leaf's life is counted in degree-days,

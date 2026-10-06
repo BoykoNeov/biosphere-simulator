@@ -231,10 +231,12 @@ most to the printed digit: the battery ends 2.3 GJ fuller less the heater's 6.6 
 flowers 105 and matures 139 days after sowing (from 103 / 137). Found: the seedling LOSES half its
 carbon in those 8 weeks (0.160 → 0.077 mol C), so it starts the warm weeks 5.5 times smaller, and
 grain falls 36 % and the soil's carbon about 40 % (directions predicted, sizes not). Measured
-afterwards, carbon booked flow by flow: the loss is mostly leaves SHED (0.073 mol C), not
-breathing — growth and upkeep nearly cancel (−0.010). The model's leaf shedding is a fixed daily
-fraction that reads no temperature, so at 4 °C a leaf dies as fast as at 22 °C: a candidate model
-gap, recorded, not acted on. No rationing. Two water stocks came out bit-identical to 3a,
+afterwards, carbon booked flow by flow: the loss is mostly tissue SHED (0.073 mol C — leaves
+0.034, roots 0.033, stems 0.007; first reported as "leaves", corrected the same day), not
+breathing — growth and upkeep nearly cancel (−0.010). The model's shedding is a fixed daily
+fraction per organ that reads no temperature, so at 4 °C tissue dies as fast as at 22 °C: a
+candidate model gap, recorded; the user chose to study it next. No rationing. Two water stocks
+came out bit-identical to 3a,
 unpredicted and explained: the plants' water use does not read the crop's size, and the
 warm-phase chamber forgets its past every minute, so the water ring converged to the same bits.
 Three tests the roster missed went red, all by the seedling being smaller: a two-day test that
