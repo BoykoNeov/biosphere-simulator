@@ -358,6 +358,15 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-06 — the biosphere's tissue shedding, delegated: 3 station goldens move
+  (`sealed_station`, `greenhouse`, `lighting`); `harvest` byte-identical (its crop starts past
+  anthesis).** No station code or param changed; the biosphere's `Senescence` / `NitrogenSenescence`
+  shed no leaf or root from age before anthesis (`docs/biosphere-reference.md`, same date;
+  `docs/plans/post-roadmap-leaf-shedding.md`). Sealed station: the cold weeks' seedling ends at
+  0.1460 mol C (0.0771 before — the 3b loss was the flat shedding), grain at maturity 14.58 mol C
+  (9.51), grain on the re-sow eve 41.02 (24.26); the energy books, the water ring and the
+  development clock are byte-identical (19 of 36 stocks). Predicted to the printed digit by the lab
+  twin (`station/examples/shedding_station`).
 - **2026-10-06 — the cold period's dimmed lamp, slice 3b: two keys added to a station PARAMETER
   FILE; 1 golden moves (`sealed_station`).** `docs/plans/post-roadmap-room-temperature.md` §24g /
   §24l (predictions, committed before the switch) and §24m (graded). `cold_period.yaml` gains
@@ -371,7 +380,8 @@ gate), so the discipline is enforced, not merely requested.
   of lamp saved, less the heater), the end chamber 288.3622829 K, the node's daily 163.1421 /
   174.3095 / 171.44761 K, chill-days 55.926093595 and thermal time 5512.7606791 (the crop is
   never water-stressed); flowering / maturity 105 / 139 days after sowing (from 103 / 137). The
-  seedling LOSES half its carbon in the dim cold weeks (0.160 → 0.077 mol C) and grain falls
+  seedling LOSES half its carbon in the dim cold weeks (⚠ since 2026-10-06 it no longer does —
+  0.146 mol C; the loss was the flat tissue shedding, see the entry above) (0.160 → 0.077 mol C) and grain falls
   36 % (37.87 → 24.26 mol C); no rationing, no events. The other 19 goldens are byte-identical;
   the manifest moves by `cold_period.yaml`'s digest and the golden hash.
 - **2026-10-05 — the plants read the chamber, with the cited cold period, slice 3a: a station

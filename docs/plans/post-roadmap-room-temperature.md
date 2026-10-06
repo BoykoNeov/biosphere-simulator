@@ -2549,3 +2549,8 @@ week, against an extinction threshold of **0** (the organ is a population that c
 shedding"* — the cold-week light stays at 100 µmol m⁻² s⁻¹ (§12's choice stands, the locus warning
 recorded), and the next item is the leaf-shedding rule that reads no temperature (sources first,
 predictions before code), ahead of slice 4.
+
+⚠ **Forward pointer (2026-10-06), §24m:** the seedling's cold-week loss (0.160 → 0.077 mol C) was
+the flat tissue shedding; after the leaf-shedding unfreeze (`post-roadmap-leaf-shedding.md`) the
+seedling ends the cold weeks at 0.146 mol C and grain at maturity is 14.58 mol C (9.51). §24m's
+numbers are a dated record of the tree before it.

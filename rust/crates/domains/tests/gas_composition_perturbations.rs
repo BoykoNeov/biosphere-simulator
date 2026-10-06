@@ -237,6 +237,14 @@ fn well_posed(t: &Trajectory, what: &str) {
 /// — pinned separately in
 /// [`the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop`], because a
 /// reversal that this test merely avoided would be a fact nothing in the tree recorded.
+/// ⚠⚠ **INVERTED 2026-10-06 — the depletion half of E1 is FALSE on the current tree**
+/// (`docs/plans/post-roadmap-leaf-shedding.md` §10a). With no leaf or root shed from age before
+/// anthesis the jar's crop is larger, and the season-low CO₂ now RISES monotonically as the room
+/// shrinks across the whole measured span: 3.348562 at f = 1.5, 3.380790 at 1.2, 3.423283 at
+/// 1.0, 3.495851 at 0.8, 3.550563 at 0.7, 3.727036 at 0.5, 4.342789 at 0.25 — none ration. The
+/// reversal the next test recorded below f ≈ 0.5 now spans every size: the crop's own feedback
+/// (a smaller room starves it sooner, so it draws less later) dominates the buffer everywhere.
+/// The composition half is unchanged. Recorded as the inversion it is, not re-pinned as a drift.
 #[test]
 fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
     let base = sealed_chamber_scenario();
@@ -262,9 +270,11 @@ fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
         let t = jar(s);
         well_posed(&t, "E1");
         let low = min_ppm(&t);
+        // INVERTED 2026-10-06 (see the doc): a smaller room now reads a HIGHER low.
         assert!(
-            low < base_low,
-            "a smaller room did not deplete further at f={f}: {base_low} -> {low} ppm"
+            low > base_low,
+            "a smaller room depleted further at f={f}: {base_low} -> {low} ppm — the 2026-10-06 \
+             inversion is gone"
         );
     }
 
@@ -273,9 +283,11 @@ fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
     // "any change depletes".
     let bigger = jar(vented(1.5));
     well_posed(&bigger, "E1 enlarged");
+    // INVERTED 2026-10-06: a larger room now reads a LOWER low (its crop grows more and draws
+    // the air down further) — still the opposite direction to shrinking, so still a falsifier.
     assert!(
-        min_ppm(&bigger) > base_low,
-        "a larger room did not deplete less: {base_low} -> {} ppm",
+        min_ppm(&bigger) < base_low,
+        "a larger room did not read lower: {base_low} -> {} ppm",
         min_ppm(&bigger)
     );
 }
@@ -305,6 +317,10 @@ fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
 /// nowhere at any room size.** The crop's draw is read against the air it leaves, which lifts
 /// every low: baseline 9.661, the minimum 9.501 at `f = 0.7`, back above baseline by 0.5
 /// (9.678), 12.378 at 0.25. The numbers above are the explicit form's at 1/16.
+/// ⚠⚠ **2026-10-06: the reversal is now the whole curve.** The stressed room (f = 0.7) no
+/// longer reads lower than the baseline (3.550563 vs 3.423283): there is no minimum left in
+/// the measured span, and every smaller room reads healthier (see the E1 test's doc). The
+/// assertions below say so; the backstop bracket in the explicit form is unchanged.
 #[test]
 fn the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop() {
     let baseline = jar(sealed_chamber_scenario());
@@ -316,10 +332,11 @@ fn the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop(
     well_posed(&stressed, "f=0.7");
     well_posed(&shrunk, "f=0.25");
 
-    // The stressed room reads lower, as E1 says it must.
+    // Since 2026-10-06 even the stressed room reads HIGHER than the baseline (3.5506 vs
+    // 3.4233): no dip remains before the reversal.
     assert!(
-        min_ppm(&stressed) < base_low,
-        "f=0.7 did not deplete: {} vs baseline {base_low} ppm",
+        min_ppm(&stressed) > base_low,
+        "f=0.7 depleted again: {} vs baseline {base_low} ppm — a dip is back",
         min_ppm(&stressed)
     );
     // The smaller, still well-posed room reads HIGHER than the healthy baseline.
@@ -333,12 +350,14 @@ fn the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop(
         "the smaller room does not read better than the merely stressed one"
     );
 
-    // The backstop's own threshold in the EXPLICIT form, bracketed as measured: well-posed at
-    // 0.17, firing at 0.16. Under the reference (C) the same room cannot ration at all.
-    assert_eq!(jar_explicit(vented(0.17)).rationed, 0, "f=0.17 was measured well-posed");
+    // The backstop's own threshold in the EXPLICIT form, bracketed as measured. Under the
+    // reference (C) the same room cannot ration at all. ⚠ MOVED 2026-10-06 from 0.17 / 0.16 to
+    // 0.60 / 0.55 (5 firings at 0.55, 35 at 0.5, 483 at 0.2): the leaf-shedding unfreeze's
+    // larger crop overdraws a smaller explicit-form room much sooner.
+    assert_eq!(jar_explicit(vented(0.60)).rationed, 0, "f=0.60 was measured well-posed");
     assert!(
-        jar_explicit(vented(0.16)).rationed > 0,
-        "f=0.16 was measured to ration; the backstop threshold has moved"
+        jar_explicit(vented(0.55)).rationed > 0,
+        "f=0.55 was measured to ration; the backstop threshold has moved"
     );
 }
 
@@ -619,12 +638,15 @@ fn halving_the_jars_oxygen_takes_it_to_anoxia_without_going_negative() {
         oxygen_limitation_factor(min_o2, base.chamber_air_capacity_mol, SOIL_K_O2) < 1.0e-6,
         "the soil oxygen factor did not collapse with the pool"
     );
-    // The baseline is already deep in the limiting region — the jar is not comfortable, it is
-    // one halving from the edge. This is the line that makes the pin above a margin statement.
+    // The baseline sits inside the limiting region. ⚠ Re-measured 2026-10-06: its trough
+    // factor ROSE 0.606 -> 0.758 (a 24 % throttle, was 39 %) — the larger crop of the
+    // leaf-shedding unfreeze leaves the jar further from anoxia, though one halving still
+    // takes it all the way (asserted above).
+    let factor = oxygen_limitation_factor(base_min, base.chamber_air_capacity_mol, SOIL_K_O2);
     assert!(
-        oxygen_limitation_factor(base_min, base.chamber_air_capacity_mol, SOIL_K_O2) < 0.7,
-        "the healthy jar is not oxygen-limited at its trough, so 'one halving from the edge' \
-         is the wrong reading"
+        (0.70..0.80).contains(&factor),
+        "the healthy jar's trough oxygen factor moved (measured 0.758; 0.606 before \
+         2026-10-06) — {factor}"
     );
 }
 

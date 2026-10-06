@@ -744,6 +744,8 @@ fn build_plants(
             lai_threshold: p.senesc.lai_threshold,
             sla_per_mol_c: p.canopy.sla_per_mol_c,
             ground_area: scenario.ground_area,
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: p.pheno,
         }),
         Box::new(Transpiration {
             id: "biosphere.transpiration".to_string(),
@@ -825,6 +827,8 @@ fn build_plants(
             lai_threshold: p.senesc.lai_threshold,
             sla_per_mol_c: p.canopy.sla_per_mol_c,
             ground_area: scenario.ground_area,
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: p.pheno,
         }));
     }
     // Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,
@@ -2739,7 +2743,8 @@ mod tests {
 
     /// THE HEADLINE WATER CLAIM: reaching the below-root store is what saves a crop whose
     /// supply is deliberately below its demand — measured against a control that removes
-    /// ONLY the transfer.
+    /// ONLY the transfer. ⚠ Since 2026-10-06 a modest rescue (1.22x grain at the season's end,
+    /// 1.59x at maturity), no longer an order of magnitude — see the re-statement below.
     ///
     /// ⚠ The effect size is a property of THIS scenario at THIS irrigation capacity, not
     /// of the model, and the bound is two-sided so a slide in either direction is caught
@@ -2790,13 +2795,27 @@ mod tests {
         // droughted control more: peak LAI 6.662 → 5.672 with the deep store, 0.696 → 0.480
         // without; grain 10.059 → 9.604 and 1.726 → 1.241. So the rescue grew because the
         // unrescued drought bites harder, not because the rescue got stronger.
+        //
+        // ⚠⚠ RE-STATED 2026-10-06 — the rescue COLLAPSED with the leaf-shedding unfreeze, and
+        // that is recorded rather than re-pinned as a drift (docs/plans/post-roadmap-leaf-
+        // shedding.md §11–§12). With no leaf or root shed from age before anthesis the droughted
+        // control no longer spirals: it grows more slowly (WSFG median 0.81, 100 days under 0.5)
+        // but keeps what it grows, and reaches the shading cap like the watered crop. Measured:
+        // peak leaf 9.836 vs 9.555 (1.0294x, was 11.83x); grain at the season's end 12.515 vs
+        // 10.260 (1.2199x, was 7.74x); at MATURITY 10.09 vs 6.35 (1.59x, was 8.7x). Whether the
+        // old collapse was realistic is NOT shown either way: no cited drought leaf death fires
+        // here (the only one on the shelf, Sinclair & Amir's termination, needs VPD > 1.75 kPa;
+        // this weather peaks at 0.75), and the drought itself is the model's — soil water is
+        // crop-blind (identical under both forms), so an October seedling dries the soil as a
+        // full canopy would. Two gaps, recorded in the note. What survives is the DIRECTION:
+        // the deep store still raises the grain; the canopy reaches its cap either way.
         assert!(
-            (11.1..13.0).contains(&leaf_ratio),
-            "the canopy rescue moved: {leaf_ratio}"
+            (1.0..1.06).contains(&leaf_ratio),
+            "the canopy ratio moved: {leaf_ratio} (measured 1.0294)"
         );
         assert!(
-            (7.3..8.2).contains(&grain_ratio),
-            "the grain rescue moved: {grain_ratio}"
+            (1.17..1.27).contains(&grain_ratio),
+            "the grain rescue moved: {grain_ratio} (measured 1.2199)"
         );
         assert!(
             subject.last().unwrap().stocks[STORAGE_C].amount > 2.5,

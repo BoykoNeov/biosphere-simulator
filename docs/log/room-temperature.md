@@ -243,3 +243,7 @@ Three tests the roster missed went red, all by the seedling being smaller: a two
 asked the lit crop to grow (now: lit above dark), and two separate-air tests at day 90 whose
 crop is no longer hungry enough (moved to a cold period with the full lamp; the dim-world
 figures recorded).
+
+⚠ **Forward pointer (2026-10-06):** the cold-week seedling loss recorded under slice 3b above was
+the biosphere's flat tissue shedding, not the dim light. Since the leaf-shedding unfreeze the
+seedling ends the cold weeks at 0.146 mol C (`docs/log/leaf-shedding.md`).

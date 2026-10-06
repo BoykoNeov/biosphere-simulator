@@ -645,7 +645,49 @@ impl Flow for StemRemobilization {
 
 // --- senescence / transpiration / uptake (plants) ---------------------------
 
-/// CARBON loss `{leaf,stem,root} -> litter_sink`.
+/// The development stage the shedding flows read, from the thermal-time aux.
+///
+/// ⚠ **Refused when absent**, unlike `Allocation`'s read: every build seeds `thermal_time` (the
+/// sown state and every re-sow), and a missing entry here would silently mean "vegetative
+/// forever, never sheds" — a crop that keeps every leaf and root it grows.
+fn shedding_dvs(
+    snapshot: &State,
+    aux: &str,
+    pheno: &params::PhenologyParams,
+) -> Result<f64, SimError> {
+    let thermal_time = snapshot.aux.get(aux).copied().ok_or_else(|| {
+        SimError::Validation(format!(
+            "tissue shedding reads the development clock {aux:?}, which this state does not carry"
+        ))
+    })?;
+    Ok(science::development_stage(
+        thermal_time,
+        pheno.tsum_anthesis,
+        pheno.tsum_maturity,
+    ))
+}
+
+/// The **age** death rates of leaf and root at development stage `dvs`: **0 before anthesis**,
+/// the flat `rdr_leaf` / `rdr_root` from it on (the leaf's mutual-shading term is added on top by
+/// the caller, at every stage).
+///
+/// Since 2026-10-06 (`docs/plans/post-roadmap-leaf-shedding.md` §10, a biosphere unfreeze). The
+/// three crop-model sources on the shelf agree that a crop sheds no tissue from age before it
+/// flowers: Penning de Vries et al. (1989) §3.2.6 p. 95 and Listing 5 (leaf and root death 0
+/// below DS 1.0), Soltani & Sinclair (2012) Box 9.1 ("no leaf senescence" from emergence to the
+/// beginning of seed growth), Teh, Eqn 7.17 after Goudriaan & van Laar (1994) (leaf death from
+/// age 0 before flowering). What follows anthesis is where they disagree, and it is left as it
+/// was. The stem rate is unchanged at every stage.
+pub fn age_shedding_rates(dvs: f64, rdr_leaf: f64, rdr_root: f64) -> (f64, f64) {
+    if dvs < 1.0 {
+        (0.0, 0.0)
+    } else {
+        (rdr_leaf, rdr_root)
+    }
+}
+
+/// CARBON loss `{leaf,stem,root} -> litter_sink`. Leaf and root shed nothing from age before
+/// anthesis ([`age_shedding_rates`]); the leaf's mutual-shading loss applies at every stage.
 pub struct Senescence {
     pub id: String,
     pub leaf_c: String,
@@ -660,6 +702,9 @@ pub struct Senescence {
     pub lai_threshold: f64,
     pub sla_per_mol_c: f64,
     pub ground_area: f64,
+    /// The development clock ([`age_shedding_rates`]).
+    pub thermal_time_aux: String,
+    pub pheno: params::PhenologyParams,
 }
 
 impl Flow for Senescence {
@@ -677,15 +722,17 @@ impl Flow for Senescence {
     ) -> Result<FlowResult, SimError> {
         let leaf_c = amt(snapshot, &self.leaf_c);
         let lai = leaf_c * self.sla_per_mol_c / self.ground_area;
+        let dvs = shedding_dvs(snapshot, &self.thermal_time_aux, &self.pheno)?;
+        let (leaf_age, root_rate) = age_shedding_rates(dvs, self.rdr_leaf, self.rdr_root);
         let rdr_leaf = crate::biosphere::science::mutual_shading_rate(
             lai,
-            self.rdr_leaf,
+            leaf_age,
             self.shade_rate,
             self.lai_threshold,
         );
         let leaf = rdr_leaf * leaf_c * dt;
         let stem = self.rdr_stem * amt(snapshot, &self.stem_c) * dt;
-        let root = self.rdr_root * amt(snapshot, &self.root_c) * dt;
+        let root = root_rate * amt(snapshot, &self.root_c) * dt;
         FlowResult::new(vec![
             leg(&self.leaf_c, -leaf)?,
             leg(&self.stem_c, -stem)?,
@@ -1212,6 +1259,9 @@ pub struct NitrogenSenescence {
     pub lai_threshold: f64,
     pub sla_per_mol_c: f64,
     pub ground_area: f64,
+    /// The development clock — the same [`age_shedding_rates`] the carbon flow reads.
+    pub thermal_time_aux: String,
+    pub pheno: params::PhenologyParams,
 }
 
 impl Flow for NitrogenSenescence {
@@ -1235,13 +1285,15 @@ impl Flow for NitrogenSenescence {
         // a shared helper — the drift hazard that buys is pinned Python-side by comparing
         // this flow's shed carbon against Senescence's own litter leg).
         let lai = leaf * self.sla_per_mol_c / self.ground_area;
+        let dvs = shedding_dvs(snapshot, &self.thermal_time_aux, &self.pheno)?;
+        let (leaf_age, root_rate) = age_shedding_rates(dvs, self.rdr_leaf, self.rdr_root);
         let rdr_leaf = crate::biosphere::science::mutual_shading_rate(
             lai,
-            self.rdr_leaf,
+            leaf_age,
             self.shade_rate,
             self.lai_threshold,
         );
-        let shed_carbon = rdr_leaf * leaf + self.rdr_stem * stem + self.rdr_root * root;
+        let shed_carbon = rdr_leaf * leaf + self.rdr_stem * stem + root_rate * root;
         let plant_n = amt(snapshot, &self.plant_n);
         let biomass_c = leaf + stem + root;
         let shed = if shed_carbon <= 0.0 || plant_n <= 0.0 || biomass_c <= 0.0 {
@@ -4486,6 +4538,8 @@ mod tests {
             lai_threshold: sen.lai_threshold,
             sla_per_mol_c: canopy.sla_per_mol_c,
             ground_area: 1.0,
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: params::phenology(),
         };
         let shed_n = |plant_n: f64| {
             NitrogenSenescence {
@@ -4503,12 +4557,17 @@ mod tests {
                 lai_threshold: sen.lai_threshold,
                 sla_per_mol_c: canopy.sla_per_mol_c,
                 ground_area: 1.0,
+                thermal_time_aux: THERMAL_TIME.to_string(),
+                pheno: params::phenology(),
             }
             .evaluate(
-                &n_state(3.0, 1.0, 1.0, 0.0, plant_n, 1.0),
+                &post_anthesis(n_state(3.0, 1.0, 1.0, 0.0, plant_n, 1.0)),
                 &SourceResolver::new(HashMap::new(), HashMap::new())
                     .expect("resolver")
-                    .bind(&n_state(3.0, 1.0, 1.0, 0.0, plant_n, 1.0), 1.0),
+                    .bind(
+                        &post_anthesis(n_state(3.0, 1.0, 1.0, 0.0, plant_n, 1.0)),
+                        1.0,
+                    ),
                 1.0,
             )
             .expect("shed")
@@ -4519,7 +4578,11 @@ mod tests {
         };
 
         let biomass = 5.0; // leaf 3 + stem 1 + root 1
-        let shed_c = legs_of(&carbon, &n_state(3.0, 1.0, 1.0, 0.0, 1.0, 1.0), 800.0)[LITTER_SINK];
+        let shed_c = legs_of(
+            &carbon,
+            &post_anthesis(n_state(3.0, 1.0, 1.0, 0.0, 1.0, 1.0)),
+            800.0,
+        )[LITTER_SINK];
         assert!(shed_c > 0.0, "the carbon leg must actually shed");
 
         // --- the WELL-FED arm: concentration above the residual, so the plant retains the
@@ -4632,12 +4695,82 @@ mod tests {
             lai_threshold: 6.0,
             sla_per_mol_c: G_SLA,
             ground_area,
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: params::phenology(),
         }
     }
 
-    /// A state carrying the litter BOUNDARY sink the organ fixture does not build.
+    /// Thermal time PAST anthesis (DVS 1.36 at the frozen 1100 / 750), where the flat age rates
+    /// apply. ⚠ Since 2026-10-06 leaf and root shed nothing from age before anthesis
+    /// (`age_shedding_rates`), so the rate pins below — written for the flat form — are taken
+    /// after it; the zero before it is pinned on its own.
+    const POST_ANTHESIS_TT: f64 = 1500.0;
+
+    /// [`n_state`] moved past anthesis — for the nitrogen-shedding pins, written for the flat
+    /// rates (see [`POST_ANTHESIS_TT`]).
+    fn post_anthesis(mut s: State) -> State {
+        s.aux.insert(THERMAL_TIME.to_string(), POST_ANTHESIS_TT);
+        s
+    }
+
+    /// **Before anthesis no tissue is shed from age** (2026-10-06): the leaf's age rate and the
+    /// root rate are 0, the stem keeps its flat rate, and the shading term still acts above
+    /// its threshold. At anthesis exactly (DVS 1, closed) the flat rates return.
+    #[test]
+    fn before_anthesis_leaf_and_root_shed_nothing_from_age() {
+        assert_eq!(age_shedding_rates(0.0, 0.02, 0.01), (0.0, 0.0));
+        assert_eq!(age_shedding_rates(0.999, 0.02, 0.01), (0.0, 0.0));
+        assert_eq!(age_shedding_rates(1.0, 0.02, 0.01), (0.02, 0.01));
+        assert_eq!(age_shedding_rates(1.7, 0.02, 0.01), (0.02, 0.01));
+        let flow = senescence_flow(1.0);
+        // 550 °C·day: DVS 0.5. Leaf at LAI 3 (under the threshold): only the stem sheds.
+        let pre = state(5.0, 2.0, 3.0, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0);
+        let mut pre = pre;
+        pre.stocks.insert(
+            LITTER_SINK.to_string(),
+            sen_state(0.0, 0.0, 0.0).stocks[LITTER_SINK].clone(),
+        );
+        let legs = sen_legs(&flow, &pre, 1.0);
+        assert_eq!(legs[LEAF], 0.0);
+        assert_eq!(legs[ROOT], 0.0);
+        assert_eq!(legs[STEM], -G_RDR_STEM * 2.0);
+        assert_eq!(legs[LITTER_SINK], G_RDR_STEM * 2.0);
+        // Above the shading threshold before anthesis: the shading term alone, on the leaf.
+        let shaded = {
+            let mut s = state(12.0, 2.0, 3.0, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0);
+            s.stocks.insert(
+                LITTER_SINK.to_string(),
+                sen_state(0.0, 0.0, 0.0).stocks[LITTER_SINK].clone(),
+            );
+            s
+        };
+        const { assert!(12.0 * G_SLA > 6.0) };
+        assert_eq!(sen_legs(&flow, &shaded, 1.0)[LEAF], -0.05 * 12.0);
+    }
+
+    /// A missing development clock is REFUSED, not read as "vegetative forever".
+    #[test]
+    fn shedding_without_a_development_clock_is_refused() {
+        let flow = senescence_flow(1.0);
+        let mut s = sen_state(5.0, 2.0, 3.0);
+        s.aux.remove(THERMAL_TIME);
+        let r = resolver(0.0, 400.0);
+        let err = flow
+            .evaluate(&s, &r.bind(&s, 1.0), 1.0)
+            .expect_err("refused");
+        assert!(err.to_string().contains("development clock"), "{err}");
+    }
+
+    /// A state carrying the litter BOUNDARY sink the organ fixture does not build, past anthesis.
     fn sen_state(leaf: f64, stem: f64, root: f64) -> State {
-        let mut s = state(leaf, stem, root, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0);
+        let mut s = state(
+            leaf,
+            stem,
+            root,
+            0.4,
+            0.21 * AIR_CAPACITY_MOL,
+            POST_ANTHESIS_TT,
+        );
         s.stocks.insert(
             LITTER_SINK.to_string(),
             Stock::new(
@@ -5578,6 +5711,8 @@ mod tests {
             lai_threshold: sen.lai_threshold,
             sla_per_mol_c: canopy.sla_per_mol_c,
             ground_area: 1.0,
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: params::phenology(),
         };
         for (label, rdr, s) in [
             // no nitrogen in a live, senescing plant

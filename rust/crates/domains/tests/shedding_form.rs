@@ -3,9 +3,10 @@
 //!
 //! Three claims, each one the others cannot stand in for:
 //!
-//! * **the control** — the lab flows at the frozen rates ([`SheddingForm::FLAT`]) reproduce the
-//!   frozen run bit for bit, on the open field (carbon only) and in the sealed jar (carbon and
-//!   its nitrogen twin). Without it, a measured difference could be the lab copy's arithmetic;
+//! * **the control** — the lab flows at the frozen form reproduce the frozen run bit for bit, on
+//!   the open field (carbon only) and in the sealed jar (carbon and its nitrogen twin). Without
+//!   it, a measured difference could be the lab copy's arithmetic. ⚠ Since 2026-10-06 the frozen
+//!   form is [`SheddingForm::BEFORE_ANTHESIS_ONLY`] (it was [`SheddingForm::FLAT`] until then);
 //! * **the law** — the rates the sources' form returns before and after anthesis, by hand;
 //! * **the reach** — the sources' form moves the run (a lab flow the seam silently ignored
 //!   would pass the control too).
@@ -71,20 +72,40 @@ fn bits(s: &(Vec<String>, Vec<f64>)) -> (Vec<String>, Vec<u64>) {
     (s.0.clone(), s.1.iter().map(|x| x.to_bits()).collect())
 }
 
+/// ⚠ **The control moved on 2026-10-06** (the biosphere unfreeze, the leaf-shedding note §10):
+/// the agreed half — no leaf or root shedding before anthesis — IS the frozen form now, so it is
+/// the lab copy of it that must reproduce the frozen run bit for bit (prediction U1). `FLAT`
+/// is the form before that day.
 #[test]
-fn flat_through_the_lab_is_the_frozen_open_field_bit_for_bit() {
+fn the_agreed_half_through_the_lab_is_the_frozen_open_field_bit_for_bit() {
     let s = DEFAULT_SCENARIO;
     assert_eq!(
-        bits(&composed_series(&s, &carbon_only(SheddingForm::FLAT))),
+        bits(&composed_series(
+            &s,
+            &carbon_only(SheddingForm::BEFORE_ANTHESIS_ONLY)
+        )),
         bits(&frozen_series(&s))
     );
 }
 
 #[test]
-fn flat_through_the_lab_is_the_frozen_sealed_jar_bit_for_bit() {
+fn the_agreed_half_through_the_lab_is_the_frozen_sealed_jar_bit_for_bit() {
     let s = sealed_chamber_scenario();
     assert_eq!(
-        bits(&composed_series(&s, &composition(SheddingForm::FLAT))),
+        bits(&composed_series(
+            &s,
+            &composition(SheddingForm::BEFORE_ANTHESIS_ONLY)
+        )),
+        bits(&frozen_series(&s))
+    );
+}
+
+/// The form before 2026-10-06 (`FLAT`, shedding from day one) is no longer the frozen run.
+#[test]
+fn the_flat_form_is_no_longer_the_frozen_run() {
+    let s = DEFAULT_SCENARIO;
+    assert_ne!(
+        bits(&composed_series(&s, &carbon_only(SheddingForm::FLAT))),
         bits(&frozen_series(&s))
     );
 }

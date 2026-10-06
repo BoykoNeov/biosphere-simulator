@@ -67,3 +67,15 @@ crop keeps its leaves and the rescue all but vanishes (1.03× canopy, 1.22× gra
 no drought-driven leaf death of its own — the flat rate stood in for it. The user paused the
 adoption to add a cited drought shedding first, so both land together. The build waits on the
 branch `wip/leaf-shedding-adoption`.
+
+**ADOPTED 2026-10-06 (a biosphere unfreeze)** (note §13), on the user's "resume". A crop now sheds
+no leaf or root from age before it flowers — what all three books say. The change landed exactly
+as its lab twin predicted, to every printed digit. Every survival test passes; the closed
+chambers' CO₂ margins fell (the jar's most) and were re-pinned with that direction stated. The
+open field's canopy now reaches the size where the cited shading rule takes over, which is what
+July's diagnosis said the flat rate had been hiding. Three findings came with it and are recorded
+in the tests: the deep-water rescue all but vanished; a smaller sealed jar now reads healthier at
+every size; the chambers' leaf-area bound was restated to the source's 6.0 by the user. The
+station's cold-week seedling no longer loses half its carbon (0.146 mol C at the end of the cold
+weeks), and its grain at maturity rises from 9.5 to 14.6 mol C. Two gaps stay open: no sourced
+drought leaf death, and water use that does not read the crop.

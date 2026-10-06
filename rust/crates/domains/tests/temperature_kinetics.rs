@@ -104,7 +104,8 @@ fn the_q10_form_moves_every_measured_quantity() {
 
 /// **The finding.** The Q10 form raises leaf-level season-integrated assimilation ~56 % (the
 /// plan's §3 table) and above-ground biomass 37 %, yet peak LAI moves only +3.5 %. The claim
-/// is that the 5 %/day mutual-shading loss above LAI 6 absorbs the rest.
+/// is that the 5 %/day mutual-shading loss above LAI 6 absorbs the rest. ⚠ Since 2026-10-06 the
+/// loss caps the frozen (cardinal) form too — see the re-statement in the body.
 ///
 /// ⚠ **A causal claim earns the experiment that removes the cause**, so this is a 2×2: only
 /// disabling the loss under BOTH forms separates "the step caps this form" from "the step
@@ -134,11 +135,18 @@ fn the_mutual_shading_step_is_what_caps_peak_lai_under_the_q10_form() {
          q10 {q10_on:.6} -> {q10_off:.6} (loss off)"
     );
 
+    // ⚠⚠ RE-STATED 2026-10-06 — the case this assertion's own message named has arrived: the
+    // loss is NO LONGER inert in the frozen tree, so "the step caps this form" became "the
+    // step caps everything" (docs/plans/post-roadmap-leaf-shedding.md §10a). With no leaf
+    // shed from age before anthesis the frozen canopy reaches the 6.0 threshold and the
+    // cited V-K&S loss regulates it: measured cardinal 6.177401 -> 14.824740 with the loss
+    // off, Q10 6.564175 -> 29.128990. The July (C) diagnosis predicted exactly this — the flat
+    // rdr_leaf had been standing in for canopy regulation. What survives of the finding is the
+    // Q10 half below: the loss is what holds the Q10 form inside its band.
     assert!(
-        (cardinal_off - cardinal_on).abs() < 1e-9,
-        "the mutual-shading loss is no longer inert in the frozen tree ({cardinal_on} -> \
-         {cardinal_off}) — then it is not the FORM that made the term load-bearing, and the \
-         finding below is about the tree instead"
+        cardinal_off - cardinal_on > 5.0,
+        "the mutual-shading loss no longer regulates the frozen canopy ({cardinal_on} -> \
+         {cardinal_off})"
     );
     assert!(
         q10_off - q10_on > 5.0,

@@ -224,18 +224,22 @@ fn the_form_no_longer_rations_the_sealed_jar_and_the_draw_probe_still_sees_a_squ
     assert_eq!((frozen.rationed, lab_explicit.rationed), (0, 0));
     let (f, l) = (frozen.of(CARBON_POOL).ratio, lab_explicit.of(CARBON_POOL).ratio);
     assert!(f < l, "the lab form must still draw harder than the frozen one: {f} vs {l}");
+    // ⚠ RE-MEASURED 2026-10-06 (the leaf-shedding unfreeze, no leaf shed from age before
+    // anthesis): the lab jar's tightest explicit step 0.3128 -> 0.6780 (step 3347), the frozen
+    // jar's 0.2009 -> 0.5678 (step 3731); neither rations. Both crops are larger, and the lab
+    // form still draws harder.
     assert!(
-        (0.29..0.34).contains(&l),
-        "the lab jar's tightest step moved (measured 0.3128): {:?}",
+        (0.64..0.71).contains(&l),
+        "the lab jar's tightest step moved (measured 0.6780): {:?}",
         lab_explicit.of(CARBON_POOL)
     );
-    // Under C the lab form's tightest step reads 0.2324 (step 3155): the draw is solved against
-    // the air the step leaves, so the hardest step asks for less.
+    // Under C the lab form's tightest step reads 0.3817 (step 3347; 0.2324 before 2026-10-06):
+    // the draw is solved against the air the step leaves, so the hardest step asks for less.
     let lab_c = step_draws(s, 1, &lab());
     assert_eq!(lab_c.rationed, 0);
     assert!(
-        (0.21..0.25).contains(&lab_c.of(CARBON_POOL).ratio),
-        "the lab jar's tightest step under C moved (measured 0.2324): {:?}",
+        (0.36..0.40).contains(&lab_c.of(CARBON_POOL).ratio),
+        "the lab jar's tightest step under C moved (measured 0.3817): {:?}",
         lab_c.of(CARBON_POOL)
     );
 

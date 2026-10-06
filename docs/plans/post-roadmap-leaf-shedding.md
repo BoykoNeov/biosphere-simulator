@@ -453,3 +453,33 @@ rate produces a collapse in this scenario, and no cited mechanism on the shelf r
 deep-water claim re-expressed and two gaps recorded; stay paused for Van Keulen (1982); stay paused
 to make transpiration read the canopy first (a separate, larger unfreeze); or abandon.
 
+**DECIDED 2026-10-06 (the user): "Resume the adoption."** The parked build (branch
+`wip/leaf-shedding-adoption`) is brought back onto main; the deep-water claim is restated at its
+measured size; two gaps are recorded (no sourced drought leaf death; crop-blind water use).
+
+## 13. ADOPTED (2026-10-06, a biosphere unfreeze) — graded
+
+| # | Prediction | Measured | Grade |
+|---|---|---|---|
+| U1 | the new frozen run = the lab twin, bit for bit | every readout of `shedding_switch` (frozen after = agreed half before, 8 of 8 to every printed digit); the station's seedling 0.1460 and grain at maturity 14.58, its twin's end state = frozen; the lab control (`tests/shedding_form.rs`) bit-identical on the open field and the jar | HELD |
+| U2 | (corrected in §10a) every crop golden + `drift_summary` move; non-crop goldens identical | 10 move; `harvest` **byte-identical** (its crop starts past anthesis, `thermal_time0`) | HELD but for `harvest` |
+| U3 | manifests: `senescence.yaml` + the moved goldens' hashes, no set change | exactly that: 1 digest + 7 biosphere + 3 station golden hashes | HELD |
+| U4 | the readings | as the lab twin (U1); rationed 0 everywhere | HELD |
+| U5 | the VKS chamber bound fails at 1.0 | jar 1.024; restated to 6.0 by the user; no chamber reaches 6.0 up to ×3.5 SLA | HELD (decided) |
+
+**The roster, done** (each with its measured numbers in the test's own doc): the margins re-pinned
+(all five fell); the jar's tightest step re-pinned (rose); the VKS gate and its twin restated;
+the flat form's unit tests moved past anthesis and the zero before it pinned; a missing clock
+refused (new test); the lab control moved to the agreed half; the deep-water claim re-stated
+(collapsed, two gaps); the Q10 2×2 re-stated (the loss now caps both forms); the value-switch probe
+moved to the jar (the open field's peak leaf is flat in k under the cap); the shading ladder
+re-measured (inverted — LAI ceiling ×1.616 on / ×0.719 off; the biomass cap unreachable with the
+loss on, its crest 14.186 at ×3; the one-sided rung moved to ×0.3); the room-size tests inverted
+(a smaller room reads a higher low at every size; the explicit form's backstop now fires below
+0.60, was 0.17); the jar's O₂ trough factor 0.606 → 0.758; the lab leaf form's jar draws
+re-pinned (0.678 explicit, 0.382 under C); the claim census +2.
+
+**Gaps recorded, not acted on:** (1) no sourced drought-driven leaf death (Van Keulen 1982 a lead);
+(2) crop-blind water use — transpiration does not read the canopy, so a seedling dries the soil as
+a full canopy would; (3) the after-anthesis form, disputed between the sources, waits for slice 4.
+

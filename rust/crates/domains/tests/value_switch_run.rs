@@ -18,8 +18,8 @@
 use domains::biosphere::params::BiosphereParams;
 use domains::biosphere::stocks::LEAF_C;
 use domains::biosphere::{
-    run_season, season_setup, season_setup_with, steps_for_years, SeasonScenario, BIO_DT,
-    DEFAULT_SCENARIO,
+    run_season, sealed_chamber_scenario, season_setup, season_setup_with, steps_for_years,
+    SeasonScenario, BIO_DT, DEFAULT_SCENARIO, SEALED_CHAMBER_YEARS,
 };
 use domains::biosphere::readouts::{peak_lai, trajectory};
 use domains::lab::{biosphere_with, Substitution};
@@ -76,6 +76,13 @@ fn an_unsubstituted_run_is_bit_identical_to_the_frozen_path() {
 /// Direction 2: a substitution reaches the run — and the empty diff above was not the
 /// seam quietly ignoring its argument.
 ///
+/// ⚠ **The probe moved to the sealed jar on 2026-10-06** (the leaf-shedding unfreeze). Until
+/// then it was the open field, whose canopy sat below the 6.0 mutual-shading threshold; with
+/// no leaf shed from age before anthesis that canopy reaches the threshold and the shading loss
+/// caps it, so its peak leaf carbon is FLAT in `extinction_coef` (measured 9.850465 / 9.835970
+/// / 9.835941 at 0.55 / 0.60 / 0.65) — the cap, not the seam. The jar's canopy (peak LAI ~1.02)
+/// is far below the cap and still light-limited: 1.630537 / 1.631221 / 1.631742.
+///
 /// ⚠ The assertion is on the **direction**, not on a value. A larger canopy extinction
 /// coefficient intercepts more light per unit leaf area, so the season's peak leaf carbon
 /// rises. Pinning the number would freeze an experimental result into a test, which is
@@ -83,9 +90,9 @@ fn an_unsubstituted_run_is_bit_identical_to_the_frozen_path() {
 /// it. `extinction_coef` is still 0.6 in the tree and this test does not move it.
 #[test]
 fn a_substituted_run_differs_and_in_the_direction_the_science_says() {
-    let base = frozen_leaf_series(&DEFAULT_SCENARIO);
+    let base = frozen_leaf_series(&sealed_chamber_scenario());
     let higher_k = leaf_series(
-        &DEFAULT_SCENARIO,
+        &sealed_chamber_scenario(),
         &biosphere_with(&[Substitution::new("canopy.yaml", "extinction_coef", 0.65)])
             .expect("substitution"),
     );
@@ -113,12 +120,12 @@ fn the_frozen_run_sits_between_a_lower_and_a_higher_substitution() {
     let peak = |s: &[f64]| s.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let at = |k: f64| {
         peak(&leaf_series(
-            &DEFAULT_SCENARIO,
+            &sealed_chamber_scenario(),
             &biosphere_with(&[Substitution::new("canopy.yaml", "extinction_coef", k)])
                 .expect("substitution"),
         ))
     };
-    let base = peak(&frozen_leaf_series(&DEFAULT_SCENARIO));
+    let base = peak(&frozen_leaf_series(&sealed_chamber_scenario()));
     let (low, high) = (at(0.55), at(0.65));
     assert!(
         low < base && base < high,
@@ -139,12 +146,17 @@ fn the_lifted_readouts_are_not_cached_across_substitutions() {
     let at = |k: f64| {
         let p = biosphere_with(&[Substitution::new("canopy.yaml", "extinction_coef", k)])
             .expect("substitution");
-        peak_lai(&trajectory(DEFAULT_SCENARIO, 1, false, &p))
+        peak_lai(&trajectory(
+            sealed_chamber_scenario(),
+            SEALED_CHAMBER_YEARS,
+            false,
+            &p,
+        ))
     };
     let (low, high) = (at(0.55), at(0.65));
     let frozen = peak_lai(&trajectory(
-        DEFAULT_SCENARIO,
-        1,
+        sealed_chamber_scenario(),
+        SEALED_CHAMBER_YEARS,
         false,
         &biosphere_with(&[]).expect("empty"),
     ));

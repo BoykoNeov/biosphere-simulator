@@ -170,7 +170,7 @@
     "photosynthesis.yaml": "3fc1843072424a20b2df3449e6f040e6986848f6559669b21478ffa557102aa0",
     "respiration.yaml": "b6ec929a0129f41cb48e6b02b2ab7298eb7a590a6493e40feb57b73375d8e638",
     "root_depth.yaml": "fefdbcc39e3e5cb1ef88368a30afe467b7be6ac3dd825657574bcdc020b358e7",
-    "senescence.yaml": "21163d3c54c958655b0e39d1613610e1264bdecb85e7432576a6cc471c3b669b",
+    "senescence.yaml": "02517d8459e63ffb8e591d85cd8135e64de1168de213090c785bb5cd9fb565ca",
     "stem_reserves.yaml": "65ae25bf8ec5ad213763c41282221837b3d0e6e8de14a70d2c5ed53ed9cbe39e",
     "transpiration.yaml": "8859b2a8612372f9ae7d4468754d3b2d5a3e4530941281fb81327fc2daf303eb",
     "water_cycle.yaml": "6d590f319950c2111879654ba2ff4393023905dc684fe07c21453d1173033dc2"
@@ -179,43 +179,43 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "f5e7031b6dabec30a1134cdc2184c713543eb354e38a68c7a671d7bea15b4030",
+      "golden_sha256": "91a23cb4c475e8bb5c12bbe35e11cf80b0e1f0cfb1f6840acfc4a75b509b9aae",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "e31e37fc04d765f4f708534e4d01d19f5dba488e2ef574a90f0e4382ec648020",
+      "golden_sha256": "ca0c5c323e5b9b8980dd0c4d85523b3e822479062ca3e8ac0ec12b9e79859d60",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "1291223e7a590a8fdfcd0c06c5a4e13efdedf0d3650015fc999e4878a1aadaa8",
+      "golden_sha256": "e5750bbccc9711fcd3209c5b3bb4daf40c466850e5a296b0e7f896f69725b598",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
     "open_season": {
       "golden": "season_euler_state.json",
-      "golden_sha256": "22e31f46cbbf29c668343444da60a071d88e69697b81071d2c8dc804e8affb74",
+      "golden_sha256": "c02fe84b68a387551ea5b3a54fa02a6348d87d69b8df08f044e32c56d1363980",
       "scenario": "DEFAULT_SCENARIO (open field)",
       "years": 1
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "a3c80436e90014628206ebf43d8647a31bbefb5276182233c1bd96578549f3bd",
+      "golden_sha256": "eebf92e1ae66b79e1dc199881501d3686b2289d29524313ee47849356efe881c",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "d1e1f11a879c3299104d84adcebb183dd3fa267d239674f20a71e47c69617367",
+      "golden_sha256": "07d7da02662309e5644341fd4770be2a86774d6dad59fe2a28fab6c5779f63a1",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "e52688e6b196d608c0984ed6e3eb097b2bd353445b85a23da49209da52599fc4",
+      "golden_sha256": "1897e9c240b05fa1ca5cfceb0b4b0b6349222574084ce6589fdccfae046bc50a",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

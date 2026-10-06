@@ -883,8 +883,13 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
    co-adaptation shape this project has refused (the consumer-chamber 2×, the DPM/RPM labile
    re-read, ruling B). This binds the **reference**; a lab-only experiment may tune, tagged
    `WHAT-IF` (`docs/param-file-conventions.md`, since 2026-09-29). ⚠ And the converse is not licensed either: a band **passing** is not an
-   endorsement. `open_season` sits **3.8 %** above the LAI lower bound and **12 %** below the
-   Greenwood crossing — these are tight margins, not comfort.
+   endorsement. `open_season` sits **23.5 %** above the LAI lower bound (peak 6.177) and **3.72 %**
+   below the Greenwood crossing (peak W 13.888) since 2026-10-06 (3.8 % / 12 % before) — the
+   biomass margin is the tight one now, and it is PINNED
+   (`science_gates::margins::the_open_fields_biomass_headroom_is_pinned`). Its canopy is held in
+   the shading regime by the V-K&S loss (14.825 with it off), a spring-wheat value transmitted by
+   Penning de Vries. With the loss on, `specific_leaf_area` alone cannot reach the cap (the ridge
+   crests at 14.186, ×3); a carbon gain by another route can.
 6. **Record provenance.** Update this file and the Phase-4 plan with what changed and why (a
    calibration cites its primary source per `docs/param-file-conventions.md`).
 7. **Re-run the gates:** full suite (incl. `-m slow` for the stress), `ruff`, `pyright`; commit
@@ -910,6 +915,32 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-06 — no tissue is shed from age before anthesis: a FORM change to `Senescence` and
+  `NitrogenSenescence`; 7 biosphere goldens move (and 3 station goldens, delegated).**
+  `docs/plans/post-roadmap-leaf-shedding.md` §10 (design, predictions and roster, advisor-reviewed
+  before code) and §13 (graded). Before anthesis (`DVS < 1`) the leaf's AGE death rate and the root
+  rate are 0 (`flows::age_shedding_rates`); the stem rate and the mutual-shading term are unchanged
+  at every stage, and every rate after anthesis is the flat one. The three crop-model sources on
+  the shelf agree on the zero before anthesis (Penning de Vries 1989 §3.2.6 / Listing 5; Soltani &
+  Sinclair 2012 Box 9.1; Teh Eqn 7.17 after Goudriaan & van Laar 1994) and disagree after it,
+  which is left as it was. The two flows read the development clock and refuse its absence. No new
+  param, no flow-set change; `senescence.yaml`'s provenance text moved (and its stale `shade_rate`
+  note was corrected). **Predicted to the printed digit by a lab twin and held exactly** (every
+  readout of `shedding_switch`, the station's seedling and grain). Gate report: every survival
+  gate passes (the five compensation bands, the decade CO₂ floor, both decade leaf cycles, the
+  consumer cycle; rationed 0 everywhere); the margins FELL (jar 14.15 → 5.00, perennial 1.224 →
+  1.097, consumer 1.235 → 1.166) and were re-pinned with the direction recorded; the jar's tightest
+  CO₂ step rose 0.165 → 0.342 of the pool. ⚠ **One band was restated, by the user's decision
+  (§10a):** `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` asserted the chambers'
+  peak LAI < 1.0 — the project's own stand-in, never a sourced bound — and the jar now peaks at
+  1.024; it asserts the claim itself, chambers below the source's 6.0 threshold (the 1.0's second
+  role, a detector of `specific_leaf_area` error, is lost and recorded). The open field's canopy
+  now reaches the shading regime (peak LAI 6.177, 14.825 with the loss off): the cited V-K&S loss
+  is the canopy's regulator, as July's (C) diagnosis predicted. Findings recorded with the change:
+  the deep-water rescue collapsed (11.8× → 1.03× canopy; 1.59× grain at maturity) — no cited
+  drought leaf death exists on the shelf for that scenario, and its soil water is crop-blind; in
+  the jar a smaller room now reads a HIGHER season-low CO₂ at every size measured. `harvest` is
+  byte-identical (its crop starts past anthesis).
 - **2026-10-01 — in a sealed build the crop transpires against the CHAMBER's air, not the
   weather's: 5 goldens here (4 on the station), their `golden_sha256` rows. Only water stocks
   moved. No flow set, aux, param file, `dt_days` or `simcore` byte changed; the open field is
