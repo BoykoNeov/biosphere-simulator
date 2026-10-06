@@ -49,3 +49,29 @@ Nothing frozen moved.
 * The wheat trials read grew Yecora Rojo under long days; a scorecard row would run the crop with
   vernalization off and read rates and amounts, not dates.
 * The water row is labelled before any run: early water use is the known leaf-area gap.
+
+**DECIDED 2026-10-07 (the user):** TM 102788 first; the frozen wheat with vernalization off, read on
+rates and amounts; the unopened sources after the first row. Yecora Rojo's spring habit was checked
+against a seed-company variety page (secondary; the UC Davis page it restates returned 403).
+
+**Slice 3, row 1 BUILT 2026-10-07, lab-only** (`rust/crates/station/tests/scorecard_tm102788.rs`,
+commit `2be91a3`). The frozen wheat in the open build, every weather forcing replaced by the
+trial's chamber. A diagnostic: it asserts its instrument and prints the scorecard; no ratio pinned.
+
+* **An instrument error caught before scoring:** the open build splits the outside air into a supply
+  stock and a respired-CO₂ stock. The first draft booked only the supply and read the night as 0.
+  The books now close on both, and a check requires a nonzero night and day on every day.
+* Peak daytime net uptake **26.4 against 27, on day 24 against 25** (0.98). The model's canopy
+  closed on the trial's schedule, so the predicted "the seedling limits the totals" was WRONG; the
+  totals are comparable rows.
+* Night respiration **0.15** of the trial's near day 20 and **0.48** over the season; the night's
+  temperature response 1.29 for 4 °C against 1.65. The model respires at night for upkeep only;
+  its growth respiration falls in the light.
+* Carbon fixed over days 10–84 **1.23×**; standing plant carbon at day 86 **0.93×**.
+* Water at full cover **0.40**, below as predicted against the advisor's guess: the model's lamp
+  heats the crop with its PAR only — near right for the station's LED, far from it for the BPC's
+  sodium lamps. A trial-mapping question as much as a model one.
+* CO₂ 1000 against 1160 ppm: **3 %**. The fixed-CO₂ forcing served the held chamber; the parked
+  controller was not needed for this row.
+* Of 12 graded predictions: 9 held, 2 failed (both season totals, above the range), 1 held on
+  direction and missed its range by 0.03. No parameter moved.

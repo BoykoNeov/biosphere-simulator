@@ -366,3 +366,91 @@ surface resistance does not close at high CO₂, which would push water use UP).
 above says the energy term dominates: the model's lamp heats the crop with its PAR only, while an
 HPS lamp's radiant output is mostly outside PAR, and the BPC moved its air hard. If W1 comes out
 above 1, the arithmetic was wrong and that is the finding.
+
+## 9. Slice 3, row 1 BUILT (2026-10-07, lab-only) — the scorecard, graded
+
+`rust/crates/station/tests/scorecard_tm102788.rs` at commit `2be91a3`; read with
+`cargo test -p station --test scorecard_tm102788 -- --nocapture`. Six tests, all instrument checks;
+the scorecard itself is printed, never asserted. Nothing frozen moved.
+
+### 9a. An instrument error, caught before any score was read
+
+The first run printed night respiration as **exactly 0** and the night-temperature ratio as NaN.
+Cause, in my instrument and not the model: the open build keeps the outside air in **two** boundary
+stocks — `boundary.co2_atmos` supplies the crop's carbon, `boundary.co2_resp` receives what it
+respires (`MaintenanceRespiration`'s open-field branch: "covered from the atmosphere, shortfall
+from the organs", returned to `co2_resp`). The draft booked `co2_atmos` alone, so it counted gross
+intake and no respiration at all. Fixed by booking and closing the books on the SUM of both stocks
+(what the trial's analyser saw), with a new check that every day has a nonzero night and day. No
+condition or parameter was changed. The draft's printed numbers are not scores and are not used.
+
+### 9b. The scorecard (ci = 812 ppm)
+
+| row | model | TM 102788 | ratio | kind |
+|---|---|---|---|---|
+| U1 peak daytime net uptake (µmol m⁻² s⁻¹) | **26.43**, TM day 24 | 27, day 25 | **0.98** | rate |
+| N1 night respiration, TM day 20 | 1.93 | ~13 | 0.149 | rate |
+| N1 night respiration, season mean | 3.44 | 7.2 | 0.478 | rate |
+| N2 night respiration 20 °C / 16 °C (day 33 / 34) | 1.294 | 1.65 (Fig. 5, 5 weeks) | 0.784 | rate |
+| W1 transpiration, TM days 25–80 (L m⁻² d⁻¹) | 2.376 | ~6.0 (peak; then roughly constant) | 0.396 | rate |
+| U2 mean daytime net uptake, days 10–84 | 17.33 | 15 | 1.156 | total |
+| C1 net carbon fixed, days 10–84 (mol C m⁻²) | 90.26 | 73.1 | 1.235 | total |
+| B1 plant carbon, TM day 86 (mol C m⁻²) | 62.01 | 66.7 (CH₂O basis; 75 at 45 % C) | 0.930 (0.83) | total |
+| W2 mean transpiration | 2.508 | 4.5 | 0.557 | total |
+| S1 C1 at ci 812 / ci 700 | 1.0308 | — | — | sensitivity |
+
+Conditions: lowest root-zone fraction **0.9899**; nitrogen factor **1.0000** on every state. The
+crop at TM day 86: DVS 1.70 (not mature — dates are not compared); leaf 8.95, stem 15.24, root
+16.58, grain 19.42, stem reserve 1.82 mol C m⁻².
+
+### 9c. The predictions, graded
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| U1 | below 27; 15–35 | 26.43 | HELD — but its stated reason ("closes after the dimming") was WRONG: the peak came on day 24, before it |
+| N1 day 20 | 0.01–0.15 | 0.149 | HELD, at the edge |
+| N1 mean | 0.15–0.6 | 0.478 | HELD |
+| N2 | 1.20–1.32, below 1.65 | 1.294 | HELD |
+| W1 | **below** (against the advisor's guess); 0.38–0.5 | 0.396 | HELD |
+| W2 | 0.5–0.67 | 0.557 | HELD |
+| U2 | below; 0.3–0.9 | 1.156 | **FAILED** (above) |
+| C1 | below; 0.35–0.9 | 1.235 | **FAILED** (above) |
+| B1 | below; 0.3–0.9 | 0.930 | direction HELD, range FAILED by 0.03 |
+| S1 | 1.005–1.05 | 1.031 | HELD |
+| conditions | water high confidence; nitrogen low | both non-limiting | HELD |
+| books | close, 0 rationed, bit-identical | as predicted (asserted) | HELD |
+
+### 9d. What the row says
+
+1. **The seedling was not the limit — the totals' label was wrong.** Both the advisor and this plan
+   expected the season totals below 1 because the model starts from 0.16 mol C m⁻² against ~1500
+   plants. The model's canopy closed on the trial's schedule: peak uptake on day 24 against day 25,
+   at 0.98 of the trial's rate. So the totals are comparable rows after all, and the "seedling"
+   label on them is withdrawn.
+2. **Daytime uptake is close; the model fixes ~23 % more carbon over the season** — mostly because
+   after the day-28 dimming its daytime uptake sits at 16–18 µmol m⁻² s⁻¹ (day 30: 18.0) where the
+   trial dropped to 15.3 (p. 12) and declined with age, and partly because its nights cost half as
+   much (next point).
+3. **The model's crop barely respires at night.** At night it pays upkeep only (0.02 d⁻¹ × Q10 2 on
+   leaf + stem + root); growth respiration happens only while it grows, i.e. in the light. The
+   trial's stand respired at 13 µmol m⁻² s⁻¹ near day 20, nearly half its daytime net rate; the
+   model 1.9. Its night also answers temperature more weakly (1.29 for 4 °C against the trial's
+   1.65, a whole-stand Q10 near 3.5 against the model's 2.0). The daytime net hides this: the
+   model's respiration is in its day numbers instead.
+4. **Standing biomass is close (0.93) while fixation is high (1.23):** the model fixed 90 mol C m⁻²
+   over days 10–84 and stands at 62 — the ~28 mol gap is presumably shed tissue (not booked here,
+   owed). The trial's own gap between gas exchange and harvest was ~10 % (p. 10).
+5. **Water: 0.40 at full cover, below as predicted against the advisor's guess.** The model's lamp
+   warms the crop with its PAR only (`lamp_net_radiation`, the 2026-10-05 choice; room-temperature
+   plan §21). That is near the truth for the station's PWM-dimmed LED, and far from it for the
+   BPC's high-pressure sodium lamps, which radiate much outside PAR. So this row measures the
+   **trial mapping** as much as the model: an HPS chamber is not the station's lamp. The
+   leaf-area-blind rate shows too — the model drinks 2.9 L m⁻² d⁻¹ from day 5, when the trial's
+   seedlings drank little.
+6. **CO₂: 3 % between 1000 and 1160 ppm**, matching the trial's "decreased slightly from 1500 to
+   800 ppm" (p. 8). The fixed-CO₂ forcing does what a held chamber does on this row: the parked
+   controller was not needed.
+
+**Not acted on.** No parameter moved; this is a diagnostic. Candidates it names, each the user's:
+the night-respiration split (point 3) and the post-dimming uptake (point 2) are science questions;
+the HPS lamp's radiation (point 5) is a trial-mapping question.
