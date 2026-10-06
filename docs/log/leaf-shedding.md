@@ -57,3 +57,13 @@ across every plant scenario and the sealed station.
   source's 6.0).
 * Recommended to the user: the agreed half is the candidate; the after-flowering half waits for
   slice 4.
+
+**BUILT AND PARKED 2026-10-06** (note §10–§11). The user chose to adopt the agreed half, and to
+restate the chambers' leaf-area bound to the source's 6.0. Built on its own branch, the change
+reproduced the lab's predictions exactly. Then one test showed what else the flat rate had been
+doing: a crop short of water used to lose its canopy (leaves dying faster than drought let them
+grow back), and reaching deep water rescued it twelvefold; without the flat rate the droughted
+crop keeps its leaves and the rescue all but vanishes (1.03× canopy, 1.22× grain). The model has
+no drought-driven leaf death of its own — the flat rate stood in for it. The user paused the
+adoption to add a cited drought shedding first, so both land together. The build waits on the
+branch `wip/leaf-shedding-adoption`.

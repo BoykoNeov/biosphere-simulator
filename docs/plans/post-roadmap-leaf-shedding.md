@@ -376,3 +376,37 @@ lab's `BEFORE_ANTHESIS_ONLY` through the seam must equal the frozen run bit for 
 | rationed / events, every run | 0 / 0 | **0 / 0** |
 | sealed station (`shedding_station`): cold seedling at day 56; grain at maturity | 0.0771; 9.51 | **0.1460; 14.58** |
 
+## 11. The build, PARKED — the drought response it removes (2026-10-06)
+
+**Built, on branch `wip/leaf-shedding-adoption` (not on main):** the form in `Senescence` /
+`NitrogenSenescence` (`age_shedding_rates`; a missing development clock refused); 10 goldens
+regenerated — U1 **held to every printed digit** (the frozen column of `shedding_switch` after
+the build equals the lab twin's before it, all eight readouts; the station's seedling 0.1460 and
+grain at maturity 14.58); `senescence.yaml` provenance; the VKS chamber bound restated to 6.0
+with its twin (measured: no chamber reaches 6.0 up to ×3.5 SLA); the margins re-pinned (all five
+FELL; the jar's tightest step 0.165 → 0.342); the claim census. U2's corrected list held except
+`harvest`, byte-identical — its crop starts past anthesis (`thermal_time0`).
+
+**What stopped it — a roster item mis-classified in §10a as "new number":**
+`system::reaching_the_below_root_store_is_what_saves_the_deep_water_crop`, the headline water
+claim. With the deep store vs without:
+
+| | before | the agreed half |
+|---|---|---|
+| peak leaf carbon ratio | 11.8× | **1.03×** (9.84 vs 9.56 mol C) |
+| grain ratio | 7.7× | **1.22×** (12.52 vs 10.26) |
+
+The droughted control used to collapse (peak LAI ≈ 0.5): its growth could not replace leaves dying
+at 2 %/day — the cold seedling's spiral. Without the flat rate, drought slows growth and kills
+nothing. **So the flat `rdr_leaf` was also standing in for drought-driven leaf death, which the
+tree does not have.** Penning de Vries et al. (1989) §4.3.4 p. 141: "Severe water stress can lead
+to progressive death and removal of leaf area… Van Keulen (1982) reduces biomass of wheat and
+grasslands by 0.1–0.2 d⁻¹ when water stress exceeds a certain level" — a LEAD, not read at source.
+
+**DECIDED 2026-10-06 (the user): "Pause; add drought shedding first."** The agreed half and a
+cited drought-driven leaf death are to be adopted together, so the drought response is not lost.
+Next: the drought-shedding study, sources first.
+
+⚠ **Lesson:** §10a classified 13 reds from their messages without reading the SIZE of each move;
+a two-sided pin failing at 1.03 against 11.1..13.0 was a claim collapsing, not a number drifting.
+
