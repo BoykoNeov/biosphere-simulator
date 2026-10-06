@@ -55,7 +55,7 @@ tree — a refusal is dated to its state, and so is each gate it failed:
 |---|---|
 | canopy peak LAI 16.4 without vegetative leaf death | **discharged** — the shading rule (5 %/day above LAI 6) was BUILT 2026-08-15 |
 | `perennial` hard-errors under RK4 | **not a reference gate** — the biosphere is frozen at Euler; RK4 appears only in lab tests (`tests/leaf_form.rs`) |
-| `perennial`'s decade CO₂ floor 0.05 | **yes** — `science_gates.rs:566`, `non_collapsing(floor=0.05)` (its window was removed 2026-08-10, a tightening) |
+| `perennial`'s decade CO₂ floor 0.05 | **yes** — `decade_min_carbon_pool_stationary` (`science_gates.rs`, the per-year minimum of the CO₂ pool, `non_collapsing(floor=0.05)`; its window was removed 2026-08-10, a tightening). ⚠ First cited here as `science_gates.rs:566`, which is the sibling LEAF floor (`perennial_decade_leaf_cycle_is_stationary_and_alive`); both floors exist (corrected 2026-10-06) |
 | Greenwood biomass cap 14.4248 t/ha | **yes** — `tests/mutual_shading_tolerance.rs` |
 | `rationed == 0` in every golden | **yes** |
 
@@ -133,7 +133,7 @@ switch harness), `--long`, plus a station example for the sealed station.
 | S0 | FLAT reproduces the frozen column **bit for bit** in every cell, rationed and events included (the control; it is arithmetic, not science) |
 | S1 | open field, L: peak LAI **rises** from 6.0228 but the shading term holds it in **6.0–7.0**; peak W **rises** and crosses the Greenwood point 14.4248 t/ha |
 | S2 | every chamber's season-low CO₂ **falls** under L, further under LR and LRS (standing tissue holds carbon the air would have had) |
-| S3 | perennial long horizon: the converged peak leaf **rises**; its CO₂ low **falls**; whether it stays above the 0.05 floor and rationed stays 0 is **not predicted** — the July blocker, the question this measures. LRS (stem) is the likeliest to break it (July: rationed 0 → 1 at dt = 1) |
+| S3 | perennial long horizon: the converged peak leaf **rises**; its CO₂ low **falls**; whether it stays above the decade CO₂ floor (0.05 mol) and rationed stays 0 is **not predicted** — the July blocker, the question this measures. LRS (stem) is the likeliest to break it (July: rationed 0 → 1 at dt = 1) |
 | S4 | station, the 3b cold seedling at day 56 (0.077 mol C under the frozen form): L ≈ **0.11**, LR ≈ **0.14**, LRS ≈ **0.150** (= 0.160 − 0.0096, the cold weeks' net production) |
 
 ## 8. Measured (2026-10-06) — the predictions graded
@@ -187,3 +187,73 @@ cap. Against WOFOST, Teh/Soltani gets the canopy's SHAPE right (leaves gone at m
 yield further off (6.5 vs 11.5 t/ha); Penning de Vries the reverse. That points at a second gap,
 recorded, not measured further: this model fills grain slowly and leans on green leaves through
 fill to do it (WOFOST has 5.7 t/ha of grain by DVS 1.27).
+
+## 9. Second review (advisor, 2026-10-06) — a confound, two corrections, and the price
+
+**Advisor, summarized:** (1) grain may be counted AFTER maturity — the green-leaf forms keep
+filling it while the crop stands; measure grain on the day DVS reaches 2; (2) the "CO₂ floor"
+wording was wrong as corrected mid-run — find the real CO₂ guard; (3) "passes every gate" is
+wider than what was run — run the full suite on a throwaway build and count the reds; (4) read the
+existing WOFOST record before calling slow grain fill a gap, and confirm the weather is the same;
+(5) split the decision in two halves, and measure "the agreed half alone" before offering it.
+
+**(1) The confound is real, and it flips the station's grain.** Grain on the first day-end past
+maturity (`tt ≥ tsum_anthesis + tsum_maturity`) beside grain at the season's end:
+
+| mol C | open field at maturity | open field at end | station at maturity (day 139) | station on the re-sow eve (day 305) |
+|---|---|---|---|---|
+| frozen | 25.91 | 33.40 | **9.51** | 24.26 |
+| L (Teh leaf) | 24.09 | 24.20 | **11.14** | 11.15 |
+| LRS (Teh, all organs) | 23.20 | 23.26 | **10.85** | 10.86 |
+| LRS-PdV | 28.05 | 35.93 | **15.04** | 61.17 |
+| BEFORE (agreed half only, new) | 27.95 | 35.30 | **14.58** | 41.02 |
+
+At maturity the forms sit within −10 % / +8 % of frozen in the open field, and in the station
+**every** source form gives MORE grain than frozen (+14 % to +58 %). The "station grain halves"
+of §8 was the frozen crop filling grain for 166 days after maturity with green leaves — which a
+real crop does not do, and which slice 4 (re-sow on maturity) removes. §8's grain rows are read
+through this table from now on.
+
+**(2) Both 0.05 floors exist.** `decade_min_carbon_pool_stationary` is the CO₂ one (per-year
+minimum of the pool) and `perennial_decade_leaf_cycle_is_stationary_and_alive` the leaf one. The
+census below ran both.
+
+**(3) The price, counted** — `BEFORE` (the agreed half) wired into `Senescence` and
+`NitrogenSenescence` on a throwaway build (`DVS < 1` → no leaf, no root shedding; nothing else),
+`cargo test --release --no-fail-fast` plus `-p domains -p station -- --ignored`, then reverted
+(`git status` clean on `flows.rs`). **29 reds in 11 binaries:**
+
+* **Every plant science gate that judges survival PASSES** — the five compensation-point bands,
+  the decade CO₂ floor, both decade leaf cycles, the consumer cycle.
+* **One science gate goes red:** `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided`
+  asserts the chambers' peak LAI stays below 1.0 ("carbon-limited by design and cannot reach the
+  regime"); the jar reaches **1.024**. The source's threshold is 6.0, so the claim the 1.0 proxies
+  for survives; the proxy does not.
+* **The pinned margins:** the five compensation margins (the jar 14.15 → 5.00), the jar's
+  tightest CO₂ step (0.165 → 0.342 of the pool — "rising is the jar closing on rationing").
+* **Every golden** (domains, cheap and expensive station) and its tier band — expected of any
+  carbon change.
+* **The flat form's own unit tests** (3) and the lab's two FLAT controls — expected (the frozen
+  flow changed under them).
+* **Characterization pins measured on the flat form:** `mutual_shading_tolerance` (6),
+  `value_switch_run` (3), `gas_composition_perturbations` (3), `leaf_form` (2),
+  `temperature_kinetics` (1), `reaching_the_below_root_store…` (1). Each records a number of
+  today's tree; adoption would re-derive each, as 3a did its roster.
+
+**(4) WOFOST.** Same weather (NASA POWER, 52° N 5° E, 2006-10-01 → 2007-08-01, PCSE 6.0.13 — both
+files' provenance). But the yield comparison is NOT like-for-like: `post-roadmap-oracle-match.md`
+("ceremony 2") already found that the oracle's longer grain fill is a **different cultivar** and
+the phase partition calendar-impossible to close. So §8's "second gap: slow grain fill" is
+**withdrawn** — what the oracle supports is the canopy SHAPE (peak LAI 6.34; no leaf at
+maturity), not a yield target.
+
+**(5) The decision, in two halves:**
+
+* **Before flowering — agreed by all three sources.** No age-related leaf or root shedding. It is
+  what the cold seedling needed (0.077 → 0.146 mol C at day 56), every survival gate passes, and
+  grain at maturity rises (station +53 %, open field +8 %). Price: 29 reds, one of them a science
+  proxy (the jar's leaf area crosses 1.0), the rest pins to re-derive.
+* **After flowering — disputed.** Teh / Soltani (leaves gone at maturity, WOFOST's shape) vs
+  Penning de Vries' table (rice; leaves stay green). Entangled with the fixed re-sow calendar,
+  which lets a green crop keep filling grain for months after maturity. Recommended: take it
+  AFTER slice 4 (re-sow on maturity), which removes that confound.

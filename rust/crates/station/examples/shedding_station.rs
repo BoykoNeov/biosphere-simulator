@@ -8,7 +8,7 @@
 //! each re-sow eve; the end state's crop and soil. `FLAT` must equal `frozen` bit for bit.
 use domains::biosphere::stocks::{
     HUMUS_CARBON, LEAF_C, LITTER_CARBON, MICROBIAL_CARBON, ROOT_C, STEM_C, STEM_RESERVE_C,
-    STORAGE_C,
+    STORAGE_C, THERMAL_TIME,
 };
 use domains::lab::shedding::{
     carbon_flow, nitrogen_flow, SheddingForm, NITROGEN_SENESCENCE_ID, SENESCENCE_ID,
@@ -98,6 +98,7 @@ fn main() {
         ("LR", Some(SheddingForm::LEAF_ROOT)),
         ("LRS", Some(SheddingForm::ALL)),
         ("LRSpdv", Some(SheddingForm::ALL_PDV)),
+        ("BEFORE", Some(SheddingForm::BEFORE_ANTHESIS_ONLY)),
     ] {
         let (states, rationed, events) = if form.is_none() {
             (frozen.0.clone(), frozen.1, frozen.2)
@@ -106,6 +107,24 @@ fn main() {
         };
         let end = states.last().unwrap();
         let same = end == frozen.0.last().unwrap();
+        // Grain at MATURITY (the first day-end with thermal time past anthesis + maturity sums)
+        // beside grain on the re-sow eve: a crop that keeps green leaves can keep filling grain
+        // while it stands past maturity, which the fixed calendar allows (slice 4 removes it).
+        let pheno = domains::biosphere::params::biosphere().pheno;
+        let mature = pheno.tsum_anthesis + pheno.tsum_maturity;
+        let at_maturity: Vec<(usize, f64)> = (0..4)
+            .filter_map(|k| {
+                (k * season + 1..((k + 1) * season).min(states.len()))
+                    .find(|&d| states[d].aux.get(THERMAL_TIME).copied().unwrap_or(0.0) >= mature)
+                    .map(|d| {
+                        (
+                            d - k * season,
+                            (a(&states[d], STORAGE_C) * 1000.0).round() / 1000.0,
+                        )
+                    })
+            })
+            .collect();
+        println!("{label:<6} grain at maturity (season day, mol C): {at_maturity:?}");
         println!(
             "{label:<6} rationed {rationed} events {events} | crop day 56 {:.4} | grain on re-sow eves {:?} | end: leaf {:.3} stem {:.3} root {:.3} grain {:.3} | humus {:.3} litter {:.3} microbial {:.3} | end state == frozen: {same}",
             crop(&states[56]),

@@ -18,7 +18,8 @@
 * The same form was refused in July because it broke the sealed chambers. That refusal is dated:
   of its four blockers, the canopy one was discharged by the shading rule built in August, the
   RK4 one is not a reference gate, and two are still gates (the long-run chamber's CO₂ floor and
-  the Greenwood biomass cap). The tree has changed enough since that none of July's numbers
+  the Greenwood biomass cap). (The CO₂ floor was first cited at the wrong line — that line is its
+  sibling leaf floor; both exist. Corrected the same day.) The tree has changed enough since that none of July's numbers
   stand.
 * Options for the user: A, the sources' form (cited; a biosphere unfreeze that must be measured
   against the chambers); B, today's rates counted per degree-day (uncited, so lab-only); C, leave
@@ -41,3 +42,18 @@ across every plant scenario and the sealed station.
   11.5 t/ha with no leaves left — so the model fills grain too slowly, a second gap, recorded.
 * My prediction that the books' form would RAISE the open field's biomass had the wrong sign
   (it was read off July's measurement, which used the milder table); recorded, not re-fitted.
+
+**SECOND REVIEW 2026-10-06** (note §9) — and two of the findings above were wrong.
+* The station's "grain halves" was counted on the re-sow eve, 166 days after maturity, while the
+  frozen crop kept green leaves and kept filling grain. Counted on the day the crop matures, every
+  source form gives MORE grain than today's (+14 % to +58 %); in the open field they sit within
+  −10 % / +8 %. Re-sowing on maturity (slice 4) removes that standing period.
+* "Slow grain fill, a second gap" is withdrawn: the WOFOST comparison is a different cultivar, a
+  finding already on record (the oracle-match plan, "ceremony 2").
+* The price of the part all sources agree on (no shedding before flowering), counted on a
+  throwaway build: every survival gate passes, including the decade CO₂ floor; 29 tests go red —
+  the goldens, the pinned margins, the flat form's own tests, a set of measured pins, and one
+  science proxy (the sealed jar's leaf area reaches 1.02 against a 1.0 bound standing in for the
+  source's 6.0).
+* Recommended to the user: the agreed half is the candidate; the after-flowering half waits for
+  slice 4.

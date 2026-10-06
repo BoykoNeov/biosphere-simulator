@@ -52,6 +52,9 @@ pub enum LeafShedding {
     Development,
     /// Penning de Vries et al. (1989) Listing 5's `LLVT` table on DVS (plus shading).
     PenningDeVries,
+    /// 0 before anthesis, the frozen flat `rdr_leaf` after (plus shading) — ONLY the part the
+    /// three sources agree on, with the disputed after-anthesis half left as it is.
+    AfterAnthesisFlat,
 }
 
 /// How roots are shed.
@@ -101,6 +104,13 @@ impl SheddingForm {
     pub const ALL: SheddingForm = SheddingForm {
         stem: StemShedding::None,
         ..SheddingForm::LEAF_ROOT
+    };
+    /// Only the agreed half: no leaf or root shedding before anthesis, everything else frozen
+    /// (the flat leaf and root rates after anthesis, the flat stem rate throughout).
+    pub const BEFORE_ANTHESIS_ONLY: SheddingForm = SheddingForm {
+        leaf: LeafShedding::AfterAnthesisFlat,
+        root: RootShedding::AfterAnthesis,
+        stem: StemShedding::Flat,
     };
     /// [`SheddingForm::ALL`] with Penning de Vries' leaf table after anthesis instead of Teh's.
     pub const ALL_PDV: SheddingForm = SheddingForm {
@@ -191,6 +201,8 @@ impl SheddingLaw {
                 dvr / (2.0 - dvs).max(0.1)
             }
             LeafShedding::PenningDeVries => afgen(&LLVT, dvs),
+            LeafShedding::AfterAnthesisFlat if dvs < 1.0 => 0.0,
+            LeafShedding::AfterAnthesisFlat => self.rdr_leaf,
         };
         let leaf = science::mutual_shading_rate(lai, leaf_age, self.shade_rate, self.lai_threshold);
         let stem = match self.form.stem {

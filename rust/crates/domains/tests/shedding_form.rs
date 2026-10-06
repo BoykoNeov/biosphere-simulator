@@ -153,3 +153,27 @@ fn the_penning_de_vries_leaf_table() {
     let law = SheddingLaw::new(SheddingForm::ALL_PDV, &s, &p);
     assert_eq!(law.rates(&state, &env).unwrap(), (0.0, 0.0, 0.0));
 }
+
+/// The agreed half alone: nothing before anthesis, the frozen rates after it.
+#[test]
+fn the_agreed_half_alone() {
+    let s = DEFAULT_SCENARIO;
+    let p = frozen();
+    let (mut state, _i, _r) = season_setup(&s, YEARS).expect("setup");
+    let resolver = weather_resolver(&s, YEARS).expect("resolver");
+    let law = SheddingLaw::new(SheddingForm::BEFORE_ANTHESIS_ONLY, &s, &p);
+    state.aux.insert(THERMAL_TIME.to_string(), 500.0);
+    let env = resolver.bind(&state, BIO_DT);
+    assert_eq!(
+        law.rates(&state, &env).unwrap(),
+        (0.0, p.senesc.rdr_stem, 0.0)
+    );
+    state
+        .aux
+        .insert(THERMAL_TIME.to_string(), p.pheno.tsum_anthesis + 100.0);
+    let env = resolver.bind(&state, BIO_DT);
+    assert_eq!(
+        law.rates(&state, &env).unwrap(),
+        (p.senesc.rdr_leaf, p.senesc.rdr_stem, p.senesc.rdr_root)
+    );
+}
