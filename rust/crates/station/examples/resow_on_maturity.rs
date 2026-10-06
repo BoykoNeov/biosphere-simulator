@@ -1,6 +1,8 @@
 //! Step 3c slice 4 stage 2's lab twin (`docs/plans/post-roadmap-room-temperature.md` §25f/§25g):
 //! the sealed station over its full horizon with the crop re-sown on maturity, against the
-//! committed `sealed_station` golden (the calendar re-sow). Prints the readouts the §25f
+//! calendar re-sow's `sealed_station` golden — read from git at [`CALENDAR_COMMIT`] (slice 4
+//! stage 1, whose stocks are the calendar run's to the bit), because since stage 2 the working
+//! tree's golden IS this run. Needs `git` and the repository's history. Prints the readouts the §25f
 //! predictions name: the re-sow days and the development stage at each, the grain each crop
 //! re-sows from, the cold days, and the end state (crop, battery, node, gas regulators).
 //!
@@ -16,6 +18,10 @@ use simcore::state::State;
 use station::scenario::{sealed_station_scenario, Phase};
 use station::sealed::{build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver};
 use station::sowing::sown_step;
+
+/// The last commit whose `sealed_station` golden is the CALENDAR re-sow's (slice 4 stage 1: its
+/// one added aux key aside, byte-identical to the calendar reference).
+const CALENDAR_COMMIT: &str = "9941eba";
 
 fn main() {
     let scenario = sealed_station_scenario();
@@ -71,8 +77,13 @@ fn main() {
     }
     println!("cold days: {cold_days}");
 
-    let golden_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/golden/sealed_station_state.json");
-    let old = simcore::snapshot::from_json(&std::fs::read_to_string(golden_path).unwrap()).unwrap();
+    let shown = std::process::Command::new("git")
+        .args(["-C", env!("CARGO_MANIFEST_DIR"), "show"])
+        .arg(format!("{CALENDAR_COMMIT}:rust/data/golden/sealed_station_state.json"))
+        .output()
+        .expect("git");
+    assert!(shown.status.success(), "git show {CALENDAR_COMMIT}: the history is needed");
+    let old = simcore::snapshot::from_json(&String::from_utf8(shown.stdout).unwrap()).unwrap();
     let new = states.last().unwrap();
     let node_k = |s: &State| s.stocks[NODE].amount / thermal.heat_capacity + thermal.space_temperature;
     println!("end state           golden (calendar)        re-sow on maturity");

@@ -96,7 +96,7 @@ the table naming files that no longer exist.
 | `save_and_load_cross_the_boundary` | `cabin_gas` | single | a real `FileAccess` disk round-trip |
 | `the_perturbed_brownout_crosses_the_boundary` | `station` brownout | single | a perturbed (rationing) run |
 | `greenhouse_two_rate_crosses_the_boundary` | `greenhouse` | **two** | the two-rate driver across the boundary |
-| `sealed_season_crossing_crosses_the_boundary` (**slow**) | `sealed` | **two** | 310 master days — the re-sow adopt branch crosses the boundary |
+| `sealed_season_crossing_crosses_the_boundary` (**slow**) | `sealed` | **two** | 310 master days — the re-sow adopt branch crosses the boundary (twice since 2026-10-06: the re-sow is on maturity, days 139 and 278) |
 | `the_objectives_read_stability_and_failure_across_the_boundary` | `station` | single | stability **and** failure are both reachable |
 
 ⚠ The slow one is excluded from CI **by name** (`-- --skip sealed_season_crossing`), not by
@@ -109,7 +109,10 @@ The full multi-year sealed **science** parity is gated in CI by the frozen
 (`915×step() == run_sealed`) is an `#[ignore]`d run-manually test in `session_parity.rs`, not
 a CI gate. The cross-boundary sealed smoke runs a few days past one 305-day season
 (`SEALED_RESUME_DAYS = 310`) so the re-sow branch fires across the FFI without paying the
-whole decade through headless Godot.
+whole decade through headless Godot. ⚠ Since 2026-10-06 (`docs/plans/post-roadmap-room-
+temperature.md` §25g) the sealed crop is re-sown when it matures, not on the 305-day calendar:
+the 310 days cross two re-sows (days 139 and 278), so the coverage stands and its stated reason
+("past one season") is no longer why.
 
 ### Where the gate runs
 

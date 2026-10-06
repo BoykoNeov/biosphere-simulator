@@ -5,7 +5,8 @@
 #
 # It drives the full five-domain sealed station (two-rate, re-sown) through the ACTUAL cdylib for
 # SEALED_RESUME_DAYS = 310 master days — a few days past one 305-day season, so the re-sow
-# (`slow_reset`) adopt branch fires ACROSS the boundary (the genuinely-new coverage over Step-1's
+# (`slow_reset`) adopt branch fires ACROSS the boundary (since 2026-10-06 the re-sow is on the
+# crop's maturity, so it fires twice in these 310 days, at days 139 and 278) (the genuinely-new coverage over Step-1's
 # single-rate cabin_gas). Each `step()` is 1440 fast sub-steps, so this is ~450k sub-steps of
 # real compute — SLOW-marked on the Python side. The full multi-year horizon is proven
 # intra-process (`tests/session_parity.rs`) + by the frozen golden; this proves the FFI boundary

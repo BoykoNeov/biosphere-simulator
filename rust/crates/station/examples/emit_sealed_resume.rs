@@ -1,7 +1,8 @@
 //! Phase-8 (P8.8) — the headless reference for the **sealed cross-boundary parity** smoke.
 //! Builds the full sealed station through the shared [`station::palette::build_scenario`] (the
 //! same builder the Godot cdylib uses) and steps [`SEALED_RESUME_DAYS`] master days — a few
-//! days past one season, so the re-sow (`slow_reset`) adopt branch fires — then emits the
+//! days past one season, so the re-sow (`slow_reset`) adopt branch fires (since slice 4 stage
+//! 2, on maturity: twice, at days 139 and 278) — then emits the
 //! `sim_io` hex-float snapshot.
 //!
 //! `godot/sealed_smoke.gd` drives the identical `build("sealed") + step_n(SEALED_RESUME_DAYS)`

@@ -16,7 +16,7 @@ extends Control
 # Fixed palette (confirmed decision #1). "station" has real temperature + battery SOC;
 # "greenhouse" and "sealed" are the two-rate ones (each step = a whole master day) that make
 # the off-render-thread fast-forward tangible — "sealed" is the multi-year "fast-forward
-# decades" scenario (re-sown each season) with the richest readouts.
+# decades" scenario (re-sown each time the crop matures) with the richest readouts.
 const SCENARIOS := ["station", "greenhouse", "sealed", "cabin_gas"]
 
 var tc: TimeController

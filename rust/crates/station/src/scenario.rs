@@ -287,7 +287,8 @@ pub const SEALED_ENERGY_DAYS: u64 = (SEALED_ENERGY_YEARS * SEALED_STATION_SEASON
 
 /// The Phase-8 (P8.8) sealed **cross-boundary parity** horizon (master days) — a handful of
 /// days past one season so the smoke exercises the re-sow (`slow_reset`) adopt branch across
-/// the Godot FFI boundary, without paying the full multi-year run through headless Godot (the
+/// the Godot FFI boundary (⚠ since slice 4 stage 2 the re-sow is on maturity, so these 310 days
+/// cross TWO re-sows, at days 139 and 278; the season is no longer what it crosses), without paying the full multi-year run through headless Godot (the
 /// full-horizon parity is proven intra-process in `tests/session_parity.rs` + the frozen
 /// `sealed_station_state.json` golden). Shared by `examples/emit_sealed_resume.rs` and
 /// `godot/sealed_smoke.gd`.
