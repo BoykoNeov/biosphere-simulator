@@ -320,11 +320,13 @@ against the branch that does not bind.
 * **The memory index is outside the repo.** `repo_gates` reads it from the user's profile, so
   on CI and on any box but the author's the memory bounds are **unchecked and say so out
   loud**. A CI-green claim about the memory budget is not a claim about the memory budget.
-* **`senescence.yaml`'s `shade_rate` note is stale** — it says the term is *"BIT-IDENTICALLY
+* ~~**`senescence.yaml`'s `shade_rate` note is stale** — it says the term is *"BIT-IDENTICALLY
   inert"*, written 2026-07-27 and falsified by the layered-canopy commit. Left deliberately: a
   comment edit in a param file is a manifest hash and therefore an unfreeze. Correct it the
   next time that file's manifest entry moves for a real reason — that is exactly how
-  `canopy.yaml`'s three stale sentences came out on 2026-09-06.
+  `canopy.yaml`'s three stale sentences came out on 2026-09-06.~~ **DONE 2026-10-06 in
+  `e9a70da`** (the leaf-shedding unfreeze moved that file's entry for a real reason; the note
+  is annotated STALE in place, and the loss is now LIVE at the frozen params).
 * **`self_discharge.yaml`'s pointer is stale**, on the same terms and still waiting for the
   same kind of occasion.
 * **`rust/data/tiers.json`'s `drift_summary` evidence string** (`max_rel_dev 0.0`, dated P7.4,
