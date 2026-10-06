@@ -1,4 +1,4 @@
-## **Checks against the real world** (the 2026-09-29 review's Step 6 — a drought with an end, built lab-only; the comparison data searched, and every trial found held its CO₂)
+## **Checks against the real world** (the 2026-09-29 review's Step 6 — a drought with an end, built lab-only; the comparison data searched, and the one trial opened held its CO₂)
 
 > One row of the record table in [`../post-roadmap-log.md`](../post-roadmap-log.md),
 > written out. The heading is that row's Work cell verbatim — a gate checks it.
@@ -27,17 +27,25 @@ Nothing frozen moved.
 **Slice 2 — the comparison data, SEARCHED; the choice is the user's.**
 
 * **Opened: NASA TM 102788** (Wheeler & Sager 1990, the Biomass Production Chamber, 1989): 112.6 m³,
-  20 m², spring wheat Yecora Rojo in nutrient solution, 20 h light at 534 µmol m⁻² s⁻¹, 20 / 16 °C,
+  20 m², wheat cv. Yecora Rojo (spring habit — general knowledge, NOT on the TM's pages) in
+  nutrient solution, 20 h light at 534 µmol m⁻² s⁻¹, 20 / 16 °C,
   **CO₂ held at 1000 ppm**. Measured: night respiration mean 7.2 µmol m⁻² s⁻¹; day uptake peak 27 at
   day 25, mean 15; 19.5 mol CO₂ fixed per day net; ~40 kg dry biomass; transpiration peak 120, mean
   90 L/day (4.5 L m⁻² d⁻¹). Public domain; on the (git-ignored) shelf.
-* **Correction:** the record called its Figs. 2–3 a free-running drawdown in the sealed chamber. The
-  trial held its CO₂; those figures are one deliberate drawdown inside it.
+* **Context added to the record** (`log/co2-uptake-source.md`, annotated in place): its Figs. 2–3
+  are, as that record said, one deliberate drawdown on day 25. What it did not say: the rest of the
+  trial held CO₂ at 1000 ppm, and the "sealed" chamber leaked 5–10 % of its air a day.
 * Named, unopened: Bugbee & Salisbury 1988 (light range, CO₂ held at 1200 ppm), the BPC programme
   papers (Wheeler 1996, 2008 — potato too), LMLSTP Phase I (1995, one crew member + 11.2 m² wheat),
   Gerbaud et al. 1988, Lunar Palace 1.
-* **Every trial found held its CO₂.** That maps onto the open-field build's fixed leaf CO₂ forcing,
-  so the parked chamber controller is NOT forced. The sealed jar has no counterpart found.
-* Every wheat trial grew a spring wheat under long days; a scorecard row runs the crop with
-  vernalization off and reads rates and amounts, not dates.
+* **The trials with a stated CO₂ control all held it** — TM 102788 (read), Bugbee & Salisbury
+  (abstract), LMLSTP Phase I (held by changing the LIGHT, a controller of another kind). Gerbaud
+  and Lunar Palace: unknown. A held trial should map onto a fixed leaf-CO₂ forcing (`CI_VAR`),
+  which the open-field build reads — but that build reads the outdoor weather, and the lamp-lit
+  builds (`lighting_scenario`, `day_neutral_lighting_scenario`: lamp, set photoperiod, constant
+  temperature) are all SEALED. No existing build hosts TM 102788 yet; slice 3 confirms the mapping.
+  If it holds, the parked chamber controller is not forced for the held-CO₂ rows; for LMLSTP it is
+  not established. The sealed jar has no counterpart found.
+* The wheat trials read grew Yecora Rojo under long days; a scorecard row would run the crop with
+  vernalization off and read rates and amounts, not dates.
 * The water row is labelled before any run: early water use is the known leaf-area gap.

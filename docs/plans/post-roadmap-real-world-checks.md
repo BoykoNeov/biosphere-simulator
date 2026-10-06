@@ -157,6 +157,13 @@ done, because finding 5's mechanism stays parked.
 
 ### 5a. The gates
 
+* **D9 HELD:** `regen_goldens` (report only) — 20 of 20 goldens identical, 0 would change.
+* `cargo clippy --all-targets -- -D warnings`: clean.
+* `cargo test --no-fail-fast`: **1339 passed, 1 failed, 6 ignored.** The one red was
+  `repo_gates::every_plan_doc_is_indexed` — this plan had no index row yet, the expected
+  bookkeeping. The suite ran BEFORE the doc edits; `repo_gates` was re-run after them (and after
+  the direction plan's re-read marker moved) and is green.
+
 
 ---
 
@@ -177,7 +184,7 @@ domain.
 | quantity | value (page) |
 |---|---|
 | chamber | 112.6 m³ incl. air handling; ~20 m² of plants (64 trays × 0.25 m² plus gaps); leak < 10 % of volume per day (p. 2), 5–10 % (p. 10) |
-| crop | *Triticum aestivum* cv **Yecora Rojo** (a spring wheat), **hydroponic** (recirculating nutrient film), ~1500 plants m⁻² (p. 4, p. 9) |
+| crop | *Triticum aestivum* cv **Yecora Rojo**, **hydroponic** — ⚠ "spring wheat" is NOT on the TM's pages; it is general knowledge of the cultivar, to be verified against a source before the crop decision leans on it (recirculating nutrient film), ~1500 plants m⁻² (p. 4, p. 9) |
 | light | 20 h light / 4 h dark after 72 h dark at planting; 96 × 400 W HPS, dimmed as the crop grew to hold canopy-top PPF; **mean 534 µmol m⁻² s⁻¹** (± 42 between levels); 695 → 480 on day 28 (pp. 5, 11) |
 | temperature, humidity | 20 °C constant to day 34, then 20 °C light / 16 °C dark; means 20.3 / 16.8 °C; RH 81 % / 82 % (p. 5) |
 | CO₂ | **HELD at 1000 ppm** by injecting pure CO₂; means 1160 ± 238 ppm light, 1380 ± 310 dark; supply ran out briefly near days 50 and 60 (pp. 5, 11) |
@@ -190,10 +197,12 @@ domain.
 | CO₂ response | drawdown rate flat from 2200 to ~800 ppm, falling below 700–800; a deliberate drawdown from 2200 ppm on day 25 (Figs. 2–3) (pp. 7–8) |
 | transpiration | condensate-measured; **peak 120 L d⁻¹ near day 25** "when ground cover was complete", then about constant to senescence; **mean ~90 L d⁻¹ = 4.5 L m⁻² d⁻¹** (pp. 12–13) |
 
-⚠ **A correction to the record.** `log/co2-uptake-source.md` called Figs. 2–3 "a measured
-whole-stand drawdown curve in the sealed 113 m³ chamber". The trial itself **held CO₂ at 1000
-ppm**; Figs. 2–3 are one deliberate drawdown made inside it on day 25. Still a usable CO₂-response
-curve — not a free-running trial.
+⚠ **Context added to an earlier record, not a correction.** `log/co2-uptake-source.md` read Figs.
+2–3 as what they are: one deliberate drawdown from 2200 ppm on day 25 "in the sealed 113 m³
+chamber". (A first draft of this paragraph called that a mistake; re-reading the record showed it
+was not.) What the record did not say: outside that test the trial **held CO₂ at 1000 ppm** (p. 5),
+and "sealed" is approximate — 5–10 % of the air leaked a day (pp. 2, 10). Annotated there in
+place. A usable CO₂-response curve; the trial as a whole is a held one.
 
 **Not opened (named, with what blocks each):**
 
@@ -207,13 +216,19 @@ curve — not a free-running trial.
 
 ### 6a. The two filters, applied
 
-* **CO₂ held or free-running.** Every trial found held its CO₂. That does **not** force the parked
-  chamber controller (third direction plan §2.2): the model's open-field build already reads a
-  **fixed leaf-internal CO₂ forcing** (`CI_VAR`, 250 ppm by default), and a held chamber is what that
-  forcing means. A held 1000-ppm trial maps onto that build with the forcing set from 1000 ppm,
-  not onto the sealed jar. The jar has no counterpart in the literature found so far.
-* **Crop class.** Every wheat trial grew **spring** wheat (Yecora Rojo at the BPC) **in nutrient
-  solution** under 16–20 h light. The reference crop is a **winter** wheat that needs a cold period.
+* **CO₂ held or free-running.** The trials with a stated CO₂ control all held it: TM 102788 (read),
+  Bugbee & Salisbury (abstract), LMLSTP Phase I (held by changing the **light** and the CO₂ supply —
+  a controller of another kind). Gerbaud et al. and Lunar Palace: not known. A held chamber
+  **should** map onto a **fixed leaf-internal CO₂ forcing** (`CI_VAR`, 250 ppm by default), which the
+  open-field build reads — so the parked chamber controller (third direction plan §2.2) would not
+  be forced for the held rows. ⚠ **Not measured, and no build hosts it yet:** the open-field build
+  reads the outdoor weather (no lamp, no 20-h day, no held 20/16 °C); the lamp-lit station builds
+  (`station::scenario::lighting_scenario`, `day_neutral_lighting_scenario` — lamp PAR, net radiation
+  and daylength, a constant temperature, the day-neutral crop) all build a **sealed** biosphere,
+  whose leaf CO₂ comes from the chamber's air. Slice 3 confirms or refutes the mapping by building
+  the row. For LMLSTP "not forced" is not established. The jar has no counterpart found.
+* **Crop class.** The wheat trials read grew **Yecora Rojo** (spring habit by general knowledge, see
+  the table) **in nutrient solution** under 16–20 h light. The reference crop is a **winter** wheat that needs a cold period.
   A scorecard row therefore runs the crop with vernalization off — the same family as the
   day-neutral crop already built (`bucket3-day-neutral-crop`), whose own lesson applies: matching
   the *timing* with a crop from the same family is tautological, so the row reads rates and
@@ -235,7 +250,8 @@ checked — each gets this check before a number from it is committed.
 1. **Which trial(s) to score first.** Recommended: TM 102788 alone first — opened, public domain,
    conditions complete, and it reports the components (night respiration, day uptake, water,
    biomass) the review asked for, not only yield. Then Bugbee & Salisbury 1988 for the light range.
-2. **The crop for the row.** Recommended: the frozen wheat with vernalization off (spring habit),
+2. **The crop for the row.** Recommended (once the cultivar's spring habit is checked against a
+   source): the frozen wheat with vernalization off (spring habit),
    read on rates and amounts, not dates. The alternative — the winter crop given the cold period
    first — would compare a crop the trial did not grow.
 3. **Whether to go after the unopened sources** (the BPC programme papers for potato; LMLSTP Phase

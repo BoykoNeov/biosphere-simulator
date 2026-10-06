@@ -28,6 +28,10 @@ wheat crop in NASA's Biomass Production Chamber: results from an 86-day study (J
 in the sealed 113 m³ chamber, at ~25 days after planting, CO₂ raised to 2200 ppm and left to draw
 down:
 
+⚠ *2026-10-06 (`log/real-world-checks.md`, the full report read):* "sealed" is approximate — the
+chamber leaked 5–10 % of its volume a day (pp. 2, 10) — and outside this one test the trial **held**
+CO₂ at 1000 ppm by injection (p. 5). The drawdown is a free-running segment inside a held trial.
+
 * **Fig. 2 (p. 19):** chamber CO₂ against time, ~2400 → ~130 ppm over ~9 hours. The pull is
   nearly steady down to ~800 ppm and then tails off, flattening well above zero.
 * **Fig. 3 (p. 20):** stand net CO₂ uptake (µmol m⁻² s⁻¹, derived from Fig. 2's slope) against

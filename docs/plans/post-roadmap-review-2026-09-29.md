@@ -393,8 +393,10 @@ open the shelf (`sources/`) before pricing any retrieval as blocked.
 **TAKEN 2026-10-06** on the user's call (*"step 6"*): `post-roadmap-real-world-checks.md`. Slice 1
 BUILT lab-only; slice 2 SEARCHED, its choice the user's. ⚠ The premise below ("no scenario on the
 roster produces drought") holds for the frozen roster only — two test-only runs already did; what
-none had was an end. And the risk below ("a trial at controlled CO₂ needs a CO₂ controller") did
-not hold: a held trial maps onto the open-field fixed-CO₂ build. The text below is left as written.
+none had was an end. And the risk below ("a trial at controlled CO₂ needs a CO₂ controller") is
+probably avoidable: a held trial should map onto a fixed leaf-CO₂ forcing, which the open-field
+build reads — unconfirmed, since no lamp-lit build takes one yet; slice 3 decides. The text below
+is left as written.
 
 ### The problem
 

@@ -513,10 +513,12 @@ lab-only, slice 2 SEARCHED): grepped this plan for drought, validation, scorecar
 controller. It touches two items and discharges neither. **§2.1:** its "drought response is
 unmeasured" now has a lab drought window under it, and the leaf form's factor fires on one day —
 annotated in place, not struck. **§2.2:** Step 6 listed as a risk that a scorecard "may force" the
-controller decision. Measured: every trial found held its CO₂, and a held chamber maps onto the
-open-field build's fixed leaf-CO₂ forcing, so a scorecard does not need the controller. §2.2's
-"not yet" stands on its own reason (whether a habitat should vent carbon), now with one pressure
-on it removed. Nothing added to §3.
+controller decision. Found, not measured: the trials with a stated CO₂ control all held it, and a
+held chamber should map onto a fixed leaf-CO₂ forcing, which the open-field build reads — so the
+held rows probably do not need the controller. No build hosts that yet (the lamp-lit builds are all
+sealed); Step 6's slice 3 confirms or refutes it, and for the LMLSTP crew test (CO₂ held by the
+light) it is not established. §2.2's "not yet" stands on its own reason (whether a habitat should
+vent carbon). Nothing added to §3.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
