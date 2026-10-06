@@ -360,6 +360,11 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
 /// cold period gives 1.2163e9, against this test's earlier measured 1.219e9.) Slice 3b (§24l
 /// C3, `W:\temp\claude\slice3b\resim.py`): the dimmed lamp saves 2.3224e9 J and the heater
 /// spends it again against the cold node, so the battery ends near **1.6808e9 J** (net +4.1 MJ).
+///
+/// ⚠ **Re-pinned by slice 4 stage 2** (§25g; re-sow on maturity): **2.2602e9 J**, measured by
+/// this tree — NOT by an independent re-simulation, as every earlier figure here was. Its
+/// direction was predicted (§25f Q5: 504 dim cold days instead of 224, so less lamp drawn); its
+/// size was not, and it is a pin against regression, not a check of the physics.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
@@ -368,7 +373,7 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
     let b = amount(r.states.last().unwrap(), BATTERY);
     eprintln!("L4 full horizon: battery ends at {b} J");
     assert!(
-        b > 0.0 && (b / 1.6808e9 - 1.0).abs() < 0.02,
+        b > 0.0 && (b / 2.2602e9 - 1.0).abs() < 0.02,
         "battery ends at {b} J"
     );
 }
@@ -378,6 +383,15 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
 /// (min / max / mean of the day-end states; the dim lamp sends 120 W less through the cooler in
 /// the cold phase); the chamber in the cold band (277.1562–277.1628 K) or the warm one (to
 /// 295.2034 K) except at the transitions, and ending mid-cool-down at 288.3622829 K.
+///
+/// ⚠ **Re-pinned by slice 4 stage 2** (§25g; re-sow on maturity, 9 crops), measured by this tree
+/// (no independent re-simulation): the node **162.2719 / 174.2496 / 169.1984 K** (colder, as §25f
+/// Q6 predicted — the dim lamp of 504 cold days instead of 224); the chamber's cold band WIDER,
+/// **277.1517–277.1673 K** (152 cold day-ends fell within 0.0043 K outside the old band: the cold
+/// weeks now fall in every part of the weather year, where they used to start on the same day
+/// of it, so the walls face different weather — not predicted); at most two transition day-ends
+/// per crop (measured 9 over 9 crops); the run ends WARM, its last crop 108 days old, at
+/// **295.1999296 K**.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -389,21 +403,23 @@ fn the_reference_node_and_chamber_follow_the_weather() {
         .fold((f64::MAX, f64::MIN), |(l, h), &x| (l.min(x), h.max(x)));
     let mean = nodes.iter().sum::<f64>() / nodes.len() as f64;
     eprintln!("node daily min {lo} max {hi} mean {mean}");
-    assert!(
-        (lo - 163.1421).abs() < 0.01 && (hi - 174.3095).abs() < 0.01,
-        "{lo} {hi}"
-    );
-    assert!((mean - 171.44761).abs() < 0.01, "{mean}");
     let ch: Vec<f64> = r.states.iter().skip(1).map(chamber_t).collect();
     let (clo, chi) = ch
         .iter()
         .fold((f64::MAX, f64::MIN), |(l, h), &x| (l.min(x), h.max(x)));
-    let in_band = |t: f64| (277.156..=277.163).contains(&t) || (295.188..=295.2035).contains(&t);
+    let in_band = |t: f64| (277.1517..=277.1673).contains(&t) || (295.188..=295.2035).contains(&t);
     let outside = ch.iter().filter(|&&t| !in_band(t)).count();
-    eprintln!("chamber daily min {clo} max {chi}; {outside} day-end states between the bands");
-    assert!(clo >= 277.156 && chi <= 295.2035, "{clo} {chi}");
-    // One mid-warm-up and one mid-cool-down day-end state per season at most.
-    assert!(outside <= 2 * sealed_station_scenario().years, "{outside}");
     let end = chamber_t(r.states.last().unwrap());
-    assert!((end - 288.3622829).abs() < 1e-6, "chamber ends {end} K");
+    eprintln!(
+        "chamber daily min {clo} max {chi}; {outside} day-end states between the bands; ends {end} K"
+    );
+    assert!(
+        (lo - 162.2719).abs() < 0.01 && (hi - 174.2496).abs() < 0.01,
+        "{lo} {hi}"
+    );
+    assert!((mean - 169.1984).abs() < 0.01, "{mean}");
+    assert!(clo >= 277.1517 && chi <= 295.2035, "{clo} {chi}");
+    // One mid-warm-up and one mid-cool-down day-end state per crop at most: 9 crops (§25g).
+    assert!(outside <= 2 * 9, "{outside}");
+    assert!((end - 295.1999296).abs() < 1e-6, "chamber ends {end} K");
 }

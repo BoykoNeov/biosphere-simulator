@@ -2759,3 +2759,73 @@ threshold: `build_season` builds every sealed crop from `params::biosphere()`, w
 * The lab shedding driver (`run_shedding`) runs no hook and refuses horizons past
   `season_days`. Changed to run the sealed re-sow hook as the reference driver does, and the
   guard goes; every lab shedding test runs 8–10 days, so nothing moves.
+
+### 25g. Stage 2 BUILT (2026-10-06, a station unfreeze) — the predictions graded
+
+The hook re-sows on `development_stage ≥ 2` from `scenario.pheno` (`params::phenology()`, the
+file the crop is built from), and the clock lost `mod season_days`. Instrument: the lab twin
+`station/examples/resow_on_maturity.rs` (committed; it reads the committed golden for the
+calendar column), then `regen_goldens --write`.
+
+| # | Prediction | Measured | Grade |
+|---|---|---|---|
+| Q1 | re-sows at the starts of days 139, 278, 417, 556, 695, 834, 973, 1112; end `sown_step` 17792; at the first day-start with DVS 2 | exactly those eight days; DVS 2.0000 on each re-sow's day-start and 1.9743–1.9750 on the one before; golden `station.sown_step` = `0x1.1600000000000p+14` | HELD |
+| Q2 | grain at each re-sow ≈ 14.6–15, never near the seedling; per crop −64 % against 41.02 | **14.5804–14.5889** (crop 1 14.5804, the frozen crop's maturity value to every digit); −64.4 %. The "+ ≤ 2 plant steps of fill" in the prediction was wrong — the 14.58 on record was already the day-139 day-start value — so the range's floor sits 0.02 above the measurement | HELD (the range's floor 0.02 high) |
+| Q3 | the post-maturity grain booked by flow before it is named | a temporary instrument (not committed; booked legs close on the observed change exactly) on the frozen tree, crop 1: before maturity `Allocation` +9.531 and `StemRemobilization` +5.049 = 14.580; days 139–305 **`Allocation` +26.415, nothing else** — the crop keeps photosynthesizing and, its development stage capped at 2, partitions the new growth to grain | HELD |
+| Q4 | end crop 108 days old, past flowering; `storage_c` < 5; thermal time 1150–1190 (≈ 1170); chill-days ≈ 55.9; DVS 1–1.1 | 108 days; grain **0.896**; thermal time **1169.84**; chill-days **55.863**; DVS **1.093** | HELD |
+| Q5 | cold days 504; battery +2.4–2.9 GJ over 8.261e9 | **504**; battery **1.11505e10 J, +2.889 GJ** | HELD |
+| Q6 | the node ends and averages colder | ends **174.0307 K** against 174.1813 (−0.151 K); the average not measured (the calendar run's trajectory is no longer reproducible from this tree) | HELD (end only) |
+| Q7 | net fixation up, so `co2_removed` and the O₂ makeup DOWN (low confidence) | both **UP** by 8.870 mol (`co2_removed` 400061.75 → 400070.62; O₂ supplied likewise) | **FAILED** |
+| Q8 | every other golden byte-identical; manifest by that golden's hash only | `regen_goldens`: 19 of 20 identical; the manifest's one line | HELD |
+
+**Why Q7 failed, measured.** The scrubber removes whatever carbon the station does not hold, so
+over a run it moves by exactly the change in the carbon the biosphere holds at the END — not by
+the carbon fixed along the way, which is what the prediction reasoned from. At the end the
+biosphere holds **8.870 mol C less** (73.976 → 65.106; the scrubber's +8.870 to the last digit):
+the frozen end crop's 41.0 mol of grain is gone (−40.12), only partly offset by the soil, fed by
+eight crops' residues instead of three (humus +5.03, litter +8.12, microbes +4.60), and a young
+crop's tissues (+13.5).
+
+**The end state changed character, as predicted**: a crop 108 days old and filling, not one 305
+days old standing since day 139 of its life. Also measured: soil carbon at the end is up by
+roughly two thirds (humus 13.22 → 18.25, litter 7.34 → 15.46, microbes 4.46 → 9.06).
+
+**The tests named red by design** were restated before the run, so none was observed red:
+`the_cold_clock_counts_whole_days_from_the_sowing` (warm at `season`, the wrap gone);
+`warm_room_arrest`'s re-sow refusal, now `warm_room_is_never_resown_because_it_never_matures`
+(two seasons, sowing 0, grain 0 throughout); `session_save_load`'s season-boundary resume,
+re-pointed to day 139 with an assertion that the sowing clock moved inside its window; the lab
+shedding driver now runs the hook. ⚠ **One more, NOT in §25f's list, found by reading the test
+after the predictions were committed and before running:** `warm_room_arrest`'s control
+(`control_the_plain_season_develops_and_fills_grain`) read the plain run's LAST day, which is
+now a third crop 27 days old with no grain; it reads the whole season now (and that the plain
+run IS re-sown). New: `the_hook_resows_at_maturity_and_not_before` (one ulp of thermal time
+short of DVS 2 → no re-sow; at it → re-sown, its sowing its own step, thermal time 0; the
+threshold equal to `params::phenology()`'s). Suite: 1334 passed, 0 failed.
+
+⚠ **Two reds NOT predicted, in the ignored full-horizon tests** (`chamber_walls.rs`, run with
+`--ignored` after the suite was green — the roster in §25f did not list the trajectory pins).
+Both moved in the predicted DIRECTIONS (Q5, Q6); their sizes were pins from independent
+re-simulations of the calendar run, now re-pinned to this tree's measurement (labelled so in
+the tests — a regression pin, not a physics check):
+* the heater-on-the-structure battery: 1.6808e9 → **2.2602e9 J**;
+* the reference node's day-end min / max / mean: 163.1421 / 174.3095 / 171.44761 →
+  **162.2719 / 174.2496 / 169.1984 K** — which also grades Q6's AVERAGE half: 2.25 K colder,
+  HELD;
+* and, NOT predicted in direction either, the chamber's **cold band widens** from
+  277.1562–277.1628 to **277.1517–277.1673 K**: 152 of the 504 cold day-ends sat outside the old
+  band, every one within 0.0043 K of it. Cause, read in the setup: the cold weeks now fall in
+  every part of the weather year (they used to start on the same weather day each season), so
+  the chamber's walls face different outdoor air while it is held cold. Physically negligible;
+  recorded because a pin moved. Transition day-ends: 9 over 9 crops (≤ 2 per crop). The run ends
+  WARM at 295.1999296 K (it ended mid-cool-down at 288.36 before).
+
+**Stale, left:** `cold_period.yaml`'s header still gives the clock as `floor(n·bio_dt) mod
+season_days` — now wrong twice over (the wrap is gone too). Same rule as in §25e.
+
+**Gaps and successors, recorded, not acted on.** (1) The model keeps filling grain after
+maturity (the crop is never told it is finished — the `FINISH` line is a domain boundary, not a
+cessation rule, on record); with the re-sow at maturity it no longer runs, but any run that
+keeps a mature crop standing still shows it. (2) The re-sow is at day resolution (the hook runs
+at master-day starts), up to one day after maturity; 0.125 day here on B8's maturity at
+138.875 days after sowing.

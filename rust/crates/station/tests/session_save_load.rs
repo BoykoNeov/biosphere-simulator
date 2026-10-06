@@ -27,6 +27,7 @@ use station::cabin::{build_cabin, cabin_resolver};
 use station::greenhouse::{build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver};
 use station::params as station_params;
 use station::scenario::{greenhouse_scenario, sealed_station_scenario, CABIN_GAS_SCENARIO};
+use station::sowing::sown_step;
 use station::sealed::{
     build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
 };
@@ -186,15 +187,19 @@ fn load_state_rejects_a_mismatched_stock_set() {
     );
 }
 
-/// The sealed station resumed **across a season boundary** — save one day before the reset,
-/// resume through it. This is the genuinely-new combination (save/load + the biosphere
-/// re-sow), transitively covered by the `#[ignore]`d full-horizon session-parity test but
-/// pinned here on its own. ~440 K sub-steps; run with `cargo test -- --ignored`.
+/// The sealed station resumed **across a re-sow** — save one day before it, resume through it.
+/// This is the genuinely-new combination (save/load + the biosphere re-sow), transitively
+/// covered by the `#[ignore]`d full-horizon session-parity test but pinned here on its own.
+/// Run with `cargo test -- --ignored`.
+///
+/// ⚠ **Re-pointed by slice 4 stage 2** (`docs/plans/post-roadmap-room-temperature.md` §25f):
+/// the re-sow is on maturity, the first at the start of day [`FIRST_RESOW_DAY`], not on the
+/// 305-day calendar — where this test, left alone, would still pass while crossing no re-sow.
+/// So it now asserts that the sowing clock moved inside its window.
 #[test]
 #[ignore = "crosses a sealed season boundary (~440 K sub-steps); run with --ignored"]
 fn sealed_resume_across_a_season_boundary_is_bit_identical() {
-    let scenario = sealed_station_scenario();
-    let boundary = scenario.season_days as u64;
+    let boundary = FIRST_RESOW_DAY;
     let build = || {
         let charge = params::charge();
         let thermal = params::thermal();
@@ -224,4 +229,20 @@ fn sealed_resume_across_a_season_boundary_is_bit_identical() {
     };
     // Save one day before the boundary; resume two days past it (the reset fires in between).
     assert_resume_parity(build, boundary - 1, boundary + 2, STEPS_PER_DAY as u64);
+    // Non-vacuous: the window does hold the re-sow — the sowing clock is 0 the day before it
+    // and the re-sow's own step after.
+    let mut session = build();
+    session.step_n(boundary - 1).unwrap();
+    assert_eq!(sown_step(session.state()).unwrap(), 0, "re-sown before day {boundary}");
+    session.step_n(3).unwrap();
+    assert_eq!(
+        sown_step(session.state()).unwrap(),
+        boundary * STEPS_PER_DAY as u64,
+        "not re-sown at the start of day {boundary}"
+    );
 }
+
+/// The first maturity re-sow of the reference sealed station: the start of day 139 after the
+/// day-0 sowing (maturity 138.875 days after sowing; `docs/plans/post-roadmap-room-
+/// temperature.md` §25f Q1, measured in §25g).
+const FIRST_RESOW_DAY: u64 = 139;

@@ -9,6 +9,7 @@ use domains::biosphere::{
     SeasonScenario, BIO_DT, DEFAULT_SCENARIO, LONG_HORIZON_YEARS, STEPS_PER_DAY,
 };
 use domains::power::{PowerScenario, BOUNDED_SOC_SCENARIO};
+use domains::biosphere::params::PhenologyParams;
 use simcore::error::SimError;
 use simcore::state::State;
 
@@ -315,7 +316,7 @@ pub const SEALED_STATION_POWER_SCENARIO: PowerScenario = PowerScenario {
 };
 
 /// The plant chamber's cold period (`cold_period.yaml`; Step 3c slices 3a + 3b,
-/// `docs/plans/post-roadmap-room-temperature.md` §24c): for the first `days` of each season the
+/// `docs/plans/post-roadmap-room-temperature.md` §24c): for the first `days` after each sowing the
 /// chamber is held at `setpoint` and the lamp is dimmed to `par` for a `photoperiod_hours` day;
 /// after it, `chamber.yaml`'s (warm) setpoint and the scenario's full lamp. One home for the
 /// program — every reader takes it from [`SealedStationScenario::cold`] — so opting a fixture
@@ -335,7 +336,7 @@ pub struct ColdProgram {
 /// Step-7 sealed-station run data (the fully-coupled multi-year station).
 #[derive(Debug, Clone, Copy)]
 pub struct SealedStationScenario {
-    /// The perennial sealed biosphere (greenhouse gas seam + lamp light), re-sown yearly.
+    /// The perennial sealed biosphere (greenhouse gas seam + lamp light), re-sown at maturity.
     pub bio: SeasonScenario,
     /// The crew stores (multi-year sized) + intake rates + initial cabin humidity.
     pub cabin: CabinScenario,
@@ -349,7 +350,9 @@ pub struct SealedStationScenario {
     pub battery0: f64,
     /// The Tier-2 horizon: whole seasons.
     pub years: usize,
-    /// The season / re-sow period (days).
+    /// The weather's tiling period and the horizon's unit (days; `days() = years ·
+    /// season_days`). ⚠ No longer the re-sow period since slice 4 stage 2: the crop is re-sown
+    /// when it matures ([`crate::sealed::sealed_reset_hook`]).
     pub season_days: usize,
     /// The cabin/Power sub-steps per biosphere day (1440).
     pub steps_per_day: u64,
@@ -361,6 +364,10 @@ pub struct SealedStationScenario {
     pub bio_steps_per_day: u64,
     /// The plant chamber's cold period ([`ColdProgram`]).
     pub cold: ColdProgram,
+    /// The crop's phenology — the re-sow hook's maturity threshold (DVS 2,
+    /// `tsum_anthesis + tsum_maturity`). The same file the crop is built from:
+    /// `build_season` takes `params::biosphere()`, whose `pheno` is `params::phenology()`.
+    pub pheno: PhenologyParams,
 }
 
 impl SealedStationScenario {
@@ -374,9 +381,10 @@ impl SealedStationScenario {
     /// reaches, through [`Self::phase`] (the state's sowing) or, for a state not yet built, here
     /// (the chamber's start, sown at step 0).
     ///
-    /// ⚠ **`mod season_days` is slice 4 stage 1's** (§25c): with the re-sow still on the
-    /// calendar every sowing is a multiple of the season, so this is today's calendar clock
-    /// exactly, the fast side's lead included. Stage 2 (re-sow on maturity) drops it.
+    /// ⚠ **No `mod season_days` since slice 4 stage 2** (§25d): the crop is re-sown when it
+    /// matures, so the cold period is the first `cold.days` after each sowing and never recurs
+    /// within a crop — a crop not yet mature a season after its sowing is not sent back into the
+    /// cold (stage 1 kept the wrap, when the re-sow was still on the calendar).
     ///
     /// ⚠ **The time base** (§23i, §24c). `n` is the SLOW step count on both sides. The fast
     /// minutes after plant step `k` run with `n = k + 1`, so the chamber's setpoint changes in
@@ -384,7 +392,7 @@ impl SealedStationScenario {
     /// fast-side forcing keyed on `n` has (the walls' too). Kept, not special-cased.
     pub fn phase_since_sowing(&self, steps: u64) -> Phase {
         let day = (steps as f64 * self.bio_dt).floor() as usize;
-        if day % self.season_days < self.cold.days {
+        if day < self.cold.days {
             Phase::Cold
         } else {
             Phase::Warm
@@ -487,6 +495,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         bio_dt: BIO_DT,
         bio_steps_per_day: STEPS_PER_DAY as u64,
         cold: crate::params::cold_period(),
+        pheno: domains::biosphere::params::phenology(),
     }
 }
 
@@ -495,8 +504,9 @@ mod cold_clock_tests {
     use super::*;
 
     /// The clock's edges, in steps since the sowing: day 55's last plant step is still cold,
-    /// day 56's first is warm, and (stage 1's `mod season_days`) a season later it is cold
-    /// again. `cold.days = 0` is never cold.
+    /// day 56's first is warm, and it stays warm — a season after the sowing too (stage 1's
+    /// `mod season_days`, which made it cold again there, went with the calendar re-sow).
+    /// `cold.days = 0` is never cold.
     #[test]
     fn the_cold_clock_counts_whole_days_from_the_sowing() {
         let s = sealed_station_scenario();
@@ -508,9 +518,8 @@ mod cold_clock_tests {
         assert!(cold(56 * per_day - 1));
         assert!(!cold(56 * per_day));
         assert!(!cold(season - 1));
-        assert!(cold(season));
-        assert!(cold(3 * season + 56 * per_day - 1));
-        assert!(!cold(3 * season + 56 * per_day));
+        assert!(!cold(season));
+        assert!(!cold(3 * season + 56 * per_day - 1));
         assert_eq!(s.chamber_setpoint(Phase::Cold, 295.15), 277.15);
         assert_eq!(s.chamber_setpoint(Phase::Warm, 295.15), 295.15);
         let warm = SealedStationScenario {

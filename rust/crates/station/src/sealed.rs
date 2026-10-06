@@ -7,7 +7,7 @@
 //! (waste heat → `thermal.chamber`, the plant chamber, since 2026-10-05) and `ChamberCooling`
 //! (chamber → node), plus `RadiatorReject`, `WaterRecovery` (and `Harvest` iff
 //! `with_harvest`); the biosphere
-//! registry is `build_season`'s, re-sown yearly by `annual_reset` via the driver's
+//! registry is `build_season`'s, re-sown by `annual_reset` when the crop matures, via the driver's
 //! `slow_reset` hook. `with_harvest` / `close_feces` default **off** (the Tier-2 scope).
 //! Tier-2 (FvCB + `T⁴`). Euler-only.
 //!
@@ -23,8 +23,9 @@ use domains::biosphere::stocks::{
     CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, RN_VAR, ROOTED_DEPTH, STORAGE_C,
     TEMP_VAR, THERMAL_TIME,
 };
+use domains::biosphere::params::PhenologyParams;
+use domains::biosphere::science;
 use domains::biosphere::system::{annual_reset, build_season, weather_forcings, weather_shared};
-use domains::biosphere::STEPS_PER_DAY;
 use domains::crew::{
     CrewParams, WaterBalance, FECAL_WASTE, FOOD_INTAKE_VAR, FOOD_STORE, WATER_BALANCE,
     WATER_INTAKE_VAR, WATER_STORE,
@@ -670,21 +671,26 @@ pub fn outdoor_temperature(
     Ok(Box::new(move |n, _fast_dt| temp(n, bio_dt)))
 }
 
-/// The sealed station's annual re-sow hook, **owned** (boxed) so a caller-driven
-/// [`crate::session::SimSession`] can hold it. `annual_reset` fires on each season
-/// boundary; `run_sealed` and the two-rate session build it via this same function so both
-/// step the identical re-sow logic (the Phase-8 parity discipline). The re-sown state's
-/// sowing clock is set to its own step ([`crate::sowing::sow_now`]) — here, not in
-/// `annual_reset`, which also re-sows the biosphere's own runs (slice 4, §25a).
+/// The sealed station's re-sow hook, **owned** (boxed) so a caller-driven
+/// [`crate::session::SimSession`] can hold it; `run_sealed` and the two-rate session build it
+/// via this same function so both step the identical re-sow logic (the Phase-8 parity
+/// discipline). The re-sown state's sowing clock is set to its own step
+/// ([`crate::sowing::sow_now`]) — here, not in `annual_reset`, which also re-sows the
+/// biosphere's own runs (slice 4, §25a).
 ///
-/// ⚠ The period is in **steps**, not days — `n` is the slow domain's step count. Mirrors
-/// the Python `season_steps = steps_for(scenario.season_days)`.
+/// **It re-sows when the crop is MATURE** (Step 3c slice 4 stage 2, the user's decision 3 of
+/// §10): the first master-day start on which the crop's development stage
+/// ([`science::development_stage`], from the scenario's phenology — the file the crop is built
+/// from) has reached 2. The driver consults it once per master day, before the plant steps, so
+/// a crop maturing during day `d` is re-sown at the start of day `d + 1`. A crop that never
+/// matures (a chamber too warm to vernalize it) is never re-sown. Until stage 2 it fired on a
+/// fixed `season_days` calendar, every 305 days.
 pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
-    let season_steps = (scenario.season_days * STEPS_PER_DAY) as u64;
     let bio = scenario.bio;
+    let pheno = scenario.pheno;
     Box::new(
-        move |n: u64, current: &State| -> Result<Option<State>, SimError> {
-            if n > 0 && n.is_multiple_of(season_steps) {
+        move |_n: u64, current: &State| -> Result<Option<State>, SimError> {
+            if is_mature(current, &pheno)? {
                 Ok(Some(sow_now(annual_reset(current, &bio)?)?))
             } else {
                 Ok(None)
@@ -693,7 +699,18 @@ pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
     )
 }
 
-/// The two-rate driver over the multi-year horizon, with the annual re-sow hook.
+/// Has `state`'s crop matured — its development stage at 2 ([`science::development_stage`] of
+/// the state's thermal time)? An error if the state carries no thermal time.
+pub fn is_mature(state: &State, pheno: &PhenologyParams) -> Result<bool, SimError> {
+    let tt = state.aux.get(THERMAL_TIME).copied().ok_or_else(|| {
+        SimError::Reference(format!(
+            "the re-sow hook reads {THERMAL_TIME:?}, which the state does not carry"
+        ))
+    })?;
+    Ok(science::development_stage(tt, pheno.tsum_anthesis, pheno.tsum_maturity) >= 2.0)
+}
+
+/// The two-rate driver over the multi-year horizon, with the re-sow-on-maturity hook.
 pub fn run_sealed(
     bio_integrator: &EulerIntegrator,
     fast_integrator: &EulerIntegrator,

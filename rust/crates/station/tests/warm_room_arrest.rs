@@ -29,6 +29,7 @@ use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScena
 use station::sealed::{
     build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver,
 };
+use station::sowing::sown_step;
 
 /// The decided setpoint (note §10, decision 4) — `chamber.yaml`'s warm one.
 const ROOM_C: f64 = 22.0;
@@ -93,12 +94,17 @@ fn veg(state: &State) -> f64 {
 
 /// The instrument can see development: the plain run vernalizes, develops and fills grain.
 /// Without this, the zeros below could be a reading that is always zero.
+///
+/// ⚠ Read over the season, not on its last day (slice 4 stage 2, §25g): the plain crop is
+/// re-sown when it matures, so day 305 holds a third crop 27 days old, with no grain yet.
 #[test]
 fn control_the_plain_season_develops_and_fills_grain() {
-    let end = season().0.last().unwrap();
-    assert!(end.aux[VERNALIZATION_DAYS] > 0.0);
-    assert!(end.aux[THERMAL_TIME] > 0.0);
-    assert!(end.stocks[STORAGE_C].amount > 0.0);
+    let plain = &season().0;
+    assert!(plain.iter().any(|s| s.aux.get(VERNALIZATION_DAYS).is_some_and(|v| *v > 0.0)));
+    assert!(plain.iter().any(|s| s.aux[THERMAL_TIME] > 0.0));
+    assert!(plain.iter().any(|s| s.stocks[STORAGE_C].amount > 0.0));
+    // …and it is re-sown, so the warm run's never-re-sown sowing below is not a constant.
+    assert!(plain.iter().any(|s| sown_step(s).unwrap() > 0));
 }
 
 /// The warm run's room is the chamber held at [`ROOM_C`] — read off the chamber, every day.
@@ -148,11 +154,19 @@ fn warm_room_grows_leaf_stem_root_and_no_grain() {
     );
 }
 
-/// Prediction 3: the first re-sow, at the season boundary, refuses — there is no seed.
+/// Prediction 3, RESTATED by slice 4 stage 2 (§25f): the warm crop never matures, so it is never
+/// re-sown — over two seasons its sowing stays at step 0 and it holds no grain.
+///
+/// Until stage 2 the re-sow was on a 305-day calendar, and this test asserted that the first
+/// re-sow refused for want of seed ("seed bank too small to re-sow — storage_c 0.0"). With the
+/// re-sow on maturity that refusal is unreachable from a warm room; the refusal itself stays
+/// covered where it lives (`domains`, `reset_crop`).
 #[test]
-fn warm_room_first_resow_fails_for_want_of_seed() {
-    let err = run(&scenario(2), true).expect_err("a seedless crop must not re-sow");
-    let msg = err.to_string();
-    assert!(msg.contains("seed bank too small to re-sow"), "{msg}");
-    assert!(msg.contains("storage_c 0.0"), "{msg}");
+fn warm_room_is_never_resown_because_it_never_matures() {
+    let warm = run(&scenario(2), true).expect("a crop that never matures is never re-sown");
+    assert_eq!(warm.len(), 2 * 305 + 1);
+    for (day, s) in warm.iter().enumerate() {
+        assert_eq!(sown_step(s).unwrap(), 0, "re-sown by day {day}");
+        assert_eq!(s.stocks[STORAGE_C].amount, 0.0, "grain on day {day}");
+    }
 }

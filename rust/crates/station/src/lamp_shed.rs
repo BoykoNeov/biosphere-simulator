@@ -333,8 +333,11 @@ pub struct ShedLog {
 }
 
 /// Step a lab sealed station `days` master days in the reference's interleaved order, with
-/// the lamp-delivery bookkeeping between the two operators. No re-sow hook: a lab run stays
-/// inside one season (the caller's horizon must be shorter than `season_days`).
+/// the lamp-delivery bookkeeping between the two operators, and the reference's re-sow hook
+/// ([`crate::sealed::sealed_reset_hook`]) consulted at each master day's start, as the
+/// reference driver does. (Until slice 4 stage 2 it ran no hook and refused a horizon past one
+/// season; with the re-sow on maturity that horizon is the crop's, which no guard can know
+/// beforehand.)
 ///
 /// Per group: run the group's slow steps (reading the share the state carries), then its
 /// fast sub-steps — asserting conservation after each, as the reference driver does
@@ -354,13 +357,6 @@ pub fn run_shedding(
     scenario: &SealedStationScenario,
     days: usize,
 ) -> Result<(Vec<State>, u64, Vec<Event>, ShedLog), SimError> {
-    if days >= scenario.season_days {
-        return Err(SimError::Validation(format!(
-            "the lab shedding driver runs no re-sow hook, so its horizon ({days} days) must \
-             stay inside one season ({} days)",
-            scenario.season_days
-        )));
-    }
     let (steps_per_day, slow_dt, fast_dt) =
         (scenario.steps_per_day, scenario.bio_dt, scenario.cabin_dt);
     if fast_dt * steps_per_day as f64 != SECONDS_PER_DAY
@@ -382,7 +378,12 @@ pub fn run_shedding(
     let mut events: Vec<Event> = Vec::new();
     let mut log = ShedLog::default();
     delivery(&state)?;
+    let reset = crate::sealed::sealed_reset_hook(scenario);
     for _day in 0..days {
+        if let Some(resown) = reset(state.n, &state)? {
+            assert_conserved_default(&state, &resown)?;
+            state = resown;
+        }
         for _ in 0..groups.count {
             for _ in 0..groups.slow {
                 let report = bio_integrator.step_report(&state, bio_resolver, slow_dt)?;

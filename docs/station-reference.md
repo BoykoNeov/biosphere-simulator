@@ -358,6 +358,23 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-06 — the crop is re-sown when it MATURES, slice 4 stage 2: 1 golden moves
+  (`sealed_station`).** `docs/plans/post-roadmap-room-temperature.md` §25f (predictions,
+  committed before code) and §25g (graded). The sealed re-sow hook fires on the first master-day
+  start with the crop's development stage at 2 (`SealedStationScenario::pheno`, the
+  `phenology.yaml` the crop is built from), no longer on the 305-day calendar; the cold program
+  runs the first 56 days after each sowing and never recurs within a crop (`mod season_days`
+  gone). `season_days` is now only the weather's tiling period and the horizon's unit (1220
+  days). **No flow-set or param change.** Measured: re-sows at days 139, 278 … 1112 (9 crops,
+  every one maturing 139 days after its sowing); each re-sows from **14.58 mol C** of grain
+  (the calendar's crop had 41.02 — 64 % of it formed by `Allocation` AFTER maturity, measured);
+  504 cold days instead of 224, so the battery ends **+2.889 GJ** (1.11505e10 J) and the node
+  0.151 K colder at the end, 2.25 K colder on average (169.1984 K); the chamber's cold hold
+  is 0.004 K looser (the cold weeks now meet every part of the weather year); the end crop is 108 days old (grain 0.896, thermal time 1169.84). The CO₂
+  scrubber and the O₂ makeup each work 8.870 mol harder over the horizon (predicted the other
+  way — the biosphere ends holding 8.870 mol C less: the end crop's grain gone, the soil up by
+  eight crops' residues). No rationing, no events. The other 19 goldens byte-identical; the
+  manifest moves by the golden's hash.
 - **2026-10-06 — the cold program reads the crop's own sowing, slice 4 stage 1: one aux key
   added to 1 golden (`sealed_station`); every stock bit-identical.**
   `docs/plans/post-roadmap-room-temperature.md` §25 (design and predictions, committed before

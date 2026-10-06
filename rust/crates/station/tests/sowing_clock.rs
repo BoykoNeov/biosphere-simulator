@@ -288,3 +288,41 @@ fn the_shed_lamp_dims_the_twin_the_clock_selects() {
     assert!(full > 0.0, "midday of a cold day is lit");
     assert_eq!(rec[&window_key(PAR_VAR)], 0.5 * full);
 }
+
+/// Stage 2 (§25d, advisor item 6): the hook re-sows exactly when the crop's development stage —
+/// from the SAME phenology the crop is built from — reaches 2, and not one ulp of thermal time
+/// before; the re-sown state's sowing is its own step and its thermal time is reset.
+#[test]
+fn the_hook_resows_at_maturity_and_not_before() {
+    use domains::biosphere::stocks::THERMAL_TIME;
+    use station::sealed::{is_mature, sealed_reset_hook};
+    let scenario = sealed_station_scenario();
+    let pheno = domains::biosphere::params::phenology();
+    assert_eq!(
+        (scenario.pheno.tsum_anthesis, scenario.pheno.tsum_maturity),
+        (pheno.tsum_anthesis, pheno.tsum_maturity),
+        "the threshold is not the crop's own phenology"
+    );
+    let mature_tt = pheno.tsum_anthesis + pheno.tsum_maturity;
+    let (state, _, _) = built();
+    let hook = sealed_reset_hook(&scenario);
+    let n = 200 * PER_DAY;
+    let with_tt = |tt: f64| {
+        let mut s = sown_at(&state, n, 0);
+        s.aux.insert(THERMAL_TIME.to_string(), tt);
+        // A matured crop has grain to re-sow from.
+        s.stocks.insert(
+            domains::biosphere::stocks::STORAGE_C.to_string(),
+            s.stocks[domains::biosphere::stocks::STORAGE_C].with_amount(10.0).unwrap(),
+        );
+        s
+    };
+    let just_before = with_tt(f64::from_bits(mature_tt.to_bits() - 1));
+    assert!(!is_mature(&just_before, &scenario.pheno).unwrap());
+    assert!(hook(n, &just_before).unwrap().is_none(), "re-sown before maturity");
+    let at = with_tt(mature_tt);
+    assert!(is_mature(&at, &scenario.pheno).unwrap());
+    let resown = hook(n, &at).unwrap().expect("not re-sown at maturity");
+    assert_eq!(station::sowing::sown_step(&resown).unwrap(), n);
+    assert_eq!(resown.aux[THERMAL_TIME], 0.0);
+}

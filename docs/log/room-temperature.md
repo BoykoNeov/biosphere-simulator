@@ -262,3 +262,21 @@ sides, in a test. Found by the wrapper's own refusal: the weather file's outdoor
 radiation and day length had been sitting under the plain names, overwritten until now; with the
 two copies they would have been read silently by anything outside the wrapper. They are removed.
 Every prediction held. Stage 2 — the re-sow fires on maturity — is next.
+
+**Slice 4, stage 2 — BUILT 2026-10-06 (a station unfreeze): the crop is re-sown when it matures**
+(plan §25f–§25g). The user's decision of 2026-10-01, built. Every crop now matures 139 days after it is
+sown, and is re-sown the next morning: nine crops over the 1220-day run instead of four, and the
+cold weeks run after every sowing — 504 cold days instead of 224. Eight predictions were written
+before the code; seven held, most to the printed digit (the re-sow days exactly; the last crop's
+thermal time 1169.8 against ≈ 1170). The big finding, predicted from the record and then booked
+flow by flow: each crop now re-sows from 14.6 mol C of grain instead of 41 — because 64 % of
+the old crop's grain formed AFTER it had matured. The model never tells a crop it is finished:
+past maturity it keeps photosynthesizing and puts the new growth into grain. Re-sowing at
+maturity removes that. The battery ends 2.9 GJ fuller (the dim lamp of the extra cold weeks).
+The one failed prediction: the CO₂ scrubber and O₂ supply work slightly MORE (8.9 mol over
+1220 days), not less — the scrubber moves with the carbon the station holds at the end, and the
+end now holds a young crop instead of a big ripe one, partly offset by soil richer from eight
+crops' residues. No rationing, no events; the 19 other saved results did not move. Two long tests (run
+separately) had pinned numbers from the old calendar run and went red; both moved the predicted
+way (more battery, a colder station) and were re-pinned, and one showed the chamber's cold hold a
+few thousandths of a degree looser — the cold weeks now meet every season's weather.

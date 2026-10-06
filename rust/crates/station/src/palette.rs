@@ -154,7 +154,7 @@ fn build_greenhouse_session() -> Result<(SimSession, DisplayContext), SimError> 
 /// The full sealed station as a **two-rate** session — the multi-year, re-sown scenario that
 /// *is* "fast-forward decades." Mirrors [`crate::sealed::run_sealed`]'s construction (and the
 /// sealed branch of `tests/session_parity.rs`): every Phase-6 seam over one shared stock dict
-/// and two registries, with the real `sealed_reset_hook` re-sowing the biosphere each season.
+/// and two registries, with the real `sealed_reset_hook` re-sowing the crop each time it matures.
 /// It carries a real node temperature and battery SOC (Power → Thermal is inside), and highlights
 /// the cross-domain shared stocks (`thermal.node` + the biosphere carbon/O₂ pools the cabin
 /// breathes). Each master day is 1440 fast sub-steps, and a decade is thousands of master days
