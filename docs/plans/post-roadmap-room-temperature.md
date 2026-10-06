@@ -2542,3 +2542,8 @@ GAP, recorded, not acted on: in thermal-time crop models a leaf's life is counte
 so a cold leaf lives longer. Not measured further here; it matters for slice 4 and for the 6- / 10-
 week sensitivity checks. The leaf never nears die-off: lowest **0.0162** mol C, falling ≈ 15 % a
 week, against an extinction threshold of **0** (the organ is a population that cannot be zeroed).
+
+**DECIDED 2026-10-06 (the user), on the 100 µmol's locus and its cost:** *"Keep 100, study
+shedding"* — the cold-week light stays at 100 µmol m⁻² s⁻¹ (§12's choice stands, the locus warning
+recorded), and the next item is the leaf-shedding rule that reads no temperature (sources first,
+predictions before code), ahead of slice 4.
