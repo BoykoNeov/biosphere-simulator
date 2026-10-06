@@ -96,3 +96,94 @@ weeks near **0.150 mol C** (0.160 − 0.0096), not 0.077.
 1. Run the measurement plan (§5)? It means a lab flow for A (and B), predictions, and runs across
    every biosphere scenario — a sizeable piece of lab work, no frozen change.
 2. If yes: A only, or A and B (B is WHAT-IF, lab-only, and cannot become the reference uncited)?
+
+**ANSWERED 2026-10-06 (the user):** *"Do what is closer to reality."* Read as **A, measured** — the
+sources' form is the cited description of real crops; B rests on a fitted reference temperature.
+B is not run. The measurement plan (§5) proceeds for A, lab-only, predictions first.
+
+## 7. A, made concrete — and the predictions, written before the lab flow exists (2026-10-06)
+
+**The form (one per organ, so the organs can be measured apart — July's stem lesson):**
+
+* **Leaf — Teh Eqn 7.17 (after Goudriaan & van Laar 1994):** age death 0 while DVS < 1; after
+  anthesis `DVR / max(0.1, 2 − DVS)`, with `DVR = daily_thermal_time(T) / tsum_maturity` (the
+  tree's own reproductive clock). Integrated, leaf then falls LINEARLY in development toward
+  maturity — Soltani & Sinclair Eqn 9.7's shape, so two sources give one curve. The shading term
+  (`shade_rate` above `lai_threshold`, Van Keulen & Seligman, built) is added unchanged. ⚠ DVR
+  omits the drought hastening factor (1 whenever the crop is unstressed, as in every run measured
+  so far) — recorded.
+* **Root — Penning de Vries:** 0 while DVS < 1; `rdr_root` (0.01) after — the frozen value, within
+  ~10 % of the source's post-anthesis 0.010–0.011 (rice). (Teh models no root death at all.)
+* **Stem — Penning de Vries:** "except for their reserves, stems do not lose weight" → 0. July
+  refused stem-only on `perennial`'s closure; measured separately here.
+* **Nitrogen shedding** (`NitrogenSenescence`, sealed scenarios) carries the same rates — "one
+  physical event, two legs" — so the lab replaces BOTH flows with one rate law. The open field has
+  no nitrogen flow; its cells come from a carbon-only replacement (the harness marks a scenario
+  n/a when a target is missing, so the two compositions are merged cell by cell, open field from
+  one, chambers from the other).
+
+**Columns:** frozen; **FLAT** (the lab flows at today's rates — the control); **L** (leaf);
+**LR** (leaf + root); **LRS** (leaf + root + stem). Instrument: `lab::report` (the value/science
+switch harness), `--long`, plus a station example for the sealed station.
+
+**Predictions:**
+
+| # | Prediction |
+|---|---|
+| S0 | FLAT reproduces the frozen column **bit for bit** in every cell, rationed and events included (the control; it is arithmetic, not science) |
+| S1 | open field, L: peak LAI **rises** from 6.0228 but the shading term holds it in **6.0–7.0**; peak W **rises** and crosses the Greenwood point 14.4248 t/ha |
+| S2 | every chamber's season-low CO₂ **falls** under L, further under LR and LRS (standing tissue holds carbon the air would have had) |
+| S3 | perennial long horizon: the converged peak leaf **rises**; its CO₂ low **falls**; whether it stays above the 0.05 floor and rationed stays 0 is **not predicted** — the July blocker, the question this measures. LRS (stem) is the likeliest to break it (July: rationed 0 → 1 at dt = 1) |
+| S4 | station, the 3b cold seedling at day 56 (0.077 mol C under the frozen form): L ≈ **0.11**, LR ≈ **0.14**, LRS ≈ **0.150** (= 0.160 − 0.0096, the cold weeks' net production) |
+
+## 8. Measured (2026-10-06) — the predictions graded
+
+**Built, lab-only:** `domains::lab::shedding` (one rate law, two flows — carbon and its nitrogen
+twin — switchable per organ; a second cited leaf reading added after the first results,
+`LeafShedding::PenningDeVries`, Listing 5's `LLVT` table); `tests/shedding_form.rs` (5: the
+control on the open field and the jar, the law by hand, Penning de Vries' table by hand, the
+reach); examples `domains/shedding_switch` (the lab report, `--long`) and
+`station/shedding_station` (the sealed station, full horizon). Outputs in
+`W:\temp\claude\shedding\`. Two temporary examples (not committed) booked the open field flow by
+flow and applied the science-gate formulas to the lab runs.
+
+Columns: frozen; FLAT (control); L (Teh's leaf); LR (+ root after anthesis); LRS (+ no stem death);
+LRS-PdV (LRS with Penning de Vries' milder leaf table after anthesis).
+
+| # | Prediction | Measured | Grade |
+|---|---|---|---|
+| S0 | FLAT = frozen bit for bit | every report cell; the station's END STATE equal; the two tests | HELD |
+| S1 | open field (L): peak LAI rises, within 6.0–7.0; peak W rises past 14.4248 | LAI **5.44 → 6.18** (the "from 6.0228" in §7 was a stale figure — 5.44 is today's); peak W **falls** 12.97 → 10.05 t/ha | LAI HELD; **peak W MISSED, wrong sign** (below) |
+| S2 | chambers' CO₂ low falls under L, further under LR, LRS | falls under L (jar 9.66 → 3.45, perennial 74.9 → 66.8, consumer 75.5 → 70.8 ppm); LR and LRS fall **slightly less** than L | first half HELD; "further" MISSED |
+| S3 | perennial long: peak leaf rises, CO₂ low falls; floor / rationing not predicted | peak leaf **+81 %**; CO₂ low −10.8 %; every gate formula passes for every form: rationed 0, compensation ratio 1.22 → **1.09** (perennial), 1.24 → 1.16 (consumer), cycles stationary and alive | HELD; **July's blocker does not reproduce** |
+| S4 | station cold seedling at day 56: L ≈ 0.11, LR ≈ 0.14, LRS ≈ 0.150 | **0.1168 / 0.1460 / 0.1521** (frozen 0.0771) | HELD |
+
+**S1's miss, explained (booked flow by flow, open field):** the L crop grows MORE (allocation 100
+vs 86 mol C) and is bigger at anthesis (leaf 9.5 vs 8.2, stem 10.0 vs 7.1, root 10.7 vs 6.6), but
+Teh's rate takes the leaves to ~0 by maturity (0.05 mol C left vs the frozen 4.6), so grain fill
+runs on a dying canopy: grain 33.4 → 24.2 mol C, and peak W comes 18 days earlier. July's
+measurement used Penning de Vries' milder post-anthesis table, which is why it pointed up.
+
+**Unpredicted — the after-flowering half decides the yield, and the two cited readings bracket it:**
+
+| | frozen | L / LRS (Teh, Soltani) | LRS-PdV | WOFOST oracle* |
+|---|---|---|---|---|
+| open field peak LAI | 5.44 | 6.18 | 6.18 | 6.34 |
+| open field leaf at maturity (mol C) | 4.63 | 0.05 | 6.76 | LAI 0 |
+| open field grain (t/ha, 0.45 C) | 8.9 | 6.5 / 6.2 | 9.6 | 11.5 |
+| open field peak W (t/ha; Greenwood cap 14.4248) | 12.97 | 10.05 / 10.62 | **15.67 — over the cap** | (TAGP 20.4) |
+| station grain per season (mol C) | 24.26 | 11.15 / 10.86 | **61.17** | — |
+| station soil humus at the end (mol C) | 7.54 | 6.02 / 5.28 | 17.05 | — |
+| chambers: all gate formulas | pass | pass | pass | — |
+
+\* `tests/oracle/winter_wheat_reference.json` — WOFOST 7.2 potential production, same site and
+season; PCSE's OUTPUT, a diagnostic (EUPL; never ported).
+
+**What it means.** The part all three books agree on — **no age-related shedding before
+flowering** — is what the cold seedling needed, and it passes every gate in every scenario. After
+flowering the two cited readings disagree, and this model's grain fill is sensitive enough that
+one halves the station's grain while the other multiplies it 2.5× and breaks the frozen Greenwood
+cap. Against WOFOST, Teh/Soltani gets the canopy's SHAPE right (leaves gone at maturity) and the
+yield further off (6.5 vs 11.5 t/ha); Penning de Vries the reverse. That points at a second gap,
+recorded, not measured further: this model fills grain slowly and leans on green leaves through
+fill to do it (WOFOST has 5.7 t/ha of grain by DVS 1.27).

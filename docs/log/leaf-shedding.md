@@ -24,3 +24,20 @@
   against the chambers); B, today's rates counted per degree-day (uncited, so lab-only); C, leave
   it recorded. A measurement plan, run through the existing lab seam with predictions first, is
   owed before A or B can be chosen.
+
+**MEASURED 2026-10-06, lab only** (note §7–§8), on the user's *"do what is closer to reality"*,
+read as: measure the books' form. A lab copy of the shedding rule, switchable organ by organ,
+reproduces today's runs bit for bit at today's rates (the control), then runs the books' form
+across every plant scenario and the sealed station.
+* The part all three books agree on — no age-related shedding before flowering — is what the
+  cold seedling needed: it ends the cold weeks at 0.152 mol C instead of 0.077, as predicted.
+* July's refusal does not reproduce: no rationing anywhere, and every chamber passes every
+  gate formula, though the long-run chamber's CO₂ margin thins (1.22 → 1.09 of its floor).
+* After flowering the two cited readings disagree, and this model's grain fill is sensitive to
+  it. Teh / Soltani take the leaves to zero by maturity: the canopy looks like WOFOST's, but grain
+  falls (open field 8.9 → 6.2 t/ha, the station's per season 24 → 11 mol C). Penning de Vries'
+  milder table keeps leaves green: grain rises (open field 9.6 t/ha, the station's 61 mol C) and
+  the open field breaks the frozen Greenwood biomass cap. WOFOST, the offline comparison, has
+  11.5 t/ha with no leaves left — so the model fills grain too slowly, a second gap, recorded.
+* My prediction that the books' form would RAISE the open field's biomass had the wrong sign
+  (it was read off July's measurement, which used the milder table); recorded, not re-fitted.

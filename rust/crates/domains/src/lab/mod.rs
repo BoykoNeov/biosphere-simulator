@@ -61,6 +61,10 @@ pub mod step_options;
 /// light's time resolution, separated.
 pub mod step_cause;
 
+/// **Tissue shedding paced by development** (`docs/plans/post-roadmap-leaf-shedding.md`): the
+/// sources' form of `Senescence` and its nitrogen twin, one organ at a time. LAB-ONLY.
+pub mod shedding;
+
 /// One substitution: a field of one frozen param file, and the value to run instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Substitution {
