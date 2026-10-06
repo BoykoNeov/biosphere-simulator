@@ -257,3 +257,122 @@ maturity), not a yield target.
   Penning de Vries' table (rice; leaves stay green). Entangled with the fixed re-sow calendar,
   which lets a green crop keep filling grain for months after maturity. Recommended: take it
   AFTER slice 4 (re-sow on maturity), which removes that confound.
+
+**DECIDED 2026-10-06 (the user): "Adopt agreed half."** No age-related leaf or root shedding
+before flowering becomes the frozen science — a biosphere unfreeze, predictions first, the 29 reds
+re-derived one by one. The after-flowering question waits for slice 4.
+
+## 10. The unfreeze — design, predictions and roster, before code (2026-10-06)
+
+**Step 1 of the ceremony (`docs/biosphere-reference.md`, "The unfreeze discipline").**
+
+**Why.** Three primary sources on the shelf (§2) agree that a crop sheds no tissue from age before
+it flowers; the frozen flat rates (all `TODO(cite)`) shed it from day one. In the cold weeks of
+the station's protocol that loss halves the seedling; measured in the lab (§8–§9) the agreed half
+removes it and every survival gate still passes.
+
+**The form — the smallest change that is the agreed half, and nothing else:**
+* `Senescence` and `NitrogenSenescence` gain the development clock they need — the thermal-time
+  aux key and `tsum_anthesis` / `tsum_maturity` from `phenology.yaml` (no new param) — and while
+  `DVS < 1` the **age** part of the leaf rate and the root rate are 0. The mutual-shading term
+  (V-K&S, built) is unchanged at every stage; the stem rate is unchanged (stem-only was refused in
+  July on its own measurement and is not part of the agreed half); after anthesis every rate is
+  today's flat one.
+* Exactly the lab's `SheddingForm::BEFORE_ANTHESIS_ONLY` arithmetic.
+* **Scope:** every crop that loads `senescence.yaml` — winter wheat and the potato, which shares
+  the file. ⚠ LOCUS: Penning de Vries states the DS-keyed form for crops generally (§3.2.6);
+  Soltani's Box 9.1 for grain crops; the potato is a tuber crop. Potato has no golden; its tests
+  passed on the throwaway build.
+* `senescence.yaml`: the three rates' `source` text says they apply AFTER anthesis and cites the
+  zero before it; the header's (C) diagnosis is annotated; the stale `shade_rate` note the third
+  direction plan's §4 waits on is corrected in the same edit.
+
+**Predictions (written before the build):**
+
+| # | Prediction |
+|---|---|
+| U1 | **Every regenerated golden equals the lab twin's run bit for bit** — the build is `BEFORE_ANTHESIS_ONLY`'s arithmetic, so the lab's report values for that column and `shedding_station`'s BEFORE end state are the new goldens' values exactly. After the build, the lab's `BEFORE_ANTHESIS_ONLY` through the seam reproduces the frozen run (the control moves from FLAT to it) |
+| U2 | Goldens that move: the biosphere goldens with a vegetative crop (`season_euler`, `sealed_chamber`, `perennial_chamber`, `perennial_long_horizon`, `consumer_chamber`, `consumer_long_horizon`) and the station goldens carrying the crop (`sealed_station`; `greenhouse`, `harvest`, `lighting`, `station` if their crop is vegetative within their horizon). `drift_summary` and the non-crop goldens (crew, eclss, power ×2, thermal, cabin_gas, water_recovery, sealed_energy_drift) byte-identical |
+| U3 | Biosphere manifest: `senescence.yaml`'s digest and the moved goldens' hashes; **no** flow-set, aux-set or param-set change (no new param, type names unchanged). Station manifest: the moved station goldens' hashes only |
+| U4 | Readings (the throwaway build / lab): open field peak LAI ≈ 6.18, peak W below the Greenwood cap; chambers' compensation ratios ≈ 5.0 / 1.10 / 1.17 (jar / perennial / consumer); decade CO₂ floor and both leaf cycles pass; sealed station: the cold seedling ≈ 0.146 mol C at day 56, grain at maturity ≈ 14.58 mol C, 0 rationing |
+| U5 | ⚠ **One science band fails as written:** `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` asserts the chambers' peak LAI < 1.0 and the jar reaches **1.024**. Argued here, not re-tuned: the 1.0 was never the source's bound — the source's threshold is 6.0 (V-K&S) and the claim the 1.0 stood for, "the chambers are carbon-limited and cannot reach the regime", holds with a 5.9× margin. Proposed: the gate asserts the claim (chambers < the source's 6.0 threshold) and records the measured 1.024; ⚠ that IS a bound change on a frozen gate, so it is the user's call, put to them with this argument |
+
+**The roster — the 29 reds of the throwaway build, each with its planned handling:**
+
+| Test(s) | Planned handling |
+|---|---|
+| 3 goldens + 3 tier bands (domains + station `golden_regression`, `tier_contract`) | regenerate; the tier bands' basis re-measured if a band is per-golden |
+| `the_five_margins_are_pinned_not_merely_positive`, `the_jars_tightest_co2_step_is_pinned_by_its_headroom` | re-pin with the movement and its direction recorded (the jar's CO₂ margin 14.15 → 5.00; its tightest step 0.165 → 0.342 of the pool — the jar closer to rationing, stated) |
+| `the_vks_mutual_shading_regime…` + `mutual_shading_tolerance::the_chamber_half_of_the_gate` | U5 — the user's decision |
+| `flows::tests` ×3 (the flat form's unit tests) | re-express: before anthesis the age rates are 0, after it the frozen rates; the shading half unchanged |
+| `shedding_form` FLAT controls ×2 | the control moves to `BEFORE_ANTHESIS_ONLY` (U1); FLAT becomes the "pre-2026-10-06 form" column |
+| `mutual_shading_tolerance` ×5, `temperature_kinetics` ×1, `value_switch_run` ×3, `gas_composition_perturbations` ×3, `leaf_form` ×1, `system::reaching_the_below_root_store…` ×1 | each read for what it claims; re-derived on the new tree if the claim survives with new numbers, re-expressed if its premise was the flat form, recorded either way — **never loosened to pass** |
+
+### 10a. Advisor review of §10 (2026-10-06, the ceremony's step 1), summarized — and what it changed
+
+(1) Classify the 15 "read each" reds NOW, from the throwaway build's messages, into premise / new
+number / claim fails — a failing science claim is a second blocking finding. (2) U1 and U4 used
+borrowed numbers: run the lab report with the agreed-half column and save it, and set its peak W
+against 14.4248. (3) Find every construction of the two flows (authoring, station, Godot) and
+what the manifest records per flow. (4) U2 hedged on "vegetative within their horizon" and was
+confident about `drift_summary` without checking. (5) Put U5 to the user now; check the 1.0's
+history first. Fold-ins: the potato's pass used wheat's sums — re-run it on the real build; make a
+missing development clock loud; list every prose the change makes false; add a station
+unfreeze-log entry.
+
+**(3) Constructions:** `Senescence` / `NitrogenSenescence` are built only in
+`biosphere/system.rs` (`build_season_with`) and in `flows.rs`'s own unit tests; the authoring
+manifest names neither; the biosphere manifest records flow TYPE NAMES, the science-gate bound
+TEXTS and the golden hashes — the 1.0 lives inside the VKS gate's check, not in its recorded bound
+text ("peak < 6.0 OR the 5%/day mutual-shading loss is MODELLED").
+
+**(4) U2 corrected:** `drift_summary.json` folds the perennial and consumer chambers' leaf series
+(`domains::goldens::drift_summary`) — it **moves**. `state_snapshot.json` is an engine fixture
+(`simcore::snapshot`) with no crop — unchanged. Every crop golden starts at DVS 0, so every one
+moves; the exact list comes from a report-only regeneration, diffed stock by stock before
+`--write`.
+
+**(5) The 1.0's history:** `docs/log/mutual-shading-tolerance.md` FINDING 5 — the chambers' "< 1.0"
+is the project's own statement that they are "carbon-limited by design and cannot reach the
+shading regime at all", never a sourced bound; it was found to be the second DETECTOR of a
+`specific_leaf_area` error (crossed between ×2.5 and ×3.5). **DECIDED 2026-10-06 (the user):
+"Restate to the source's 6.0."** Both copies move together (`science_gates.rs` and
+`tests/mutual_shading_tolerance.rs::the_chamber_half_of_the_gate`); the detector role is lost,
+recorded. Paired cost stated to the user: the jar's tightest single CO₂ draw 0.165 → 0.342 of
+the pool, never rationing.
+
+**(1) The 15, classified from their messages on the throwaway build:**
+
+| Test | Message (throwaway build) | Class |
+|---|---|---|
+| VKS gate; `the_chamber_half_of_the_gate` | jar peak LAI 1.024 ≥ 1.0; "still inside the bound at ×2.5 — 2.567" | **claim (proxy) fails** → U5, decided |
+| `the_loss_is_inert_on_both_observables…` | "the frozen canopy must stay under 6.0 — 6.177" | premise was the flat form: the shading loss is now LIVE at frozen params |
+| `the_loss_delays_the_biomass_cap…`, `the_loss_roughly_doubles…` | "the frozen rung must be under 14.4248 / 8" (the loss-OFF ladder) | premise: without vegetative shedding the frozen canopy needs the loss to stay inside its bands |
+| `the_loss_is_one_sided…` | the ×0.682 low rung reaches 6.04 vs 7.02 | premise: the low rung no longer sits below the threshold — a lower rung is needed |
+| `the_peak_w_crest_is_light_saturation…` | "a 25 % cut in k must cost the frozen canopy real biomass — 0.031" | premise: the frozen canopy is now near light saturation, where k matters little |
+| `temperature_kinetics::the_mutual_shading_step_is_what_caps…` | cardinal 6.18 → **14.82** with the loss off | premise: the loss is no longer inert in the frozen tree — the canopy is regulated by the cited shading rule, as July's (C) diagnosis predicted ("the flat `rdr_leaf` has been standing in for canopy regulation") |
+| `value_switch_run` ×3 | peak leaf at k 0.55 / frozen / 0.65: 9.850 / 9.836 / 9.836 | premise: the harness's probe (higher k → higher peak leaf) is flat in a shading-capped canopy; a monotone probe is needed |
+| `gas_composition_perturbations`: the vent, the reversal | at f = 0.8 the jar's low is 3.50 vs 3.42 baseline | new number: the depletion reversal now begins above f = 0.8 |
+| `gas_composition_perturbations`: halving O₂ | "the healthy jar is not oxygen-limited at its trough" | new number, the statement inverts: the jar is further from anoxia |
+| `leaf_form::the_form_no_longer_rations…` | the lab jar's tightest step 0.678 (pinned 0.3128) | new number |
+| `system::reaching_the_below_root_store…` | "the canopy rescue moved: 1.029" | new number |
+
+No science claim other than the U5 proxy fails; the Greenwood gate itself passed (peak W 13.88
+t/ha < 14.4248 on the throwaway build).
+
+**(2) The lab twin's own numbers** (`shedding_switch --long`, column `BEFORE (agreed half)`, run
+on the pre-change tree; saved `W:\temp\claude\shedding\lab_twin_report.txt`) — **U1/U4 restated:
+after the build, the frozen column of the same report must print exactly these values**, and the
+lab's `BEFORE_ANTHESIS_ONLY` through the seam must equal the frozen run bit for bit:
+
+| readout | today | the agreed half (= the new frozen) |
+|---|---|---|
+| open field peak LAI | 5.440614 | **6.177401** |
+| open field peak W, t/ha (Greenwood cap 14.4248) | 12.966529 | **13.888379** — under the cap by 3.7 % |
+| jar season-low CO₂, ppm | 9.661059 | **3.423283** |
+| perennial chamber season-low CO₂, ppm | 74.861477 | **67.059152** |
+| consumer chamber season-low CO₂, ppm | 75.544857 | **71.312478** |
+| perennial long horizon, converged peak leaf, mol C | 0.587917 | **1.029832** |
+| rationed / events, every run | 0 / 0 | **0 / 0** |
+| sealed station (`shedding_station`): cold seedling at day 56; grain at maturity | 0.0771; 9.51 | **0.1460; 14.58** |
+

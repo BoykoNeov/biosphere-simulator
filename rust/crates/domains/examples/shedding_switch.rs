@@ -8,7 +8,8 @@
 //!
 //! Columns: `frozen`; `FLAT` (the lab flows at the frozen rates — the control, which must equal
 //! `frozen` in every cell); `L` (leaf on Teh's form); `LR` (+ root); `LRS` (+ stem); `LRS-PdV`
-//! (`LRS` with Penning de Vries' milder leaf table after anthesis).
+//! (`LRS` with Penning de Vries' milder leaf table after anthesis); `BEFORE (agreed half)` (no
+//! leaf or root shedding before anthesis, everything else frozen — the adoption candidate).
 //!
 //! ⚠ **Two compositions per column, merged cell by cell.** The sealed scenarios carry the
 //! nitrogen twin of `Senescence`, which sheds on the same rates, so there both flows are
@@ -73,6 +74,7 @@ fn main() {
         column("LR", SheddingForm::LEAF_ROOT, long),
         column("LRS", SheddingForm::ALL, long),
         column("LRS-PdV", SheddingForm::ALL_PDV, long),
+        column("BEFORE (agreed half)", SheddingForm::BEFORE_ANTHESIS_ONLY, long),
     ];
     for c in &columns {
         println!("{}: rationed {} events {}", c.label, c.rationed, c.events);
