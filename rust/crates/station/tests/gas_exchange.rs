@@ -26,7 +26,11 @@ use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
     build_sealed_station, build_sealed_station_at, build_sealed_station_unread,
-    sealed_bio_resolver, sealed_fast_resolver,
+    sealed_bio_resolver, sealed_fast_resolver, wrap_last,
+};
+use station::scenario::Phase;
+use station::sowing::{
+    map_program_or_plain, on_sowing_clock, program_value, twin, PLANT_PROGRAM_VARS,
 };
 
 /// The PLANT-STEP sealed build, **unread** — its plants not yet wrapped to read the chamber —
@@ -51,13 +55,13 @@ fn built(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
 }
 
 /// The sealed build with the crop's gas exchange on the minute step, the plants then wrapped
-/// to read the chamber — the reference's order.
+/// to read the chamber and both registries put on the sowing clock — the reference's order.
 fn built_minute(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
     let (state, bio, fast) = built(scenario);
     let (bio, fast) =
         gas_exchange_on_fast_step(&state.stocks, bio, fast, &weather_shared(&scenario.bio))
             .expect("minute gas exchange");
-    let bio = plants_read_chamber(bio, &state.stocks, &station_params::chamber()).expect("wrap");
+    let (bio, fast) = wrap_last(bio, fast, &state.stocks, scenario).expect("wrap");
     (state, bio, fast)
 }
 
@@ -67,10 +71,13 @@ fn chamber_c(state: &State) -> f64 {
     state.stocks[CHAMBER].amount / station_params::chamber().heat_capacity - 273.15
 }
 
-/// What the plant step reads for `var` on `state`: the chamber for `temp`, the resolver else.
+/// What the plant step reads for `var` on `state`: the chamber for `temp`, a cold-program
+/// variable's twin for the state's phase (slice 4), the resolver else.
 fn plant_reads(r: &SourceResolver, state: &State, var: &str, dt: f64) -> f64 {
     if var == TEMP_VAR {
         chamber_c(state)
+    } else if PLANT_PROGRAM_VARS.contains(&var) {
+        program_value(r, var, state, &sealed_station_scenario(), dt).expect("program twin")
     } else {
         r.bind(state, dt).get(var).expect("forcing")
     }
@@ -152,9 +159,20 @@ fn the_wrapped_flow_is_the_inner_flow_on_a_minute_in_days() {
     assert_eq!(raw_allocation.id(), "biosphere.allocation");
     assert_eq!(wrapped.id(), "biosphere.allocation");
     // The raw flow reads `temp` from its environment: the plants' resolver, plus the chamber's
-    // temperature on this state as a forcing (the unread build's resolver carries none).
+    // temperature on this state as a forcing (the unread build's resolver carries none). It is
+    // not on the sowing clock either, so the program's variables are handed to it under their
+    // plain names, as the twins of this day's phase (slice 4).
     let (mut forcings, shared) = resolver(&scenario).into_parts();
     forcings.insert(TEMP_VAR.to_string(), constant(chamber_c(&state)).unwrap());
+    let phase = scenario.phase(&state).unwrap();
+    for var in PLANT_PROGRAM_VARS {
+        for p in Phase::BOTH {
+            let schedule = forcings.remove(&twin(var, p)).expect("twin");
+            if p == phase {
+                forcings.insert(var.to_string(), schedule);
+            }
+        }
+    }
     let reference = SourceResolver::new(forcings, shared).unwrap();
     let fast_dt = scenario.cabin_dt;
     let mut lit = 0;
@@ -222,8 +240,9 @@ fn a_change_to_the_plant_side_light_reaches_the_minute_step() {
         let (state, bio, fast) = built_minute(&scenario);
         let mut plant_r = resolver(&scenario);
         if dark {
+            // Both phase twins (slice 4): a plain `par` beside them would be refused.
             let (mut forcings, shared) = plant_r.into_parts();
-            forcings.insert(PAR_VAR.to_string(), constant(0.0).unwrap());
+            map_program_or_plain(&mut forcings, PAR_VAR, |_| constant(0.0).unwrap()).unwrap();
             plant_r = SourceResolver::new(forcings, shared).unwrap();
         }
         let fast_r = sealed_fast_resolver(&params::charge(), &scenario).unwrap();
@@ -297,6 +316,8 @@ fn a_wrap_before_the_move_is_refused() {
     let (bio, fast) =
         gas_exchange_on_fast_step(&state.stocks, bio, fast, &weather_shared(&scenario.bio))
             .expect("move");
+    // The sowing clock last, as every sealed build applies it (slice 4).
+    let (bio, fast) = on_sowing_clock(bio, fast, &state.stocks, &scenario).expect("clock");
     let after = EulerIntegrator::new(bio).step(&state, &resolver(&scenario), scenario.bio_dt);
     // The recorder joined the plant step after the wrap, so it is unwrapped and finds no `temp`
     // in the plants' resolver; had it found one, the moved flows would refuse it.

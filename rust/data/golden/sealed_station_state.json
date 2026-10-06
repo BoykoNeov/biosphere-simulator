@@ -3,6 +3,7 @@
     "rooted_depth": "0x1.4ce62c870d2b2p+0",
     "station.plant_window.par": "0x0.0p+0",
     "station.plant_window.temp": "0x1.60cc82fb19f60p+4",
+    "station.sown_step": "0x1.c980000000000p+13",
     "thermal_time": "0x1.588c2bbdd8be1p+12",
     "vernalization_days": "0x1.bf68a3c23aebbp+5"
   },

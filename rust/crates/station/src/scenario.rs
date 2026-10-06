@@ -9,6 +9,8 @@ use domains::biosphere::{
     SeasonScenario, BIO_DT, DEFAULT_SCENARIO, LONG_HORIZON_YEARS, STEPS_PER_DAY,
 };
 use domains::power::{PowerScenario, BOUNDED_SOC_SCENARIO};
+use simcore::error::SimError;
+use simcore::state::State;
 
 // --- Step 1 (P6.1): the Power → Thermal heat-closure station --------------------------
 
@@ -367,26 +369,48 @@ impl SealedStationScenario {
         self.years * self.season_days
     }
 
-    /// Is step `n` in the cold period? **The one clock** every reader of the program calls:
-    /// `floor(n·bio_dt) mod season_days < cold.days`. With the calendar kept, the season start
-    /// is the sowing; ⚠ slice 4 (re-sow on maturity) must move this clock into the state.
+    /// The program's phase `steps` slow steps after a sowing: `floor(steps·bio_dt) mod
+    /// season_days < cold.days` is [`Phase::Cold`]. **The one clock** every reader of the program
+    /// reaches, through [`Self::phase`] (the state's sowing) or, for a state not yet built, here
+    /// (the chamber's start, sown at step 0).
+    ///
+    /// ⚠ **`mod season_days` is slice 4 stage 1's** (§25c): with the re-sow still on the
+    /// calendar every sowing is a multiple of the season, so this is today's calendar clock
+    /// exactly, the fast side's lead included. Stage 2 (re-sow on maturity) drops it.
     ///
     /// ⚠ **The time base** (§23i, §24c). `n` is the SLOW step count on both sides. The fast
     /// minutes after plant step `k` run with `n = k + 1`, so the chamber's setpoint changes in
     /// the last 90 minutes of the day before the plants' day changes — the lead every
     /// fast-side forcing keyed on `n` has (the walls' too). Kept, not special-cased.
-    pub fn is_cold_on_step(&self, n: u64) -> bool {
-        let day = (n as f64 * self.bio_dt).floor() as usize;
-        day % self.season_days < self.cold.days
+    pub fn phase_since_sowing(&self, steps: u64) -> Phase {
+        let day = (steps as f64 * self.bio_dt).floor() as usize;
+        if day % self.season_days < self.cold.days {
+            Phase::Cold
+        } else {
+            Phase::Warm
+        }
     }
 
-    /// The chamber's setpoint (K) at step `n`: the cold program's in the cold period, else
-    /// `warm_k` (`chamber.yaml`'s setpoint).
-    pub fn chamber_setpoint_on_step(&self, n: u64, warm_k: f64) -> f64 {
-        if self.is_cold_on_step(n) {
-            self.cold.setpoint
-        } else {
-            warm_k
+    /// The program's phase on `state`: [`Self::phase_since_sowing`] of the steps since the
+    /// state's own sowing ([`crate::sowing::sown_step`], Step 3c slice 4). An error if the state
+    /// carries no sowing, or one later than its own step.
+    pub fn phase(&self, state: &State) -> Result<Phase, SimError> {
+        let sown = crate::sowing::sown_step(state)?;
+        if state.n < sown {
+            return Err(SimError::Validation(format!(
+                "the cold program's clock: step {} precedes its own sowing at step {sown}",
+                state.n
+            )));
+        }
+        Ok(self.phase_since_sowing(state.n - sown))
+    }
+
+    /// The chamber's setpoint (K) in `phase`: the cold program's, else `warm_k`
+    /// (`chamber.yaml`'s setpoint).
+    pub fn chamber_setpoint(&self, phase: Phase, warm_k: f64) -> f64 {
+        match phase {
+            Phase::Cold => self.cold.setpoint,
+            Phase::Warm => warm_k,
         }
     }
 
@@ -396,45 +420,55 @@ impl SealedStationScenario {
         photon_efficacy * self.lamp_power_w / self.bio.ground_area
     }
 
-    /// The lamp's on-window PAR (µmol m⁻² s⁻¹) at step `n`: the cold program's in the cold
-    /// period, else [`Self::full_lamp_par`].
-    pub fn lamp_par_on_step(&self, n: u64, photon_efficacy: f64) -> f64 {
-        if self.is_cold_on_step(n) {
-            self.cold.par
-        } else {
-            self.full_lamp_par(photon_efficacy)
+    /// The lamp's on-window PAR (µmol m⁻² s⁻¹) in `phase`: the cold program's, else
+    /// [`Self::full_lamp_par`].
+    pub fn lamp_par(&self, phase: Phase, photon_efficacy: f64) -> f64 {
+        match phase {
+            Phase::Cold => self.cold.par,
+            Phase::Warm => self.full_lamp_par(photon_efficacy),
         }
     }
 
-    /// The lamp's photoperiod (whole hours) at step `n`.
-    pub fn photoperiod_hours_on_step(&self, n: u64) -> u64 {
-        if self.is_cold_on_step(n) {
-            self.cold.photoperiod_hours
-        } else {
-            self.photoperiod_hours
+    /// The lamp's photoperiod (whole hours) in `phase`.
+    pub fn photoperiod_hours(&self, phase: Phase) -> u64 {
+        match phase {
+            Phase::Cold => self.cold.photoperiod_hours,
+            Phase::Warm => self.photoperiod_hours,
         }
     }
 
-    /// The lamp's on-window draw (W) at step `n`: `lamp_power_w`, or in the cold period the
+    /// The lamp's on-window draw (W) in `phase`: `lamp_power_w`, or in the cold period the
     /// draw that delivers the cold PAR, `par · ground_area / photon_efficacy`.
     ///
     /// ⚠ DESIGN (the user, 2026-10-05, §24j): the lamp is a PWM-dimmed LED, so it keeps its
     /// photon efficacy when dimmed (it runs at its rated current for a shorter share of each
     /// cycle). No source read for dimming.
-    pub fn lamp_power_on_step(&self, n: u64, photon_efficacy: f64) -> f64 {
-        if self.is_cold_on_step(n) {
-            self.cold.par * self.bio.ground_area / photon_efficacy
-        } else {
-            self.lamp_power_w
+    pub fn lamp_power(&self, phase: Phase, photon_efficacy: f64) -> f64 {
+        match phase {
+            Phase::Cold => self.cold.par * self.bio.ground_area / photon_efficacy,
+            Phase::Warm => self.lamp_power_w,
         }
     }
 
-    /// The lamp's daily-average draw (W) at step `n`: [`Self::lamp_power_on_step`] ·
-    /// photoperiod / 24 — what the fast-side `lamp_power` forcing carries.
-    pub fn lamp_average_power_on_step(&self, n: u64, photon_efficacy: f64) -> f64 {
-        self.lamp_power_on_step(n, photon_efficacy) * self.photoperiod_hours_on_step(n) as f64
-            / 24.0
+    /// The lamp's daily-average draw (W) in `phase`: [`Self::lamp_power`] · photoperiod / 24 —
+    /// what the fast-side `lamp_power` twin for that phase carries.
+    pub fn lamp_average_power(&self, phase: Phase, photon_efficacy: f64) -> f64 {
+        self.lamp_power(phase, photon_efficacy) * self.photoperiod_hours(phase) as f64 / 24.0
     }
+}
+
+/// The cold program's two phases ([`SealedStationScenario::phase`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Phase {
+    /// The cold period after a sowing (`cold_period.yaml`).
+    Cold,
+    /// The rest of the crop's life: `chamber.yaml`'s setpoint and the full lamp.
+    Warm,
+}
+
+impl Phase {
+    /// Both phases, cold first.
+    pub const BOTH: [Phase; 2] = [Phase::Cold, Phase::Warm];
 }
 
 /// `SEALED_STATION_SCENARIO`: the fully-coupled sealed station over multiple annual cycles.
@@ -460,28 +494,56 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
 mod cold_clock_tests {
     use super::*;
 
-    /// The clock's edges, by step: day 55's last plant step is still cold, day 56's first is
-    /// warm, and the next season's first step is cold again. `cold.days = 0` is never cold.
+    /// The clock's edges, in steps since the sowing: day 55's last plant step is still cold,
+    /// day 56's first is warm, and (stage 1's `mod season_days`) a season later it is cold
+    /// again. `cold.days = 0` is never cold.
     #[test]
-    fn the_cold_clock_counts_whole_days_from_each_season_start() {
+    fn the_cold_clock_counts_whole_days_from_the_sowing() {
         let s = sealed_station_scenario();
         assert_eq!(s.cold.days, 56);
         let per_day = s.bio_steps_per_day;
         let season = s.season_days as u64 * per_day;
-        assert!(s.is_cold_on_step(0));
-        assert!(s.is_cold_on_step(56 * per_day - 1));
-        assert!(!s.is_cold_on_step(56 * per_day));
-        assert!(!s.is_cold_on_step(season - 1));
-        assert!(s.is_cold_on_step(season));
-        assert!(s.is_cold_on_step(3 * season + 56 * per_day - 1));
-        assert!(!s.is_cold_on_step(3 * season + 56 * per_day));
-        assert_eq!(s.chamber_setpoint_on_step(0, 295.15), 277.15);
-        assert_eq!(s.chamber_setpoint_on_step(56 * per_day, 295.15), 295.15);
+        let cold = |steps| s.phase_since_sowing(steps) == Phase::Cold;
+        assert!(cold(0));
+        assert!(cold(56 * per_day - 1));
+        assert!(!cold(56 * per_day));
+        assert!(!cold(season - 1));
+        assert!(cold(season));
+        assert!(cold(3 * season + 56 * per_day - 1));
+        assert!(!cold(3 * season + 56 * per_day));
+        assert_eq!(s.chamber_setpoint(Phase::Cold, 295.15), 277.15);
+        assert_eq!(s.chamber_setpoint(Phase::Warm, 295.15), 295.15);
         let warm = SealedStationScenario {
             cold: ColdProgram { days: 0, ..s.cold },
             ..s
         };
-        assert!((0..2 * season).step_by(7).all(|n| !warm.is_cold_on_step(n)));
+        assert!((0..2 * season)
+            .step_by(7)
+            .all(|n| warm.phase_since_sowing(n) == Phase::Warm));
+    }
+
+    /// The state's clock (slice 4): the phase is read from the steps since the state's OWN
+    /// sowing, so a crop sown on day 10 is cold through day 65 and warm from day 66 — the
+    /// calendar would have it warm from day 56. A state with no sowing, or one sown after its
+    /// own step, is refused.
+    #[test]
+    fn the_phase_is_read_from_the_states_own_sowing() {
+        use simcore::state::State;
+        use std::collections::BTreeMap;
+        let s = sealed_station_scenario();
+        let per_day = s.bio_steps_per_day;
+        let at = |n: u64, sown: Option<u64>| {
+            let aux = sown
+                .map(|v| BTreeMap::from([(crate::sowing::SOWN_STEP.to_string(), v as f64)]))
+                .unwrap_or_default();
+            State::new(n, BTreeMap::new(), 0, aux).unwrap()
+        };
+        let sown = Some(10 * per_day);
+        assert_eq!(s.phase(&at(65 * per_day + 15, sown)).unwrap(), Phase::Cold);
+        assert_eq!(s.phase(&at(66 * per_day, sown)).unwrap(), Phase::Warm);
+        assert_eq!(s.phase(&at(56 * per_day, Some(0))).unwrap(), Phase::Warm);
+        assert!(s.phase(&at(3, None)).is_err());
+        assert!(s.phase(&at(3, Some(4))).is_err());
     }
 
     /// The cold lamp (slice 3b, §24c): 100 µmol on the 1 m² plot at 2.5 µmol/J (the PWM DESIGN:
@@ -492,16 +554,16 @@ mod cold_clock_tests {
         let s = sealed_station_scenario();
         let eff = crate::params::lamp().photon_efficacy;
         assert_eq!((eff, s.bio.ground_area), (2.5, 1.0));
-        let (cold, warm) = (0, 56 * s.bio_steps_per_day);
-        assert_eq!(s.lamp_par_on_step(cold, eff), 100.0);
-        assert_eq!(s.photoperiod_hours_on_step(cold), 8);
-        assert_eq!(s.lamp_power_on_step(cold, eff), 40.0);
-        assert_eq!(s.lamp_average_power_on_step(cold, eff), 40.0 * 8.0 / 24.0);
-        assert_eq!(s.lamp_par_on_step(warm, eff), 500.0);
-        assert_eq!(s.photoperiod_hours_on_step(warm), 16);
-        assert_eq!(s.lamp_power_on_step(warm, eff), 200.0);
+        let (cold, warm) = (Phase::Cold, Phase::Warm);
+        assert_eq!(s.lamp_par(cold, eff), 100.0);
+        assert_eq!(s.photoperiod_hours(cold), 8);
+        assert_eq!(s.lamp_power(cold, eff), 40.0);
+        assert_eq!(s.lamp_average_power(cold, eff), 40.0 * 8.0 / 24.0);
+        assert_eq!(s.lamp_par(warm, eff), 500.0);
+        assert_eq!(s.photoperiod_hours(warm), 16);
+        assert_eq!(s.lamp_power(warm, eff), 200.0);
         assert_eq!(
-            s.lamp_average_power_on_step(warm, eff),
+            s.lamp_average_power(warm, eff),
             crate::sealed::full_lamp_average_power(&s)
         );
     }

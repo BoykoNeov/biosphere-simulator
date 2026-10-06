@@ -38,6 +38,7 @@ pub mod scenario;
 pub mod science_gates;
 pub mod sealed;
 pub mod session;
+pub mod sowing;
 pub mod stocks;
 pub mod system;
 pub mod ulp_probe;

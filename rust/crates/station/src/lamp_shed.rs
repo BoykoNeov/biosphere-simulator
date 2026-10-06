@@ -78,6 +78,7 @@ use crate::chamber::CHAMBER_HEATER;
 use crate::driver::{day_groups, DAYS_PER_MASTER_DAY, SECONDS_PER_DAY};
 use crate::flows::{LAMP, LAMP_POWER_VAR};
 use crate::scenario::SealedStationScenario;
+use crate::sowing::program_value;
 
 /// The loads switched off below the reserve: the lamp and the plant chamber's heater.
 pub const INTERRUPTIBLE_LOADS: [&str; 2] = [LAMP, CHAMBER_HEATER];
@@ -187,6 +188,11 @@ fn delivery(state: &State) -> Result<f64, SimError> {
 /// An environment whose `par` and `net_radiation` are the inner values times the lamp's
 /// delivered share: both are the lamp's (§21 of the room-temperature plan), so a shed lamp
 /// darkens the crop's water loss as well as its photosynthesis.
+///
+/// ⚠ **Their phase twins too** (slice 4, [`crate::sowing`]). A sealed build is on the sowing
+/// clock before this rewiring, so the clock sits INSIDE this wrapper and asks it for
+/// `par@cold` / `par@warm`, never `par`. Scaling only the plain names would leave the shed lamp
+/// lighting the crop at full strength.
 struct LampLitEnv<'a> {
     inner: &'a dyn Environment,
     delivered: f64,
@@ -195,7 +201,8 @@ struct LampLitEnv<'a> {
 impl Environment for LampLitEnv<'_> {
     fn get(&self, var: &str) -> Result<f64, SimError> {
         let value = self.inner.get(var)?;
-        if var == PAR_VAR || var == RN_VAR {
+        let light = crate::sowing::untwin(var);
+        if light == PAR_VAR || light == RN_VAR {
             Ok(value * self.delivered)
         } else {
             Ok(value)
@@ -364,14 +371,9 @@ pub fn run_shedding(
         ));
     }
     let groups = day_groups(steps_per_day, scenario.bio_steps_per_day)?;
-    let lamp_power = fast_resolver
-        .forcings()
-        .get(LAMP_POWER_VAR)
-        .ok_or_else(|| {
-            SimError::Reference(format!("the fast resolver carries no {LAMP_POWER_VAR:?}"))
-        })?;
     // The nominal is the lamp PROGRAM's draw on the same step `drawn` reads (§24i): the cold
-    // phase's dimmed lamp is not a 90 % failure of the full one.
+    // phase's dimmed lamp is not a 90 % failure of the full one. Both read the program's phase
+    // from the state's sowing (slice 4), as the wrapped `Lamp` flow does.
     let efficacy = crate::params::lamp().photon_efficacy;
 
     let mut state = initial;
@@ -396,9 +398,15 @@ pub fn run_shedding(
                 state = report.state;
                 assert_conserved_default(&before, &state)?;
                 if lit {
-                    drawn += lamp_power(before.n, fast_dt);
+                    drawn += program_value(
+                        fast_resolver,
+                        LAMP_POWER_VAR,
+                        &before,
+                        scenario,
+                        fast_dt,
+                    )?;
                 }
-                nominal += scenario.lamp_average_power_on_step(before.n, efficacy);
+                nominal += scenario.lamp_average_power(scenario.phase(&before)?, efficacy);
                 rationed += report.rationed;
                 events.extend(report.events);
             }
@@ -432,13 +440,10 @@ pub fn with_lamp_power_cut(
     end: u64,
 ) -> Result<SourceResolver, SimError> {
     let (mut forcings, shared) = fast_resolver.into_parts();
-    let base = forcings.remove(LAMP_POWER_VAR).ok_or_else(|| {
-        SimError::Reference(format!("the fast resolver carries no {LAMP_POWER_VAR:?}"))
+    // Both phase twins (slice 4): the cut reaches the cold period's dimmed lamp too.
+    crate::sowing::map_program_or_plain(&mut forcings, LAMP_POWER_VAR, |base| {
+        domains::biosphere::perturbations::window_override(base, start, end, 0.0)
     })?;
-    forcings.insert(
-        LAMP_POWER_VAR.to_string(),
-        domains::biosphere::perturbations::window_override(base, start, end, 0.0),
-    );
     SourceResolver::new(forcings, shared)
 }
 

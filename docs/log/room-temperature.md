@@ -247,3 +247,18 @@ figures recorded).
 ⚠ **Forward pointer (2026-10-06):** the cold-week seedling loss recorded under slice 3b above was
 the biosphere's flat tissue shedding, not the dim light. Since the leaf-shedding unfreeze the
 seedling ends the cold weeks at 0.146 mol C (`docs/log/leaf-shedding.md`).
+
+**Slice 4, stage 1 — BUILT 2026-10-06 (a station unfreeze, plumbing only)** (plan §25). Re-sowing
+when the crop matures means the chamber's cold weeks must count from each sowing, not from a
+fixed calendar. Stage 1 moves that clock into the simulation's state — the step the standing crop
+was sown on — while the re-sow itself stays on the calendar, so nothing can move but the record of
+the clock: the sealed station's saved result gained exactly the one predicted line, every amount
+bit-identical. The engine's core was not touched (both freeze rules forbid it): each of the five
+lamp-and-chamber inputs the cold program drives is carried twice, a cold copy and a warm copy,
+and a wrapper around every plant and station process picks one by the crop's own sowing. Because
+the calendar and the new clock agree on every step of every saved run, matching them proves
+nothing about the readers; a crop sown on day 10 does — its cold weeks moved 10 days on both
+sides, in a test. Found by the wrapper's own refusal: the weather file's outdoor light, net
+radiation and day length had been sitting under the plain names, overwritten until now; with the
+two copies they would have been read silently by anything outside the wrapper. They are removed.
+Every prediction held. Stage 2 — the re-sow fires on maturity — is next.

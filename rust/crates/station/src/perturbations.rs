@@ -80,19 +80,18 @@ pub fn window_scale(base: Schedule, start: u64, end: u64, factor: f64) -> Schedu
 /// Rust idiom for Python's `with_forcing(resolver, var, transform(resolver.forcings[var]))`
 /// (which cannot be expressed directly here, as a `Schedule` is non-`Clone`). Consumes the
 /// resolver, removes the owned base schedule for `var`, applies `f`, reinserts, rebuilds.
-/// Errors if `var` is absent (the perturbation target must exist in the resolver).
+/// Errors if `var` is absent (the perturbation target must exist in the resolver). A sealed
+/// build's cold-program variable is carried as two phase twins; `f` is applied to each
+/// ([`crate::sowing::map_program_or_plain`]).
 fn map_forcing(
     resolver: SourceResolver,
     var: &str,
-    f: impl FnOnce(Schedule) -> Schedule,
+    f: impl Fn(Schedule) -> Schedule,
 ) -> Result<SourceResolver, SimError> {
     let (mut forcings, shared) = resolver.into_parts();
-    let base = forcings.remove(var).ok_or_else(|| {
-        SimError::Reference(format!(
-            "perturbation target forcing var {var:?} is absent from the resolver"
-        ))
-    })?;
-    forcings.insert(var.to_string(), f(base));
+    // A cold-program variable of a sealed build is carried as its two phase twins (slice 4):
+    // both are changed, so the perturbation reaches the cold period too.
+    crate::sowing::map_program_or_plain(&mut forcings, var, f)?;
     SourceResolver::new(forcings, shared)
 }
 

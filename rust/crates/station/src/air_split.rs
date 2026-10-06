@@ -427,8 +427,7 @@ pub fn build_split_station(
         GasExchangeStep::PlantStep => (bio_reg, fast_reg),
         GasExchangeStep::Minute => water_on_fast_step(&state.stocks, bio_reg, fast_reg, &shared)?,
     };
-    let bio_reg =
-        crate::chamber::plants_read_chamber(bio_reg, &state.stocks, &crate::params::chamber())?;
+    let (bio_reg, fast_reg) = crate::sealed::wrap_last(bio_reg, fast_reg, &state.stocks, &resized)?;
     Ok((state, bio_reg, fast_reg))
 }
 

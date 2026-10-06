@@ -2669,3 +2669,43 @@ Three options were weighed:
 * The lab shedding driver's "inside one season" guard becomes "inside one crop" (it runs no
   hook) — re-decided in stage 2.
 * The golden moves; its numbers are predicted from a lab run of stage 2 before the regeneration.
+
+### 25e. Stage 1 BUILT (2026-10-06, a station unfreeze) — the predictions graded
+
+| # | Prediction | Measured | Grade |
+|---|---|---|---|
+| P1 | one new aux key in `sealed_station_state.json`, `0x1.c980000000000p+13`, every other byte identical | `regen_goldens`: 19 of 20 identical, `sealed_station` CHANGED; the diff is exactly one added line, `"station.sown_step": "0x1.c980000000000p+13"` | HELD |
+| P2 | manifest: only that golden's hash | `dump_station_inventory --write-manifest`: one line, `sealed_station`'s `golden_sha256`; `simcore/` and `domains/` untouched (`git status`) | HELD |
+| P3 | sown on day 10 → every program variable's cold window shifts 10 days, both sides | `tests/sowing_clock.rs`: all five, through the wrapper, on days 60 / 65 / 66 of a day-10 sowing (cold / cold / warm; each pair of twins differs, asserted), and day 60 of a day-0 sowing warm; on the REAL build the window recorder records the cold `par` and the lamp draws the cold power from the battery | HELD |
+| P4 | a plain program forcing beside the clock refused; a registry off the clock fails at its first read | both, `tests/sowing_clock.rs` (Validation "silently overridden"; an unknown program variable) | HELD |
+| P5 | perturbation tests green; a warm-twin-only mutation reddens ≥ 1 | green; the mutation (map `@warm`, leave `@cold`) reddened **3**: `a_lighting_failure_darkens_the_crops_net_radiation_too`, `cutting_only_the_lamps_power_darkens_the_lab_crop`, `lighting_failure_stalls_growth_and_spares_battery`. Restored | HELD |
+| P6 | session save/load and parity unchanged | green, unedited | HELD |
+| P7 | full suite and clippy green with the n-only API deleted | `cargo test --workspace`: 1333 passed, 0 failed (6 ignored, run separately); `clippy --all-targets -D warnings` clean | HELD |
+
+**Found by the guard, not predicted.** The first suite run had 24 reds, every one the clock's
+refusal of a plain `net_radiation` / `daylength_s` (value 67.29, 40541.1): the sealed plant
+resolver starts from `weather_forcings`, which carries the weather's own `par`, `net_radiation` and
+`daylength`, and slices 3b/§21 had replaced them by **overwriting** the plain names. With twins
+the weather's values stayed behind under the plain names, where an unwrapped reader would have
+read the WEATHER silently. The resolver now removes all three, as it already removed `temp`.
+This is the guard doing the one thing it exists for.
+
+**The former calendar readers, re-pointed** (the compiler's list, once the n-only API was
+deleted): the lab shedding driver's lamp draw and nominal (`lamp_shed.rs`, now
+`sowing::program_value` and `scenario.phase`); `tests/lamp_net_radiation.rs`. And the readers
+the compiler could NOT list — direct reads of a plain program variable from a sealed resolver,
+which fail at run time — found by running: `tests/gas_exchange.rs` (three tests),
+`tests/minute_transpiration.rs` (one). The hand-assembled builds (`air_split`, the
+`shedding_station` example, the gas-exchange tests' minute build) now call
+`sealed::wrap_last`, which applies the chamber wrapper and the clock together, so neither can be
+applied without the other.
+
+**The wrapper order, as built.** The lab lamp shed rewires a build that is already on the clock,
+so its `LampLitEnv` sits OUTSIDE the clock, not inside as §25c planned, and is asked for the
+twins; it now dims `par@cold`/`par@warm` (`sowing::untwin`). Tested
+(`the_shed_lamp_dims_the_twin_the_clock_selects`: half delivery records half the cold `par`).
+
+**Stale, left:** `cold_period.yaml`'s header still names `is_cold_on_step` and "slice 4 must move
+this clock into the state". A comment edit in a param file moves its manifest digest (an
+unfreeze of its own); corrected the next time that file's entry moves for a real reason, the
+`senescence.yaml` precedent.

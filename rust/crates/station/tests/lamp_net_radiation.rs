@@ -13,8 +13,9 @@ use simcore::state::State;
 use station::greenhouse::greenhouse_bio_resolver;
 use station::lighting::{lamp_par, lighting_bio_resolver};
 use station::perturbations::with_lighting_failure;
-use station::scenario::{greenhouse_scenario, lighting_scenario, sealed_station_scenario};
+use station::scenario::{greenhouse_scenario, lighting_scenario, sealed_station_scenario, Phase};
 use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
+use station::sowing::program_value;
 
 const STEPS: u64 = domains::biosphere::STEPS_PER_DAY as u64;
 /// The plant window at midday of `day` (lit) and the one at midnight (dark).
@@ -52,6 +53,13 @@ fn rn(r: &SourceResolver, n: u64) -> f64 {
     r.bind(&state_at(n), dt).get(RN_VAR).unwrap()
 }
 
+/// A sealed resolver's net radiation on step `n`, read as the sowing clock reads it: the twin
+/// of the phase of a crop sown at step 0 (slice 4 — the plain name is in no sealed resolver).
+fn sealed_rn(r: &SourceResolver, n: u64) -> f64 {
+    let dt = 1.0 / STEPS as f64;
+    program_value(r, RN_VAR, &state_at(n), &sealed_station_scenario(), dt).unwrap()
+}
+
 fn close(a: f64, b: f64) -> bool {
     (a - b).abs() <= 1e-12 * b.abs()
 }
@@ -65,12 +73,13 @@ fn the_sealed_crops_net_radiation_is_the_lamps_lit_and_zero_dark() {
     let mut differs = 0;
     // Days 0 and 40 are in the cold period (the dimmed lamp, an 8 h day still lit at midday);
     // 150 and 250 under the full lamp. Both phases asserted.
-    assert!(scn.is_cold_on_step(midday(40)) && !scn.is_cold_on_step(midday(150)));
+    assert_eq!(scn.phase(&state_at(midday(40))).unwrap(), Phase::Cold);
+    assert_eq!(scn.phase(&state_at(midday(150))).unwrap(), Phase::Warm);
     for (day, lamp_rn) in [(0, DIM_RN), (40, DIM_RN), (150, LAMP_RN), (250, LAMP_RN)] {
-        let lit = rn(&r, midday(day));
+        let lit = sealed_rn(&r, midday(day));
         assert!(close(lit, lamp_rn), "day {day}: lit {lit}, lamp {lamp_rn}");
         assert_eq!(
-            rn(&r, midnight(day)),
+            sealed_rn(&r, midnight(day)),
             0.0,
             "day {day}: the dark window is lit"
         );
@@ -116,10 +125,10 @@ fn a_lighting_failure_darkens_the_crops_net_radiation_too() {
     let bio = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
     let fast = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
     let (bio, _) = with_lighting_failure(bio, fast, 2 * STEPS, 5 * STEPS).unwrap();
-    assert_eq!(rn(&bio, midday(3)), 0.0, "the failed lamp still radiates");
+    assert_eq!(sealed_rn(&bio, midday(3)), 0.0, "the failed lamp still radiates");
     // Day 6 is in the cold period: the lamp comes back DIMMED (slice 3b).
     assert!(
-        close(rn(&bio, midday(6)), DIM_RN),
+        close(sealed_rn(&bio, midday(6)), DIM_RN),
         "the lamp did not come back"
     );
 }

@@ -66,7 +66,8 @@ pub const CHAMBER_SURROUNDINGS: &str = "boundary.chamber_surroundings";
 /// file's daily value, the same one the plants read.
 pub const OUTDOOR_TEMP_VAR: &str = "chamber_outdoor_temp";
 /// Fast forcing var: the chamber's setpoint (K) — the cold program's or the warm one
-/// (`SealedStationScenario::chamber_setpoint_on_step`). The cooler and the heater read it.
+/// (`SealedStationScenario::chamber_setpoint`), as the twin the sowing clock selects
+/// ([`crate::sowing`], slice 4). The cooler and the heater read it.
 pub const CHAMBER_SETPOINT_VAR: &str = "chamber_setpoint";
 /// Celsius → Kelvin.
 const ZERO_CELSIUS_K: f64 = 273.15;

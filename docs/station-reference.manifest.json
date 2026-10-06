@@ -178,7 +178,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "16883ffdcdfdea7c94e33d220add24770f81914e000a0817d2490e0be792d5cc",
+      "golden_sha256": "61793da694872ada338a2f6d9d1ba64d3770fd793a338e1ff3e35d944129198e",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

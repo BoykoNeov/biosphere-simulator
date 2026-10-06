@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use domains::biosphere::science::humidity_target_kg;
 use domains::biosphere::stocks::{RN_VAR, TEMP_VAR, WATER_VAPOR};
 use domains::params;
-use simcore::environment::{constant, Environment, SourceResolver};
+use simcore::environment::{constant, SourceResolver};
 use simcore::error::SimError;
 use simcore::flow::{Flow, FlowResult};
 use simcore::integrator::EulerIntegrator;
@@ -31,6 +31,7 @@ use station::gas_exchange::{
 use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{sealed_bio_resolver, sealed_fast_resolver};
+use station::sowing::program_value;
 
 fn split(gas_exchange: GasExchangeStep, transpiration: GasExchangeStep) -> AirSplit {
     AirSplit {
@@ -132,15 +133,15 @@ fn the_plant_step_records_the_windows_net_radiation_and_nothing_twice() {
     let mut changes = 0;
     let mut previous = None;
     for n in 0..(2 * scenario.bio_steps_per_day) {
-        let env = reference.bind(&s, scenario.bio_dt);
-        // The temperature is the chamber's since slice 3a; the light and radiation the resolver's.
+        // The temperature is the chamber's since slice 3a; the light and radiation the resolver's
+        // twins for the state's phase (slice 4: the plain names are in no sealed resolver).
         let want: Vec<(String, f64)> = [RN_VAR, TEMP_VAR, domains::biosphere::stocks::PAR_VAR]
             .iter()
             .map(|v| {
                 let value = if *v == TEMP_VAR {
                     chamber_c(&s)
                 } else {
-                    env.get(v).expect("forcing")
+                    program_value(&reference, v, &s, &scenario, scenario.bio_dt).expect("forcing")
                 };
                 (window_key(v), value)
             })

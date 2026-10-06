@@ -358,6 +358,21 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-06 — the cold program reads the crop's own sowing, slice 4 stage 1: one aux key
+  added to 1 golden (`sealed_station`); every stock bit-identical.**
+  `docs/plans/post-roadmap-room-temperature.md` §25 (design and predictions, committed before
+  code) and §25e (graded). The state carries `station.sown_step`, the slow step of the standing
+  crop's sowing — seeded by the sealed build, rewritten by the sealed re-sow hook (not by
+  `annual_reset`, which the biosphere's own runs share). The five variables the cold program
+  drives (`par`, `net_radiation`, `daylength_s`; `lamp_power`, `chamber_setpoint`) are carried in
+  the sealed resolvers as two phase twins (`v@cold`, `v@warm`) and selected by a wrapper on every
+  flow and aux process (`station::sowing`; type names, ids and priorities kept, so **no flow-set
+  change**); the plain names are in no sealed resolver, and the wrapper refuses one beside its
+  twins. The re-sow stays on the calendar here, so the clock keeps `mod season_days` and agrees
+  with the calendar on every step: the golden gains exactly the one line
+  `"station.sown_step": "0x1.c980000000000p+13"` (day 915), as predicted, and the manifest moves by
+  that golden's hash alone. `simcore/` and `domains/` untouched. Stage 2 (re-sow on maturity) is
+  the switch.
 - **2026-10-06 — the biosphere's tissue shedding, delegated: 3 station goldens move
   (`sealed_station`, `greenhouse`, `lighting`); `harvest` byte-identical (its crop starts past
   anthesis).** No station code or param changed; the biosphere's `Senescence` / `NitrogenSenescence`

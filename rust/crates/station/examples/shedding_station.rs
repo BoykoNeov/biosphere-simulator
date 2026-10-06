@@ -16,11 +16,11 @@ use domains::lab::shedding::{
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
-use station::chamber::{plants_read_chamber, ChamberSurroundings};
+use station::chamber::ChamberSurroundings;
 use station::gas_exchange::GasExchangeStep;
 use station::scenario::sealed_station_scenario;
 use station::sealed::{
-    build_sealed_station_unread, run_sealed, sealed_bio_resolver, sealed_fast_resolver,
+    build_sealed_station_unread, run_sealed, sealed_bio_resolver, sealed_fast_resolver, wrap_last,
 };
 
 fn run(form: Option<SheddingForm>) -> (Vec<State>, u64, usize) {
@@ -66,7 +66,7 @@ fn run(form: Option<SheddingForm>) -> (Vec<State>, u64, usize) {
             Registry::new(flows, &state.stocks, aux).unwrap()
         }
     };
-    let bio_reg = plants_read_chamber(bio_reg, &state.stocks, &station::params::chamber()).unwrap();
+    let (bio_reg, fast_reg) = wrap_last(bio_reg, fast_reg, &state.stocks, &scenario).unwrap();
     let bio = sealed_bio_resolver(&lamp, &scenario).unwrap();
     let fast = sealed_fast_resolver(&charge, &scenario).unwrap();
     let (states, rationed, events) = run_sealed(

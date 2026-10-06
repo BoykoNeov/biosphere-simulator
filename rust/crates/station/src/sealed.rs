@@ -14,7 +14,8 @@
 //! **Since slice 3a (2026-10-05) the plants read the chamber**: every plant-step flow and aux
 //! process is wrapped ([`crate::chamber::plants_read_chamber`], type names kept) so `temp` is
 //! the chamber's, the plant resolver carries no temperature, and the chamber runs the cold
-//! program (`cold_period.yaml`; [`SealedStationScenario::is_cold_on_step`]).
+//! program (`cold_period.yaml`) from each sowing — the state's own clock since slice 4 stage 1
+//! ([`crate::sowing`]; [`SealedStationScenario::phase`]).
 
 use std::collections::BTreeMap;
 
@@ -65,7 +66,8 @@ use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
 };
 use crate::lighting::{lamp_light_path, lamp_net_radiation_path};
-use crate::scenario::SealedStationScenario;
+use crate::scenario::{Phase, SealedStationScenario};
+use crate::sowing::{insert_twins, on_sowing_clock, sow_now, PLANT_PROGRAM_VARS, SOWN_STEP};
 use crate::stocks::{
     cabin_h2o_stock, co2_composition, food_store_stock, gas_boundary, o2_composition,
     water_store_stock,
@@ -80,7 +82,7 @@ fn mean_solar_power(scenario: &SealedStationScenario) -> f64 {
 
 /// The FULL lamp's daily-average draw (W): `lamp_power_w · photoperiod / 24` — the warm phase's.
 /// ⚠ Not the lamp's draw on a given step since slice 3b (the cold phase dims it):
-/// [`SealedStationScenario::lamp_average_power_on_step`] is that. Renamed from
+/// [`SealedStationScenario::lamp_average_power`] in the step's phase is that. Renamed from
 /// `lighting_average_power` so every reader re-decided which one it meant.
 pub(crate) fn full_lamp_average_power(scenario: &SealedStationScenario) -> f64 {
     scenario.lamp_power_w * scenario.photoperiod_hours as f64 / 24.0
@@ -117,7 +119,7 @@ pub fn sealed_node_heat(
 /// waste heat alone). The warm phase's; the node's start ([`sealed_node_heat`]) reads it.
 ///
 /// ⚠ Since slice 3b the cold phase's dimmed lamp sends less
-/// ([`SealedStationScenario::lamp_average_power_on_step`]). Renamed from `chamber_heat_input_w`
+/// ([`SealedStationScenario::lamp_average_power`]). Renamed from `chamber_heat_input_w`
 /// so every reader re-decided: the chamber's START reads the program at step 0, not this.
 pub fn full_lamp_heat_input_w(scenario: &SealedStationScenario) -> f64 {
     full_lamp_average_power(scenario)
@@ -222,14 +224,30 @@ pub fn build_sealed_station_in(
         gas,
         surroundings,
     )?;
-    let bio_reg = plants_read_chamber(bio_reg, &state.stocks, &crate::params::chamber())?;
+    let (bio_reg, fast_reg) = wrap_last(bio_reg, fast_reg, &state.stocks, scenario)?;
     Ok((state, bio_reg, fast_reg))
 }
 
-/// [`build_sealed_station_in`] **without** the plants reading the chamber: for a build that
-/// moves plant flows onto the fast step itself (the lab's separate air, [`crate::air_split`])
-/// and must wrap after its own moves. ⚠ A run of this build's plant registry as it stands
-/// errors at the first `temp` read: the plant resolver carries no temperature.
+/// The two wrappers every sealed build applies **last**, after any move of plant flows onto
+/// the fast step: the plants read the chamber ([`plants_read_chamber`], slice 3a) and both
+/// registries read the cold program from the state's sowing ([`on_sowing_clock`], slice 4).
+/// One function, so a build that assembles its own registries cannot apply one and not the
+/// other.
+pub fn wrap_last(
+    bio_reg: Registry,
+    fast_reg: Registry,
+    stocks: &BTreeMap<String, Stock>,
+    scenario: &SealedStationScenario,
+) -> Result<(Registry, Registry), SimError> {
+    let bio_reg = plants_read_chamber(bio_reg, stocks, &crate::params::chamber())?;
+    on_sowing_clock(bio_reg, fast_reg, stocks, scenario)
+}
+
+/// [`build_sealed_station_in`] **without** the plants reading the chamber or the sowing clock:
+/// for a build that moves plant flows onto the fast step itself (the lab's separate air,
+/// [`crate::air_split`]) and must wrap after its own moves. ⚠ A run of this build's registries
+/// as they stand errors at the first `temp` read (the plant resolver carries no temperature)
+/// and at the first read of a cold-program variable (the resolvers carry only its twins).
 #[allow(clippy::too_many_arguments)]
 pub fn build_sealed_station_unread(
     charge: &ChargeParams,
@@ -282,11 +300,13 @@ pub fn build_sealed_station_unread(
         true,
     )?);
     fast_seq.push(node_stock(node0)?);
-    // Day 0's setpoint and lamp: the cold program's in the reference (§24c, "start values").
+    // Day 0's setpoint and lamp: the program's on the sowing day (the cold phase's in the
+    // reference; §24c, "start values"). The crop is sown at step 0 (`SOWN_STEP` below).
+    let sowing_phase = scenario.phase_since_sowing(0);
     fast_seq.push(chamber_stock(chamber_heat0(
         &chamber,
-        scenario.chamber_setpoint_on_step(0, chamber.warm_setpoint),
-        scenario.lamp_average_power_on_step(0, lamp.photon_efficacy),
+        scenario.chamber_setpoint(sowing_phase, chamber.warm_setpoint),
+        scenario.lamp_average_power(sowing_phase, lamp.photon_efficacy),
     ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
     if matches!(
@@ -331,6 +351,9 @@ pub fn build_sealed_station_unread(
             // Invisible while the depth gate was inert; fatal once stress divides by
             // `TTSW = depth * EXTR * rho * A`.
             (ROOTED_DEPTH.to_string(), scenario.bio.rooted_depth0),
+            // The cold program's clock (slice 4): the crop is sown now. Seeded here, not
+            // defaulted at the reader — the omission `vernalization_days` still has (§10).
+            (SOWN_STEP.to_string(), 0.0),
         ]),
     )?;
 
@@ -516,8 +539,10 @@ fn assert_flow_ids_disjoint(bio_reg: &Registry, fast_reg: &Registry) -> Result<(
 /// The biosphere forcing: weather-driven, with `PAR`, net radiation (since 2026-10-05; the
 /// weather's outdoor value before) and `daylength` from the lamp — which follows the cold
 /// program since slice 3b: dimmed to `cold.par` on a `cold.photoperiod_hours` day in the cold
-/// period ([`SealedStationScenario::is_cold_on_step`]). The `weather` is tiled over
-/// `scenario.years` seasons (so `_table` never end-clamps).
+/// period. Since slice 4 each of the three is carried as its two phase twins
+/// ([`crate::sowing::twin`]), which the plant registry's sowing clock selects between; the
+/// plain names are absent. The `weather` is tiled over `scenario.years` seasons (so `_table`
+/// never end-clamps).
 ///
 /// **No temperature** since slice 3a: the plants read the chamber
 /// ([`crate::chamber::plants_read_chamber`]), whose guard refuses a plant-side `temp`. The walls
@@ -528,57 +553,44 @@ pub fn sealed_bio_resolver(
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = weather_forcings(&scenario.bio, scenario.years)?;
     forcings.remove(TEMP_VAR);
+    // The lamp's light, net radiation and day replace the weather's (slice 3b; §21). Since
+    // slice 4 they are carried as twins, so the weather's plain values must go too — the
+    // sowing clock refuses a plain name beside its twins (which is how this was found).
+    for var in PLANT_PROGRAM_VARS {
+        forcings.remove(var);
+    }
     // The lamp follows the cold program (slice 3b): dimmed, on a short day, in the cold period.
     let (warm, cold) = (scenario.photoperiod_hours, scenario.cold.photoperiod_hours);
     let (warm_s, cold_s) = (warm as f64 * 3600.0, cold as f64 * 3600.0);
     let warm_par = scenario.full_lamp_par(lamp.photon_efficacy);
     let cold_par = scenario.cold.par;
-    forcings.insert(
-        PAR_VAR.to_string(),
-        on_cold_program(
-            scenario,
-            lamp_light_path(warm_par, warm_s),
-            lamp_light_path(cold_par, cold_s),
-        ),
+    insert_twins(
+        &mut forcings,
+        PAR_VAR,
+        lamp_light_path(cold_par, cold_s),
+        lamp_light_path(warm_par, warm_s),
     );
     // The crop's net radiation is the lamp's too, not the weather file's outdoor value (§21).
-    forcings.insert(
-        RN_VAR.to_string(),
-        on_cold_program(
-            scenario,
-            lamp_net_radiation_path(warm_par, warm_s),
-            lamp_net_radiation_path(cold_par, cold_s),
-        ),
+    insert_twins(
+        &mut forcings,
+        RN_VAR,
+        lamp_net_radiation_path(cold_par, cold_s),
+        lamp_net_radiation_path(warm_par, warm_s),
     );
-    forcings.insert(
-        DAYLENGTH_VAR.to_string(),
-        on_cold_program(scenario, constant(warm_s)?, constant(cold_s)?),
+    insert_twins(
+        &mut forcings,
+        DAYLENGTH_VAR,
+        constant(cold_s)?,
+        constant(warm_s)?,
     );
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }
 
-/// `cold` in the cold period, else `warm` — on the one clock
-/// ([`SealedStationScenario::is_cold_on_step`]). On the plant side `n` is the plants' own step;
-/// on the fast side it leads the plants' day by one plant step (§24c), as the setpoint does.
-fn on_cold_program(
-    scenario: &SealedStationScenario,
-    warm: simcore::environment::Schedule,
-    cold: simcore::environment::Schedule,
-) -> simcore::environment::Schedule {
-    let scenario = *scenario;
-    Box::new(move |n, dt| {
-        if scenario.is_cold_on_step(n) {
-            cold(n, dt)
-        } else {
-            warm(n, dt)
-        }
-    })
-}
-
 /// The fast-domain forcing: crew intakes + the lamp's daily-average draw on the cold program
-/// (since slice 3b; [`SealedStationScenario::lamp_average_power_on_step`]) + constant
-/// solar/load, the outdoor temperature the chamber's walls face, and the chamber's setpoint
-/// program ([`chamber_setpoint`]).
+/// (since slice 3b; [`SealedStationScenario::lamp_average_power`]) + constant solar/load, the
+/// outdoor temperature the chamber's walls face, and the chamber's setpoint program
+/// ([`chamber_setpoint_twins`]). The lamp's draw and the setpoint are carried as their phase
+/// twins (slice 4, [`crate::sowing`]); the fast registry's sowing clock selects between them.
 pub fn sealed_fast_resolver(
     charge: &ChargeParams,
     scenario: &SealedStationScenario,
@@ -596,10 +608,11 @@ pub fn sealed_fast_resolver(
     // the plant side's PAR is built from the `LampParams` its caller passes: a caller passing a
     // modified efficacy there would see cold PAR and cold draw disagree (none does).
     let efficacy = crate::params::lamp().photon_efficacy;
-    let program = *scenario;
-    forcings.insert(
-        LAMP_POWER_VAR.to_string(),
-        Box::new(move |n, _fast_dt| program.lamp_average_power_on_step(n, efficacy)),
+    insert_twins(
+        &mut forcings,
+        LAMP_POWER_VAR,
+        constant(scenario.lamp_average_power(Phase::Cold, efficacy))?,
+        constant(scenario.lamp_average_power(Phase::Warm, efficacy))?,
     );
     forcings.insert(
         SOLAR_POWER_VAR.to_string(),
@@ -610,24 +623,28 @@ pub fn sealed_fast_resolver(
         constant(balanced_load_w(charge, &scenario.power))?,
     );
     forcings.insert(OUTDOOR_TEMP_VAR.to_string(), outdoor_temperature(scenario)?);
-    forcings.insert(
-        CHAMBER_SETPOINT_VAR.to_string(),
-        chamber_setpoint(scenario, &crate::params::chamber()),
-    );
+    chamber_setpoint_twins(&mut forcings, scenario, &crate::params::chamber())?;
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }
 
-/// The chamber's setpoint (K) on the fast step: the cold program's in the cold period, else
-/// `chamber.yaml`'s warm one — [`SealedStationScenario::chamber_setpoint_on_step`], the one
-/// clock. ⚠ Keyed on `n` like [`outdoor_temperature`], so it leads the plants' day by one plant
-/// step (the setpoint changes 90 minutes before the plants' day does, §24c).
-pub fn chamber_setpoint(
+/// The chamber's setpoint (K) on the fast step, as its two phase twins: the cold program's and
+/// `chamber.yaml`'s warm one ([`SealedStationScenario::chamber_setpoint`]). The fast registry's
+/// sowing clock selects between them by the fast state's `n` — which leads the plants' day by
+/// one plant step, like [`outdoor_temperature`] (the setpoint changes 90 minutes before the
+/// plants' day does, §24c).
+pub fn chamber_setpoint_twins(
+    forcings: &mut std::collections::HashMap<String, simcore::environment::Schedule>,
     scenario: &SealedStationScenario,
     chamber: &ChamberParams,
-) -> simcore::environment::Schedule {
-    let scenario = *scenario;
+) -> Result<(), SimError> {
     let warm = chamber.warm_setpoint;
-    Box::new(move |n, _fast_dt| scenario.chamber_setpoint_on_step(n, warm))
+    insert_twins(
+        forcings,
+        CHAMBER_SETPOINT_VAR,
+        constant(scenario.chamber_setpoint(Phase::Cold, warm))?,
+        constant(scenario.chamber_setpoint(Phase::Warm, warm))?,
+    );
+    Ok(())
 }
 
 /// The outdoor temperature (°C) the chamber's walls face on the fast step: the weather file's
@@ -656,7 +673,9 @@ pub fn outdoor_temperature(
 /// The sealed station's annual re-sow hook, **owned** (boxed) so a caller-driven
 /// [`crate::session::SimSession`] can hold it. `annual_reset` fires on each season
 /// boundary; `run_sealed` and the two-rate session build it via this same function so both
-/// step the identical re-sow logic (the Phase-8 parity discipline).
+/// step the identical re-sow logic (the Phase-8 parity discipline). The re-sown state's
+/// sowing clock is set to its own step ([`crate::sowing::sow_now`]) — here, not in
+/// `annual_reset`, which also re-sows the biosphere's own runs (slice 4, §25a).
 ///
 /// ⚠ The period is in **steps**, not days — `n` is the slow domain's step count. Mirrors
 /// the Python `season_steps = steps_for(scenario.season_days)`.
@@ -666,7 +685,7 @@ pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
     Box::new(
         move |n: u64, current: &State| -> Result<Option<State>, SimError> {
             if n > 0 && n.is_multiple_of(season_steps) {
-                Ok(Some(annual_reset(current, &bio)?))
+                Ok(Some(sow_now(annual_reset(current, &bio)?)?))
             } else {
                 Ok(None)
             }
