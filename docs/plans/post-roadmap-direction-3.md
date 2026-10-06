@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `leaf-shedding.md`
+**Re-read against the record's last row:** `real-world-checks.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -88,7 +88,10 @@ recommendation to refuse was built on that sentence and is withdrawn with it.
   clean — at **a third of their CO₂ floor margin**. The **jar breaks under both integrators**
   (5 Euler rationing firings; an RK4 raise at day 193): August's *"the RK4 blocker clears at
   `dt = ¼`"* does not hold on today's tree, and no cause is claimed. Drought response is
-  unmeasured (no scenario on the roster fires the leaf drought factor). **Continue, park, or
+  unmeasured (no scenario on the roster fires the leaf drought factor). ⚠ *2026-10-06
+  (`log/real-world-checks.md`):* a lab drought window now reaches the form's leaf factor — on one
+  pre-flowering day only, which shows the input arrives, not an effect on leaf area; the
+  measurement this bullet needs is still owed. **Continue, park, or
   refuse is the user's call again**, on these numbers.
 * ⚠ **A lab route reopened 2026-09-29 by a rule change** (`log/what-if-experiments.md`): uncited or
   tuned science is now allowed in lab experiments, tagged WHAT-IF. "No citation / no retune" no
@@ -505,6 +508,15 @@ more books on the shelf, Soltani & Sinclair Box 9.1 and Teh after Goudriaan & va
 dim cold seedling, a case off July's roster). It touches **§4's stale `shade_rate` note**: if A is
 ever adopted, `senescence.yaml`'s manifest entry moves for a real reason — the occasion that
 bullet waits for. Discharges nothing; the decision lives in the note.
+⚠ *Re-read 2026-10-06* (`log/real-world-checks.md`, the review proposal's Step 6: slice 1 BUILT
+lab-only, slice 2 SEARCHED): grepped this plan for drought, validation, scorecard, real-world and
+controller. It touches two items and discharges neither. **§2.1:** its "drought response is
+unmeasured" now has a lab drought window under it, and the leaf form's factor fires on one day —
+annotated in place, not struck. **§2.2:** Step 6 listed as a risk that a scorecard "may force" the
+controller decision. Measured: every trial found held its CO₂, and a held chamber maps onto the
+open-field build's fixed leaf-CO₂ forcing, so a scorecard does not need the controller. §2.2's
+"not yet" stands on its own reason (whether a habitat should vent carbon), now with one pressure
+on it removed. Nothing added to §3.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

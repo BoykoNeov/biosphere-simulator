@@ -390,6 +390,12 @@ open the shelf (`sources/`) before pricing any retrieval as blocked.
 
 ## Step 6 — checks against the real world
 
+**TAKEN 2026-10-06** on the user's call (*"step 6"*): `post-roadmap-real-world-checks.md`. Slice 1
+BUILT lab-only; slice 2 SEARCHED, its choice the user's. ⚠ The premise below ("no scenario on the
+roster produces drought") holds for the frozen roster only — two test-only runs already did; what
+none had was an end. And the risk below ("a trial at controlled CO₂ needs a CO₂ controller") did
+not hold: a held trial maps onto the open-field fixed-CO₂ build. The text below is left as written.
+
 ### The problem
 
 The frozen results prove that nothing changed. The plausibility bands prove that outputs are

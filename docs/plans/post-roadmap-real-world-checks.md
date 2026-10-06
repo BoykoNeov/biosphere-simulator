@@ -120,3 +120,123 @@ about 130–170 kg; late-spring demand on this weather is ~4–5.8 kg/day (the d
 * **D8 — the control** holds every factor at exactly 1 (already measured: lowest FTSW 0.9933; this
   is the test's own check, not a new prediction).
 * **D9 — nothing frozen moves:** `regen_goldens` reports 20 of 20 identical; no manifest line.
+
+## 5. Slice 1 BUILT (2026-10-06, lab-only) — the predictions graded
+
+`rust/crates/domains/tests/drought_window.rs`, six tests, green on the first run. Nothing frozen
+moved: no source file outside the new test changed.
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| D1 | below 0.40 on days 230–250; below 0.30 on days 232–255 | **day 249** and **day 254** (29 and 34 days after the cut) | HELD, both at the late edge |
+| D2 | lowest FTSW 0.10–0.29 | **0.2093** | HELD |
+| D3 | back at ≥ 0.30 by day 275; every factor exactly 1 from then to day 305 | last state below 0.30 on **day 263**, below 0.40 on **day 266**; exactly 1 from there to the end | HELD |
+| D4 | development factor peak 1.05–1.40; flowering 0–4 days early; maturity 0–8 days early | **1.1209**; flowering **day 250 = control**; maturity **day 293 = control**; end thermal time 2038.22 vs 2028.37 | HELD (both shifts at 0) |
+| D5 | grain at maturity 0.60–0.97 of the control's | 26.92 vs 27.95 mol C, **0.9631** | HELD, near the top edge |
+| D6 | 0 rationed, no events, a re-run bit-identical | as predicted (each asserted) | HELD |
+| D7 | the lab leaf form's factor below 1 on ≥ 1 pre-flowering step | **17 states**, all on day 249 | HELD, but weak (below) |
+| D8 | the control holds every factor at 1 | lowest FTSW 0.9933 | HELD |
+| D9 | 20 of 20 goldens identical | see §5a | — |
+
+**Mutations (`--no-fail-fast`), both red as designed:** M1 (the cut 0 → 8 mm/day) turned 4 of 6
+red — fires, recovers (no stressed state to recover from), hastens, the lab leaf form; M2 (the
+window to the season's end) turned exactly the recovery test red.
+
+**Finding — the root zone carries about a month of a full crop's water.** With the roots near
+their depth, a full zone loses its first 70 % in 29–34 days at the full-cover rate, so a 40-day cut
+stresses the crop only on its last 6–11 days. The window was placed to cover "the month before
+flowering"; the stress it delivered fell **at and after flowering** (days 249–266 against
+flowering on 250). That is why flowering and maturity did not move: the development factor ran
+above 1 for only ~10 days. The test's assertions do not depend on where the stress falls, so the
+window is left as built and the fact recorded.
+
+**D7 is weak, stated so.** The lab leaf form's factor sits below 1 on one day before flowering. That
+shows the drought reaches the factor's input; it does not show the form's leaf area moves because
+of it. A window starting ~30 days earlier would give the form a real pre-flowering drought; not
+done, because finding 5's mechanism stays parked.
+
+### 5a. The gates
+
+
+---
+
+## 6. Slice 2 — the comparison data: the search (2026-10-06)
+
+**The shelf first.** `sources/` holds no closed-chamber trial. The project's own record holds two
+pointers: BVAD Rev 2 Table 4-91's wheat row (nominal CO₂ uptake 77.00 g CO₂ m⁻² d⁻¹, used in
+`log/chamber-scale.md`), a *design* value and not a trial; and NASA TM 102788, named a Step 6
+target by `log/co2-uptake-source.md` and never opened.
+
+**Opened this session: NASA TM 102788** — Wheeler, R.M. & Sager, J.C. (January 1990), *Carbon
+Dioxide and Water Exchange Rates by a Wheat Crop in NASA's Biomass Production Chamber: Results
+from an 86-Day Study (January to April 1989)*, Kennedy Space Center. NTRS 19900016137 (scanned;
+every page below read off the page image). Now on the shelf:
+`sources/wheeler_sager_1990_TM102788.pdf` (the shelf is git-ignored). A US-Government work, public
+domain.
+
+| quantity | value (page) |
+|---|---|
+| chamber | 112.6 m³ incl. air handling; ~20 m² of plants (64 trays × 0.25 m² plus gaps); leak < 10 % of volume per day (p. 2), 5–10 % (p. 10) |
+| crop | *Triticum aestivum* cv **Yecora Rojo** (a spring wheat), **hydroponic** (recirculating nutrient film), ~1500 plants m⁻² (p. 4, p. 9) |
+| light | 20 h light / 4 h dark after 72 h dark at planting; 96 × 400 W HPS, dimmed as the crop grew to hold canopy-top PPF; **mean 534 µmol m⁻² s⁻¹** (± 42 between levels); 695 → 480 on day 28 (pp. 5, 11) |
+| temperature, humidity | 20 °C constant to day 34, then 20 °C light / 16 °C dark; means 20.3 / 16.8 °C; RH 81 % / 82 % (p. 5) |
+| CO₂ | **HELD at 1000 ppm** by injecting pure CO₂; means 1160 ± 238 ppm light, 1380 ± 310 dark; supply ran out briefly near days 50 and 60 (pp. 5, 11) |
+| span | planted 19 Jan 1989; water off day 84; lights off day 86 (p. 6) |
+| dark respiration | rose to ~13 µmol m⁻² s⁻¹ by ~day 20, then fell; **mean 7.2** (440 ppm per 4-h night); +65 % / +45 % for 16 → 20 °C at 5 / 10 weeks (p. 9) |
+| net photosynthesis | **peak 27 µmol m⁻² s⁻¹ at day 25**; **mean 15** over days 10–84; low before day 15 from incomplete ground cover (pp. 9–10) |
+| carbon balance | 21.6 mol CO₂ fixed per 20-h day, 2.1 respired per night: **19.5 mol CO₂ d⁻¹ net** for the stand (≈ 0.98 mol m⁻² d⁻¹, 43 g CO₂ m⁻² d⁻¹ — about 56 % of BVAD's nominal 77) (p. 10) |
+| biomass | **~40 kg total dry biomass at harvest** (≈ 2.0 kg m⁻²); the gas-exchange estimate 44 kg (p. 10) |
+| light response | stand uptake linear in PPF from 60 to 750 µmol m⁻² s⁻¹; light compensation point ~190 (p. 11) |
+| CO₂ response | drawdown rate flat from 2200 to ~800 ppm, falling below 700–800; a deliberate drawdown from 2200 ppm on day 25 (Figs. 2–3) (pp. 7–8) |
+| transpiration | condensate-measured; **peak 120 L d⁻¹ near day 25** "when ground cover was complete", then about constant to senescence; **mean ~90 L d⁻¹ = 4.5 L m⁻² d⁻¹** (pp. 12–13) |
+
+⚠ **A correction to the record.** `log/co2-uptake-source.md` called Figs. 2–3 "a measured
+whole-stand drawdown curve in the sealed 113 m³ chamber". The trial itself **held CO₂ at 1000
+ppm**; Figs. 2–3 are one deliberate drawdown made inside it on day 25. Still a usable CO₂-response
+curve — not a free-running trial.
+
+**Not opened (named, with what blocks each):**
+
+| candidate | what it is | access | why it matters |
+|---|---|---|---|
+| Bugbee & Salisbury 1988, *Plant Physiol.* 88:869–878 | wheat (hydroponic, 2000 plants m⁻²) at CO₂ **held at 1200 ppm**, PPF 400–2080, 16–20 h; harvests at 24, 45, 79 days; crop growth rate to 138 g m⁻² d⁻¹, grain 60 g m⁻² d⁻¹; harvest index 41–44 % (abstract only) | open on PMC (PMC1055676), read as abstract | the light-response row: the same crop across a 5× light range |
+| Wheeler et al. 1996 and 2008, *Adv. Space Res.* (2008: 41:706–713) | the BPC's whole programme: five wheat, three soybean, five lettuce, four **potato** crops; biomass against daily light, radiation use 0.4–0.7 g per mol photons | Elsevier; seen only through a NASA slide deck (NTRS 20150022488), so far secondary | the potato row for our second species |
+| Lunar-Mars Life Support Test Project Phase I (JSC, 1995; Edeen & Barta, JSC-33636) | one crew member 15 days in a closed chamber with 11.2 m² of wheat; CO₂ and O₂ held by changing the light and the CO₂ supply | NTRS candidates (19980233235), not opened | the only **crew + crop** row — the station's question, not the jar's |
+| Gerbaud, André & Richaud 1988, *Physiol. Plant.* 73:471–478 | a closed wheat chamber over the life cycle, 80 plants m⁻²; transpiration peak ~9, mean 5–6 L m⁻² d⁻¹ (as quoted in TM 102788 p. 13) | Wiley, not opened | a second transpiration row at a lower plant density |
+| Lunar Palace 1 (Beihang, 2014, 105 days, 3 crew) | wheat as the main O₂ source in a multi-crop closed system | papers not opened | multi-crop, crew; conditions probably held |
+
+### 6a. The two filters, applied
+
+* **CO₂ held or free-running.** Every trial found held its CO₂. That does **not** force the parked
+  chamber controller (third direction plan §2.2): the model's open-field build already reads a
+  **fixed leaf-internal CO₂ forcing** (`CI_VAR`, 250 ppm by default), and a held chamber is what that
+  forcing means. A held 1000-ppm trial maps onto that build with the forcing set from 1000 ppm,
+  not onto the sealed jar. The jar has no counterpart in the literature found so far.
+* **Crop class.** Every wheat trial grew **spring** wheat (Yecora Rojo at the BPC) **in nutrient
+  solution** under 16–20 h light. The reference crop is a **winter** wheat that needs a cold period.
+  A scorecard row therefore runs the crop with vernalization off — the same family as the
+  day-neutral crop already built (`bucket3-day-neutral-crop`), whose own lesson applies: matching
+  the *timing* with a crop from the same family is tautological, so the row reads rates and
+  amounts, not dates. Hydroponic roots never dry; an irrigated soil held at FTSW ≈ 1 (measured in
+  §2, the control's lowest 0.9933) is the closest the model has.
+* **The water row is labelled now, before any run:** the model's transpiration is the full-cover
+  rate from day 0, so it cannot show TM 102788's low early water use "before ground cover was
+  complete". Any ratio on transpiration before ~day 25 is the known leaf-area gap, not a finding.
+
+### 6b. Licensing (slice 4, as each source is listed)
+
+TM 102788: a US-Government work, public domain; its numbers are facts cited to the page. Bugbee &
+Salisbury 1988: free to read on PMC, publisher copyright; measurements cited to the paper are
+facts (`docs/reuse-and-licenses.md`); no dataset file copied. The rest: not opened, so not
+checked — each gets this check before a number from it is committed.
+
+### 6c. Decisions owed to the user
+
+1. **Which trial(s) to score first.** Recommended: TM 102788 alone first — opened, public domain,
+   conditions complete, and it reports the components (night respiration, day uptake, water,
+   biomass) the review asked for, not only yield. Then Bugbee & Salisbury 1988 for the light range.
+2. **The crop for the row.** Recommended: the frozen wheat with vernalization off (spring habit),
+   read on rates and amounts, not dates. The alternative — the winter crop given the cold period
+   first — would compare a crop the trial did not grow.
+3. **Whether to go after the unopened sources** (the BPC programme papers for potato; LMLSTP Phase
+   I for crew + crop) now, or after the first row.
