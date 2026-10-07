@@ -51,6 +51,11 @@ branch never pushed (plan §9–§10).
 * **Water only.** No carbon, nitrogen, oxygen, energy or aux value moved anywhere. Open field −4.7 %
   transpired (the irrigation the same); chambers' condensate −66 to −88 %; sealed station +9 %.
 * 8 reds: 7 goldens, bands and instrument checks; 1 unpredicted — the perennial chamber's
-  below-root store now takes ~4 cycles to settle instead of one (it converges; water is conserved).
-* **Exposed gap:** with the crop gone, a sealed chamber's air dries to ~0 vapour over wet soil — the
-  model has no bare-soil evaporation, which the constant resistance had been standing in for.
+  below-root store now converges geometrically (~0.8 per cycle) instead of settling in one cycle.
+* The sealed station moves the other way (condensate +9 %): its end crop is a closed canopy (LAI
+  ≈ 4.0), where the new form's 50 s/m is below 70. Potato: carbon identical, soil water +0.2 %.
+* **Exposed gap, measured:** in the never-re-sown 3-year sealed chamber the air sits below half the
+  frozen vapour on 48 % of steps, all with the crop dead (LAI < 0.1), and ends at ~3e-6 kg. The
+  re-sown chambers: only on day 0. The model has no bare-soil evaporation to supply that air.
+* **The mirror image, about the frozen model today:** that frozen chamber's crop is dead on 62.5 % of
+  steps, and the constant 70 s/m makes it transpire at the full rate throughout.

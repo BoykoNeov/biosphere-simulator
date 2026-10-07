@@ -356,8 +356,9 @@ throwaway probe, `W:\temp\claude\step6\price\zz_subsoil.rs`): 172.242, 172.329, 
 172.610, … 172.851 — rising by 0.087, 0.115, 0.092, 0.073 … 0.008 kg per cycle, the increment
 shrinking ~0.8× a cycle. **It converges** (to ~172.9 kg), not a ratchet: water migrates slowly from
 the condensate (3.18 → 2.44 kg) into the subsoil because the sparse crop drinks less. The frozen claim
-"one transient cycle, then a fixed point held to round-off" becomes "a transient of ~4 cycles". Water
-is conserved throughout (asserted each step).
+"one transient cycle, then a fixed point held to round-off" becomes **geometric convergence at
+~0.8 per cycle** (an e-folding of ~4 cycles; the round-off fixed point is not reached inside 15).
+Water is conserved throughout (asserted each step).
 
 ### 10c. The price table
 
@@ -370,19 +371,29 @@ is conserved throughout (asserted each step).
 | `lighting` | condensate −88 %; soil +11.5 % |
 | `greenhouse` | condensate −84 %; vapour −57 %; soil +16.2 % |
 | `harvest` | condensate −87 %; vapour −69 %; soil +3.1 % |
-| `sealed_station` | condensate +9.1 %; subsoil +9.5 %; soil −1.7 % (the tier band reports 9.46 % at its worst leaf) |
+| `sealed_station` | condensate +9.1 %; subsoil +9.5 %; soil −1.7 % (the tier band reports 9.46 % at its worst leaf) — the OPPOSITE sign: its end-state crop has leaf carbon 6.51 mol C, LAI ≈ 4.0 (SLA ≈ 0.62), a closed lamp-lit canopy where Szeicz–Long gives 50 s m⁻¹ < 70, so it drinks MORE |
 | the other ten | identical |
+| potato (no golden; one season through the lab switch, on main) | plant carbon and tubers bit-identical; end soil water 116.71 → 116.97 kg (+0.2 %) — water only; its tests stayed green on the branch |
 
 **Water only:** no carbon, nitrogen, oxygen, energy or aux value moves in any golden.
 
-**A gap this exposes — must be weighed before any adoption.** In the 3-year sealed chamber the air
-ends with **2.9e-6 kg of water vapour (against 0.25 frozen) — effectively none** over a wet soil: the crop has senesced (LAI → 0, so its
-resistance → ∞ and it transpires nothing), and the model has **no bare-soil evaporation** — the
-frozen constant resistance had been letting a dead or absent canopy keep "transpiring", standing in
-for it. An adoption without a soil-evaporation term gives sealed chambers bone-dry air whenever the
-crop is small or gone. (Teh §4.7, on the same page as Eq. 4.80, carries a soil form; FAO-56's own
-scope sentence says partial cover "should indeed include the effects of the evaporation from the soil
-surface".)
+**A gap this exposes — measured for its extent (a throwaway probe on main through the lab switch,
+`W:\temp\claude\step6\price\zz_dry_air.rs`).** In the 3-year sealed chamber the air ends with
+**2.9e-6 kg of water vapour against 0.25 frozen — effectively none** over a wet soil. Measured over the
+run: its vapour sits below half the frozen run's on **48.1 % of steps, every one of them at LAI < 0.1**
+(6 steps on day 0, then 2154 in year 2 and all 4880 of year 3 — after the crop has died; this
+scenario is never re-sown). In the two RE-SOWN chambers it happens on 6 and 13 steps, all on day 0:
+**not during seedling weeks** ("whenever the crop is small" was too broad, and is withdrawn). So: under
+Szeicz–Long, a sealed chamber's air goes dry only while there is no living canopy for long; the model
+has **no bare-soil evaporation** to supply it. (Teh §4.7, on the same page as Eq. 4.80, carries a soil
+form; FAO-56's scope sentence says partial cover "should indeed include the effects of the evaporation
+from the soil surface".)
+
+**The mirror image, a finding about the FROZEN model today.** In the frozen 3-year sealed chamber the
+crop sits at LAI < 0.1 on **62.5 % of steps** (it matures in year 1 and is never re-sown), and the
+constant 70 s m⁻¹ makes that dead crop transpire at the full rate throughout: its golden's water ring
+is driven by a canopy that is not there. (Perennial and consumer, re-sown: 8.2 % and 11.8 % of steps
+at LAI < 0.1.)
 
 **Ceremony, beyond the run (§9e):** `100` and `4.0` into `transpiration.yaml` with their sources (the
 file's digest changes → its manifest row regenerates); the uncited 70 kept for the lab form or
