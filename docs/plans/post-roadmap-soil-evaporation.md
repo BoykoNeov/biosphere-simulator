@@ -276,3 +276,34 @@ daily 251; + soil, events **243**; + soil + floor, events **237**.
 * `cargo clippy --all-targets -- -D warnings`: clean (two `is_multiple_of` rewrites, same arithmetic,
   made after the suite started).
 * `cargo test --no-fail-fast`: **1357 passed, 0 failed, 8 ignored**.
+
+## 9. The top layer overfilled under events — measured, decided, predictions (2026-10-07)
+
+**Advisor review of §8, summarized:** an event puts the whole root-zone deficit (~90 kg) into a top
+account of 19.5 kg capacity, and only the 30 %/day drainage brings it down — the book also caps the
+top layer at saturation (`WSAT1 = DEP1·SAT`, the excess running off). Check the overshoot first. The
+success readout saturates at the humidity setpoint (0.999 means "at the cap"), so add soil
+evaporation over the frozen dead crop's transpiration; strike "almost one for one" (392 against 708).
+The §8b tally is wrong: 6 held, 1 mostly, 1 failed, 2 split. The station cannot run the soil form
+until a lab re-sow hook uses `annual_reset_with`; under events its recycling becomes
+`EventRecycling`, and the lab air-split's `TriggeredWatering` does not feed the account. And the
+soil-shading LAI of a never-re-sown crop stays held at its seed-growth value (~1.0) through its dead
+years, keeping ~39 % of the light off the fallow soil — the book's hold covers one season.
+
+**Measured (a throwaway probe, `W:\temp\claude\step6\soil\zz_overshoot.rs`), top-layer capacity 19.5
+kg:** daily watering — peak 1.00× (default, sealed), 1.10× (perennial); events — **peak 4.78×**,
+31.9 days above capacity in the default season (16.4 above 2×), 36.2 in the 3-year sealed chamber,
+165.8 in the 5-year perennial. **So §8's event rows are inflated.**
+
+**DECIDED (the user): the book's limit, silt loam** (over silty clay, passing straight through, and
+labelling the rows). Soltani & Sinclair Table 13.1, silt loam: `SAT` 0.433, `DUL` 0.218, `EXTR` 0.132
+(the model's 0.13). Above capacity the top drains at the model's `drainage_factor` (the book's
+`DRAINF`, 0.3); above saturation, `DEP1·(SAT − DUL)` = 32.25 mm over capacity (**2.65×**), the account
+stops counting — that water is already in the root zone below, so no stock moves.
+
+**Predictions:**
+* T1: under events the peak fill is ≤ 2.65× capacity in every run; daily watering unchanged.
+* T2: under events, soil evaporation and the Stage I share fall below §8's (the inflated top had
+  room it no longer has); carbon still identical.
+* T3: the never-re-sown chamber's dead-phase air stays dry under events (its trigger still never fires).
+* T4: the four instrument tests stay green.
