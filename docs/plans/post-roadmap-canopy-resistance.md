@@ -247,3 +247,81 @@ steps carry **5.7 %** of the row's water and partly lit steps 11.0 %.
 So the candidate reference form is `rc = 100 / min(LAI, 2.0)` s m⁻¹. Pricing it means measuring what
 an adoption would move — every golden, every pinned test, every gate — with predictions first.
 Adoption itself is a further decision and a biosphere + station unfreeze, not taken here.
+
+---
+
+## 9. Pricing Szeicz–Long for adoption — predictions before the flip (2026-10-07)
+
+### 9a. Advisor review (2026-10-07), summarized
+
+Enumerate all 20 goldens from the report, not a word search. Check the station's heat books for
+evaporative cooling before predicting "water only". Decide potato rather than extend the user's
+wheat decision to it silently. Make exact predictions from lab twins, the leaf-shedding pattern.
+List the reds-by-design before running and classify every red after. Run the flip on a local branch
+— one loader line, `regen_goldens` in REPORT mode only, the full suite, the ignored tests — never on
+main. List the ceremony costs the run cannot show. Hand the user a price table, not a
+recommendation.
+
+### 9b. Checked before predicting
+
+* **No evaporative heat in the station:** `station/src/chamber.rs` and every `station/src/*.rs` carry
+  no latent-heat or transpiration term. Lower water use cannot warm the plant chamber, so the plants'
+  temperature (which they read since slice 3a) cannot move through this route.
+* **The station's watering trigger** refills at FAO-56's depletion fraction 0.55 (`watering-on-a-
+  trigger`), so the root zone sits near FTSW ≥ 0.45, above `wssg` 0.30: no stress route.
+* **Potato inherits the wheat transpiration params** (`params::potato()` is `..biosphere()`), so a
+  loader flip would move potato too. No golden holds potato; its tests in
+  `domains/tests/potato_crop.rs` would. **Priced as its own line; the user's decision covered wheat.**
+
+### 9c. The lab twins — exact predictions
+
+A throwaway probe (`W:\temp\claude\step6\twins\zz_twins.rs`, run once, not committed) mirrored the
+producer of every golden that holds a crop. For each, a CONTROL run with the frozen-form
+`Transpiration` swapped in reproduced the committed golden **byte for byte** (proving the mirror); then
+the same run with the Szeicz–Long flow swapped in wrote the TWIN to `W:\temp\claude\step6\twins\`.
+The station twins swap the flow by id before `wrap_last`, as `examples/shedding_station.rs` does.
+
+**What each twin moves against its committed golden** (stock ids whose amounts differ; every other
+stock and every aux value byte-identical):
+
+| golden | moves |
+|---|---|
+| `season_euler_state` | `soil_water`, `boundary.vapor_sink`, `boundary.water_source` |
+| `sealed_chamber_state` | `condensate`, `soil_water`, `water_vapor` |
+| `perennial_chamber_state`, `perennial_long_horizon_state` | `condensate`, `soil_water`, `subsoil_water` |
+| `consumer_chamber_state`, `consumer_long_horizon_state` | `condensate`, `soil_water`, `subsoil_water` |
+| `lighting_state` | `condensate`, `soil_water` |
+| `greenhouse_state`, `harvest_state` | `condensate`, `soil_water`, `water_vapor` |
+| `sealed_station_state` | `condensate`, `soil_water`, `subsoil_water` (its transpiration sits on the plant step) |
+
+**Water only, everywhere.** No carbon, nitrogen, oxygen, energy or aux value moves in any twin.
+
+**Predicted unchanged (the other ten):** `drift_summary.json` (it folds leaf-carbon trajectories only,
+and carbon does not move), `sealed_energy_drift_summary.json` (`build_station`, no crop), and the eight
+crop-free goldens (`cabin_gas`, `crew`, `eclss`, `power`, `power_self_discharge`, `thermal`,
+`water_recovery`, `station`) plus the untiered `state_snapshot.json`.
+
+### 9d. Predictions for the branch run
+
+| | prediction |
+|---|---|
+| Q1 | `regen_goldens` (report): exactly the ten goldens of §9c "would change"; each regenerated text equals its twin **byte for byte**; the other ten (and `state_snapshot.json`) identical |
+| Q2 | red by design: `canopy_resistance.rs` P1 (the loader no longer returns `Constant`); the scorecard's R1 (`biosphere_what_if` inherits the new default, `w1_by_hand` still assumes 70); `golden_regression` on the ten moved goldens; the manifest byte gates on their hashes; the deep-water rescue's grain pin in `system.rs` (lab 1.0885 against a band set at 1.22) |
+| Q3 | possibly red, classified after: any test pinning a water stock, a humidity or a transpiration total in a run with a crop (the chamber-dryness, vapour, watering, minute-step, air-split and lamp tests); `potato_crop.rs` where it pins water |
+| Q4 | green: every carbon, energy and gas test; `drought_window.rs` (its assertions do not pin days); the conservation and determinism laws |
+| Q5 | ignored tests (`--ignored --release`): `chamber_walls.rs` trajectory pins green — they read the node temperature and the battery, which do not read water |
+
+### 9e. Ceremony costs the run cannot show
+
+1. **The numbers become param data.** The reference may not hard-code coefficients, so `100` (FAO-56
+   Box 5) and `4.0` (Teh p. 98) move into `transpiration.yaml` with their sources — the file's
+   digest changes, so the biosphere manifest's `param_files` row regenerates (C7).
+2. **The uncited 70** stops being read by the reference: kept for the lab `Constant` form, or retired
+   (a schema change). The user's call.
+3. **Manifest lines:** the ten moved goldens' `golden_sha256` rows (biosphere and station manifests)
+   plus the `transpiration.yaml` row.
+4. **Prose:** each contract's dated-change entry; the station contract's own sentence *"transpiration
+   does not read the canopy"* (`docs/station-reference.md`) becomes false; the record's standing gap
+   "transpiration ignores leaf area" closes for the crop (not for bare-soil evaporation).
+5. **Potato:** adopt for both crops, or keep potato on the constant (a `transp` override in
+   `params::potato()`).
