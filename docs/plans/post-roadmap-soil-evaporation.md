@@ -428,6 +428,36 @@ the deep store still empties — 175.5 → 91.4 (re-sow 1) → 0.0 (day 400) →
 **R1 FAILED:** the over-application slows the drain, it does not stop it. Two reasons: the excess
 drains only while the zone is above its upper limit, and the crop and soil pull it back below within
 about a day, so little percolates; and at each re-sow the abandoned deep soil keeps the root zone's
-fill at harvest (~0.5 under events, ~1.0 frozen), so it returns half as much. In a rain-free chamber
-watered only around the roots, a slowly drying deep profile may be mostly real physics; the frozen
-model never shows it because its continuous top-up keeps everything full.
+fill at harvest (~0.5 under events, ~1.0 frozen), so it returns half as much. ~~In a rain-free chamber watered only around the roots, a slowly drying deep profile may be mostly
+real physics~~ (withdrawn, §10d: deep drying is plausible, but WHERE the roots stop is the single
+deep store credited at full capacity — `0.233 + 91.36 / 130 = 0.936 m`, exactly the stopping depth).
+
+### 10d. Advisor review, the book's rule, and same-day percolation (2026-10-07)
+
+**Advisor review, summarized:** the stopping depth is not dry soil — `rooted depth at re-sow + deep
+store / (EXTR · 1000)` predicts it exactly — so it is the model's ONE undifferentiated deep store,
+credited at full capacity per metre of new root, not physics; check the book before saying more. The
+watering mapping recharged less than its sources assume: both FAO sources take the loss the SAME
+day, so route `gross − net` straight below the roots (a correction of the mapping, not a new user
+decision). ⚠ **Stale, labelled:** the six twins in `W:\temp\claude\step6\reprice\twins\` and the
+event rows of §8a / §9a were produced before the efficiency change (`bc0bed8`); they predict nothing
+now and are regenerated once the watering settles. And the price has grown: three forms became five
+lab changes.
+
+**The book, read:** Soltani & Sinclair Eqn 14.12 and p. 175: `EWAT = min(GRTD · EXTR, WSTORG)` — new
+root depth is credited at FULL capacity, capped by the single deep store `WSTORG`; `WSTORG = WSTORG +
+DRAIN − EWAT`. The model follows the book exactly. The book models ONE season; carried across
+re-sowings, its single deep store with full-capacity credit is what stops the roots early. A
+limitation of the book's single-season soil model applied over many seasons — not established physics.
+
+**Same-day percolation, built** (`EventIrrigation` / `EventRecycling` now put `net` into the root zone
+and `gross − net` into the deep store in the event step). The root trace, perennial chamber:
+
+| day | 0 | 120 | 300 | 310 (re-sown) | 400 | 615 | 920 | 1225 | 1500 |
+|---|---|---|---|---|---|---|---|---|---|
+| depth (m) | 0.15 | 1.30 | 1.30 | 0.23 | **1.18** | 0.23 | 0.23 | 0.23 | **1.15** |
+| water below the roots (kg) | 175.5 | 26.0 | 64.0 | **142.1** | 18.5 | 113.0 | 78.3 | 100.0 | 6.2 |
+| frozen, the same | 175.5 / 1.30 … | | | 158.5 | 1.18 / 39.4 | 158.5 | 158.5 | 158.5 | 1.30 / 24.2 |
+
+**R1 mostly held now:** the deep store holds near the frozen run's (season 2's roots reach 1.18 m,
+as frozen), with a slower residual decline (1.15 m against 1.30 after five seasons).

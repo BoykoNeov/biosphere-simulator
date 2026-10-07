@@ -1225,9 +1225,12 @@ fn root_zone(snapshot: &State, soil_water: &str, rooted_aux: &str, extr: f64, ar
 pub struct EventIrrigation {
     pub inner: Irrigation,
     pub trigger_ftsw: f64,
-    /// The field application efficiency `ea`: an event applies `deficit / ea`, and the model's
-    /// `Drainage` carries the excess below the roots (FAO Manual 4, `d_gross = d_net · 100 / ea`).
+    /// The field application efficiency `ea`: an event draws `deficit / ea` (FAO Manual 4,
+    /// `d_gross = d_net · 100 / ea`); the deficit fills the root zone and the rest percolates.
     pub application_efficiency: f64,
+    /// Where the loss goes the same day: the store below the roots (FAO-56: water above field
+    /// capacity is *"lost the same day by deep percolation"*).
+    pub subsoil_water: String,
 }
 
 impl Flow for EventIrrigation {
@@ -1258,19 +1261,26 @@ impl Flow for EventIrrigation {
         if capacity <= 0.0 || water / capacity > self.trigger_ftsw {
             return Ok(FlowResult::empty());
         }
-        let dose = (capacity - water).max(0.0) / self.application_efficiency;
-        FlowResult::new(vec![leg(&i.water_source, -dose)?, leg(&i.soil_water, dose)?])
+        let net = (capacity - water).max(0.0);
+        let gross = net / self.application_efficiency;
+        FlowResult::new(vec![
+            leg(&i.water_source, -gross)?,
+            leg(&i.soil_water, net)?,
+            leg(&self.subsoil_water, gross - net)?,
+        ])
     }
 }
 
 /// LAB-ONLY watering in EVENTS (`WateringForm::Fao56Trigger`, sealed chamber): the condensate store
-/// is the reservoir; at a trigger step it moves `min(condensate, deficit)` into the root zone, and
-/// nothing otherwise. Wraps the season's own `Recycling` (its wiring).
+/// is the reservoir; at a trigger step it draws `min(condensate, deficit / ea)`, the `ea` share into
+/// the root zone and the rest below it, and nothing otherwise. Wraps the season's own `Recycling`.
 pub struct EventRecycling {
     pub inner: Recycling,
     pub trigger_ftsw: f64,
     /// As [`EventIrrigation::application_efficiency`]; limited by the condensate held.
     pub application_efficiency: f64,
+    /// As [`EventIrrigation::subsoil_water`].
+    pub subsoil_water: String,
     pub rooted_depth_aux: String,
     pub soil_extractable_water: f64,
     pub ground_area: f64,
@@ -1300,9 +1310,14 @@ impl Flow for EventRecycling {
         if capacity <= 0.0 || water / capacity > self.trigger_ftsw {
             return Ok(FlowResult::empty());
         }
-        let dose = ((capacity - water).max(0.0) / self.application_efficiency)
+        let gross = ((capacity - water).max(0.0) / self.application_efficiency)
             .min(amt(snapshot, &r.condensate));
-        FlowResult::new(vec![leg(&r.condensate, -dose)?, leg(&r.soil_water, dose)?])
+        let net = gross * self.application_efficiency;
+        FlowResult::new(vec![
+            leg(&r.condensate, -gross)?,
+            leg(&r.soil_water, net)?,
+            leg(&self.subsoil_water, gross - net)?,
+        ])
     }
 }
 
@@ -3715,6 +3730,64 @@ mod tests {
             water_legs(&rec, &s, 200.0, 0.0, 0.5)[SOIL_WATER],
             0.5 * water_legs(&rec, &s, 200.0, 0.0, 1.0)[SOIL_WATER]
         );
+    }
+
+    /// **Watering in events loses `gross − net` below the roots IN THE EVENT STEP** (lab-only,
+    /// `docs/plans/post-roadmap-soil-evaporation.md` §10d): the root zone gets the deficit, the
+    /// store below gets the rest, the reservoir pays the gross. Before §10d the whole gross went
+    /// into the root zone and `Drainage` carried the excess at 30 % a day, which the crop pulled
+    /// back first — so a leg that ignored the efficiency, or sent the loss to the root zone,
+    /// would still balance and is caught only here.
+    #[test]
+    fn an_event_puts_the_deficit_in_the_root_zone_and_the_loss_below_it_the_same_step() {
+        const SUBSOIL: &str = "biosphere.subsoil_water";
+        const TRIGGER: f64 = 1.0 - science::FAO56_WHEAT_DEPLETION;
+        // 39 kg in the 130 kg zone is FTSW 0.30, under the 0.45 trigger: the deficit is 91 kg.
+        let net = 91.0;
+        let close = |a: f64, b: f64| (a - b).abs() <= 1e-12 * b.abs().max(1.0);
+        let event = EventIrrigation {
+            inner: irrigation_flow(1.0),
+            trigger_ftsw: TRIGGER,
+            application_efficiency: science::SPRINKLER_APPLICATION_EFFICIENCY,
+            subsoil_water: SUBSOIL.to_string(),
+        };
+        let gross = net / science::SPRINKLER_APPLICATION_EFFICIENCY;
+        let legs = water_legs(&event, &water_only_state(39.0, TEST_DEPTH, 0.0, 0.0), 200.0, 1.0, 1.0);
+        assert!(close(legs[SOIL_WATER], net), "root zone {} != {net}", legs[SOIL_WATER]);
+        assert!(close(legs[SUBSOIL], gross - net), "below {} != {}", legs[SUBSOIL], gross - net);
+        assert!(close(legs[IRRIGATION_SUPPLY], -gross), "source {}", legs[IRRIGATION_SUPPLY]);
+        assert!(gross - net > 30.0, "the loss is not material: {}", gross - net);
+        // Above the trigger, nothing at all — the loss rides only on an event.
+        let quiet = water_legs(&event, &water_only_state(100.0, TEST_DEPTH, 0.0, 0.0), 200.0, 1.0, 1.0);
+        assert!(quiet.values().all(|&v| v == 0.0), "no event, yet {quiet:?}");
+
+        let recycle = EventRecycling {
+            inner: Recycling {
+                id: "biosphere.recycling".to_string(),
+                condensate: CONDENSATE.to_string(),
+                soil_water: SOIL_WATER.to_string(),
+                recycling_rate: 0.5,
+            },
+            trigger_ftsw: TRIGGER,
+            application_efficiency: science::DRIP_APPLICATION_EFFICIENCY,
+            subsoil_water: SUBSOIL.to_string(),
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: EXTR,
+            ground_area: 1.0,
+        };
+        // Ample condensate: the same split at the drip efficiency.
+        let gross = net / science::DRIP_APPLICATION_EFFICIENCY;
+        let legs = water_legs(&recycle, &water_only_state(39.0, TEST_DEPTH, 0.0, 500.0), 200.0, 0.0, 1.0);
+        assert!(close(legs[SOIL_WATER], net), "chamber root zone {}", legs[SOIL_WATER]);
+        assert!(close(legs[SUBSOIL], gross - net), "chamber below {}", legs[SUBSOIL]);
+        assert!(close(legs[CONDENSATE], -gross), "condensate {}", legs[CONDENSATE]);
+        // ⚠ SHORT OF CONDENSATE: the 50 kg held is the gross, so the root zone gets only its
+        // efficiency share and the loss stays proportional — never the whole 50 into the zone.
+        let legs = water_legs(&recycle, &water_only_state(39.0, TEST_DEPTH, 0.0, 50.0), 200.0, 0.0, 1.0);
+        let net_short = 50.0 * science::DRIP_APPLICATION_EFFICIENCY;
+        assert!(close(legs[CONDENSATE], -50.0), "short condensate {}", legs[CONDENSATE]);
+        assert!(close(legs[SOIL_WATER], net_short), "short root zone {}", legs[SOIL_WATER]);
+        assert!(close(legs[SUBSOIL], 50.0 - net_short), "short below {}", legs[SUBSOIL]);
     }
 
     /// **The saturation bound** — a sealed chamber's air holds at most `e_s(T)/P_std · n_ref`

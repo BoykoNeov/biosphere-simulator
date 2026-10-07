@@ -45,3 +45,18 @@ limit for silt loam (Soltani & Sinclair Table 13.1, up to 2.65×). Measured with
 * Still owed before any station pricing: a lab re-sow hook (the station's uses the plain reset,
   which refuses these values), event recycling in the station, and the lab air-split watering,
   which does not feed the top-layer account.
+
+**Re-pricing all three, opened 2026-10-07** (plan §10). The station's re-sow hook now uses
+`annual_reset_with` (frozen-identical: 20/20 goldens, station suite 241 passed). The floor left
+off — closer to reality in a lamp-lit chamber, the user's delegation.
+
+* Found while preparing the twins: event watering slowly empties the store below the roots. Each
+  re-sow returns the root zone's water at its harvest fill (half full under events), and watering
+  only to full never recharges below. Roots stopped at 0.94 m in season 2, 0.16 m after 15 years.
+* The stopping depth is the book's single deep store credited at full capacity per metre of new
+  root (`EWAT = min(GRTD·EXTR, WSTORG)`, a single-season model), not dry soil — predicted exactly.
+* The user chose to water a little over full: FAO Manual 4's field application efficiency
+  (sprinkler 75 % in the field, drip 90 % in chambers), the loss percolating the same day, as
+  both FAO sources assume. The deep store then holds near the frozen run's (roots 1.18 m in
+  season 2, as frozen; 1.15 against 1.30 after five seasons).
+* The earlier twins and event numbers predate this and are stale; regenerated before any flip.

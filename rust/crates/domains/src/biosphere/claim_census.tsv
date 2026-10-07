@@ -581,3 +581,4 @@ A	flows.rs	sealed_transpiration_reads_the_chambers_own_dryness	no-ancestor-named
 A	science.rs	the_chambers_vapour_pressure_inverts_the_saturation_identity	no-ancestor-named	-
 A	flows.rs	before_anthesis_leaf_and_root_shed_nothing_from_age	no-ancestor-named	-
 A	flows.rs	shedding_without_a_development_clock_is_refused	no-ancestor-named	-
+A	flows.rs	an_event_puts_the_deficit_in_the_root_zone_and_the_loss_below_it_the_same_step	no-ancestor-named	-

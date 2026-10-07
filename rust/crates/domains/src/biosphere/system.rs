@@ -982,6 +982,7 @@ fn irrigation_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Bo
             inner,
             trigger_ftsw,
             application_efficiency: science::SPRINKLER_APPLICATION_EFFICIENCY,
+            subsoil_water: SUBSOIL_WATER.to_string(),
         }),
     }
 }
@@ -1000,6 +1001,7 @@ fn recycling_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Box
             inner,
             trigger_ftsw,
             application_efficiency: science::DRIP_APPLICATION_EFFICIENCY,
+            subsoil_water: SUBSOIL_WATER.to_string(),
             rooted_depth_aux: ROOTED_DEPTH.to_string(),
             soil_extractable_water: scenario.soil_extractable_water,
             ground_area: scenario.ground_area,
