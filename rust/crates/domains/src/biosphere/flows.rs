@@ -798,6 +798,59 @@ impl CanopyRead {
     }
 }
 
+/// Where [`Transpiration`] reads the soil's evaporation under the lab
+/// [`science::SoilEvaporationForm::TwoStage`] (`docs/plans/post-roadmap-soil-evaporation.md`).
+/// `None` on every frozen build.
+pub struct SoilEvapRead {
+    pub floor: bool,
+    pub leaf_c: String,
+    pub sla_per_mol_c: f64,
+    /// The stored LAI when the lab leaf form keeps one ([`CarbonContext::lai_at`]'s rule).
+    pub leaf_area_aux: Option<String>,
+    /// The albedo the model's net-radiation forcing is already net of (`weather::ALBEDO`).
+    pub reference_albedo: f64,
+    pub top_aux: String,
+    pub dry_days_aux: String,
+    pub shade_aux: String,
+    pub today_evap_aux: String,
+    pub today_potential_aux: String,
+    /// An open build's own sink for the soil's vapour; `None` when sealed (both go to the air).
+    pub soil_sink: Option<String>,
+}
+
+impl SoilEvapRead {
+    fn lai_green(&self, snapshot: &State, ground_area: f64) -> f64 {
+        match &self.leaf_area_aux {
+            None => science::leaf_area_index(
+                amt(snapshot, &self.leaf_c),
+                self.sla_per_mol_c,
+                ground_area,
+            ),
+            Some(aux) => snapshot.aux.get(aux).copied().unwrap_or(0.0).max(0.0),
+        }
+    }
+}
+
+/// One step's water leaving the root zone under the lab soil-evaporation form, split by source
+/// (kg on the ground area) — the ONE computation [`Transpiration`] and [`SoilSurfaceAccount`] share.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WaterSplit {
+    /// The crop's transpiration this step.
+    pub crop: f64,
+    /// The soil's evaporation this step (floor included).
+    pub soil: f64,
+    /// The bare-soil potential this step (no canopy), what the floor's condition reads.
+    pub bare_potential: f64,
+    /// Stage I this step.
+    pub wet: bool,
+    /// The green LAI the crop's energy share read.
+    pub lai_green: f64,
+}
+
+fn aux_of(snapshot: &State, key: &str) -> f64 {
+    snapshot.aux.get(key).copied().unwrap_or(0.0)
+}
+
 /// WATER `soil_water -> vapor_sink` (Penman–Monteith · f_water).
 ///
 /// Sealed (`saturation` is `Some`): `soil_water -> water_vapor + condensate`, the vapour share
@@ -820,6 +873,166 @@ pub struct Transpiration {
     /// `Some` only under a lab surface-resistance form; `None` reads `surface_resistance` as
     /// before, on every frozen build.
     pub canopy: Option<CanopyRead>,
+    /// `Some` only under the lab soil-evaporation form; `None` on every frozen build, which then
+    /// takes exactly the code path it took before the form existed.
+    pub soil: Option<SoilEvapRead>,
+}
+
+impl Transpiration {
+    /// The air-dryness this step's crop reads (the chamber's own under `VpdRead::Chamber`).
+    fn vpd(&self, snapshot: &State, env: &dyn Environment, temp_c: f64) -> Result<f64, SimError> {
+        Ok(match &self.saturation {
+            Some(sat) if sat.vpd_read == science::VpdRead::Chamber => science::chamber_vpd_pa(
+                temp_c,
+                amt(snapshot, &sat.water_vapor),
+                sat.air_capacity_mol,
+            ),
+            _ => env.get(&self.vpd_var)?,
+        })
+    }
+
+    /// The step's crop transpiration and soil evaporation under the lab soil-evaporation form.
+    ///
+    /// The energy is split: the crop's radiation term reads `1 − exp(−KET·LAI_green)` of the net
+    /// radiation, the soil `exp(−KET·ETLAI)` of the incident (ETLAI ≥ LAI_green, so the shares
+    /// never exceed 1; what dead leaves intercept goes to neither). The soil runs at its potential
+    /// in Stage I, at the book's per-day Stage II factor otherwise, never beyond the top layer's
+    /// water; with the floor on, the day's last step tops the day up to 1.5 mm when the day's
+    /// bare-soil potential exceeded it. An error when the form is off.
+    pub fn split(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<WaterSplit, SimError> {
+        let Some(s) = &self.soil else {
+            return Err(SimError::Reference(
+                "Transpiration::split needs the lab soil-evaporation form".to_string(),
+            ));
+        };
+        let net_radiation = env.get(&self.rn_var)?;
+        let temp_c = env.get(&self.temp_var)?;
+        let vpd = self.vpd(snapshot, env, temp_c)?;
+        let soil_water = amt(snapshot, &self.soil_water);
+        let rooted = aux_of(snapshot, &self.rooted_depth_aux);
+        let lai_green = s.lai_green(snapshot, self.ground_area);
+        let surface_resistance = match &self.canopy {
+            None => self.surface_resistance,
+            Some(c) => science::canopy_surface_resistance(
+                c.form,
+                self.surface_resistance,
+                c.lai(snapshot, self.ground_area),
+            ),
+        };
+        let crop_potential = science::penman_monteith_transpiration(
+            net_radiation * science::crop_radiation_share(lai_green),
+            vpd,
+            temp_c,
+            self.aerodynamic_resistance,
+            surface_resistance,
+        );
+        let f_water = science::soil_water_stress(
+            soil_water,
+            rooted,
+            self.soil_extractable_water,
+            self.ground_area,
+            self.wssg,
+        );
+        let crop = crop_potential * f_water * self.ground_area * dt;
+
+        let top = aux_of(snapshot, &s.top_aux).max(0.0);
+        let ftsw = science::fraction_transpirable(
+            soil_water,
+            science::transpirable_capacity(rooted, self.soil_extractable_water, self.ground_area),
+        );
+        let wet = top > science::TOP_LAYER_WET_MM * self.ground_area
+            && ftsw > science::STAGE_ONE_FTSW;
+        let shade = aux_of(snapshot, &s.shade_aux);
+        let eos = science::soil_evaporation_potential(
+            net_radiation,
+            s.reference_albedo,
+            temp_c,
+            shade,
+        );
+        let rate = if wet {
+            eos
+        } else {
+            eos * science::stage_two_factor(aux_of(snapshot, &s.dry_days_aux))
+        };
+        let room = top.min((soil_water - crop).max(0.0));
+        let mut soil = (rate * self.ground_area * dt).min(room);
+        let bare_potential = science::soil_evaporation_potential(
+            net_radiation,
+            s.reference_albedo,
+            temp_c,
+            0.0,
+        ) * self.ground_area
+            * dt;
+        let steps_per_day = (1.0 / dt).round() as u64;
+        if s.floor && wet && (snapshot.n + 1).is_multiple_of(steps_per_day) {
+            let floor_kg = science::SOIL_EVAPORATION_FLOOR_MM_DAY * self.ground_area;
+            let day_potential = aux_of(snapshot, &s.today_potential_aux) + bare_potential;
+            if day_potential > floor_kg {
+                let short = floor_kg - (aux_of(snapshot, &s.today_evap_aux) + soil);
+                if short > 0.0 {
+                    soil += short.min((room - soil).max(0.0));
+                }
+            }
+        }
+        Ok(WaterSplit { crop, soil, bare_potential, wet, lai_green })
+    }
+
+    /// The lab soil-evaporation branch of `evaluate`: the crop and the soil leave the root zone
+    /// together; sealed, the chamber's cap sees their SUM.
+    fn evaluate_with_soil(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+        s: &SoilEvapRead,
+    ) -> Result<FlowResult, SimError> {
+        let split = self.split(snapshot, env, dt)?;
+        let Some(sat) = &self.saturation else {
+            let sink = s.soil_sink.as_ref().ok_or_else(|| {
+                SimError::Reference("an open soil-evaporating build needs a soil sink".to_string())
+            })?;
+            return FlowResult::new(vec![
+                leg(&self.soil_water, -(split.crop + split.soil))?,
+                leg(&self.vapor_sink, split.crop)?,
+                leg(sink, split.soil)?,
+            ]);
+        };
+        let temp_c = env.get(&self.temp_var)?;
+        self.sealed_legs(sat, snapshot, temp_c, dt, split.crop + split.soil)
+    }
+
+    /// A sealed chamber's legs for `flux` leaving the root zone: the air takes what the humidity
+    /// target allows at the END of the step, the rest condenses in the same step — one cap for
+    /// whatever the flux holds (the crop's, or the crop's and the soil's together).
+    fn sealed_legs(
+        &self,
+        sat: &VapourSaturation,
+        snapshot: &State,
+        temp_c: f64,
+        dt: f64,
+        flux: f64,
+    ) -> Result<FlowResult, SimError> {
+        let target =
+            science::humidity_target_kg(temp_c, sat.air_capacity_mol, sat.humidity_setpoint);
+        let vapour = amt(snapshot, &sat.water_vapor);
+        // The room left at the END of the step: the target, less the vapour now, plus what the
+        // condenser takes this step (never negative: above the target the excess is part of
+        // what condenses). Without the condenser's term the air ends at `target − rate·dt·v`,
+        // which settles at `target / (1 + rate·dt)` — a step-size number, not a humidity.
+        let condensed = science::condensed_vapour_kg(vapour, target, sat.condensation_rate, dt);
+        let headroom = (target - vapour + condensed).max(0.0);
+        let to_air = flux.min(headroom);
+        FlowResult::new(vec![
+            leg(&self.soil_water, -flux)?,
+            leg(&self.vapor_sink, to_air)?,
+            leg(&sat.condensate, flux - to_air)?,
+        ])
+    }
 }
 
 impl Flow for Transpiration {
@@ -835,6 +1048,9 @@ impl Flow for Transpiration {
         env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
+        if let Some(s) = &self.soil {
+            return self.evaluate_with_soil(snapshot, env, dt, s);
+        }
         let net_radiation = env.get(&self.rn_var)?;
         let temp_c = env.get(&self.temp_var)?;
         // Under `VpdRead::Chamber` a sealed crop transpires into the chamber's own air (Step 3b);
@@ -882,21 +1098,195 @@ impl Flow for Transpiration {
                 leg(&self.vapor_sink, flux)?,
             ]);
         };
-        let target =
-            science::humidity_target_kg(temp_c, sat.air_capacity_mol, sat.humidity_setpoint);
-        let vapour = amt(snapshot, &sat.water_vapor);
-        // The room left at the END of the step: the target, less the vapour now, plus what the
-        // condenser takes this step (never negative: above the target the excess is part of
-        // what condenses). Without the condenser's term the air ends at `target − rate·dt·v`,
-        // which settles at `target / (1 + rate·dt)` — a step-size number, not a humidity.
-        let condensed = science::condensed_vapour_kg(vapour, target, sat.condensation_rate, dt);
-        let headroom = (target - vapour + condensed).max(0.0);
-        let to_air = flux.min(headroom);
-        FlowResult::new(vec![
-            leg(&self.soil_water, -flux)?,
-            leg(&self.vapor_sink, to_air)?,
-            leg(&sat.condensate, flux - to_air)?,
-        ])
+        self.sealed_legs(sat, snapshot, temp_c, dt, flux)
+    }
+}
+
+/// The top layer's own account and the soil-evaporation clocks — LAB-ONLY
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §4b).
+///
+/// Soltani & Sinclair track the top layer as an account OVERLAPPING the root zone (Eqn 14.2): the
+/// water stays in `soil_water`; this process advances `ATSW1` by the same inflow (`inflow`'s leg
+/// into `soil_water`), less the top layer's drainage `(ATSW1 − TTSW1)·DRAINF`, its share of the
+/// crop's uptake (`TR1`, the book's program) and the soil's evaporation. Every amount comes from the
+/// same functions the flows run on the same snapshot — `water.split` and `inflow.evaluate` — so the
+/// account and the flows cannot disagree. It also advances the dry-stage clock, the soil-shading
+/// leaf area (held from beginning seed growth) and the day's evaporation and potential (the floor).
+pub struct SoilSurfaceAccount {
+    pub id: String,
+    /// An instance built exactly as the season's `Transpiration` (one builder, two instances).
+    pub water: Transpiration,
+    /// An instance of the season's watering inflow — `Irrigation` (open) or `Recycling` (sealed).
+    pub inflow: Box<dyn Flow>,
+    pub drainage_factor: f64,
+    pub thermal_time_aux: String,
+    pub pheno: PhenologyParams,
+    /// The development stage at which the partition table first gives grain a share — the model's
+    /// "beginning seed growth", where the soil-shading leaf area stops following the green LAI.
+    pub seed_growth_dvs: f64,
+}
+
+impl SoilSurfaceAccount {
+    fn top_capacity(&self) -> f64 {
+        science::TOP_LAYER_DEPTH_M
+            * self.water.soil_extractable_water
+            * science::WATER_DENSITY
+            * self.water.ground_area
+    }
+}
+
+impl AuxProcess for SoilSurfaceAccount {
+    fn type_name(&self) -> &'static str {
+        "SoilSurfaceAccount"
+    }
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
+        let s = self.water.soil.as_ref().ok_or_else(|| {
+            SimError::Reference("SoilSurfaceAccount needs the soil-evaporation form".to_string())
+        })?;
+        let split = self.water.split(snapshot, env, dt)?;
+        let inflow: f64 = self
+            .inflow
+            .evaluate(snapshot, env, dt)?
+            .legs
+            .iter()
+            .filter(|l| l.stock == self.water.soil_water)
+            .map(|l| l.amount)
+            .sum();
+        let top = aux_of(snapshot, &s.top_aux);
+        let capacity = self.top_capacity();
+        let drain = (top - capacity).max(0.0) * self.drainage_factor * dt;
+        let rooted = aux_of(snapshot, &self.water.rooted_depth_aux);
+        let top_crop = if rooted <= science::TOP_LAYER_DEPTH_M {
+            split.crop
+        } else {
+            split.crop * (science::fraction_transpirable(top, capacity) / self.water.wssg).min(1.0)
+        };
+        let mut d_top = inflow - drain - top_crop - split.soil;
+        if top + d_top < 0.0 {
+            d_top = -top;
+        }
+        let dry = aux_of(snapshot, &s.dry_days_aux);
+        let d_dry = if split.wet { -dry } else { dt };
+        let dvs = science::development_stage(
+            aux_of(snapshot, &self.thermal_time_aux),
+            self.pheno.tsum_anthesis,
+            self.pheno.tsum_maturity,
+        );
+        let shade = aux_of(snapshot, &s.shade_aux);
+        let d_shade = if dvs < self.seed_growth_dvs { split.lai_green - shade } else { 0.0 };
+        let steps_per_day = (1.0 / dt).round() as u64;
+        let first_of_day = snapshot.n.is_multiple_of(steps_per_day);
+        let (evap_today, potential_today) =
+            (aux_of(snapshot, &s.today_evap_aux), aux_of(snapshot, &s.today_potential_aux));
+        let (d_evap, d_potential) = if first_of_day {
+            (split.soil - evap_today, split.bare_potential - potential_today)
+        } else {
+            (split.soil, split.bare_potential)
+        };
+        Ok(BTreeMap::from([
+            (s.top_aux.clone(), d_top),
+            (s.dry_days_aux.clone(), d_dry),
+            (s.shade_aux.clone(), d_shade),
+            (s.today_evap_aux.clone(), d_evap),
+            (s.today_potential_aux.clone(), d_potential),
+        ]))
+    }
+}
+
+/// The root zone's `(water, transpirable capacity)` at the step's start.
+fn root_zone(snapshot: &State, soil_water: &str, rooted_aux: &str, extr: f64, area: f64) -> (f64, f64) {
+    (
+        amt(snapshot, soil_water),
+        science::transpirable_capacity(aux_of(snapshot, rooted_aux), extr, area),
+    )
+}
+
+/// LAB-ONLY watering in EVENTS (`WateringForm::Fao56Trigger`, open field): nothing until the root
+/// zone has fallen to `FTSW ≤ 1 − p`, then the whole deficit to full in that step. Wraps the
+/// season's own `Irrigation` (its wiring); its system capacity does not cap an event.
+pub struct EventIrrigation {
+    pub inner: Irrigation,
+    pub trigger_ftsw: f64,
+}
+
+impl Flow for EventIrrigation {
+    fn type_name(&self) -> &'static str {
+        "EventIrrigation"
+    }
+    fn id(&self) -> &str {
+        &self.inner.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        _dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let i = &self.inner;
+        // A zero watering capacity is still a hard off (an irrigation-cut window), as for `Irrigation`.
+        if env.get(&i.irrigation_var)? <= 0.0 {
+            return Ok(FlowResult::empty());
+        }
+        let (water, capacity) = root_zone(
+            snapshot,
+            &i.soil_water,
+            &i.rooted_depth_aux,
+            i.soil_extractable_water,
+            i.ground_area,
+        );
+        if capacity <= 0.0 || water / capacity > self.trigger_ftsw {
+            return Ok(FlowResult::empty());
+        }
+        let dose = (capacity - water).max(0.0);
+        FlowResult::new(vec![leg(&i.water_source, -dose)?, leg(&i.soil_water, dose)?])
+    }
+}
+
+/// LAB-ONLY watering in EVENTS (`WateringForm::Fao56Trigger`, sealed chamber): the condensate store
+/// is the reservoir; at a trigger step it moves `min(condensate, deficit)` into the root zone, and
+/// nothing otherwise. Wraps the season's own `Recycling` (its wiring).
+pub struct EventRecycling {
+    pub inner: Recycling,
+    pub trigger_ftsw: f64,
+    pub rooted_depth_aux: String,
+    pub soil_extractable_water: f64,
+    pub ground_area: f64,
+}
+
+impl Flow for EventRecycling {
+    fn type_name(&self) -> &'static str {
+        "EventRecycling"
+    }
+    fn id(&self) -> &str {
+        &self.inner.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        _dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let r = &self.inner;
+        let (water, capacity) = root_zone(
+            snapshot,
+            &r.soil_water,
+            &self.rooted_depth_aux,
+            self.soil_extractable_water,
+            self.ground_area,
+        );
+        if capacity <= 0.0 || water / capacity > self.trigger_ftsw {
+            return Ok(FlowResult::empty());
+        }
+        let dose = (capacity - water).max(0.0).min(amt(snapshot, &r.condensate));
+        FlowResult::new(vec![leg(&r.condensate, -dose)?, leg(&r.soil_water, dose)?])
     }
 }
 
@@ -2986,6 +3376,7 @@ mod tests {
             wssg: WSSG,
             // The open-field shape: two legs to the boundary sink, no saturation bound.
             canopy: None,
+            soil: None,
             saturation: None,
         }
     }
@@ -3343,6 +3734,7 @@ mod tests {
         let sealed = Transpiration {
             vapor_sink: WATER_VAPOR.to_string(),
             canopy: None,
+            soil: None,
             saturation: Some(VapourSaturation {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
@@ -3441,6 +3833,7 @@ mod tests {
         let sealed = |read| Transpiration {
             vapor_sink: WATER_VAPOR.to_string(),
             canopy: None,
+            soil: None,
             saturation: Some(VapourSaturation {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
@@ -3508,6 +3901,7 @@ mod tests {
         let sealed = Transpiration {
             vapor_sink: WATER_VAPOR.to_string(),
             canopy: None,
+            soil: None,
             saturation: Some(VapourSaturation {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),

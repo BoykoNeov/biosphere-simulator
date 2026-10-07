@@ -41,7 +41,8 @@
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
 use crate::biosphere::science::{
-    Co2Read, KineticsForm, LeafAreaForm, O2Form, SurfaceResistanceForm, VpdRead,
+    Co2Read, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm, SurfaceResistanceForm,
+    VpdRead, WateringForm,
 };
 use config::{with_override, ConfigError, ParamFile};
 
@@ -220,6 +221,24 @@ pub fn biosphere_with_rs_form(
 ) -> Result<BiosphereParams, ConfigError> {
     let mut p = biosphere_with(subs)?;
     p.transp.rs_form = form;
+    Ok(p)
+}
+
+/// The frozen params with **bare-soil evaporation** switched on, under a canopy-resistance form —
+/// lab-only (`docs/plans/post-roadmap-soil-evaporation.md`). The user's order: soil evaporation is
+/// built and then priced together with the canopy resistance, so the two are set together here.
+///
+/// # ⚠ This endorses no form
+pub fn biosphere_with_soil_evaporation(
+    subs: &[Substitution],
+    rs_form: SurfaceResistanceForm,
+    soil: SoilEvaporationForm,
+    watering: WateringForm,
+) -> Result<BiosphereParams, ConfigError> {
+    let mut p = biosphere_with(subs)?;
+    p.transp.rs_form = rs_form;
+    p.transp.soil_evap = soil;
+    p.water.watering = watering;
     Ok(p)
 }
 

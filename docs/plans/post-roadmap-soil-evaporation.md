@@ -192,3 +192,87 @@ station's lab watering (`station::air_split::FAO56_WHEAT_DEPLETION_FRACTION`).
 * The top-layer account reads the same `Irrigation`/`Recycling` instance, so it sees the events.
 * The trigger (0.45) sits above the crop's stress threshold (`wssg` 0.30), so the crop should never
   be stressed by the schedule itself — carbon is predicted unchanged; water timing changes.
+
+---
+
+## 8. BUILT lab-only and measured (2026-10-07) — graded
+
+**Built (nothing frozen moved):** `science::SoilEvaporationForm` (`Off` — the loader's —
+`TwoStage { floor }`), `science::WateringForm` (`Continuous` — the loader's — `Fao56Trigger`), the
+book's constants beside them; `flows::SoilEvapRead`, `WaterSplit` and `Transpiration::split` (one
+computation, used by the flow and the account), one sealed cap helper (`sealed_legs`) for both
+branches; `flows::SoilSurfaceAccount` (the top layer's account and the clocks);
+`flows::EventIrrigation` / `EventRecycling` (watering in events, lab wrappers, a zero capacity still
+a hard off); one builder each for the water flow and the two watering flows, so the account's
+instances are built as the season's are; `annual_reset_with` resets the five new values, the plain
+`annual_reset` refuses them; `lab::biosphere_with_soil_evaporation`. Test:
+`rust/crates/domains/tests/soil_evaporation.rs` (four instrument checks; the measurement
+`#[ignore]`d, run with `--ignored --release`). Found by its own check while building: the plain
+reset's refusal had not been applied by the first edit — the S10 test went red and caught it.
+
+### 8a. The measurement (per year of the run)
+
+| scenario | config | water out of the root zone | of it soil | at LAI < 0.5 | Stage I share | watering events | lowest FTSW | carbon = frozen | dead-crop vapour / frozen |
+|---|---|---|---|---|---|---|---|---|---|
+| default (1 y) | frozen | 587.29 | 0 | 95.40 | — | 0 | 0.993 | — | — |
+| | Szeicz–Long alone | 559.57 | 0 | 30.52 | — | 0 | 0.998 | yes | — |
+| | S–L + soil, daily watering | 651.42 | 148.51 | 91.36 | 1.000 | 0 | 0.994 | yes | — |
+| | S–L + soil, events | 538.61 | 35.98 | 38.20 | 0.241 | 5 | 0.448 | yes | — |
+| | S–L + soil + floor, events | 613.47 | 110.84 | 38.20 | 0.229 | 6 | 0.449 | yes | — |
+| sealed chamber (3 y, never re-sown) | frozen | 708.03 | 0 | 532.25 | — | 0 | 0.843 | — | 1.000 |
+| | S–L alone | 180.22 | 0 | 38.95 | — | 0 | 0.952 | yes | 0.195 |
+| | S–L + soil, daily | 510.54 | 392.40 | 315.74 | 1.000 | 0 | 0.867 | yes | **0.999** |
+| | S–L + soil, events | 167.79 | 49.87 | 43.89 | 0.087 | 5 | 0.450 | yes | **0.204** |
+| | S–L + soil + floor, events | 166.46 | 48.57 | 42.30 | 0.093 | 5 | 0.450 | yes | 0.195 |
+| perennial chamber (5 y) | frozen | 707.99 | 0 | 319.95 | — | 0 | 0.843 | — | 1.000 |
+| | S–L alone | 404.99 | 0 | 117.97 | — | 0 | 0.955 | yes | 0.993 |
+| | S–L + soil, daily | 701.89 | 459.14 | 252.38 | 1.000 | 0 | 0.867 | yes | 1.000 |
+| | S–L + soil, events | 446.34 | 204.31 | 137.88 | 0.333 | 46 | 0.447 | yes | 0.998 |
+| | S–L + soil + floor, events | 476.90 | 234.11 | 150.68 | 0.392 | 57 | 0.443 | yes | 0.997 |
+| consumer chamber (5 y) | frozen | 708.00 | 0 | 398.23 | — | 0 | 0.836 | — | 1.000 |
+| | S–L alone | 346.30 | 0 | 129.01 | — | 0 | 0.957 | yes | 0.941 |
+| | S–L + soil, daily | 684.20 | 487.46 | 319.86 | 1.000 | 0 | 0.861 | yes | 0.999 |
+| | S–L + soil, events | 448.39 | 250.68 | 188.94 | 0.396 | 62 | 0.442 | yes | 0.941 |
+| | S–L + soil + floor, events | 464.05 | 266.52 | 198.80 | 0.430 | 72 | 0.441 | yes | 0.957 |
+
+`drought_window`'s cut (days 220–260), first day below FTSW 0.30: frozen 254; S–L alone 250; + soil
+daily 251; + soil, events **243**; + soil + floor, events **237**.
+
+### 8b. The predictions, graded
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| S1 | the frozen forms through the switches are the frozen run, bit for bit | asserted (default and sealed, every stock and aux value) | HELD (golden report: §8d) |
+| S2 | a day sums to the book's daily value; the floor tops each eligible day to 1.5 mm | 63 floor-eligible days, 0 short; the Stage II factor constant within a day and equal to `√(d+1) − √d` | HELD |
+| S3 | soil + crop radiation terms ≤ the net radiation | worst 0.7196 | HELD |
+| S4 | **the success test:** dead-crop vapour 0.7–1.5× frozen (refuted < 0.5) | daily watering **0.999 — HELD**; watering in events **0.204 — FAILED** | split by watering |
+| S5 | open-field winter water 65–130 kg | daily 91.36 (HELD); events 38.20 (FAILED) | split by watering |
+| S6 | carbon bit-identical in the four runs | yes in every config, events included (lowest FTSW ≥ 0.44 > 0.30) | HELD |
+| S7 | the top layer in Stage I on > 90 % of steps | daily watering 100 % (HELD — the prediction assumed it); events 9–43 % | HELD for the watering it assumed |
+| S8 | the floor adds 80–160 kg to the open field, < 10 % in the chambers | open field +74.9 kg (just below); sealed −1 %, perennial **+15 %**, consumer +6 % | FAILED narrowly on both |
+| S9 | drought runs dry sooner than S–L alone's day 250 | events 243 / 237 (HELD); daily 251 (FAILED by one day) | mostly held |
+| S10 | every re-sow resets the values; the plain reset refuses | asserted (after a first-edit miss the test itself caught) | HELD |
+
+### 8c. What it says
+
+1. **With daily top-ups the surface never dries** (Stage I 100 % everywhere), and soil evaporation then
+   restores the dead-crop chamber's air exactly (0.999 of frozen) — it replaces the dead crop's
+   phantom transpiration almost one for one (392 kg/yr of soil against the frozen crop's 708).
+2. **With watering in events the surface dries between waterings** (Stage I 9–43 % of steps), drought
+   bites a week or more sooner, and the water cycled through the chambers falls by a third or more.
+3. **But the never-re-sown chamber's dead phase dries out again under events (0.20):** its root zone
+   is DEEP (the dead crop's roots reached 1.30 m — the golden's own `rooted_depth`), the soil only evaporates from the 150 mm top, so the
+   zone never falls to the 0.45 trigger — nothing waters it, the surface stays dry, and Stage II
+   decays as √t. Physically that is a fallow chamber with a dry crust: plausible, and not the
+   "phantom transpiration" artefact, but it means the success test (S4) passes only with daily
+   watering. The re-sown chambers keep their air under every config (0.94–1.00).
+4. **Carbon never moves** in any configuration measured: the crop is never stressed, events included.
+5. **The floor matters only with a crop:** +75 kg/yr in the open field; nothing in the fallow chamber
+   (dry surface, Stage II).
+
+### 8d. The gates
+
+* `regen_goldens` (report): **20 of 20 identical, 0 would change** — S1 in full.
+* `cargo clippy --all-targets -- -D warnings`: clean (two `is_multiple_of` rewrites, same arithmetic,
+  made after the suite started).
+* `cargo test --no-fail-fast`: **1357 passed, 0 failed, 8 ignored**.

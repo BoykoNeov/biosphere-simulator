@@ -93,6 +93,24 @@ pub const ROOTED_DEPTH: &str = "rooted_depth";
 /// `LeafAreaForm::NodeEnvelope`; no canonical build seeds it, so no golden carries the key.
 pub const LEAF_AREA_INDEX: &str = "leaf_area_index";
 
+// --- LAB-only soil evaporation (`docs/plans/post-roadmap-soil-evaporation.md`) --------------
+// Present only under `SoilEvaporationForm::TwoStage`; no canonical build seeds them.
+/// `ATSW1`, the top layer's own water (kg on the ground area) — Soltani & Sinclair's overlapping
+/// account INSIDE the root zone (Eqn 14.2), not a second store: the water itself stays in
+/// `soil_water`.
+pub const TOP_SOIL_WATER: &str = "top_soil_water";
+/// `DYSE`, days since Stage II began (0 in Stage I).
+pub const SOIL_DRY_DAYS: &str = "soil_dry_days";
+/// `ETLAI`, the leaf area shading the soil: green LAI until beginning seed growth, then held.
+pub const SOIL_SHADE_LAI: &str = "soil_shade_lai";
+/// The day's soil evaporation so far (kg) and its bare-soil potential (kg) — the floor is a daily
+/// total.
+pub const SOIL_EVAP_TODAY: &str = "soil_evap_today";
+pub const SOIL_POTENTIAL_TODAY: &str = "soil_potential_today";
+/// Where an OPEN build's soil evaporation goes — its own sink, so the books separate it from the
+/// crop's `vapor_sink`. (A sealed build sends both into the chamber air through one cap.)
+pub const SOIL_EVAP_SINK: &str = "boundary.soil_evaporation";
+
 /// The handful of stock ids whose identity depends on `sealed`, computed once.
 #[derive(Debug, Clone)]
 pub struct ChamberWiring {

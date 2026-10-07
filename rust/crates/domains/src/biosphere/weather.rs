@@ -47,7 +47,7 @@ const PAR_ENERGY_FRACTION: f64 = 0.5;
 /// PAR photon flux per unit PAR energy: ~4.57 µmol photons per J (McCree 1972).
 pub const PAR_UMOL_PER_J: f64 = 4.57;
 /// FAO-56 reference-crop albedo (net shortwave Rns = (1 − α)·Rs).
-const ALBEDO: f64 = 0.23;
+pub const ALBEDO: f64 = 0.23;
 
 // Saturation-vapour-pressure constants (Tetens / FAO-56); Python locates these in
 // `transpiration`. e_s(T) = SVP_A · exp(SVP_B · T / (T + SVP_C))  [Pa], T in °C.

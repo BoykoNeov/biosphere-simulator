@@ -37,7 +37,8 @@
 //! `docs/biosphere-reference.md`.
 
 use super::science::{
-    Co2Read, KineticsForm, LeafAreaForm, O2Form, SurfaceResistanceForm, VpdRead,
+    Co2Read, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm, SurfaceResistanceForm,
+    VpdRead, WateringForm,
 };
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
@@ -261,6 +262,10 @@ pub struct TranspirationParams {
     /// from the file: the loader sets the frozen [`SurfaceResistanceForm::Constant`]; the two
     /// leaf-area forms are lab-only (`docs/plans/post-roadmap-canopy-resistance.md`).
     pub rs_form: SurfaceResistanceForm,
+    /// Whether the soil evaporates ([`SoilEvaporationForm`]). Never loaded from the file: the loader
+    /// sets [`SoilEvaporationForm::Off`] (the frozen model has none); the two-stage form is lab-only
+    /// (`docs/plans/post-roadmap-soil-evaporation.md`).
+    pub soil_evap: SoilEvaporationForm,
 }
 
 /// Thermal-time phenology params.
@@ -398,6 +403,10 @@ pub struct WaterCycleParams {
     /// `docs/plans/post-roadmap-chamber-dryness.md`); [`VpdRead::Weather`] is the retired
     /// reading, kept runnable through `domains::lab`.
     pub vpd_read: VpdRead,
+    /// How the root zone is watered ([`WateringForm`]). Never loaded from the file: the loader sets
+    /// [`WateringForm::Continuous`]; watering in events is lab-only
+    /// (`docs/plans/post-roadmap-soil-evaporation.md` §7).
+    pub watering: WateringForm,
 }
 
 /// Minimal-consumer params (grazing + respiration + mortality + f_O2 Monod).
@@ -671,6 +680,7 @@ pub fn transpiration_from_bounded(
         aerodynamic_resistance: v["aerodynamic_resistance"],
         surface_resistance: v["surface_resistance"],
         rs_form: SurfaceResistanceForm::Constant,
+        soil_evap: SoilEvaporationForm::Off,
     }
 }
 
@@ -1176,6 +1186,7 @@ pub fn water_cycle_from_bounded(
         // CHAMBER since the Step 3b freeze (2026-10-01): this line moved 9 goldens, water
         // stocks only (docs/plans/post-roadmap-chamber-dryness.md §4.6).
         vpd_read: VpdRead::Chamber,
+        watering: WateringForm::Continuous,
     }
 }
 

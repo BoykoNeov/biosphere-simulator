@@ -16,3 +16,20 @@ the lab and then priced together with that resistance. Plan: `docs/plans/post-ro
 * A mapping that removes a choice: the model already treats root-zone water as uniform, so the
   book's top-layer test reduces to "the root zone is above half full", and the top-layer depth
   (150–600 mm in the book) drops out.
+
+**Watering in events DECIDED 2026-10-07 (the user):** FAO-56's depletion trigger (`p = 0.55`) —
+nothing until the root zone has used 55 % of its water, then a full refill; the sealed chambers'
+condensate is the reservoir. Raised because daily top-ups would keep the top layer always wet.
+
+**BUILT lab-only and measured 2026-10-07** (plan §8). Three switches, all off in the loader; the
+frozen path is bit-identical (asserted; 20 of 20 goldens).
+
+* With daily top-ups the surface never dries (Stage I 100 %), and soil evaporation restores the
+  dead-crop chamber's air exactly (0.999 of frozen): it replaces the dead crop's phantom water use.
+* With watering in events the surface dries between waterings (Stage I 9–43 % of steps), drought
+  bites a week sooner, and the chambers cycle a third or more less water.
+* Under events the never-re-sown chamber's air dries again while its crop is dead (0.20): its root
+  zone is 1.30 m deep and loses water only from the top 150 mm, so it never reaches the trigger — a
+  fallow chamber with a dry crust. The re-sown chambers keep their air (0.94–1.00).
+* Carbon never moved in any configuration. Of 10 predictions 7 held (two only for the watering they
+  assumed), 2 failed narrowly, 1 split by watering. A test caught a reset refusal the first edit missed.

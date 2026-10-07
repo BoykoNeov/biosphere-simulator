@@ -1009,6 +1009,87 @@ pub const FAO_ACTIVE_LAI_FRACTION: f64 = 0.5;
 /// own peak LAI.
 pub const TEH_THRESHOLD_LAI: f64 = 4.0;
 
+/// Whether the soil evaporates — LAB-ONLY (`docs/plans/post-roadmap-soil-evaporation.md`).
+///
+/// [`SoilEvaporationForm::Off`] is the loader's value: the frozen model has no bare-soil
+/// evaporation. [`SoilEvaporationForm::TwoStage`] is Soltani & Sinclair (2012) Ch. 14 after Amir &
+/// Sinclair (1991), with the energy split between soil and crop and the user's three choices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SoilEvaporationForm {
+    #[default]
+    Off,
+    /// `floor`: the book's 1.5 mm/day minimum (`EOSMIN`), met as a daily total; a switch so it is
+    /// measured on and off (the user's decision).
+    TwoStage { floor: bool },
+}
+
+/// How the root zone is watered — LAB-ONLY (`docs/plans/post-roadmap-soil-evaporation.md` §7).
+///
+/// [`WateringForm::Continuous`] is the loader's value: the open field topped up to full every step,
+/// the sealed chamber's condensate recycled as a steady fraction. [`WateringForm::Fao56Trigger`]
+/// waters in EVENTS: nothing until the root zone has used `p` of its transpirable water, then the
+/// whole deficit at once (FAO-56 applies the net depth `Dr` in one irrigation).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WateringForm {
+    #[default]
+    Continuous,
+    Fao56Trigger,
+}
+
+/// FAO-56 (Allen et al. 1998) Table 22, the wheat depletion fraction for no stress, `p = 0.55`
+/// (`RAW = p·TAW`); the watering trigger is `FTSW = 1 − p`. The same citation as
+/// `station::air_split::FAO56_WHEAT_DEPLETION_FRACTION`.
+pub const FAO56_WHEAT_DEPLETION: f64 = 0.55;
+
+/// `SALB`, the soil's albedo — Soltani & Sinclair (2012) p. 180, *"commonly … close to 0.12"*.
+pub const SOIL_ALBEDO: f64 = 0.12;
+/// `KET`, the canopy extinction coefficient for global radiation — Soltani & Sinclair p. 180
+/// (*"~0.5"*) and p. 184 (fixed at 0.5 in their model). Used for the soil–crop energy split.
+pub const SOIL_SHADE_EXTINCTION: f64 = 0.5;
+/// `EOSMIN`, mm day⁻¹ — Soltani & Sinclair p. 184, after Amir & Sinclair (1991).
+pub const SOIL_EVAPORATION_FLOOR_MM_DAY: f64 = 1.5;
+/// `DEP1`, the top layer's depth (m) — the user's 150 mm (2026-10-07), the shallow end of Soltani &
+/// Sinclair's *"usually 150 to 600 mm"* (p. 172) and the model's own rooting depth at emergence.
+pub const TOP_LAYER_DEPTH_M: f64 = 0.15;
+/// The top layer must hold more than 1 mm for Stage I (`ATSW1 > 1`, Soltani & Sinclair p. 180).
+pub const TOP_LAYER_WET_MM: f64 = 1.0;
+/// Stage I also needs the profile above half full (`FTSW > 0.5`, p. 181).
+pub const STAGE_ONE_FTSW: f64 = 0.5;
+
+/// Potential evaporation (kg m⁻² day⁻¹ = mm day⁻¹) from bare wet soil — Soltani & Sinclair Eqns
+/// 14.15–14.18, `SRAD · (1 − SALB) · exp(−KET · ETLAI) · Δ/(Δ + γ)` in water units.
+///
+/// `net_radiation` is the model's own forcing, already `(1 − reference_albedo)` of the incident
+/// shortwave (weather and lamp alike), so the incident value is recovered once and the soil's own
+/// albedo applied once. `Δ` and `γ` are the model's (67 Pa K⁻¹ against the book's 68).
+pub fn soil_evaporation_potential(
+    net_radiation: f64,
+    reference_albedo: f64,
+    temp_c: f64,
+    shade_lai: f64,
+) -> f64 {
+    let incident = net_radiation / (1.0 - reference_albedo);
+    let delta = slope_svp(temp_c);
+    let latent = incident * (1.0 - SOIL_ALBEDO) * (-SOIL_SHADE_EXTINCTION * shade_lai).exp()
+        * delta
+        / (delta + GAMMA_PSYCHROMETRIC);
+    (latent / LATENT_HEAT_VAPORIZATION * SECONDS_PER_DAY).max(0.0)
+}
+
+/// The book's Stage II factor for DAY `d` of drying, `√(d+1) − √d` (Eqn 14.19), with `d` the whole
+/// days since Stage II began — a per-day amount, applied as a rate through that day so a day's
+/// steps sum to the book's daily value at any step size.
+pub fn stage_two_factor(dry_days: f64) -> f64 {
+    let d = dry_days.max(0.0).floor();
+    (d + 1.0).sqrt() - d.sqrt()
+}
+
+/// The share of the net radiation the GREEN canopy takes, `1 − exp(−KET · LAI)` — the crop's side
+/// of the soil–crop energy split.
+pub fn crop_radiation_share(lai_green: f64) -> f64 {
+    1.0 - (-SOIL_SHADE_EXTINCTION * lai_green.max(0.0)).exp()
+}
+
 /// The canopy surface resistance (s m⁻¹) a [`SurfaceResistanceForm`] gives at leaf area `lai`;
 /// `constant` is the frozen file value, returned unchanged by [`SurfaceResistanceForm::Constant`].
 ///

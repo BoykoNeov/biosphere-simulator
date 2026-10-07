@@ -22,7 +22,8 @@ use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 use super::flows::{
-    Allocation, CanopyRead, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
+    Allocation, CanopyRead, CarbonContext, Condensation, ConsumerMortality, SoilEvapRead,
+    SoilSurfaceAccount, EventIrrigation, EventRecycling, ConsumerRespiration, Decomposition,
     Drainage, Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
     Irrigation, LeafAreaExpansion, LitterNitrogenTransfer, MaintenanceRespiration,
     MicrobialNitrogenRelease,
@@ -549,15 +550,7 @@ fn build_soil(
             scenario.water_source0,
             true,
         )?);
-        flows.push(Box::new(Irrigation {
-            id: "biosphere.irrigation".to_string(),
-            water_source: WATER_SOURCE.to_string(),
-            soil_water: SOIL_WATER.to_string(),
-            irrigation_var: IRRIGATION_VAR.to_string(),
-            ground_area: scenario.ground_area,
-            rooted_depth_aux: ROOTED_DEPTH.to_string(),
-            soil_extractable_water: scenario.soil_extractable_water,
-        }));
+        flows.push(irrigation_flow(scenario, p));
     }
     if scenario.sealed {
         stocks.push(pool_stock(
@@ -747,42 +740,7 @@ fn build_plants(
             thermal_time_aux: THERMAL_TIME.to_string(),
             pheno: p.pheno,
         }),
-        Box::new(Transpiration {
-            id: "biosphere.transpiration".to_string(),
-            soil_water: SOIL_WATER.to_string(),
-            vapor_sink: wiring.vapor_target.clone(),
-            rn_var: RN_VAR.to_string(),
-            vpd_var: VPD_VAR.to_string(),
-            temp_var: TEMP_VAR.to_string(),
-            aerodynamic_resistance: p.transp.aerodynamic_resistance,
-            surface_resistance: p.transp.surface_resistance,
-            ground_area: scenario.ground_area,
-            rooted_depth_aux: ROOTED_DEPTH.to_string(),
-            soil_extractable_water: scenario.soil_extractable_water,
-            wssg: scenario.wssg,
-            // Sealed: the air takes what the humidity target allows and the rest condenses in
-            // the same step (docs/plans/post-roadmap-vapour-saturation.md, and
-            // docs/plans/post-roadmap-vapour-step-artefact.md for the target). Open field: the
-            // weather's boundary sink, unbounded, byte-for-byte as before.
-            saturation: scenario.sealed.then(|| VapourSaturation {
-                water_vapor: WATER_VAPOR.to_string(),
-                condensate: CONDENSATE.to_string(),
-                air_capacity_mol: scenario.chamber_air_capacity_mol,
-                condensation_rate: p.water.condensation_rate,
-                humidity_setpoint: p.water.humidity_setpoint,
-                vpd_read: p.water.vpd_read,
-            }),
-            // A lab surface-resistance form only (docs/plans/post-roadmap-canopy-resistance.md);
-            // every frozen build keeps `None` and reads the file constant exactly as before.
-            canopy: (p.transp.rs_form != science::SurfaceResistanceForm::Constant).then(|| {
-                CanopyRead {
-                    form: p.transp.rs_form,
-                    leaf_c: LEAF_C.to_string(),
-                    sla_per_mol_c: p.canopy.sla_per_mol_c,
-                    leaf_area_aux: stores_leaf_area(p).then(|| LEAF_AREA_INDEX.to_string()),
-                }
-            }),
-        }),
+        Box::new(transpiration_flow(scenario, p, &wiring)),
         Box::new(NitrogenUptake {
             id: "biosphere.nitrogen_uptake".to_string(),
             soil_n: SOIL_N.to_string(),
@@ -924,7 +882,178 @@ fn build_plants(
     if let Some(process) = leaf_area {
         aux.push(Box::new(process));
     }
+    if soil_evaporates(p) {
+        aux.push(Box::new(soil_surface_account(scenario, p)));
+        if !scenario.sealed {
+            stocks.push(boundary::sink(SOIL_EVAP_SINK.to_string(), Quantity::Water, 0.0)?);
+        }
+    }
     Ok(CompartmentBuild { stocks, flows, aux })
+}
+
+/// Is the lab soil-evaporation form on (`docs/plans/post-roadmap-soil-evaporation.md`)?
+fn soil_evaporates(p: &params::BiosphereParams) -> bool {
+    p.transp.soil_evap != science::SoilEvaporationForm::Off
+}
+
+/// The season's `Transpiration` — ONE builder, so the lab soil account's own instance is built
+/// exactly as the flow is.
+fn transpiration_flow(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+    wiring: &ChamberWiring,
+) -> Transpiration {
+    Transpiration {
+        id: "biosphere.transpiration".to_string(),
+        soil_water: SOIL_WATER.to_string(),
+        vapor_sink: wiring.vapor_target.clone(),
+        rn_var: RN_VAR.to_string(),
+        vpd_var: VPD_VAR.to_string(),
+        temp_var: TEMP_VAR.to_string(),
+        aerodynamic_resistance: p.transp.aerodynamic_resistance,
+        surface_resistance: p.transp.surface_resistance,
+        ground_area: scenario.ground_area,
+        rooted_depth_aux: ROOTED_DEPTH.to_string(),
+        soil_extractable_water: scenario.soil_extractable_water,
+        wssg: scenario.wssg,
+        // Sealed: the air takes what the humidity target allows and the rest condenses in
+        // the same step (docs/plans/post-roadmap-vapour-saturation.md, and
+        // docs/plans/post-roadmap-vapour-step-artefact.md for the target). Open field: the
+        // weather's boundary sink, unbounded, byte-for-byte as before.
+        saturation: scenario.sealed.then(|| VapourSaturation {
+            water_vapor: WATER_VAPOR.to_string(),
+            condensate: CONDENSATE.to_string(),
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
+            condensation_rate: p.water.condensation_rate,
+            humidity_setpoint: p.water.humidity_setpoint,
+            vpd_read: p.water.vpd_read,
+        }),
+        // A lab surface-resistance form only (docs/plans/post-roadmap-canopy-resistance.md);
+        // every frozen build keeps `None` and reads the file constant exactly as before.
+        canopy: (p.transp.rs_form != science::SurfaceResistanceForm::Constant).then(|| {
+            CanopyRead {
+                form: p.transp.rs_form,
+                leaf_c: LEAF_C.to_string(),
+                sla_per_mol_c: p.canopy.sla_per_mol_c,
+                leaf_area_aux: stores_leaf_area(p).then(|| LEAF_AREA_INDEX.to_string()),
+            }
+        }),
+        // The lab soil-evaporation form only; `None` on every frozen build.
+        soil: match p.transp.soil_evap {
+            science::SoilEvaporationForm::Off => None,
+            science::SoilEvaporationForm::TwoStage { floor } => Some(SoilEvapRead {
+                floor,
+                leaf_c: LEAF_C.to_string(),
+                sla_per_mol_c: p.canopy.sla_per_mol_c,
+                leaf_area_aux: stores_leaf_area(p).then(|| LEAF_AREA_INDEX.to_string()),
+                reference_albedo: super::weather::ALBEDO,
+                top_aux: TOP_SOIL_WATER.to_string(),
+                dry_days_aux: SOIL_DRY_DAYS.to_string(),
+                shade_aux: SOIL_SHADE_LAI.to_string(),
+                today_evap_aux: SOIL_EVAP_TODAY.to_string(),
+                today_potential_aux: SOIL_POTENTIAL_TODAY.to_string(),
+                soil_sink: (!scenario.sealed).then(|| SOIL_EVAP_SINK.to_string()),
+            }),
+        },
+    }
+}
+
+/// The trigger `FTSW = 1 − p` for watering in events, or `None` (continuous, the loader's).
+fn event_trigger(p: &params::BiosphereParams) -> Option<f64> {
+    (p.water.watering == science::WateringForm::Fao56Trigger)
+        .then_some(1.0 - science::FAO56_WHEAT_DEPLETION)
+}
+
+/// The open field's watering — ONE builder for the season's flow and the soil account's copy:
+/// `Irrigation` (continuous, the frozen form), or `EventIrrigation` wrapping it (lab).
+fn irrigation_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Box<dyn Flow> {
+    let inner = Irrigation {
+        id: "biosphere.irrigation".to_string(),
+        water_source: WATER_SOURCE.to_string(),
+        soil_water: SOIL_WATER.to_string(),
+        irrigation_var: IRRIGATION_VAR.to_string(),
+        ground_area: scenario.ground_area,
+        rooted_depth_aux: ROOTED_DEPTH.to_string(),
+        soil_extractable_water: scenario.soil_extractable_water,
+    };
+    match event_trigger(p) {
+        None => Box::new(inner),
+        Some(trigger_ftsw) => Box::new(EventIrrigation { inner, trigger_ftsw }),
+    }
+}
+
+/// A sealed chamber's watering from its condensate — ONE builder, as [`irrigation_flow`].
+fn recycling_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Box<dyn Flow> {
+    let inner = Recycling {
+        id: "biosphere.recycling".to_string(),
+        condensate: CONDENSATE.to_string(),
+        soil_water: SOIL_WATER.to_string(),
+        recycling_rate: p.water.recycling_rate,
+    };
+    match event_trigger(p) {
+        None => Box::new(inner),
+        Some(trigger_ftsw) => Box::new(EventRecycling {
+            inner,
+            trigger_ftsw,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: scenario.soil_extractable_water,
+            ground_area: scenario.ground_area,
+        }),
+    }
+}
+
+/// The development stage at which the partition table first gives grain a share: the last row
+/// with no grain before the first row with some (the share is positive just above it).
+fn seed_growth_dvs(p: &params::BiosphereParams) -> f64 {
+    let rows = &p.alloc.table;
+    match rows.iter().position(|r| r.fo > 0.0) {
+        Some(0) | None => rows.first().map_or(0.0, |r| r.dvs),
+        Some(j) => rows[j - 1].dvs,
+    }
+}
+
+/// The lab soil account (`SoilSurfaceAccount`), with its own instances of the season's
+/// `Transpiration` and watering inflow — `Irrigation` open, `Recycling` sealed, wired as the
+/// season's own are.
+fn soil_surface_account(scenario: &SeasonScenario, p: &params::BiosphereParams) -> SoilSurfaceAccount {
+    let inflow: Box<dyn Flow> = if scenario.sealed {
+        recycling_flow(scenario, p)
+    } else {
+        irrigation_flow(scenario, p)
+    };
+    SoilSurfaceAccount {
+        id: "biosphere.soil_surface".to_string(),
+        water: transpiration_flow(scenario, p, &chamber_wiring(scenario.sealed)),
+        inflow,
+        drainage_factor: scenario.drainage_factor,
+        thermal_time_aux: THERMAL_TIME.to_string(),
+        pheno: p.pheno,
+        seed_growth_dvs: seed_growth_dvs(p),
+    }
+}
+
+/// The lab soil account's starting values: the top layer holds its uniform share of the root
+/// zone's water (the zone is uniform by declaration); the clocks at 0; the soil shaded by the
+/// seedling's own leaf area.
+fn soil_surface_initial(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+    soil_water: f64,
+    rooted_depth: f64,
+) -> [(String, f64); 5] {
+    let share = if rooted_depth > 0.0 {
+        (science::TOP_LAYER_DEPTH_M / rooted_depth).min(1.0)
+    } else {
+        1.0
+    };
+    let seedling = science::leaf_area_index(scenario.leaf_c0, p.canopy.sla_per_mol_c, scenario.ground_area);
+    [
+        (TOP_SOIL_WATER.to_string(), soil_water * share),
+        (SOIL_DRY_DAYS.to_string(), 0.0),
+        (SOIL_SHADE_LAI.to_string(), seedling),
+        (SOIL_EVAP_TODAY.to_string(), 0.0),
+        (SOIL_POTENTIAL_TODAY.to_string(), 0.0),
+    ]
 }
 
 fn build_water(
@@ -940,12 +1069,7 @@ fn build_water(
         Quantity::Water,
         scenario.condensate0,
     )?];
-    let flows: Vec<Box<dyn Flow>> = vec![Box::new(Recycling {
-        id: "biosphere.recycling".to_string(),
-        condensate: CONDENSATE.to_string(),
-        soil_water: SOIL_WATER.to_string(),
-        recycling_rate: p.water.recycling_rate,
-    })];
+    let flows: Vec<Box<dyn Flow>> = vec![recycling_flow(scenario, p)];
     Ok(CompartmentBuild {
         stocks,
         flows,
@@ -1107,6 +1231,15 @@ pub fn build_season_with(
     if stores_leaf_area(p) {
         initial_aux.insert(LEAF_AREA_INDEX.to_string(), seedling_leaf_area(scenario, p));
     }
+    // Seeded ONLY under the lab soil-evaporation form, for the same reason.
+    if soil_evaporates(p) {
+        initial_aux.extend(soil_surface_initial(
+            scenario,
+            p,
+            scenario.soil_water0,
+            scenario.rooted_depth0,
+        ));
+    }
     let state = State::new(0, stocks.clone(), 0, initial_aux)?;
     let registry = Registry::new(flows, &stocks, aux)?;
     Ok((state, registry))
@@ -1224,6 +1357,12 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
              must be re-sown by annual_reset_with, which can reset it"
         )));
     }
+    if state.aux.contains_key(TOP_SOIL_WATER) {
+        return Err(SimError::Validation(format!(
+            "annual_reset: this state stores {TOP_SOIL_WATER:?} (the lab soil-evaporation form) \
+             and must be re-sown by annual_reset_with, which can reset it"
+        )));
+    }
     reset_crop(state, scenario)
 }
 
@@ -1236,11 +1375,26 @@ pub fn annual_reset_with(
     p: &params::BiosphereParams,
 ) -> Result<State, SimError> {
     let reset = reset_crop(state, scenario)?;
-    if !reset.aux.contains_key(LEAF_AREA_INDEX) {
+    let (leaf, soil) = (
+        reset.aux.contains_key(LEAF_AREA_INDEX),
+        reset.aux.contains_key(TOP_SOIL_WATER),
+    );
+    if !leaf && !soil {
         return Ok(reset);
     }
     let mut aux = reset.aux.clone();
-    aux.insert(LEAF_AREA_INDEX.to_string(), seedling_leaf_area(scenario, p));
+    if leaf {
+        aux.insert(LEAF_AREA_INDEX.to_string(), seedling_leaf_area(scenario, p));
+    }
+    if soil {
+        // The re-sown zone starts at the sowing depth; the top layer takes its uniform share.
+        aux.extend(soil_surface_initial(
+            scenario,
+            p,
+            reset.stocks[SOIL_WATER].amount,
+            reset.aux[ROOTED_DEPTH],
+        ));
+    }
     State::new(reset.n, reset.stocks.clone(), reset.rng_seed, aux)
 }
 
