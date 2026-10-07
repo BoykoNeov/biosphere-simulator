@@ -148,3 +148,22 @@ share of transpiration (`TR1`) and all of the soil evaporation. So:
   **Checked:** `weather::net_radiation` is `(1 − 0.23) × shortwave` exactly (no long-wave term), and the
   lamp's is the same `net_shortwave` of its radiant PAR — so `RN / 0.77` is the incident value in every
   build.
+
+## 6. Predictions (before any code)
+
+Hand arithmetic behind the sizes: bare wet soil under full outdoor sun at ~100 W m⁻² mean incident
+gives `100 · 0.88 · Δ/(Δ+γ)` ≈ 55 W m⁻² ≈ **1.9 mm/day** at 20 °C (Δ/(Δ+γ) ≈ 0.63); the frozen crop's
+full-cover rate on the same weather is ~2 mm/day. Under LAI 1 the soil keeps 61 %, under LAI 6 5 %.
+
+| | prediction | confidence |
+|---|---|---|
+| S1 | with soil evaporation off and the constant resistance, the new code path is bit-identical: every state of a frozen run, and `regen_goldens` 20 of 20 | high |
+| S2 | a day of constant forcing at dt = 1/16 sums to the book's daily value — Stage I `EOS`, Stage II `EOS·(√(d+1) − √d)` — to 1e-12; the floor adds exactly the day's shortfall to 1.5 mm | high |
+| S3 | energy: on every step the soil's evaporation and the crop's radiation-driven transpiration together use at most the net radiation (latent-heat equivalent); the crop's VPD-driven part reported apart | high |
+| S4 | **the success test** — in the never-re-sown sealed chamber, over its dead-crop steps (LAI < 0.1), the mean chamber vapour under Szeicz–Long + soil (floor off) is **0.7–1.5× the frozen run's** (Szeicz–Long alone: ~0); refuted below 0.5 | medium |
+| S5 | open-field winter (LAI < 0.5) water loss, frozen 95.4 kg / Szeicz–Long alone 30.5: with soil evaporation **65–130 kg** — most of it now from the soil | low-medium |
+| S6 | carbon bit-identical in the default season and the three sealed chambers (no run reaches FTSW < 0.30) | medium |
+| S7 | the open field's top layer is in Stage I on > 90 % of steps (it is watered daily); a sealed chamber's, fed continuously by recycling, likewise | medium |
+| S8 | the floor (on) adds 80–160 kg to the open field's season evaporation (under the closed canopy, `exp(−0.5·6) = 5 %`, the floor lifts ~0.15 to 1.5 mm/day for ~100 summer days); < 10 % in the chambers, whose canopies never close | low |
+| S9 | drought runs dry sooner: `drought_window`'s first stressed day earlier than Szeicz–Long alone's 250 | medium |
+| S10 | every re-sow resets the three values (asserted after `annual_reset_with` and in the station's hook) | high |
