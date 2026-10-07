@@ -344,3 +344,34 @@ Instrument tests green; S2 now 49 floor-eligible days, 0 short; S3 worst 0.7196.
 soil supplies only **0.56–0.96** of what the frozen model's dead or sparse crop "transpired" over its
 dead-crop days, and under events **0.01–0.74**. Soil evaporation does not replace the phantom water
 use one for one anywhere; it replaces part of it.
+
+---
+
+## 10. Re-pricing all three for adoption (the user, 2026-10-07)
+
+**DECIDED (the user): re-price all three together** — the Szeicz–Long canopy resistance, soil
+evaporation and watering in events (over resistance + soil with daily watering, and over stopping at
+the lab). ⚠ Watering in events in the reference is its own design change: every frozen run waters
+continuously today.
+
+**The floor: OFF, my choice on the user's delegation** (*"Choose what is closer to reality"*).
+Reason: the model already gives the soil its own energy share, `exp(−0.5·ETLAI)` of the light, never
+zero; the book's floor stands in for energy its formula misses outdoors (diffuse sky light,
+advection). A sealed lamp-lit chamber has neither, so a fixed 1.5 mm/day would evaporate water with
+no energy to pay for it (S3 had to exclude the floor for that reason), and it does not dim with the
+lamp. Kept as a switch.
+
+**The candidate reference:** `rs = 100 / min(LAI, 2.0)`; soil evaporation two-stage with the energy
+split, the 150 mm top layer capped at silt-loam saturation, no floor; watering on FAO-56's trigger
+(`p = 0.55`), the whole deficit per event.
+
+**Precondition built first (on main, frozen-identical):** the station's `sealed_reset_hook` now calls
+`annual_reset_with` with the params the season was built from (`params::biosphere()`), which equals
+`annual_reset` on every frozen build and re-sows the lab values the plain reset refuses. Proven by the
+golden report and the station suite including its ignored tests (§10a).
+
+### 10a. The precondition, proven
+
+`regen_goldens` (report): 20 of 20 identical. `cargo test --release -p station -- --include-ignored`:
+241 passed, 0 failed (the sealed station's golden, its band, both session resumes and the
+`chamber_walls` trajectory pins among them).

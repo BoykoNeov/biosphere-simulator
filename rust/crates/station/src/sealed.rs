@@ -25,7 +25,7 @@ use domains::biosphere::stocks::{
 };
 use domains::biosphere::params::PhenologyParams;
 use domains::biosphere::science;
-use domains::biosphere::system::{annual_reset, build_season, weather_forcings, weather_shared};
+use domains::biosphere::system::{annual_reset_with, build_season, weather_forcings, weather_shared};
 use domains::crew::{
     CrewParams, WaterBalance, FECAL_WASTE, FOOD_INTAKE_VAR, FOOD_STORE, WATER_BALANCE,
     WATER_INTAKE_VAR, WATER_STORE,
@@ -688,10 +688,15 @@ pub fn outdoor_temperature(
 pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
     let bio = scenario.bio;
     let pheno = scenario.pheno;
+    // `annual_reset_with` and the params the season was built from (`build_season` takes
+    // `params::biosphere()`): identical to `annual_reset` on every frozen build, and it also
+    // re-sows the lab forms' state values, which the plain reset refuses
+    // (`docs/plans/post-roadmap-soil-evaporation.md` §10).
+    let params = domains::biosphere::params::biosphere();
     Box::new(
         move |_n: u64, current: &State| -> Result<Option<State>, SimError> {
             if is_mature(current, &pheno)? {
-                Ok(Some(sow_now(annual_reset(current, &bio)?)?))
+                Ok(Some(sow_now(annual_reset_with(current, &bio, &params)?)?))
             } else {
                 Ok(None)
             }
