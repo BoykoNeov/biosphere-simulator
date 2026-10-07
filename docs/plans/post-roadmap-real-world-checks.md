@@ -395,7 +395,8 @@ condition or parameter was changed. The draft's printed numbers are not scores a
 | W1 transpiration, TM days 25–80 (L m⁻² d⁻¹) | 2.376 | ~6.0 (peak; then roughly constant) | 0.396 | rate |
 | U2 mean daytime net uptake, days 10–84 | 17.33 | 15 | 1.156 | total |
 | C1 net carbon fixed, days 10–84 (mol C m⁻²) | 90.26 | 73.1 | 1.235 | total |
-| B1 plant carbon, TM day 86 (mol C m⁻²) | 62.01 | 66.7 (CH₂O basis; 75 at 45 % C) | 0.930 (0.83) | total |
+| B1 plant carbon, TM day 86, roots in (mol C m⁻²) | 62.01 | 66.7 (CH₂O basis; 75 at 45 % C) | 0.930 (0.83) | total |
+| B1 the same, roots out | 45.43 | 66.7 | 0.681 (0.61) | total |
 | W2 mean transpiration | 2.508 | 4.5 | 0.557 | total |
 | S1 C1 at ci 812 / ci 700 | 1.0308 | — | — | sensitivity |
 
@@ -420,6 +421,10 @@ crop at TM day 86: DVS 1.70 (not mature — dates are not compared); leaf 8.95, 
 | conditions | water high confidence; nitrogen low | both non-limiting | HELD |
 | books | close, 0 rationed, bit-identical | as predicted (asserted) | HELD |
 
+**The count:** of the **10 predictions about the model**, 7 held, 2 failed (U2, C1 — above their
+ranges), 1 held on direction and missed its range by 0.03 (B1, roots in). The last two rows are
+the instrument's own checks, asserted by the test; they are not counted.
+
 ### 9d. What the row says
 
 1. **The seedling was not the limit — the totals' label was wrong.** Both the advisor and this plan
@@ -437,20 +442,27 @@ crop at TM day 86: DVS 1.70 (not mature — dates are not compared); leaf 8.95, 
    model 1.9. Its night also answers temperature more weakly (1.29 for 4 °C against the trial's
    1.65, a whole-stand Q10 near 3.5 against the model's 2.0). The daytime net hides this: the
    model's respiration is in its day numbers instead.
-4. **Standing biomass is close (0.93) while fixation is high (1.23):** the model fixed 90 mol C m⁻²
-   over days 10–84 and stands at 62 — the ~28 mol gap is presumably shed tissue (not booked here,
-   owed). The trial's own gap between gas exchange and harvest was ~10 % (p. 10).
-5. **Water: 0.40 at full cover, below as predicted against the advisor's guess.** The model's lamp
-   warms the crop with its PAR only (`lamp_net_radiation`, the 2026-10-05 choice; room-temperature
-   plan §21). That is near the truth for the station's PWM-dimmed LED, and far from it for the
-   BPC's high-pressure sodium lamps, which radiate much outside PAR. So this row measures the
-   **trial mapping** as much as the model: an HPS chamber is not the station's lamp. The
-   leaf-area-blind rate shows too — the model drinks 2.9 L m⁻² d⁻¹ from day 5, when the trial's
-   seedlings drank little.
+4. **Fixation is high (1.23) and a third of it is shed — measured.** Over the whole run the model
+   fixed 92.26 mol C m⁻²: 61.85 became plant and **30.41 was shed to the open build's litter sink**
+   (the books close to 6e-14). The trial's gap between gas exchange and harvest was ~10 % (p. 10).
+   Whether standing biomass is "close" depends on what the TM's "about 40 kg of total biomass"
+   (p. 10) covers, which it does not say: **0.93 with roots, 0.68 without** (roots are 27 % of the
+   model's plant carbon). Both are reported; neither is chosen.
+5. **Water: 0.40 at full cover, below as predicted against the advisor's guess. The cause is NOT
+   tested.** Two candidates, neither isolated: (a) the model's lamp warms the crop with its PAR only
+   (`lamp_net_radiation`, the 2026-10-05 choice; room-temperature plan §21), while the BPC's
+   high-pressure sodium lamps radiate a great deal outside PAR; (b) the frozen resistances (air 50,
+   surface 70 s m⁻¹) are the FAO grass-reference values outdoors, while the BPC blew air hard over
+   the crop. **Sized:** to transpire 6 L m⁻² d⁻¹ at those resistances the crop needs ~198 W m⁻² of
+   latent heat while lit, i.e. ~340 W m⁻² of net radiation — **about 4× the 81 W m⁻²** the lamp gives
+   at 480 µmol. The lamp's extra radiation may be only part of that. Whether either candidate holds
+   for the station's own lamp is not shown here. The leaf-area-blind rate shows too — the model
+   drinks 2.9 L m⁻² d⁻¹ from day 5, when the trial's seedlings drank little.
 6. **CO₂: 3 % between 1000 and 1160 ppm**, matching the trial's "decreased slightly from 1500 to
    800 ppm" (p. 8). The fixed-CO₂ forcing does what a held chamber does on this row: the parked
    controller was not needed.
 
 **Not acted on.** No parameter moved; this is a diagnostic. Candidates it names, each the user's:
 the night-respiration split (point 3) and the post-dimming uptake (point 2) are science questions;
-the HPS lamp's radiation (point 5) is a trial-mapping question.
+the water gap (point 5) needs its two candidates separated — a lab what-if (net radiation scaled,
+or the resistances lowered) would size each; not run.

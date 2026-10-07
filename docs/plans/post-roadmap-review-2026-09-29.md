@@ -396,7 +396,8 @@ roster produces drought") holds for the frozen roster only — two test-only run
 none had was an end. And the risk below ("a trial at controlled CO₂ needs a CO₂ controller") is
 probably avoidable: a held trial should map onto a fixed leaf-CO₂ forcing, which the open-field
 build reads — unconfirmed, since no lamp-lit build takes one yet; slice 3 decides. The text below
-is left as written.
+is left as written. ⚠ *2026-10-07:* slice 3's row 1 decided it for the held-CO₂ trials — the open
+build with the lamp inputs swapped in hosted TM 102788, no controller needed.
 
 ### The problem
 

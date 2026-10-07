@@ -27,7 +27,7 @@ use domains::biosphere::science;
 use domains::biosphere::stocks::{
     CI_VAR, CO2_ATMOS, CO2_RESP, DAYLENGTH_VAR, FERTILIZATION_VAR, IRRIGATION_VAR, LEAF_C, PAR_VAR,
     PLANT_N, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C,
-    TEMP_VAR, VPD_VAR,
+    LITTER_SINK, TEMP_VAR, VPD_VAR,
 };
 use domains::biosphere::system::{build_season, weather_forcings, weather_shared};
 use domains::biosphere::weather::saturation_vapor_pressure;
@@ -311,17 +311,20 @@ fn scorecard() {
     let c1 = net_fixed(&r, 10, 84);
     let end = r.states.last().unwrap();
     let b1 = plant_c(end) / DEFAULT_SCENARIO.ground_area;
+    // TM p. 10 says only "about 40 kg of total biomass" — whether roots are in it is not stated.
+    let b1_shoot = (plant_c(end) - end.stocks[ROOT_C].amount) / DEFAULT_SCENARIO.ground_area;
     let c1_setpoint = net_fixed(&run(CA_SETPOINT), 10, 84);
 
-    let rows: [(&str, f64, f64, &str); 9] = [
+    let rows: [(&str, f64, f64, &str); 10] = [
         ("U1 peak daytime net uptake (µmol m⁻² s⁻¹)", peak, 27.0, "rate"),
         ("N1 night respiration, TM day 20", night_20, 13.0, "rate"),
         ("N1 night respiration, season mean", night_mean, 7.2, "rate"),
         ("N2 night resp. 20 °C / 16 °C (day 33 / 34)", n2, 1.65, "rate"),
         ("W1 transpiration, days 25–80 (L m⁻² d⁻¹)", w1, 6.0, "rate"),
-        ("U2 mean daytime net uptake, days 10–84", u2, 15.0, "TOTAL (seedling)"),
-        ("C1 net C fixed, days 10–84 (mol C m⁻²)", c1, 73.1, "TOTAL (seedling)"),
-        ("B1 plant C at day 86 (mol C m⁻², CH₂O basis)", b1, 66.7, "TOTAL (seedling)"),
+        ("U2 mean daytime net uptake, days 10–84", u2, 15.0, "total"),
+        ("C1 net C fixed, days 10–84 (mol C m⁻²)", c1, 73.1, "total"),
+        ("B1 plant C at day 86, roots in (mol C m⁻²)", b1, 66.7, "total"),
+        ("B1 plant C at day 86, roots out", b1_shoot, 66.7, "total"),
         ("W2 mean transpiration (L m⁻² d⁻¹)", w2, 4.5, "TOTAL (leaf-blind)"),
     ];
     eprintln!("\nTM 102788 scorecard (ci = {:.0} ppm):", scenario(CA_ROW).ci);
@@ -347,6 +350,16 @@ fn scorecard() {
         end.stocks.get(STEM_RESERVE_C).map_or(0.0, |x| x.amount),
     );
     eprintln!("  CO₂ by flow over the run (mol): {:?}", r.co2_by_flow);
+    // Where the fixed carbon went: the plant, or tissue shed to the open build's litter sink.
+    let start = &r.states[0];
+    let fixed_all = -r.co2.iter().sum::<f64>();
+    let litter = end.stocks[LITTER_SINK].amount - start.stocks[LITTER_SINK].amount;
+    let grew = plant_c(end) - plant_c(start);
+    eprintln!(
+        "  carbon over the whole run (mol): fixed {fixed_all:.3} = plant gain {grew:.3} + shed to \
+         litter {litter:.3} + rest {:.2e}",
+        fixed_all - grew - litter
+    );
     for d in [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80] {
         eprintln!(
             "  TM day {d:>2}: peak uptake {:>7.3}  night resp {:>7.3}  water {:>6.3}  plant C {:>8.3}",

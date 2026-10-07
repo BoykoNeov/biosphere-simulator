@@ -519,6 +519,9 @@ held rows probably do not need the controller. No build hosts that yet (the lamp
 sealed); Step 6's slice 3 confirms or refutes it, and for the LMLSTP crew test (CO₂ held by the
 light) it is not established. §2.2's "not yet" stands on its own reason (whether a habitat should
 vent carbon). Nothing added to §3.
+⚠ *2026-10-07, same item:* Step 6's row 1 ran TM 102788 on the open build with a fixed leaf CO₂ and
+the lamp inputs swapped in, so for the held-CO₂ trials the controller is NOT needed — now shown by a
+run, not argued. Still unshown for the LMLSTP crew test (CO₂ held by the light).
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

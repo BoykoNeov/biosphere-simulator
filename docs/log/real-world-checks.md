@@ -67,11 +67,14 @@ trial's chamber. A diagnostic: it asserts its instrument and prints the scorecar
 * Night respiration **0.15** of the trial's near day 20 and **0.48** over the season; the night's
   temperature response 1.29 for 4 °C against 1.65. The model respires at night for upkeep only;
   its growth respiration falls in the light.
-* Carbon fixed over days 10–84 **1.23×**; standing plant carbon at day 86 **0.93×**.
-* Water at full cover **0.40**, below as predicted against the advisor's guess: the model's lamp
-  heats the crop with its PAR only — near right for the station's LED, far from it for the BPC's
-  sodium lamps. A trial-mapping question as much as a model one.
+* Carbon fixed over days 10–84 **1.23×**. Measured over the run: of 92.3 mol C fixed, 61.9 stayed
+  in the plant and **30.4 was shed** to litter. Standing plant carbon at day 86: **0.93× with roots,
+  0.68× without** — the TM does not say whether its 40 kg includes roots.
+* Water at full cover **0.40**, below as predicted against the advisor's guess. **Cause untested.**
+  Two candidates: the model's lamp heats the crop with its PAR only (the BPC's sodium lamps
+  radiate far more), and the frozen air/surface resistances are outdoor-grass values (the BPC blew
+  air hard). Sized: 6 L m⁻² d⁻¹ would need ~4× the lamp's net radiation at these resistances.
 * CO₂ 1000 against 1160 ppm: **3 %**. The fixed-CO₂ forcing served the held chamber; the parked
   controller was not needed for this row.
-* Of 12 graded predictions: 9 held, 2 failed (both season totals, above the range), 1 held on
-  direction and missed its range by 0.03. No parameter moved.
+* Of 10 predictions about the model: 7 held, 2 failed (both season totals, above the range), 1 held
+  on direction and missed its range by 0.03. No parameter moved.
