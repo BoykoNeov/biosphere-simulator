@@ -775,6 +775,29 @@ pub struct VapourSaturation {
     pub vpd_read: science::VpdRead,
 }
 
+/// Where [`Transpiration`] reads its canopy under a lab [`science::SurfaceResistanceForm`]
+/// (`docs/plans/post-roadmap-canopy-resistance.md`). `None` on every frozen build.
+pub struct CanopyRead {
+    pub form: science::SurfaceResistanceForm,
+    pub leaf_c: String,
+    pub sla_per_mol_c: f64,
+    /// The stored LAI when the lab leaf form keeps one ([`CarbonContext::lai_at`]'s rule).
+    pub leaf_area_aux: Option<String>,
+}
+
+impl CanopyRead {
+    fn lai(&self, snapshot: &State, ground_area: f64) -> f64 {
+        match &self.leaf_area_aux {
+            None => science::leaf_area_index(
+                amt(snapshot, &self.leaf_c),
+                self.sla_per_mol_c,
+                ground_area,
+            ),
+            Some(aux) => snapshot.aux.get(aux).copied().unwrap_or(0.0).max(0.0),
+        }
+    }
+}
+
 /// WATER `soil_water -> vapor_sink` (Penman–Monteith · f_water).
 ///
 /// Sealed (`saturation` is `Some`): `soil_water -> water_vapor + condensate`, the vapour share
@@ -794,6 +817,9 @@ pub struct Transpiration {
     pub soil_extractable_water: f64,
     pub wssg: f64,
     pub saturation: Option<VapourSaturation>,
+    /// `Some` only under a lab surface-resistance form; `None` reads `surface_resistance` as
+    /// before, on every frozen build.
+    pub canopy: Option<CanopyRead>,
 }
 
 impl Flow for Transpiration {
@@ -822,12 +848,20 @@ impl Flow for Transpiration {
             _ => env.get(&self.vpd_var)?,
         };
         let soil_water = amt(snapshot, &self.soil_water);
+        let surface_resistance = match &self.canopy {
+            None => self.surface_resistance,
+            Some(c) => science::canopy_surface_resistance(
+                c.form,
+                self.surface_resistance,
+                c.lai(snapshot, self.ground_area),
+            ),
+        };
         let potential = science::penman_monteith_transpiration(
             net_radiation,
             vpd,
             temp_c,
             self.aerodynamic_resistance,
-            self.surface_resistance,
+            surface_resistance,
         );
         let f_water = science::soil_water_stress(
             soil_water,
@@ -2951,6 +2985,7 @@ mod tests {
             soil_extractable_water: EXTR,
             wssg: WSSG,
             // The open-field shape: two legs to the boundary sink, no saturation bound.
+            canopy: None,
             saturation: None,
         }
     }
@@ -3307,6 +3342,7 @@ mod tests {
         let open = transpiration_flow(2.0);
         let sealed = Transpiration {
             vapor_sink: WATER_VAPOR.to_string(),
+            canopy: None,
             saturation: Some(VapourSaturation {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
@@ -3404,6 +3440,7 @@ mod tests {
         let cap = science::saturation_vapour_kg(20.0, ROOM_MOL);
         let sealed = |read| Transpiration {
             vapor_sink: WATER_VAPOR.to_string(),
+            canopy: None,
             saturation: Some(VapourSaturation {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
@@ -3470,6 +3507,7 @@ mod tests {
         let target = SETPOINT * science::saturation_vapour_kg(20.0, ROOM_MOL);
         let sealed = Transpiration {
             vapor_sink: WATER_VAPOR.to_string(),
+            canopy: None,
             saturation: Some(VapourSaturation {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),

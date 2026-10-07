@@ -975,6 +975,58 @@ pub enum LeafAreaForm {
     NodeEnvelope,
 }
 
+/// How transpiration's canopy surface resistance is obtained — LAB-ONLY
+/// (`docs/plans/post-roadmap-canopy-resistance.md`).
+///
+/// Not a fitted coefficient and never loaded from a param file — like [`LeafAreaForm`], it selects
+/// between the frozen form and a lab one. Neither lab form is endorsed; which one, if any, is ever
+/// priced for adoption is the user's call after the measurement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SurfaceResistanceForm {
+    /// The frozen reference: `transpiration.yaml`'s constant `surface_resistance`, whatever the
+    /// canopy's leaf area.
+    #[default]
+    Constant,
+    /// FAO-56 (Allen et al. 1998) Ch. 2 Eq. 5, `rs = rl / LAI_active`, with Box 5's
+    /// `LAI_active = 0.5 LAI` and `rl ≈ 100 s m⁻¹`. ⚠ FAO scopes Eq. 5 to *"dense full cover
+    /// vegetation"*, and states the 0.5 and the 100 in its GRASS box; below full cover this form
+    /// runs outside its source's stated scope.
+    FaoFullCover,
+    /// Teh §4.6 Eq. 4.80 after Szeicz & Long (1969): `rc = rst / L` for `L ≤ 0.5 Lcr`, constant
+    /// `rst / (0.5 Lcr)` above, with Teh's own `Lcr = 4.0`. ⚠ A COMPOSITE: Teh's `rst` is the
+    /// light-dependent Jarvis form (Eq. 4.79), for which no wheat coefficients are on the shelf;
+    /// FAO's constant 100 s m⁻¹ stands in for it, so this form does not close stomata in the dark.
+    SzeiczLong,
+}
+
+/// `rl`, a well-watered single leaf's stomatal resistance (s m⁻¹) — FAO-56 Ch. 2 Box 5, *"about
+/// 100 s m⁻¹ under well-watered conditions"*. Lab-only, beside the form that reads it.
+pub const LEAF_STOMATAL_RESISTANCE: f64 = 100.0;
+/// FAO-56 Ch. 2 Box 5's `LAI_active = 0.5 LAI` (*"only the upper half of dense clipped grass"*).
+pub const FAO_ACTIVE_LAI_FRACTION: f64 = 0.5;
+/// `Lcr`, Teh's threshold leaf area index — *"In this book, we will take Lcr as 4.0, a typical
+/// maximum leaf area index"* (§4.6, p. 98). Taken as the book's choice, never from the model's
+/// own peak LAI.
+pub const TEH_THRESHOLD_LAI: f64 = 4.0;
+
+/// The canopy surface resistance (s m⁻¹) a [`SurfaceResistanceForm`] gives at leaf area `lai`;
+/// `constant` is the frozen file value, returned unchanged by [`SurfaceResistanceForm::Constant`].
+///
+/// At `lai ≤ 0` both lab forms return `+∞`, which Penman–Monteith turns into exactly zero
+/// transpiration (its denominator diverges); the flux stays finite.
+pub fn canopy_surface_resistance(form: SurfaceResistanceForm, constant: f64, lai: f64) -> f64 {
+    match form {
+        SurfaceResistanceForm::Constant => constant,
+        _ if lai <= 0.0 => f64::INFINITY,
+        SurfaceResistanceForm::FaoFullCover => {
+            LEAF_STOMATAL_RESISTANCE / (FAO_ACTIVE_LAI_FRACTION * lai)
+        }
+        SurfaceResistanceForm::SzeiczLong => {
+            LEAF_STOMATAL_RESISTANCE / lai.min(0.5 * TEH_THRESHOLD_LAI)
+        }
+    }
+}
+
 /// `MSNN = 1 + CTU/PHYL` — main-stem node number, DERIVED ([F] Eqns 9.1–9.2).
 ///
 /// [F] Box 9.2 starts `MSNN` at 1 and adds `DTU/PHYL` per step, which integrates to this

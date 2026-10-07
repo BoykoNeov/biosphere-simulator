@@ -22,7 +22,7 @@ use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 use super::flows::{
-    Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
+    Allocation, CanopyRead, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
     Drainage, Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
     Irrigation, LeafAreaExpansion, LitterNitrogenTransfer, MaintenanceRespiration,
     MicrobialNitrogenRelease,
@@ -771,6 +771,16 @@ fn build_plants(
                 condensation_rate: p.water.condensation_rate,
                 humidity_setpoint: p.water.humidity_setpoint,
                 vpd_read: p.water.vpd_read,
+            }),
+            // A lab surface-resistance form only (docs/plans/post-roadmap-canopy-resistance.md);
+            // every frozen build keeps `None` and reads the file constant exactly as before.
+            canopy: (p.transp.rs_form != science::SurfaceResistanceForm::Constant).then(|| {
+                CanopyRead {
+                    form: p.transp.rs_form,
+                    leaf_c: LEAF_C.to_string(),
+                    sla_per_mol_c: p.canopy.sla_per_mol_c,
+                    leaf_area_aux: stores_leaf_area(p).then(|| LEAF_AREA_INDEX.to_string()),
+                }
             }),
         }),
         Box::new(NitrogenUptake {

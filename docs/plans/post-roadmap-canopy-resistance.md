@@ -119,3 +119,106 @@ coupling not understood here, and that is the finding.
 3. Teh's threshold LAI (his 4.0) or a cited crop maximum.
 4. Whether the open field's bare-soil evaporation, which today's full-cover rate stands in for, is
    taken up (Teh §4.7 carries a soil form) — a separate item.
+
+---
+
+## 7. BUILT lab-only and measured (2026-10-07) — the predictions graded
+
+**What was built (nothing frozen moved):** `science::SurfaceResistanceForm` (`Constant` — the
+loader's value — `FaoFullCover`, `SzeiczLong`) and `science::canopy_surface_resistance`, with the
+three lab constants beside it (`LEAF_STOMATAL_RESISTANCE` 100, `FAO_ACTIVE_LAI_FRACTION` 0.5,
+`TEH_THRESHOLD_LAI` 4.0); `TranspirationParams::rs_form`, never loaded from the file;
+`flows::CanopyRead`, which `Transpiration` carries only under a lab form (`None` on every frozen
+build, so the frozen path is the old code path); `lab::biosphere_with_rs_form`. Tests:
+`rust/crates/domains/tests/canopy_resistance.rs` (two instrument checks; the 24-season measurement
+`#[ignore]`d, run with `--ignored --release`) and, in `station/tests/scorecard_tm102788.rs`,
+`the_rows_water_curve_under_the_canopy_resistance_forms` (printed).
+
+### 7a. The measurement
+
+| scenario | form | season transpiration (kg) | at LAI < 0.5 | at LAI ≥ 4 | irrigated | lowest FTSW | end carbon = frozen |
+|---|---|---|---|---|---|---|---|
+| default | Constant | 587.29 | 95.40 | 351.05 | 586.98 | 0.9933 | — |
+| | FAO | 555.41 (−5.4 %) | 17.37 (−82 %) | 421.18 (+20 %) | 555.10 | 0.9975 | yes |
+| | Szeicz–Long | 559.57 (−4.7 %) | 30.52 (−68 %) | 388.85 (+11 %) | 559.24 | 0.9977 | yes |
+| deep water 1 mm/d | Constant | 420.80 | 95.40 | 188.30 | 265.75 | 0.0810 | — |
+| | FAO | 326.18 | 17.37 | 200.26 | 172.53 | 0.0767 | no (stressed) |
+| | Szeicz–Long | 348.84 | 30.52 | 185.50 | 192.59 | 0.0720 | no (stressed) |
+| sealed chamber | Constant / FAO / S–L | 708.21 / 334.60 (−53 %) / 504.19 (−29 %) | | | | 0.84 / 0.97 / 0.95 | yes |
+| perennial chamber | Constant / FAO / S–L | 708.21 / 290.24 (−59 %) / 448.48 (−37 %) | | | | 0.84 / 0.97 / 0.95 | yes |
+| consumer chamber | Constant / FAO / S–L | 708.25 / 248.14 (−65 %) / 393.58 (−44 %) | | | | 0.84 / 0.97 / 0.96 | yes |
+
+Drainage was **0.00** in every run; the open field's irrigation is deficit-driven, so it tracks
+transpiration (586.98 against 587.29). The sealed chambers are watered by their own condensate ring,
+not irrigation.
+
+| deep-water rescue (with the below-root store / without) | canopy | grain at the season's end |
+|---|---|---|
+| Constant (pinned) | 1.0294 (9.836 / 9.555) | 1.2199 (12.515 / 10.260) |
+| FAO | **1.0000** (9.836 / 9.836) | 1.0360 (11.069 / 10.685) |
+| Szeicz–Long | 1.0037 (9.836 / 9.799) | 1.0885 (10.894 / 10.008) |
+
+| `drought_window` (cut days 220–260) | first day FTSW < 0.30 | lowest FTSW |
+|---|---|---|
+| Constant | 254 | 0.2093 |
+| FAO | 247 | 0.1177 |
+| Szeicz–Long | 250 | 0.1567 |
+
+**TM 102788, the water curve** — each day's use over its own mean for TM days 25–80, against Fig. 10
+(p. 27) "water added", read off the page image (± ~0.1):
+
+| TM day | 5 | 8 | 11 | 14 | 20 | 26 | 40 | 60 | 80 | W1 (L m⁻² d⁻¹) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Fig. 10 / ~85 | 0.21 | 0.47 | 0.71 | 1.18 | — | 1.29 | 0.82–1.06 | | | ~6.0 (level) |
+| Constant | 1.21 | 1.21 | 1.21 | 1.21 | 1.21 | 1.21 | 0.99 | 0.99 | 0.99 | 2.376 |
+| FAO | 0.08 | 0.21 | 0.44 | 0.73 | 1.10 | 1.22 | 0.99 | 0.98 | 0.98 | 2.853 |
+| Szeicz–Long | **0.17** | **0.40** | **0.74** | **1.06** | 1.21 | **1.21** | 0.99 | 0.99 | 0.99 | 2.607 |
+| model LAI | 0.06 | 0.18 | 0.47 | 1.12 | 3.68 | 6.37 | 6.54 | 5.98 | 5.89 | |
+
+(The model's step from 1.21 to 0.99 between days 26 and 40 is the trial's day-28 lamp dimming,
+695 → 480 µmol; the trial's own curve falls over the same days.) Under the frozen form, fully dark
+steps carry **5.7 %** of the row's water and partly lit steps 11.0 %.
+
+### 7b. The predictions, graded
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| P1 | the constant form through the switch is bit-identical; `regen_goldens` 20/20 | every state of the default and sealed runs bit-identical (asserted); golden report: see §7d | HELD (assert); §7d |
+| P2 | each form reaches the flow to ~1e-9 | to 1e-12, open field and sealed chamber, and each form moved the resistance (asserted) | HELD |
+| P3 | sealed chambers: FAO −45–75 %, S–L −20–50 % | FAO −53 / −59 / −65 %; S–L −29 / −37 / −44 % | HELD |
+| P4 | default: winter use −80 %+ under both; summer FAO +15–30 %, S–L +5–15 %; season −0–25 %; drainage rises | winter FAO −82 % (HELD), S–L **−68 % (FAILED)**; summer +20 / +11 % (HELD); season −5.4 / −4.7 % (HELD); drainage **0 throughout — the irrigation absorbs it (FAILED, the mechanism was wrong)** | mixed |
+| P5 | carbon bit-identical in the unstressed runs | default and all three chambers: yes | HELD |
+| P6 | deep-water grain ratio 1.00–1.18; canopy 1.00–1.06 | grain 1.036 / 1.089; canopy 1.000 / 1.004 | HELD |
+| P7 | drought window earlier: FAO 3–10 days, S–L 1–6 | 7 / 4 days | HELD |
+| P8 | W1 FAO ~2.8–2.9, S–L ~2.5–2.6; early use falls toward the trial's | 2.853 (HELD); 2.607 (**0.007 over**); early use falls under both (HELD) | mostly held |
+| P9 | dark steps ~8 % of the water | 5.7 % fully dark (+ 11.0 % partly lit) | FAILED (low) |
+| P10 | forcing the form back to constant in the flow turns the exactness check red | red, as predicted; restored | HELD |
+
+### 7c. What it says
+
+1. **Both forms are clean couplings:** water moves, carbon does not, until a drought makes the
+   water matter. Then the shape of the season changes in two directions at once. The seedling
+   barely drinks, so the invented early drought goes. The closed canopy drinks more, so a summer
+   drought comes sooner and deeper (`drought_window` 7 or 4 days earlier; the deep-water crop's
+   grain WITH its deep store falls 12.52 → 11.07 / 10.89).
+2. **The deep-water rescue collapses to ~1.** Under FAO the store-less crop reaches the same canopy
+   (9.836 both), and grain differs by only 3.6 % — the rescue the frozen pin records was mostly the
+   seedling drought the constant resistance invents.
+3. **The sealed chambers drink 29–65 % less** — their canopies never close, so their resistance sits
+   above 70 on every step. In an adoption every sealed golden's water stocks would move.
+4. **The trial's early water curve fits Szeicz–Long closely** (0.17 / 0.40 / 0.74 / 1.06 against
+   0.21 / 0.47 / 0.71 / 1.18), while FAO's rises too slowly and the frozen constant is flat from day
+   5. One trial, one figure read by eye, a model LAI trajectory of its own: suggestive, not decisive.
+   Neither form closes the LEVEL (2.6–2.9 against ~6), which stays the air-coupling question of the
+   Step 6 record.
+5. **FAO's form runs outside its source's scope below full cover**, and it is the one that fits the
+   early curve worse. Szeicz–Long is the form whose source addresses low LAI — with a composite leaf
+   value and no light response (worth ~6 % of the water here, in the dark).
+
+### 7d. The gates
+
+* `regen_goldens` (report only): **20 of 20 goldens identical, 0 would change** — P1 HELD in full.
+* `cargo clippy --all-targets -- -D warnings`: clean.
+* `cargo test --no-fail-fast`: **1354 passed, 0 failed, 6 ignored** (run before the measurement was
+  marked `#[ignore]`, so it ran once inside the suite; it is run on demand from here on).
+* `repo_gates` re-run after the doc edits.

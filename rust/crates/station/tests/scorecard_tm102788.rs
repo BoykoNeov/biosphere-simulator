@@ -495,3 +495,51 @@ fn the_surface_resistance_a_full_canopy_would_have() {
         w1_by_hand(1e-6, rs_fao, 1.0)
     );
 }
+
+/// Printed, never asserted (`docs/plans/post-roadmap-canopy-resistance.md` §5, P8–P9): the row's
+/// water use under the lab canopy-resistance forms, as a level (W1) and as a SHAPE — each day's
+/// use over its own mean for TM days 25–80 — against TM 102788 Fig. 10 (p. 27) "water added",
+/// read off the page image (±5–10 L day⁻¹ on ~85; stand of 20 m²): day 5 ~18, 8 ~40, 11 ~60,
+/// 14 ~100, 26 ~110, then ~70–90 to day 80, ~57 at day 83.
+#[test]
+fn the_rows_water_curve_under_the_canopy_resistance_forms() {
+    use domains::biosphere::science::SurfaceResistanceForm as F;
+    let days = [5usize, 8, 11, 14, 20, 26, 40, 60, 80];
+    let base = run(CA_ROW);
+    let dark: f64 = (0..base.water.len())
+        .filter(|&n| lit(n as u64, BIO_DT) == 0.0)
+        .map(|n| base.water[n])
+        .sum();
+    let partly_dark: f64 = (0..base.water.len())
+        .filter(|&n| {
+            let l = lit(n as u64, BIO_DT);
+            l > 0.0 && l < 1.0
+        })
+        .map(|n| base.water[n])
+        .sum();
+    let total: f64 = base.water.iter().sum();
+    println!(
+        "P9: under the frozen form, fully dark steps carry {:.4} of the row's water; partly lit steps {:.4}",
+        dark / total,
+        partly_dark / total
+    );
+    let sla = params::biosphere().canopy.sla_per_mol_c;
+    for form in [F::Constant, F::FaoFullCover, F::SzeiczLong] {
+        let r = run_what_if(&domains::lab::biosphere_with_rs_form(&[], form).unwrap(), 1.0);
+        let w1 = mean(W1_DAYS.map(|d| daily_water(&r, d)));
+        let shape: Vec<String> = days
+            .iter()
+            .map(|&d| format!("{d}:{:.2}", daily_water(&r, d) / w1))
+            .collect();
+        let lai: Vec<String> = days
+            .iter()
+            .map(|&d| {
+                let s = &r.states[(d - TM_DAY0) * STEPS_PER_DAY];
+                format!("{:.2}", science::leaf_area_index(s.stocks[LEAF_C].amount, sla, 1.0))
+            })
+            .collect();
+        println!("P8 {form:<13?} W1 {w1:.4} L m⁻² d⁻¹; day/W1: {}", shape.join(" "));
+        println!("   LAI on those days: {}", lai.join(" "));
+    }
+    println!("TM Fig. 10 water added / ~85 (its days 25–80 level): 5:0.21 8:0.47 11:0.71 14:1.18 26:1.29 40–80: 0.82–1.06 83:0.67");
+}

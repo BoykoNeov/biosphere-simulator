@@ -40,7 +40,9 @@
 //! (`docs/log/canopy-provenance.md`) is still open and still the user's.
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
-use crate::biosphere::science::{Co2Read, KineticsForm, LeafAreaForm, O2Form, VpdRead};
+use crate::biosphere::science::{
+    Co2Read, KineticsForm, LeafAreaForm, O2Form, SurfaceResistanceForm, VpdRead,
+};
 use config::{with_override, ConfigError, ParamFile};
 
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
@@ -201,6 +203,23 @@ pub fn biosphere_with_vpd_read(
 ) -> Result<BiosphereParams, ConfigError> {
     let mut p = biosphere_with(subs)?;
     p.water.vpd_read = form;
+    Ok(p)
+}
+
+/// The frozen params under an alternative **canopy surface resistance** form — lab-only
+/// (`docs/plans/post-roadmap-canopy-resistance.md`).
+///
+/// [`SurfaceResistanceForm::Constant`] is the loader's value (the file's 70 s m⁻¹, whatever the
+/// leaf area). The two lab forms read the crop's LAI: FAO-56 Eq. 5 (scoped by its source to dense
+/// full cover) and Teh Eq. 4.80 after Szeicz & Long (a composite leaf value; no light response).
+///
+/// # ⚠ This endorses no form
+pub fn biosphere_with_rs_form(
+    subs: &[Substitution],
+    form: SurfaceResistanceForm,
+) -> Result<BiosphereParams, ConfigError> {
+    let mut p = biosphere_with(subs)?;
+    p.transp.rs_form = form;
     Ok(p)
 }
 
