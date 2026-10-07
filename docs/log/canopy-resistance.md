@@ -41,3 +41,16 @@ keeps the frozen constant, and the frozen path is the old code path (asserted bi
   failed: drainage stayed 0 (irrigation is deficit-driven), and the dark share was 5.7 %, not 8 %.
 * Decisions owed to the user: which form to price for adoption, a constant or light-dependent leaf
   resistance, and the threshold LAI.
+
+**PRICED 2026-10-07** on the user's call (Szeicz–Long, constant 100 s/m, Teh's 4.0), on a local
+branch never pushed (plan §9–§10).
+
+* Lab twins of the ten crop goldens, each proven against its committed golden by a control run,
+  predicted the flip exactly: the report showed the same ten "would change", and each equalled its
+  twin byte for byte. The other ten were identical.
+* **Water only.** No carbon, nitrogen, oxygen, energy or aux value moved anywhere. Open field −4.7 %
+  transpired (the irrigation the same); chambers' condensate −66 to −88 %; sealed station +9 %.
+* 8 reds: 7 goldens, bands and instrument checks; 1 unpredicted — the perennial chamber's
+  below-root store now takes ~4 cycles to settle instead of one (it converges; water is conserved).
+* **Exposed gap:** with the crop gone, a sealed chamber's air dries to ~0 vapour over wet soil — the
+  model has no bare-soil evaporation, which the constant resistance had been standing in for.

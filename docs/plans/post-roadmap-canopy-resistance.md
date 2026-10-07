@@ -325,3 +325,68 @@ crop-free goldens (`cabin_gas`, `crew`, `eclss`, `power`, `power_self_discharge`
    "transpiration ignores leaf area" closes for the crop (not for bare-soil evaporation).
 5. **Potato:** adopt for both crops, or keep potato on the constant (a `transp` override in
    `params::potato()`).
+
+---
+
+## 10. The price, measured on a local branch (2026-10-07) — graded
+
+Branch `wip/canopy-resistance-price` (local, never pushed; one commit, `b5d20b5`, the loader line
+`rs_form: SurfaceResistanceForm::SzeiczLong`). Main keeps the constant form throughout. Logs:
+`W:\temp\claude\step6\price\`.
+
+### 10a. The predictions, graded
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| Q1 | exactly ten goldens change, each equal to its twin byte for byte; the other ten identical | `regen_goldens` report: **20 run, 10 would change** — the predicted ten; a probe calling each producer on the branch: **all ten equal their twins byte for byte** | HELD exactly |
+| Q2 | red by design: canopy P1, scorecard R1, the goldens' regression and band checks, the manifest byte gates, the deep-water grain pin | P1, R1, `golden_regression` (domains + station cheap + the expensive sealed station), `tier_contract` (all three), the deep-water pin (*"1.0885 (measured 1.2199)"*) red. **The manifest byte gates stayed green** — they hash the committed files, which a report-only run does not rewrite | HELD except the manifest gates (wrong: they go red only after `--write`) |
+| Q3 | possibly red: tests pinning water in a run with a crop | **none red** — no chamber-dryness, vapour, watering, minute-step, air-split, lamp or potato test moved | none fired |
+| Q4 | carbon, energy, gas tests, `drought_window`, the laws green | green | HELD |
+| Q5 | `chamber_walls` trajectory pins green | green (heater battery; node and chamber temperatures), plus both session resumes | HELD |
+| — | **NOT predicted** | `the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years` red: the perennial chamber's below-root store no longer settles after one cycle | a finding (10b) |
+
+Suite on the branch: **1345 passed, 8 failed** (debug); ignored, release: 5 passed, 2 failed (the
+sealed station's golden and band). Every red classified: 7 are goldens / bands / instrument checks
+that an adoption regenerates or restates by construction; 1 is a behaviour change.
+
+### 10b. The one unpredicted red, measured
+
+On the branch, the perennial chamber's below-root store at each cycle's start, 15 cycles (a
+throwaway probe, `W:\temp\claude\step6\price\zz_subsoil.rs`): 172.242, 172.329, 172.444, 172.537,
+172.610, … 172.851 — rising by 0.087, 0.115, 0.092, 0.073 … 0.008 kg per cycle, the increment
+shrinking ~0.8× a cycle. **It converges** (to ~172.9 kg), not a ratchet: water migrates slowly from
+the condensate (3.18 → 2.44 kg) into the subsoil because the sparse crop drinks less. The frozen claim
+"one transient cycle, then a fixed point held to round-off" becomes "a transient of ~4 cycles". Water
+is conserved throughout (asserted each step).
+
+### 10c. The price table
+
+| golden | what moves (end state) |
+|---|---|
+| `season_euler` (open field) | transpired −27.7 kg (−4.72 %) and irrigated −27.7 kg — the same water; soil −0.02 % |
+| `sealed_chamber` | condensate 8.15 → **3.0e-6**; water vapour 0.25 → **2.9e-6** kg; soil +8.40 kg (+5.2 %) |
+| `perennial_chamber` / long horizon | condensate −66 % / −69 %; soil +2.6 % / +2.7 %; subsoil +4.9 % / +5.0 % |
+| `consumer_chamber` / long horizon | condensate −75 % / −78 %; soil +2.9 % / +3.0 %; subsoil +5.5 % / +5.7 % |
+| `lighting` | condensate −88 %; soil +11.5 % |
+| `greenhouse` | condensate −84 %; vapour −57 %; soil +16.2 % |
+| `harvest` | condensate −87 %; vapour −69 %; soil +3.1 % |
+| `sealed_station` | condensate +9.1 %; subsoil +9.5 %; soil −1.7 % (the tier band reports 9.46 % at its worst leaf) |
+| the other ten | identical |
+
+**Water only:** no carbon, nitrogen, oxygen, energy or aux value moves in any golden.
+
+**A gap this exposes — must be weighed before any adoption.** In the 3-year sealed chamber the air
+ends with **2.9e-6 kg of water vapour (against 0.25 frozen) — effectively none** over a wet soil: the crop has senesced (LAI → 0, so its
+resistance → ∞ and it transpires nothing), and the model has **no bare-soil evaporation** — the
+frozen constant resistance had been letting a dead or absent canopy keep "transpiring", standing in
+for it. An adoption without a soil-evaporation term gives sealed chambers bone-dry air whenever the
+crop is small or gone. (Teh §4.7, on the same page as Eq. 4.80, carries a soil form; FAO-56's own
+scope sentence says partial cover "should indeed include the effects of the evaporation from the soil
+surface".)
+
+**Ceremony, beyond the run (§9e):** `100` and `4.0` into `transpiration.yaml` with their sources (the
+file's digest changes → its manifest row regenerates); the uncited 70 kept for the lab form or
+retired; ten `golden_sha256` rows across the biosphere and station manifests; the contracts' dated
+entries and the station contract's sentence "transpiration does not read the canopy"; the deep-water
+pin and the re-sow cycle test restated at their measured values; potato — adopt for both crops or
+keep potato on the constant.
