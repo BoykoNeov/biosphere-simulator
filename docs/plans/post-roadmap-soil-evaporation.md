@@ -253,11 +253,15 @@ daily 251; + soil, events **243**; + soil + floor, events **237**.
 | S9 | drought runs dry sooner than S–L alone's day 250 | events 243 / 237 (HELD); daily 251 (FAILED by one day) | mostly held |
 | S10 | every re-sow resets the values; the plain reset refuses | asserted (after a first-edit miss the test itself caught) | HELD |
 
+**The count (corrected 2026-10-07, advisor review):** of 10 predictions **6 held** (S1, S2, S3, S6, S7,
+S10), 1 mostly held (S9), 1 failed (S8), 2 split by watering (S4, S5).
+
 ### 8c. What it says
 
 1. **With daily top-ups the surface never dries** (Stage I 100 % everywhere), and soil evaporation then
-   restores the dead-crop chamber's air exactly (0.999 of frozen) — it replaces the dead crop's
-   phantom transpiration almost one for one (392 kg/yr of soil against the frozen crop's 708).
+   holds the dead-crop chamber's air at 0.999 of frozen — ~~it replaces the dead crop's phantom
+   transpiration almost one for one~~ (withdrawn, §9: the vapour readout tops out at the humidity
+   setpoint; over the dead-crop days the soil supplies **0.56** of the frozen dead crop's water).
 2. **With watering in events the surface dries between waterings** (Stage I 9–43 % of steps), drought
    bites a week or more sooner, and the water cycled through the chambers falls by a third or more.
 3. **But the never-re-sown chamber's dead phase dries out again under events (0.20):** its root zone
@@ -307,3 +311,36 @@ stops counting — that water is already in the root zone below, so no stock mov
   room it no longer has); carbon still identical.
 * T3: the never-re-sown chamber's dead-phase air stays dry under events (its trigger still never fires).
 * T4: the four instrument tests stay green.
+
+### 9a. Measured with the cap — graded
+
+| run | config | water out (kg/yr) | of it soil | Stage I share | events | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill |
+|---|---|---|---|---|---|---|---|---|
+| default | + soil, daily | 651.42 | 148.51 | 1.000 | 0 | — | 0.961 | 1.00 |
+| | + soil, events | 536.26 | 33.63 | 0.204 | 5 | — | 0.744 | **2.65** |
+| | + soil + floor, events | 592.70 | 88.57 | 0.180 | 6 | — | 0.744 | 2.65 |
+| sealed chamber (3 y) | + soil, daily | 510.54 | 392.40 | 1.000 | 0 | 0.999 | **0.559** | 1.00 |
+| | + soil, events | 150.45 | 32.44 | 0.061 | 4 | 0.176 | **0.011** | 2.65 |
+| | + soil + floor, events | 150.55 | 32.54 | 0.061 | 4 | 0.176 | 0.011 | 2.65 |
+| perennial (5 y) | + soil, daily | 701.89 | 459.14 | 1.000 | 0 | 1.000 | 0.657 | 1.10 |
+| | + soil, events | 481.79 | 239.05 | 0.416 | 63 | 0.998 | 0.220 | 2.65 |
+| | + soil + floor, events | 485.97 | 243.19 | 0.420 | 66 | 0.998 | 0.277 | 2.65 |
+| consumer (5 y) | + soil, daily | 684.20 | 487.46 | 1.000 | 0 | 0.999 | 0.618 | 1.10 |
+| | + soil, events | 333.34 | 136.27 | 0.173 | 25 | 0.936 | 0.209 | 2.65 |
+| | + soil + floor, events | 389.11 | 191.26 | 0.275 | 41 | 0.935 | 0.179 | 2.65 |
+
+(Frozen and Szeicz–Long-alone rows unchanged from §8a; carbon bit-identical to frozen in every row.)
+`drought_window` under events: first stressed day **244** (floor: **240**), against §8's 243 / 237.
+Instrument tests green; S2 now 49 floor-eligible days, 0 short; S3 worst 0.7196.
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| T1 | peak fill ≤ 2.65× under events; daily unchanged | 2.65 in every event run; daily 1.00 / 1.10 as before | HELD |
+| T2 | under events, soil evaporation and Stage I share fall below §8's; carbon identical | default 35.98 → 33.63 and 0.241 → 0.204; sealed 49.87 → 32.44, 0.087 → 0.061; consumer 250.68 → 136.27, 0.396 → 0.173 — HELD; **perennial ROSE** 204.31 → 239.05 and 0.333 → 0.416 (63 events against 46: with less room in the top, the zone reaches the trigger more often); carbon identical everywhere | HELD except the perennial chamber |
+| T3 | the never-re-sown chamber's dead phase stays dry under events | 0.176 | HELD |
+| T4 | the instrument tests stay green | green | HELD |
+
+**What the new readout says.** The 0.999 of §8 was the humidity cap: even under daily watering the
+soil supplies only **0.56–0.96** of what the frozen model's dead or sparse crop "transpired" over its
+dead-crop days, and under events **0.01–0.74**. Soil evaporation does not replace the phantom water
+use one for one anywhere; it replaces part of it.

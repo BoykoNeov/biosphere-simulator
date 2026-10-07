@@ -243,7 +243,7 @@ fn measurement() {
     ];
     for (name, s, years, perennial) in &named {
         let frozen = run(s, &params::biosphere(), *years, *perennial, None);
-        println!("\n{name} ({years} y): water out of the root zone (kg/yr) | of it soil | at LAI<0.5 | Stage I share | events | lowest FTSW | carbon == frozen | dead-crop vapour / frozen");
+        println!("\n{name} ({years} y): water out of the root zone (kg/yr) | of it soil | at LAI<0.5 | Stage I share | events | lowest FTSW | carbon == frozen | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill / capacity");
         for (label, rs, soil, water) in configs {
             let p = params(rs, soil, water);
             let r = run(s, &p, *years, *perennial, None);
@@ -266,7 +266,27 @@ fn measurement() {
             } else {
                 f64::NAN
             };
-            println!("  {label:<20} {total:>9.2} | {soil_total:>8.2} | {winter:>8.2} | {stage1:>6.3} | {events:>5} | {low:.4} | {same} | {vap:.3}");
+            let dead_days: Vec<usize> = (0..r.states.len() / STEPS_PER_DAY - 1)
+                .filter(|&d| lai(&r.states[d * STEPS_PER_DAY], s) < 0.1)
+                .collect();
+            let ratio = if soil == Soil::Off || dead_days.is_empty() {
+                f64::NAN
+            } else {
+                let by_day = soil_by_day(&r);
+                let soil_dead: f64 = dead_days.iter().map(|&d| by_day[d]).sum();
+                let frozen_dead: f64 = dead_days
+                    .iter()
+                    .map(|&d| frozen.out[d * STEPS_PER_DAY..(d + 1) * STEPS_PER_DAY].iter().sum::<f64>())
+                    .sum();
+                soil_dead / frozen_dead
+            };
+            let cap = science::TOP_LAYER_DEPTH_M * s.soil_extractable_water * 1000.0 * s.ground_area;
+            let peak = if soil == Soil::Off {
+                f64::NAN
+            } else {
+                r.states.iter().map(|st| st.aux[TOP_SOIL_WATER]).fold(0.0, f64::max) / cap
+            };
+            println!("  {label:<20} {total:>9.2} | {soil_total:>8.2} | {winter:>8.2} | {stage1:>6.3} | {events:>5} | {low:.4} | {same} | {vap:.3} | {ratio:.3} | {peak:.2}");
         }
     }
     println!("\ndrought window (watering cut days 220-260), first day below FTSW 0.30:");

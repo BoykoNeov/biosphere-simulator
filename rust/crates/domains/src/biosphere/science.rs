@@ -1055,6 +1055,11 @@ pub const TOP_LAYER_DEPTH_M: f64 = 0.15;
 pub const TOP_LAYER_WET_MM: f64 = 1.0;
 /// Stage I also needs the profile above half full (`FTSW > 0.5`, p. 181).
 pub const STAGE_ONE_FTSW: f64 = 0.5;
+/// The top layer's room ABOVE its drained upper limit before it is saturated, `SAT − DUL`
+/// (m³ m⁻³) — Soltani & Sinclair Table 13.1, silt loam (`SAT` 0.433, `DUL` 0.218; its `EXTR` 0.132
+/// matches the model's 0.13). The user's choice (2026-10-07). Water above saturation is not counted
+/// by the top-layer account: it is already in the root zone below.
+pub const TOP_LAYER_SAT_ABOVE_DUL: f64 = 0.433 - 0.218;
 
 /// Potential evaporation (kg m⁻² day⁻¹ = mm day⁻¹) from bare wet soil — Soltani & Sinclair Eqns
 /// 14.15–14.18, `SRAD · (1 − SALB) · exp(−KET · ETLAI) · Δ/(Δ + γ)` in water units.

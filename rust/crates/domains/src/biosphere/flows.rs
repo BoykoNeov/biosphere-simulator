@@ -1173,6 +1173,16 @@ impl AuxProcess for SoilSurfaceAccount {
         if top + d_top < 0.0 {
             d_top = -top;
         }
+        // Saturation caps the account (Table 13.1, silt loam): above it the water has passed into
+        // the root zone below, where it already is — no stock moves.
+        let saturated = capacity
+            + science::TOP_LAYER_DEPTH_M
+                * science::TOP_LAYER_SAT_ABOVE_DUL
+                * science::WATER_DENSITY
+                * self.water.ground_area;
+        if top + d_top > saturated {
+            d_top = saturated - top;
+        }
         let dry = aux_of(snapshot, &s.dry_days_aux);
         let d_dry = if split.wet { -dry } else { dt };
         let dvs = science::development_stage(

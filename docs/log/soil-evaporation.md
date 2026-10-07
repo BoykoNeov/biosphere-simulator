@@ -24,12 +24,24 @@ condensate is the reservoir. Raised because daily top-ups would keep the top lay
 **BUILT lab-only and measured 2026-10-07** (plan §8). Three switches, all off in the loader; the
 frozen path is bit-identical (asserted; 20 of 20 goldens).
 
-* With daily top-ups the surface never dries (Stage I 100 %), and soil evaporation restores the
-  dead-crop chamber's air exactly (0.999 of frozen): it replaces the dead crop's phantom water use.
+* With daily top-ups the surface never dries (Stage I 100 %), and the dead-crop chamber's air sits
+  at 0.999 of frozen — its humidity cap; the soil supplies only 0.56 of the dead crop's phantom water.
 * With watering in events the surface dries between waterings (Stage I 9–43 % of steps), drought
   bites a week sooner, and the chambers cycle a third or more less water.
 * Under events the never-re-sown chamber's air dries again while its crop is dead (0.20): its root
   zone is 1.30 m deep and loses water only from the top 150 mm, so it never reaches the trigger — a
   fallow chamber with a dry crust. The re-sown chambers keep their air (0.94–1.00).
-* Carbon never moved in any configuration. Of 10 predictions 7 held (two only for the watering they
-  assumed), 2 failed narrowly, 1 split by watering. A test caught a reset refusal the first edit missed.
+* Carbon never moved in any configuration. Of 10 predictions 6 held, 1 mostly, 1 failed, 2 split by
+  watering (corrected; first recorded as 7 held). A test caught a reset refusal the first edit missed.
+
+**The top layer overfilled under events, CAPPED 2026-10-07** (plan §9). An event refilled the root
+zone into a 19.5 kg top account, peaking at 4.8× its capacity. The user chose the book's saturation
+limit for silt loam (Soltani & Sinclair Table 13.1, up to 2.65×). Measured with the cap:
+
+* Peak fill 2.65× in every event run; event-watered soil evaporation and wet share fell in three
+  runs and ROSE in the perennial chamber (more waterings with less room on top).
+* Under daily watering the soil supplies 0.56–0.96 of the frozen model's dead or sparse crop's
+  phantom water over its dead days; under events 0.01–0.74. It replaces part of it, nowhere all.
+* Still owed before any station pricing: a lab re-sow hook (the station's uses the plain reset,
+  which refuses these values), event recycling in the station, and the lab air-split watering,
+  which does not feed the top-layer account.
