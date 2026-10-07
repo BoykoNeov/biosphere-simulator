@@ -1225,6 +1225,9 @@ fn root_zone(snapshot: &State, soil_water: &str, rooted_aux: &str, extr: f64, ar
 pub struct EventIrrigation {
     pub inner: Irrigation,
     pub trigger_ftsw: f64,
+    /// The field application efficiency `ea`: an event applies `deficit / ea`, and the model's
+    /// `Drainage` carries the excess below the roots (FAO Manual 4, `d_gross = d_net · 100 / ea`).
+    pub application_efficiency: f64,
 }
 
 impl Flow for EventIrrigation {
@@ -1255,7 +1258,7 @@ impl Flow for EventIrrigation {
         if capacity <= 0.0 || water / capacity > self.trigger_ftsw {
             return Ok(FlowResult::empty());
         }
-        let dose = (capacity - water).max(0.0);
+        let dose = (capacity - water).max(0.0) / self.application_efficiency;
         FlowResult::new(vec![leg(&i.water_source, -dose)?, leg(&i.soil_water, dose)?])
     }
 }
@@ -1266,6 +1269,8 @@ impl Flow for EventIrrigation {
 pub struct EventRecycling {
     pub inner: Recycling,
     pub trigger_ftsw: f64,
+    /// As [`EventIrrigation::application_efficiency`]; limited by the condensate held.
+    pub application_efficiency: f64,
     pub rooted_depth_aux: String,
     pub soil_extractable_water: f64,
     pub ground_area: f64,
@@ -1295,7 +1300,8 @@ impl Flow for EventRecycling {
         if capacity <= 0.0 || water / capacity > self.trigger_ftsw {
             return Ok(FlowResult::empty());
         }
-        let dose = (capacity - water).max(0.0).min(amt(snapshot, &r.condensate));
+        let dose = ((capacity - water).max(0.0) / self.application_efficiency)
+            .min(amt(snapshot, &r.condensate));
         FlowResult::new(vec![leg(&r.condensate, -dose)?, leg(&r.soil_water, dose)?])
     }
 }

@@ -978,7 +978,11 @@ fn irrigation_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Bo
     };
     match event_trigger(p) {
         None => Box::new(inner),
-        Some(trigger_ftsw) => Box::new(EventIrrigation { inner, trigger_ftsw }),
+        Some(trigger_ftsw) => Box::new(EventIrrigation {
+            inner,
+            trigger_ftsw,
+            application_efficiency: science::SPRINKLER_APPLICATION_EFFICIENCY,
+        }),
     }
 }
 
@@ -995,6 +999,7 @@ fn recycling_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Box
         Some(trigger_ftsw) => Box::new(EventRecycling {
             inner,
             trigger_ftsw,
+            application_efficiency: science::DRIP_APPLICATION_EFFICIENCY,
             rooted_depth_aux: ROOTED_DEPTH.to_string(),
             soil_extractable_water: scenario.soil_extractable_water,
             ground_area: scenario.ground_area,

@@ -1040,6 +1040,12 @@ pub enum WateringForm {
 /// (`RAW = p·TAW`); the watering trigger is `FTSW = 1 − p`. The same citation as
 /// `station::air_split::FAO56_WHEAT_DEPLETION_FRACTION`.
 pub const FAO56_WHEAT_DEPLETION: f64 = 0.55;
+/// Field application efficiency, sprinkler — FAO Irrigation Water Management Training Manual No. 4
+/// (*Irrigation Scheduling*), Annex 1 Table 8: the share of applied water the crop can use; the rest
+/// is lost to deep percolation (and runoff). The open field's, the user's choice (2026-10-07).
+pub const SPRINKLER_APPLICATION_EFFICIENCY: f64 = 0.75;
+/// Field application efficiency, drip — the same table. The sealed chambers', the user's choice.
+pub const DRIP_APPLICATION_EFFICIENCY: f64 = 0.90;
 
 /// `SALB`, the soil's albedo — Soltani & Sinclair (2012) p. 180, *"commonly … close to 0.12"*.
 pub const SOIL_ALBEDO: f64 = 0.12;

@@ -400,3 +400,34 @@ upper limit, so `Drainage` (which moves only water above it) never recharges the
 store therefore empties season by season; once it is empty the roots stop deepening (Soltani &
 Sinclair Box 14.1, `If WSTORG = 0`), so the zone ends shallow. The crop is never stressed (fill ≥ 0.44),
 so carbon does not move — but the soil profile ratchets.
+
+### 10c. Fixing the ratchet: watering a little over full (the user, 2026-10-07)
+
+**DECIDED (the user): water a bit over full** (over refilling the whole profile, and over accepting
+the drain). **Source, read first-hand:** FAO Irrigation Water Management Training Manual No. 4,
+*Irrigation Scheduling* (Brouwer, Prins & Heibloem), Ch. 3: *"Not all water which is applied to the
+field can indeed be used by the plants. Part of the water is lost through deep percolation and
+runoff"*; `d_gross = d_net · 100 / ea`; Annex 1 Table 8, indicative field application efficiencies:
+surface 60 %, sprinkler 75 %, drip 90 %. (FAO-56 Ch. 8 itself asks the NET depth not to exceed the
+depletion, to avoid percolation — Eq. 88 and its scheduling paragraph — so it gives no excess.)
+**The user's values: the open field sprinkler 75 %, the sealed chambers drip 90 %.**
+
+**The mapping:** each event applies `deficit / ea` into the root zone (in a sealed chamber,
+`min(condensate, deficit / ea)`); the model's own `Drainage` (Soltani & Sinclair 14.11–14.12, 30 %
+a day of the excess above the drained upper limit, into the unbounded deep store `WSTORG`) carries
+the extra below the roots — no new path. A sealed chamber cannot lose runoff, so all of its loss
+percolates.
+
+**Predictions:** R1 — the deep store no longer empties: the re-sown chambers' rooted depth at the
+end of their goldens returns to ~1.30 m (as frozen), not 0.33 / 0.16; R2 — carbon still identical;
+R3 — the open field draws more from its water source (gross 1/0.75 of net).
+
+**Measured (the root trace over five seasons, perennial chamber, all three forms with the efficiencies):**
+the deep store still empties — 175.5 → 91.4 (re-sow 1) → 0.0 (day 400) → 50.8 → 23.7 → 19.5 → **1.0 kg**
+(frozen ~24–159), and the rooted depth ends at **0.50 m** (frozen 1.30; without the over-watering 0.33).
+**R1 FAILED:** the over-application slows the drain, it does not stop it. Two reasons: the excess
+drains only while the zone is above its upper limit, and the crop and soil pull it back below within
+about a day, so little percolates; and at each re-sow the abandoned deep soil keeps the root zone's
+fill at harvest (~0.5 under events, ~1.0 frozen), so it returns half as much. In a rain-free chamber
+watered only around the roots, a slowly drying deep profile may be mostly real physics; the frozen
+model never shows it because its continuous top-up keeps everything full.
