@@ -375,3 +375,28 @@ golden report and the station suite including its ignored tests (§10a).
 `regen_goldens` (report): 20 of 20 identical. `cargo test --release -p station -- --include-ignored`:
 241 passed, 0 failed (the sealed station's golden, its band, both session resumes and the
 `chamber_walls` trajectory pins among them).
+
+### 10b. The biosphere twins — and a ratchet in the deep store (2026-10-07)
+
+Twins of the six biosphere goldens under all three forms (`W:\temp\claude\step6\reprice\zz_twins3.rs`,
+throwaway; each control equal to its committed golden byte for byte; twins in
+`W:\temp\claude\step6\reprice\twins\`). Every twin differs, and adds **five aux keys**
+(`top_soil_water`, `soil_dry_days`, `soil_shade_lai`, `soil_evap_today`, `soil_potential_today`);
+the open season also adds the stock `boundary.soil_evaporation`. Water stocks move; **carbon does not**.
+
+⚠ **Not predicted: the rooted depth moves in the four re-sown goldens** — perennial 5 y 1.300 → **0.332 m**,
+consumer 15 y 1.300 → **0.156 m**. Traced (a throwaway probe, `zz_roots.rs`), perennial chamber:
+
+| | day 0 | 120 | 300 (maturity) | 310 (re-sown) | 400 | 500 |
+|---|---|---|---|---|---|---|
+| frozen — depth / root-zone fill / water below the roots (kg) | 0.15 / 1.00 / 175.5 | 1.30 / 0.99 / 26.0 | 1.30 / 0.95 / 26.0 | 0.23 / 1.04 / 158.5 | 1.18 / 1.00 / 39.4 | 1.30 / 0.97 / 24.2 |
+| all three | 0.15 / 1.00 / 175.5 | 1.30 / 0.61 / 26.0 | 1.30 / 0.53 / 26.0 | 0.23 / 0.48 / **91.4** | 0.94 / 0.65 / **0.0** | 0.94 / 0.48 / **0.0** |
+
+**The mechanism — a redistribution, invisible to conservation:** the deepening roots capture the
+water below them (the frozen mechanism); at each re-sow the abandoned zone returns its CURRENT water
+to the deep store (`resow_water_return`, a fraction of the zone's water), and under events the zone
+sits near half full, so it returns about half as much; and an event fills the zone only to its drained
+upper limit, so `Drainage` (which moves only water above it) never recharges the deep store. The deep
+store therefore empties season by season; once it is empty the roots stop deepening (Soltani &
+Sinclair Box 14.1, `If WSTORG = 0`), so the zone ends shallow. The crop is never stressed (fill ≥ 0.44),
+so carbon does not move — but the soil profile ratchets.
