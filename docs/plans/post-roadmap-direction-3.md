@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `real-world-checks.md`
+**Re-read against the record's last row:** `canopy-resistance.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -522,6 +522,11 @@ vent carbon). Nothing added to §3.
 ⚠ *2026-10-07, same item:* Step 6's row 1 ran TM 102788 on the open build with a fixed leaf CO₂ and
 the lamp inputs swapped in, so for the held-CO₂ trials the controller is NOT needed — now shown by a
 run, not argued. Still unshown for the LMLSTP crew test (CO₂ held by the light).
+⚠ *Re-read 2026-10-07* (`log/canopy-resistance.md`, OPENED, lab measurement owed, nothing built):
+grepped this plan for transpiration, surface resistance, leaf area and soil water. The plan carries
+no canopy-resistance item, so this discharges nothing and is not a re-proposal of a §3 row. It
+bears on the vapour item's history above (the chamber's VPD coupling, frozen 2026-10-01) only in
+that a leaf-area resistance would move the same water stocks; recorded, not acted on.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
