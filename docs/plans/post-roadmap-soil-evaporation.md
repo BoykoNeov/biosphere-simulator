@@ -89,3 +89,62 @@ the shelf; book pp. 172, 180–181, 184 read off the page images):
   together stay within the net radiation (the crop's VPD-driven part is reported separately).
 
 Predictions, built before any code, follow in §6 once the build's surface is fixed.
+
+---
+
+## 3b. Advisor review of §4 (2026-10-07), summarized — and the user's fourth decision
+
+The review found that §4's "the top layer drops out" also removed the drying stage: with the top
+layer read as the whole root zone, Stage II needs the zone at or below half full, which a watered run
+almost never reaches (default 0.99, chambers ~0.84, station ≥ ~0.45), so evaporation would run at its
+full potential from up to 1.3 m of soil. Put to the user. Also: two flows filling one chamber's air
+overshoot its humidity cap (the cabin-humidity lesson) — build soil evaporation inside
+`Transpiration`; give the crop its GREEN leaf area and the soil the held one; the book's Stage II
+factor and floor are daily quantities against a 1/16-day step; every new state value must be reset at
+every re-sow path and must be finite.
+
+**DECIDED 2026-10-07 (the user): a thin top layer, 150 mm** — the shallow end of the book's 150–600 mm,
+the model's own rooting depth at emergence (`rooted_depth0`), over another depth and over the whole
+root zone.
+
+## 4b. The design, revised (supersedes §4 where they differ)
+
+**The top layer is the book's own overlapping account, not a second store of water.** Soltani &
+Sinclair track two balances: the TOTAL root zone (Eqn 14.5, which already contains the top layer) and
+the top layer (Eqn 14.2), fed by the same watering, with its own drainage downward (`DRAIN1`), its own
+share of transpiration (`TR1`) and all of the soil evaporation. So:
+
+* `soil_water` stays the whole root-zone store, and none of its ten readers changes.
+* A new lab aux value, `top_soil_water` (`ATSW1`, kg on the ground area), is advanced each step by an
+  aux process from the SAME pure functions the flows use on the same start-of-step snapshot (aux and
+  flows are evaluated on one snapshot — `simcore::integrator`): `+` the irrigation or the sealed
+  recycling inflow, `− DRAIN1 = (ATSW1 − TTSW1)·DRAINF` above capacity (the model's `drainage_factor`),
+  `− TR1` (all of the transpiration while rooted depth ≤ 0.15 m; else `TR · min(1, FTSW1/WSSG)`, the
+  book's program), `− SEVP`; floored at 0. `TTSW1 = 0.15 m · EXTR · 1000 · area`.
+* **The stage (the user's rule):** Stage I while `ATSW1 > 1 mm` and `FTSW > 0.5`; Stage II otherwise.
+* **The dry-stage clock** `soil_dry_days` (aux): + dt per step in Stage II, reset to 0 in Stage I. The
+  Stage II factor is the book's per-DAY amount, `√(d+1) − √d` with `d = ⌊soil_dry_days⌋`, applied as a
+  rate through day d — so a day's steps sum to the book's daily value.
+* **The held leaf area** `soil_shade_lai` (aux): equals green LAI until the partition table first gives
+  grain a share, then holds. Finite throughout (it starts at the seedling's LAI).
+* **One flow, one cap.** Soil evaporation is computed inside `Transpiration`, so the sealed chamber's
+  saturation cap and condensate split see the SUM, and every path that moves the flow by id moves both.
+  Open builds give the soil its own sink leg so the books separate. A pure function computes the
+  crop/soil split for readouts.
+* **The energy split:** the crop's radiation term reads `RN · (1 − exp(−KET · LAI_green))`, the soil
+  `RN/(1 − 0.23) · (1 − 0.12) · exp(−KET · soil_shade_lai)`. Since `soil_shade_lai ≥ LAI_green`, the
+  two shares never exceed 1; the energy dead leaves intercept goes to neither. `KET` = 0.5 (the book's,
+  for global radiation) in every build — in lamp-lit builds the crop's own PAR extinction is 0.60; the
+  book's value is kept and the difference recorded.
+* **The floor (switch):** met as a daily total — aux accumulators for the day's soil evaporation and
+  its bare-soil potential; on the day's last step, if the potential exceeded 1.5 mm and the evaporated
+  total is below it, the shortfall is added (only while the top layer holds it).
+* **Every re-sow path** (`annual_reset_with`; the station's `sealed_reset_hook`) resets the three
+  values: `top_soil_water` to the uniform share of the zone's water, `soil_dry_days` to 0,
+  `soil_shade_lai` to the new seedling's LAI. A plain reset refuses a state carrying them (the lab leaf
+  form's precedent).
+* `weather::net_radiation` is checked before dividing by 0.77; if it carries a long-wave term, the
+  incident shortwave is read from the weather's own shortwave forcing instead.
+  **Checked:** `weather::net_radiation` is `(1 − 0.23) × shortwave` exactly (no long-wave term), and the
+  lamp's is the same `net_shortwave` of its radiant PAR — so `RN / 0.77` is the incident value in every
+  build.
