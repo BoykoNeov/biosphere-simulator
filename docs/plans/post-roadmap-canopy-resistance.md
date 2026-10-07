@@ -401,3 +401,15 @@ retired; ten `golden_sha256` rows across the biosphere and station manifests; th
 entries and the station contract's sentence "transpiration does not read the canopy"; the deep-water
 pin and the re-sow cycle test restated at their measured values; potato — adopt for both crops or
 keep potato on the constant.
+
+---
+
+## 11. Decisions TAKEN (the user, 2026-10-07)
+
+1. **Bare-soil evaporation first**, as its own item, then re-price Szeicz–Long and soil evaporation
+   together (over adopting Szeicz–Long as it stands, and over keeping both lab-only). The reason on
+   record: without it a sealed chamber's air goes dry whenever its crop is dead (§10c).
+2. **Potato adopts with wheat** under any adoption (over a potato-only constant).
+3. **The pricing branch `wip/canopy-resistance-price` is kept** (local, `b5d20b5`, not pushed).
+
+Nothing adopted; main keeps the constant form.

@@ -59,3 +59,6 @@ branch never pushed (plan §9–§10).
   re-sown chambers: only on day 0. The model has no bare-soil evaporation to supply that air.
 * **The mirror image, about the frozen model today:** that frozen chamber's crop is dead on 62.5 % of
   steps, and the constant 70 s/m makes it transpire at the full rate throughout.
+
+**DECIDED 2026-10-07 (the user):** bare-soil evaporation first, as its own item, then re-price both
+together; potato adopts with wheat; the pricing branch is kept. Nothing adopted.
