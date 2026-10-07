@@ -466,3 +466,59 @@ the instrument's own checks, asserted by the test; they are not counted.
 the night-respiration split (point 3) and the post-dimming uptake (point 2) are science questions;
 the water gap (point 5) needs its two candidates separated — a lab what-if (net radiation scaled,
 or the resistances lowered) would size each; not run.
+
+---
+
+## 10. The water gap, split (2026-10-07, the user's pick) — design and predictions, before code
+
+**The user's pick:** *"Split the water gap"* — offered as "raise the lamp's heating, or lower the air
+resistance, and see which one closes the gap". **The method changed, told to the user before
+work:** the model's water use reads only the lamp's net radiation, VPD, temperature and two
+resistances, and feeds nothing back while the root zone stays wet. So a sweep inside the model
+would only re-run Penman–Monteith. The arithmetic sizes each candidate, sources judge whether
+the size is physically plausible, and one small run checks only the instrument and the coupling.
+
+### 10a. Advisor review (2026-10-07), summarized
+
+Arithmetic first: as the air resistance goes to 0, the lit-period limit is `ρcp·VPD/(γ·rs)`, which
+may already rule out the airflow candidate alone. The heating candidate needs a plausibility
+source (the BPC construction papers the TM cites on p. 2; HPS radiant output outside PAR) — with a
+stop rule if those are blocked. Check what the 6 L measures (condensate, p. 7) — open solution
+surfaces may evaporate too. One run, WHAT-IF, pinning nothing: a resistance substitution must move
+water use to the arithmetic's value (the substitution reaches `Transpiration`), and a scaled net
+radiation must leave every carbon row bit-identical while FTSW stays ≥ 0.30. Write, before reading
+any source, what each source would have to say to refute each candidate; "not refuted" is the most
+a surviving candidate earns.
+
+### 10b. The arithmetic (the model's own constants)
+
+`ρcp` = 1.205 × 1013 = 1220.7 J m⁻³ K⁻¹; `γ` = 67 Pa K⁻¹; frozen `ra` = 50, `rs` = 70 s m⁻¹; VPD =
+es(T) × 0.19 = 444 Pa at 20 °C, 345 Pa at 16 °C. The trial's full-cover 6.0 L m⁻² d⁻¹ is a daily
+mean latent flux of ~170 W m⁻²; with the dark hours at their own rate it needs **~198 W m⁻² while
+lit**.
+
+* **(b) airflow alone.** As `ra → 0`, `λE → ρcp·VPD/(γ·rs)`: **~116 W m⁻² lit, ~90 dark (16 °C)**, so
+  **at most ~3.9 L m⁻² d⁻¹ with infinite airflow** — short of 6.0. Reaching 198 lit at `ra → 0`
+  needs `rs` ≈ **41 s m⁻¹**, the leaves' pores MORE open than the frozen 70, where the expected
+  direction at 1000+ ppm CO₂ is the opposite (partial stomatal closure — general knowledge, not
+  sourced here).
+* **(a) lamp heating alone**, frozen resistances: 198 W m⁻² lit needs net radiation ≈ **340 W m⁻²**,
+  **~4.2×** the lamp's PAR-only 81 W m⁻² at 480 µmol.
+* **(c) evaporation from the nutrient solution's open surfaces** inside the 6 L — not sizable from
+  arithmetic.
+
+### 10c. Predictions
+
+| | prediction | what would refute it |
+|---|---|---|
+| A1 | (b) alone cannot close the gap: no `ra` gives more than ~3.9 L m⁻² d⁻¹ at `rs` = 70 | a source giving the BPC wheat canopy's `rs` ≤ ~41 s m⁻¹ at 1000+ ppm |
+| A2 | (a) alone is implausible at ×4.2: an HPS lamp's radiation outside PAR adds well under 3× the PAR energy, so the canopy's net radiation stays under ~2.5× the PAR-only figure (low confidence; from general knowledge of HPS spectra) | a source putting the BPC canopy's net radiation near 340 W m⁻², or HPS non-PAR radiant output ≥ ~3× its PAR |
+| A3 | the BPC's lamps sat behind barriers that absorbed part of their infrared (low confidence) | a construction source showing bare lamps over the canopy (strengthens (a)) |
+| A4 | the TM gives no way to take solution-surface evaporation out of its 6 L | a page that separates it |
+| A5 | so the gap is most likely (a) and (b) together, perhaps with (c); no single candidate is named the cause | — |
+| R1 | run: `aerodynamic_resistance` 50 → 10 (WHAT-IF) moves W1 to the value Penman–Monteith gives on the same forcings, to ~1e-9 | a mismatch: the substitution does not reach the flow, or something else modulates it |
+| R2 | run: net radiation × 4.2 (WHAT-IF) gives W1 ≈ 6.0 (5.8–6.2), every carbon readout bit-identical, FTSW ≥ 0.30 throughout (the demand ~6 against irrigation 8 mm/day) | carbon moves, or the soil dries — a coupling finding |
+
+Stop rule for sources: the shelf, then NTRS for Prince et al. 1987, Sager et al. 1988, Prince & Knott
+1989, then one search for HPS radiant output. Paywalled or blocked → recorded as blocked, and the
+row stops at the arithmetic.
