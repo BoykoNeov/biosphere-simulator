@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `canopy-resistance.md`
+**Re-read against the record's last row:** `soil-evaporation.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -527,6 +527,9 @@ grepped this plan for transpiration, surface resistance, leaf area and soil wate
 no canopy-resistance item, so this discharges nothing and is not a re-proposal of a §3 row. It
 bears on the vapour item's history above (the chamber's VPD coupling, frozen 2026-10-01) only in
 that a leaf-area resistance would move the same water stocks; recorded, not acted on.
+⚠ *Re-read 2026-10-07* (`log/soil-evaporation.md`, OPENED, designed, nothing built): grepped this
+plan for soil evaporation, bare soil and evaporation. It carries no such item; this discharges
+nothing and adds nothing to §2 or §3.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
