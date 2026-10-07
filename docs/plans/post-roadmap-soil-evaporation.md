@@ -167,3 +167,28 @@ full-cover rate on the same weather is ~2 mm/day. Under LAI 1 the soil keeps 61 
 | S8 | the floor (on) adds 80–160 kg to the open field's season evaporation (under the closed canopy, `exp(−0.5·6) = 5 %`, the floor lifts ~0.15 to 1.5 mm/day for ~100 summer days); < 10 % in the chambers, whose canopies never close | low |
 | S9 | drought runs dry sooner: `drought_window`'s first stressed day earlier than Szeicz–Long alone's 250 | medium |
 | S10 | every re-sow resets the three values (asserted after `annual_reset_with` and in the station's hook) | high |
+
+## 7. Watering in events (the user, 2026-10-07)
+
+**The problem, raised by a side note and confirmed:** the model waters continuously — the open
+field is topped up to full every step (`Irrigation`, deficit-driven), the sealed chambers get a
+steady trickle of recycled condensate — and the weather fixture has no rain (`WeatherRow` carries
+temperature, radiation and vapour pressure only). So the 150 mm top layer is refilled every day and
+the drying stage would appear only in drought runs. Real fields and chambers are watered in events.
+
+**DECIDED (the user): FAO-56's depletion trigger** (over a fixed interval with an unsourced dose, and
+over keeping daily top-ups). FAO-56 Table 22, wheat `p = 0.55` (`RAW = p·TAW`), already used by the
+station's lab watering (`station::air_split::FAO56_WHEAT_DEPLETION_FRACTION`).
+
+**The design (lab-only, a third switch, `WateringForm`):**
+* **Open field:** `Irrigation` waters only on a step that starts with the root zone at or below
+  `FTSW = 1 − p = 0.45`, and then applies the whole deficit to full in that step — FAO-56's
+  scheduling applies the net depth `Dr` at once. The 8 mm/day system capacity does not cap an event
+  (stated: an event is not a daily rate).
+* **Sealed chambers:** the condensate store is the reservoir. `Recycling` moves water only at a
+  trigger step, `min(condensate, deficit)`, instead of a steady fraction.
+* Unlike `station::air_split::TriggeredWatering`, which holds the zone AT the trigger with capped
+  top-ups (no latch), these are events: the zone refills to full and then dries for days.
+* The top-layer account reads the same `Irrigation`/`Recycling` instance, so it sees the events.
+* The trigger (0.45) sits above the crop's stress threshold (`wssg` 0.30), so the crop should never
+  be stressed by the schedule itself — carbon is predicted unchanged; water timing changes.
