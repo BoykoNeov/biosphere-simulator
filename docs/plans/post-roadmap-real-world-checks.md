@@ -558,28 +558,60 @@ read off their page images; both now on the git-ignored shelf):
 
 | | prediction | what the sources say | grade |
 |---|---|---|---|
-| A1 | (b) airflow alone cannot close the gap | arithmetic holds; and the premise "the BPC blew air hard" is **not supported**: 0.2–1.2 m s⁻¹ is gentle air, which raises `ra` if anything | HELD, strengthened |
-| A2 | (a) at ×4.2 is implausible; non-PAR radiation adds well under 3× | **not answered by the infrared figure** (Tazawa gives visible only). But see the energy balance below: the ×4.2 is the MODEL's need, not the lamp's | NOT TESTED as written; reframed |
+| A1 | (b) airflow alone cannot close the gap | arithmetic holds **at the frozen `rs` = 70** — and only there (§10e). ~~and the premise "the BPC blew air hard" is not supported: 0.2–1.2 m s⁻¹ is gentle air, which raises `ra` if anything~~ (withdrawn: `ra` = 50 is a field wind-profile value; in a chamber the air moves through the canopy, so the chamber's air speed says nothing about it here) | HELD at `rs` = 70 ~~, strengthened~~ |
+| A2 | (a) at ×4.2 is implausible; non-PAR radiation adds well under 3× | not answered: Tazawa gives the visible share only. The one leaf-temperature reading counts AGAINST radiation alone (§10e) | NOT TESTED |
 | A3 | lamps behind barriers | barriers existed (p. 4); their absorption unknown | HELD on existence |
 | A4 | the TM gives no way to separate solution-surface evaporation | none found; the only stated contamination is early humidifier water, outside the W1 window (days 25–80) | HELD |
-| A5 | (a) and (b) together, no single cause | supported, in the form below | HELD |
+| A5 | (a) and (b) together, no single cause | no single cause is shown; ~~supported, in the form below~~ the form below is withdrawn (§10e) | not shown |
 
-**The energy balance the sources allow (an inference, from the Phase II crop).** Leaves within
+⚠ **The two paragraphs below were WRONG and are struck, not reworded** (caught by advisor review
+the same day, after commit `bb79817` had recorded them; §10e is the correction).
+
+~~**The energy balance the sources allow (an inference, from the Phase II crop).** Leaves within
 ± 1 °C of the air means little sensible heat: at `ra` = 50 s m⁻¹, 1 K is `ρcp/ra` ≈ 24 W m⁻². So the
 canopy's latent heat ≈ its net radiation ± ~24. Phase II's 6.1 L m⁻² d⁻¹ under continuous light is a
 latent flux of ~173 W m⁻²; its 660 µmol of PAR is 144 W m⁻² radiant, 111 net of the 0.23 albedo. So
 the canopy absorbed **at least ~1.3×** the energy of its PAR alone — extra lamp radiation was there,
-but a modest multiple, not 4×.
+but a modest multiple, not 4×.~~
 
-**So the ×4.2 belongs to the model's split, not to the lamp alone.** At the frozen `ra` 50 / `rs` 70
+~~**So the ×4.2 belongs to the model's split, not to the lamp alone.** At the frozen `ra` 50 / `rs` 70
 the model's Penman–Monteith sends only about half of its net radiation into evaporation
 (`Δ / (Δ + γ(1 + rs/ra))` ≈ 0.47 at 20 °C) and warms the leaf with the rest, while the chamber's
 leaves sat at air temperature. The gap is therefore **both**: more radiant energy than PAR (a), and
 a surface/air coupling in the model that does not put it into evaporation the way the chamber's
 canopy did (a resistance question — but toward a lower `rs`/`ra` ratio, not "hard airflow"). Neither
-is named the cause; "not refuted" is what (a) earns, and (b) in its "airflow" form is refuted.
+is named the cause; "not refuted" is what (a) earns, and (b) in its "airflow" form is refuted.~~
 
-**Not done, the user's call:** whether the station's own lamp (a PWM-dimmed LED in the record,
-mostly PAR) has the same gap is not measured here — this row is an HPS chamber. A lower `rs` at high
-CO₂ would go against the expected stomatal response, so a resistance change would need a source of
-its own.
+### 10e. The correction (2026-10-07, advisor review of §10d)
+
+1. **"About half into evaporation" confused the marginal coefficient with the split.** `Δ / (Δ +
+   γ(1 + rs/ra))` ≈ 0.47 is what each EXTRA watt of net radiation adds to evaporation. At the
+   model's operating point the split is **74 of 81 W m⁻² ≈ 0.91** (§8). At ×4.2 the leftover is
+   ~340 − 198 ≈ 142 W m⁻² of sensible heat, which puts the model's leaf **~5.8 K above the air**
+   (142 × 50 / 1220.7). The Phase II reading — shoots within ± 1 °C of the air — therefore counts
+   **against** the radiation-only candidate, not for it.
+2. **The "at least ~1.3× PAR" bound does not stand.** Its ± 24 W m⁻² per kelvin assumed `ra` = 50, the
+   very value in question (at `ra` = 10 the same 1 K allows ± 122). And Phase II's 6.1 L m⁻² d⁻¹ is on
+   ~8 m² of trays (TM 103494 p. 6: *"approximately 8 m² of growing area (32 0.25-m² trays)"*), while
+   TM 102788 counts its 16 m² of trays as ~20 m² with the gaps (p. 2). On that basis Phase II is ~4.9
+   L m⁻² d⁻¹ (~139 W m⁻²) and the bound falls to ~1.0×. **Extra lamp radiation is not established.**
+3. **The resistance candidate was framed wrongly.** The frozen `rs` = 70 is uncited (`TODO(cite)`,
+   "literature-typical ~50–100 s/m") — it is not an FAO value in this tree, though it equals FAO-56's
+   grass reference. FAO-56's canopy form `rs = rl / (0.5·LAI)` (`rl` ≈ 100 s m⁻¹; general knowledge,
+   not read on a page here) makes it a **canopy-scale** value that falls as leaf area rises. Measured
+   (printed by `the_surface_resistance_a_full_canopy_would_have`): the model's mean **LAI over TM
+   days 25–80 is 6.216**, so that form gives **`rs` ≈ 32.2 s m⁻¹**, and:
+   * W1 at the frozen `ra` 50 rises **2.376 → 2.853** L m⁻² d⁻¹ — part of the gap;
+   * the airflow ceiling (`ra → 0`) at that `rs` is **8.59** — ABOVE the trial's ~6.0. So once `rs`
+     follows leaf area, resistances alone are no longer ruled out; A1 holds only at `rs` = 70.
+
+   This is the record's existing gap — *transpiration ignores leaf area* — showing up at full cover,
+   not a physiological stretch: it needs no lower stomatal resistance at high CO₂.
+4. **What stands.** A1 (at `rs` = 70), R1, R2: firm. The one leaf-temperature reading (an earlier crop,
+   a different area basis) counts against radiation alone. Extra lamp radiation: not established. A
+   canopy resistance that falls with leaf area: a named mechanism tied to a recorded gap, which with a
+   chamber `ra` below 50 (not sourced) could close the rest. **Neither is named the cause.**
+
+**Not done, the user's call:** pricing a leaf-area-dependent canopy resistance as a science item (lab
+first; adopting it would be an unfreeze). Whether the station's own lamp has the same gap is not
+measured here — this row is an HPS chamber.

@@ -83,12 +83,18 @@ trial's chamber. A diagnostic: it asserts its instrument and prints the scorecar
 the model's water use feeds nothing back while the soil is wet, so arithmetic sizes the
 candidates, sources judge them, and one WHAT-IF run checks only the instrument and the coupling.
 
-* Airflow alone cannot close it: infinite airflow tops out at 3.95 L m⁻² d⁻¹ against ~6.0. And
-  the BPC's air was gentle (0.2–1.2 m s⁻¹, TM 103494 p. 8), so "hard airflow" is refuted.
+* At the frozen surface resistance (70 s/m, uncited) airflow alone cannot close it: infinite
+  airflow tops out at 3.95 L m⁻² d⁻¹ against ~6.0.
 * 4.2× the lamp's net radiation reproduces 6.05 L; carbon bit-identical; the soil stays wet.
-* TM 103494 (an earlier crop): leaves within ±1 °C of the air, so latent heat ≈ net radiation.
-  That crop's canopy absorbed at least ~1.3× its PAR energy — extra lamp radiation, but a modest
-  multiple. The model needs 4.2× because its fixed resistances send only ~half of its net
-  radiation into evaporation. The gap is both causes; neither is named THE cause.
+* ⚠ **Corrected the same day (plan §10e; commit `bb79817` recorded a wrong reading).** At ×4.2 the
+  model's leaf would sit ~5.8 K above the air; TM 103494's earlier crop had shoots within ±1 °C of
+  it — so that reading counts AGAINST radiation alone. The "at least 1.3× PAR" bound did not stand
+  (it assumed the air resistance in question, and that crop's 6.1 L is per tray area, ~4.9 on
+  TM 102788's basis). Extra lamp radiation is NOT established. The "half into evaporation" was the
+  marginal coefficient; the model's split at its operating point is ~0.91.
+* A canopy surface resistance that falls with leaf area (FAO-56's form, general knowledge) gives
+  rs ≈ 32 at the model's LAI 6.2: water use 2.38 → 2.85 L at the frozen air resistance, and an
+  airflow ceiling of 8.6 — so resistances alone are no longer ruled out once rs follows leaf area.
+  This is the recorded "transpiration ignores leaf area" gap at full cover. Neither cause is named.
 * Sources on the shelf: TM 103494 (public domain); Tazawa 1999 JARQ (HPS visible 39 % of input; no
   infrared share given).

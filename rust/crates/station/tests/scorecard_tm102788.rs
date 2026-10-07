@@ -471,3 +471,27 @@ fn a_what_if_lamp_heating_moves_water_and_nothing_else() {
         assert_eq!(a.stocks[k].amount.to_bits(), b.stocks[k].amount.to_bits(), "{k} moved");
     }
 }
+
+/// Printed, never asserted (plan §10e): the canopy-scale surface resistance FAO-56 gives for the
+/// model's own leaf area, `rs = rl / (0.5 · LAI)` with `rl` = 100 s m⁻¹ — its Eq. 5 form, known
+/// from general knowledge of FAO-56 and NOT read on a page here — and the W1 it would give at the
+/// frozen air resistance. The frozen `rs` = 70 is uncited (`TODO(cite)`); it equals FAO-56's grass
+/// reference, i.e. `rl = 100` at LAI 2.88.
+#[test]
+fn the_surface_resistance_a_full_canopy_would_have() {
+    let r = run(CA_ROW);
+    let sla = params::biosphere().canopy.sla_per_mol_c;
+    let lai = mean(W1_DAYS.map(|d| {
+        let s = &r.states[(d - TM_DAY0) * STEPS_PER_DAY];
+        science::leaf_area_index(s.stocks[LEAF_C].amount, sla, DEFAULT_SCENARIO.ground_area)
+    }));
+    let (ra, rs) = transpiration_params();
+    let rs_fao = 100.0 / (0.5 * lai);
+    eprintln!(
+        "§10e: mean LAI over TM days 25–80 {lai:.3}; FAO-form rs {rs_fao:.2} s m⁻¹ (frozen {rs}); \
+         W1 at ra {ra}: {:.4} (frozen rs: {:.4}); at that rs as ra -> 0: {:.4} (TM ~6.0)",
+        w1_by_hand(ra, rs_fao, 1.0),
+        w1_by_hand(ra, rs, 1.0),
+        w1_by_hand(1e-6, rs_fao, 1.0)
+    );
+}
