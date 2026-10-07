@@ -60,3 +60,19 @@ off — closer to reality in a lamp-lit chamber, the user's delegation.
   both FAO sources assume. The deep store then holds near the frozen run's (roots 1.18 m in
   season 2, as frozen; 1.15 against 1.30 after five seasons).
 * The earlier twins and event numbers predate this and are stale; regenerated before any flip.
+
+**Same-day percolation committed (`cb3a305`); new roots credited with the deep soil's actual wetness,
+built lab-only (2026-10-07,** plan §10e–f). The user's two decisions: credit new roots by how wet the
+deep store really is (`min(1, WSTORG / capacity below the roots)` — our mapping, not in the book; equal
+to the book while the store is full), and accept the slow residual drying.
+
+* Over fifteen seasons in the perennial chamber with all lab forms: roots reach 1.30 m every season
+  (the book's credit: shrinking to 0.90 m); the deep soil settles at 69 % full after each re-sowing,
+  flat from season 9 (frozen 96 %; the book's credit ~44 %). The drying the user accepted is a level,
+  not a ratchet.
+* Carbon identical to four digits under all three. Frozen goldens untouched: the book's path computes
+  no ratio.
+* Bounded quirk recorded, not fixed: ~19 kg sits above the bottom layer's capacity at each harvest (the
+  book's deep store has no outflow).
+* Still owed before a flip: regenerate the stale twins and the §8a/§9a event rows under the settled
+  watering + credit.

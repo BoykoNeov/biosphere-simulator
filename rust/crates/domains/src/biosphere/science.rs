@@ -1047,6 +1047,38 @@ pub const SPRINKLER_APPLICATION_EFFICIENCY: f64 = 0.75;
 /// Field application efficiency, drip — the same table. The sealed chambers', the user's choice.
 pub const DRIP_APPLICATION_EFFICIENCY: f64 = 0.90;
 
+/// What a metre of new root captures from the store below the roots — LAB-ONLY
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §10e).
+///
+/// [`DeepSoilCredit::FullCapacity`] is the loader's value and the book's: Soltani & Sinclair Eqn
+/// 14.10, `EWAT = min(GRTD · EXTR, WSTORG)`, the new depth at its drained upper limit whatever the
+/// store holds. [`DeepSoilCredit::ActualWetness`] scales it by [`deep_soil_wetness`] — the user's
+/// instruction, mapped by us and NOT in the book; it equals the book whenever the store is full.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DeepSoilCredit {
+    #[default]
+    FullCapacity,
+    ActualWetness,
+}
+
+/// How full the store below the roots is, `min(1, WSTORG / ((SOLDEP − DEPORT) · EXTR · ρ · A))` —
+/// the store spread evenly over the unrooted soil, as Eqn 14.28 seeds it (a uniform `MAI`). Capped at
+/// 1 because Eqn 14.12 gives the store no outflow, so percolation can push it past its own capacity;
+/// 0 when no soil is left below the roots.
+pub fn deep_soil_wetness(
+    subsoil_water: f64,
+    depth: f64,
+    soil_depth: f64,
+    soil_extractable_water: f64,
+    ground_area: f64,
+) -> f64 {
+    let capacity = captured_water(soil_depth - depth, soil_extractable_water, ground_area);
+    if capacity <= 0.0 {
+        return 0.0;
+    }
+    (subsoil_water / capacity).clamp(0.0, 1.0)
+}
+
 /// `SALB`, the soil's albedo — Soltani & Sinclair (2012) p. 180, *"commonly … close to 0.12"*.
 pub const SOIL_ALBEDO: f64 = 0.12;
 /// `KET`, the canopy extinction coefficient for global radiation — Soltani & Sinclair p. 180

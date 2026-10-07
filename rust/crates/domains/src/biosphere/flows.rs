@@ -2372,6 +2372,8 @@ pub struct RootZoneCapture {
     pub soil_depth: f64,
     pub soil_extractable_water: f64,
     pub ground_area: f64,
+    /// The book's full-capacity credit, or the lab's actual-wetness one ([`science::DeepSoilCredit`]).
+    pub deep_credit: science::DeepSoilCredit,
 }
 
 impl Flow for RootZoneCapture {
@@ -2388,12 +2390,13 @@ impl Flow for RootZoneCapture {
         dt: f64,
     ) -> Result<FlowResult, SimError> {
         let available = amt(snapshot, &self.subsoil_water);
+        let depth = snapshot
+            .aux
+            .get(&self.rooted_depth_aux)
+            .copied()
+            .unwrap_or(0.0);
         let rate = science::extension_rate(
-            snapshot
-                .aux
-                .get(&self.rooted_depth_aux)
-                .copied()
-                .unwrap_or(0.0),
+            depth,
             snapshot
                 .aux
                 .get(&self.thermal_time_aux)
@@ -2410,8 +2413,21 @@ impl Flow for RootZoneCapture {
             self.soil_extractable_water,
             self.ground_area,
         );
-        let demand =
+        let full =
             science::captured_water(rate * dt, self.soil_extractable_water, self.ground_area);
+        // The book's path computes no ratio at all, so the frozen runs stay bit-identical.
+        let demand = match self.deep_credit {
+            science::DeepSoilCredit::FullCapacity => full,
+            science::DeepSoilCredit::ActualWetness => {
+                full * science::deep_soil_wetness(
+                    available,
+                    depth,
+                    self.soil_depth,
+                    self.soil_extractable_water,
+                    self.ground_area,
+                )
+            }
+        };
         let flux = if demand < available {
             demand
         } else {

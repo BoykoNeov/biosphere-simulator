@@ -461,3 +461,83 @@ and `gross − net` into the deep store in the event step). The root trace, pere
 
 **R1 mostly held now:** the deep store holds near the frozen run's (season 2's roots reach 1.18 m,
 as frozen), with a slower residual decline (1.15 m against 1.30 after five seasons).
+
+### 10e. New roots credited with the deep soil's actual wetness (the user, 2026-10-07)
+
+**DECIDED (the user): credit new roots with the deep soil's actual wetness, not full capacity; accept
+the slow residual drying** that remains. Same-day percolation (§10d) is committed first, on its own.
+
+**The form — MINE, on the user's instruction; NOT in the book.** A fourth lab switch, a sibling of
+the watering form (`DeepSoilCredit`; the loader keeps the book's `FullCapacity`, and its code path
+computes no ratio at all, so the frozen runs stay bit-identical). Under `ActualWetness`, the water a
+metre of new root captures is the book's scaled by how wet the deep store is:
+
+```
+EWAT = GRTD · EXTR · ρ · A · min(1, WSTORG / ((SOLDEP − DEPORT) · EXTR · ρ · A))
+```
+
+— the deep store spread evenly over the unrooted soil, which is how the book itself seeds it (Eqn
+14.28, `WSTORG = (SOLDEP − DEPORT)·EXTR·ρ·A·MAI`, a uniform fraction `MAI`). It reduces to the book's
+Eqn 14.10 exactly when the deep store is at capacity — the book's single-season case. Capped at 1:
+over-watering can push the store past its own capacity (Eqn 14.12 has no outflow), and the credit
+must never exceed the book's. Only the water side changes; the rooting RATE and its four stops are
+untouched (`extension_rate` stays the single source).
+
+**Predictions (before code):**
+
+* **P1 (exact, tests the build): capture leaves the deep soil's wetness unchanged.** Taking
+  `Δd · W/(S−d)` from `W` over `S−d` leaves `W/(k(S−d))` the same. So the dry-subsoil stop (`WSTORG =
+  0`) essentially never fires, and **the roots reach 1.30 m every season by construction** — rooted
+  depth stops being the readout. **The new readout:** the deep store's wetness at each re-sowing, and
+  the root zone's fill once the roots are at full depth.
+* **P2: where the wetness drifts.** Only two things move it: drainage and percolation push it UP;
+  a re-sowing mixes the abandoned zone back in at its harvest fill (~0.5 under events). So under events
+  the deep wetness should settle somewhere between the harvest fill and 1 — the residual drying, now
+  a measured fraction, not a stopping depth.
+* **P3: equal to the book while the deep store is full.** Every first season starts at MAI = 1, and
+  under continuous watering the drainage keeps the 0.2 m below 1.30 m at exactly 26.0 kg = capacity
+  (§10b). So the new form ALONE, continuous watering: the three never-re-sown goldens and every first
+  season equal the book to rounding; after the first re-sowing the deep store is 158.5 / 164.7 kg =
+  0.962 full, so season 2's new roots get ~4 % less water per metre.
+* **P4: the depth trace under all forms + percolation + this:** as frozen (1.18 m at day 400; **1.30 m
+  at day 1500**, against 1.15 now), because the depth rate reads the root zone's stress, and events
+  trigger at FTSW 0.45, above `wssg` 0.30.
+* **P5: carbon may move now — down, if at all.** Less water per metre of new root makes the deep part
+  of the zone drier: events come sooner (more percolation — a feedback that recharges the deep store),
+  and any drought response reading the zone fill above the trigger could bite. Expected small.
+
+### 10f. BUILT lab-only and measured — graded (2026-10-07)
+
+Built as §10e describes (`science::DeepSoilCredit`, `deep_soil_wetness`, `lab::with_deep_credit`;
+`RootZoneCapture` reads `p.water.deep_credit`). New unit test: a deep store seeded half full keeps
+its wetness at 0.5 on every capture step and the roots reach the cap, while the book's credit empties
+it and stops the roots at `0.15 + W/(EXTR·ρ·A)`. Throwaway probes (`W:\temp\claude\rootcredit\
+zz_rootcredit.rs`, `zz_rootcredit15.rs`; outputs `probe.log`, `probe15.log`), perennial chamber.
+
+**Fifteen years, at each harvest** (deep wetness = the store below the roots over its capacity,
+just after the re-sowing):
+
+| | roots, every season | deep wetness after re-sowing | water over the 0.2 m layer's capacity at harvest | air + condensate | peak grain s1 → s14 |
+|---|---|---|---|---|---|
+| frozen | 1.30 m | 0.956 | 0 | 8.4 kg | 0.7127 → 0.5185 |
+| all forms, book credit | 1.30 → **0.90 m** | 0.87 → 0.50 → **~0.44** | 38 → 0 | 30 → ~104 kg | identical |
+| all forms, actual wetness | **1.30 m, all 15** | 0.87 → 0.76 → **0.69** (flat from s9) | 38 → **~19, flat** | 30 → ~65 kg | identical |
+
+**Graded:**
+
+* **P1 HELD (exact):** within a season the wetness stays put under capture (0.880 at days 310 and 400);
+  the roots reach 1.30 m in all fifteen seasons.
+* **P2 HELD:** it moves only up within a season (percolation) and is mixed down at each re-sowing; it
+  settles at **0.69** — between the harvest fill and 1 — and stops falling. This is the slow residual
+  drying the user accepted: **a level, not a ratchet** (0.956 frozen → 0.69).
+* **P3 HELD:** the form alone, continuous watering: season 1 identical to the book (deep wetness 1.000
+  throughout); after the first re-sowing 0.964 vs 0.962, and the re-sow wetness 0.957 either way.
+* **P4 HELD:** 1.184 m at day 400 as frozen; 1.30 m at day 1500 (1.15 under the book's credit).
+* **P5: carbon did NOT move** — peak grain identical to four digits in all three, every season. The
+  crop is never water-stressed under either credit (the events trigger above `wssg`).
+
+**Found, not acted on:** the 0.2 m below the full-depth roots holds ~19 kg ABOVE its capacity at every
+harvest (Eqn 14.12's store has no outflow, and the credit is capped at 1, so percolated water waits
+there until the next re-sowing mixes it up). It is bounded — flat from season 9, and the chamber's free
+water does not drain into it (~65 kg held) — so it is a resting place, not a leak. In a real chamber
+that water would pond at the bottom of the container. Left as is; the user's to reopen.

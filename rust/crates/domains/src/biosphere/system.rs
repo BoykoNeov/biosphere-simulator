@@ -541,6 +541,7 @@ fn build_soil(
             soil_depth: scenario.soil_depth,
             soil_extractable_water: scenario.soil_extractable_water,
             ground_area: scenario.ground_area,
+            deep_credit: p.water.deep_credit,
         }),
     ];
     if !scenario.sealed {
@@ -1818,6 +1819,82 @@ mod tests {
         assert!(
             checked > 30,
             "the capture must actually run ({checked} steps)"
+        );
+    }
+
+    /// **The lab's actual-wetness credit** (`DeepSoilCredit::ActualWetness`,
+    /// `docs/plans/post-roadmap-soil-evaporation.md` §10e) on a deep store seeded HALF full.
+    ///
+    /// Every step captures the book's geometry times the store's wetness; capture then leaves the
+    /// wetness exactly where it was (§10e P1 — `Δd·W/(S−d)` from `W` over `S−d`), so the dry-subsoil
+    /// stop never fires and the roots reach the crop's cap. Under the book's full-capacity credit
+    /// the same store runs dry at `0.15 + W/(EXTR·ρ·A)` m and the roots stop there — the contrast
+    /// that shows the switch is live.
+    #[test]
+    fn the_actual_wetness_credit_keeps_the_deep_soil_as_wet_and_lets_the_roots_reach_the_cap() {
+        let scenario = SeasonScenario {
+            subsoil_water0: 0.5 * DEFAULT_SCENARIO.subsoil_water0,
+            ..DEFAULT_SCENARIO
+        };
+        let (extr, area, soil) =
+            (scenario.soil_extractable_water, scenario.ground_area, scenario.soil_depth);
+        let wet = |w: f64, d: f64| science::deep_soil_wetness(w, d, soil, extr, area);
+        // The function's own limbs: half, capped at 1, nothing below the soil.
+        assert!((wet(scenario.subsoil_water0, scenario.rooted_depth0) - 0.5).abs() < 1e-12);
+        assert_eq!(wet(1e6, scenario.rooted_depth0), 1.0, "the credit must never exceed the book's");
+        assert_eq!(wet(10.0, soil), 0.0);
+
+        let cap = params::root_depth().max_rooted_depth;
+        let run = |form| {
+            let p = crate::lab::with_deep_credit(params::biosphere(), form);
+            let (state, integrator, resolver) =
+                super::super::season_setup_with(&scenario, 1, &p).unwrap();
+            let mut seen: Vec<(f64, f64)> = Vec::new();
+            let mut observe = |s: &State| {
+                seen.push((s.aux[ROOTED_DEPTH], s.stocks[SUBSOIL_WATER].amount));
+            };
+            run_season(
+                &integrator,
+                state,
+                &resolver,
+                super::super::BIO_DT,
+                super::super::steps_for_years(1),
+                None,
+                &mut observe,
+            )
+            .expect("half-full deep store season");
+            seen
+        };
+
+        let seen = run(science::DeepSoilCredit::ActualWetness);
+        let mut checked = 0usize;
+        for pair in seen.windows(2) {
+            let ((d0, w0), (d1, w1)) = (pair[0], pair[1]);
+            if d1 - d0 <= 0.0 {
+                continue;
+            }
+            let want = science::captured_water(d1 - d0, extr, area) * wet(w0, d0);
+            assert!((w0 - w1 - want).abs() <= 1e-9 * want, "capture {} != {want}", w0 - w1);
+            assert!((wet(w1, d1) - 0.5).abs() < 1e-9, "the wetness moved: {}", wet(w1, d1));
+            checked += 1;
+        }
+        assert!(checked > 30, "the capture must actually run ({checked} steps)");
+        let (depth, _) = *seen.last().unwrap();
+        // The cap cuts the RATE once reached, so the last step may overshoot by one increment.
+        let one_step = params::root_depth().max_extension_rate * super::super::BIO_DT;
+        assert!(
+            depth >= cap && depth <= cap + one_step,
+            "the roots stopped at {depth}, not the {cap} m cap"
+        );
+
+        let book = run(science::DeepSoilCredit::FullCapacity);
+        let (book_depth, book_below) = *book.last().unwrap();
+        let dry_at = scenario.rooted_depth0
+            + scenario.subsoil_water0 / science::captured_water(1.0, extr, area);
+        assert_eq!(book_below, 0.0, "the book's credit should empty the half-full store");
+        assert!(
+            (book_depth - dry_at).abs() < 0.01 && book_depth < cap - 0.3,
+            "the book's roots stop at {book_depth}, predicted {dry_at}"
         );
     }
 

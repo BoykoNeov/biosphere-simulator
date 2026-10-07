@@ -37,8 +37,8 @@
 //! `docs/biosphere-reference.md`.
 
 use super::science::{
-    Co2Read, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm, SurfaceResistanceForm,
-    VpdRead, WateringForm,
+    Co2Read, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
+    SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
@@ -407,6 +407,10 @@ pub struct WaterCycleParams {
     /// [`WateringForm::Continuous`]; watering in events is lab-only
     /// (`docs/plans/post-roadmap-soil-evaporation.md` §7).
     pub watering: WateringForm,
+    /// What new roots capture from the store below them ([`DeepSoilCredit`]). Never loaded from the
+    /// file: the loader sets the book's [`DeepSoilCredit::FullCapacity`]; the other is lab-only
+    /// (`docs/plans/post-roadmap-soil-evaporation.md` §10e).
+    pub deep_credit: DeepSoilCredit,
 }
 
 /// Minimal-consumer params (grazing + respiration + mortality + f_O2 Monod).
@@ -1187,6 +1191,7 @@ pub fn water_cycle_from_bounded(
         // stocks only (docs/plans/post-roadmap-chamber-dryness.md §4.6).
         vpd_read: VpdRead::Chamber,
         watering: WateringForm::Continuous,
+        deep_credit: DeepSoilCredit::FullCapacity,
     }
 }
 

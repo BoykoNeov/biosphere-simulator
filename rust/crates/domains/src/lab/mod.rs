@@ -41,8 +41,8 @@
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
 use crate::biosphere::science::{
-    Co2Read, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm, SurfaceResistanceForm,
-    VpdRead, WateringForm,
+    Co2Read, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
+    SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{with_override, ConfigError, ParamFile};
 
@@ -240,6 +240,18 @@ pub fn biosphere_with_soil_evaporation(
     p.transp.soil_evap = soil;
     p.water.watering = watering;
     Ok(p)
+}
+
+/// `p` with new roots credited by `form` ([`DeepSoilCredit`]) — lab-only
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §10e). Takes built params so it composes with the
+/// other forms: alone over [`biosphere_with`], or over [`biosphere_with_soil_evaporation`].
+///
+/// # ⚠ This endorses no form
+///
+/// [`DeepSoilCredit::FullCapacity`] (Soltani & Sinclair Eqn 14.10) is the reference and stays it.
+pub fn with_deep_credit(mut p: BiosphereParams, form: DeepSoilCredit) -> BiosphereParams {
+    p.water.deep_credit = form;
+    p
 }
 
 /// The frozen params under an alternative **leaf-area** form — the third form sibling.
