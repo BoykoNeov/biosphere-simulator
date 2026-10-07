@@ -98,3 +98,5 @@ candidates, sources judge them, and one WHAT-IF run checks only the instrument a
   This is the recorded "transpiration ignores leaf area" gap at full cover. Neither cause is named.
 * Sources on the shelf: TM 103494 (public domain); Tazawa 1999 JARQ (HPS visible 39 % of input; no
   infrared share given).
+* ⚠ *Later 2026-10-07:* FAO-56 was then read first-hand (`log/canopy-resistance.md`): Eq. 5 is
+  scoped to dense full cover, so its use here at the model's full-cover LAI 6.2 is within scope.

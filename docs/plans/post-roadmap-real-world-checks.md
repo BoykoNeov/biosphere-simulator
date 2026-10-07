@@ -584,6 +584,11 @@ is named the cause; "not refuted" is what (a) earns, and (b) in its "airflow" fo
 
 ### 10e. The correction (2026-10-07, advisor review of §10d)
 
+⚠ *Later 2026-10-07 (`log/canopy-resistance.md`):* FAO-56 Ch. 2 has since been read first-hand. Eq. 5
+is scoped by its source to *"dense full cover vegetation"*, and the 0.5 and the ~100 s m⁻¹ are stated
+in its grass box — so the use below, at the model's full-cover LAI 6.2, is inside the source's scope;
+the "general knowledge, not read on a page" caveat in point 3 is discharged.
+
 1. **"About half into evaporation" confused the marginal coefficient with the split.** `Δ / (Δ +
    γ(1 + rs/ra))` ≈ 0.47 is what each EXTRA watt of net radiation adds to evaporation. At the
    model's operating point the split is **74 of 81 W m⁻² ≈ 0.91** (§8). At ×4.2 the leftover is

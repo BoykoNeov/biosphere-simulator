@@ -188,7 +188,7 @@ steps carry **5.7 %** of the row's water and partly lit steps 11.0 %.
 | P3 | sealed chambers: FAO −45–75 %, S–L −20–50 % | FAO −53 / −59 / −65 %; S–L −29 / −37 / −44 % | HELD |
 | P4 | default: winter use −80 %+ under both; summer FAO +15–30 %, S–L +5–15 %; season −0–25 %; drainage rises | winter FAO −82 % (HELD), S–L **−68 % (FAILED)**; summer +20 / +11 % (HELD); season −5.4 / −4.7 % (HELD); drainage **0 throughout — the irrigation absorbs it (FAILED, the mechanism was wrong)** | mixed |
 | P5 | carbon bit-identical in the unstressed runs | default and all three chambers: yes | HELD |
-| P6 | deep-water grain ratio 1.00–1.18; canopy 1.00–1.06 | grain 1.036 / 1.089; canopy 1.000 / 1.004 | HELD |
+| P6 | deep-water grain ratio 1.00–1.18; canopy 1.00–1.06 | grain 1.036 / 1.089; canopy 1.000 / 1.004 | HELD on the numbers; **the reasoning was WRONG for the grain** (§7c point 2: the stored crop lost grain to the summer draw; the seedling drought explains the canopy only) |
 | P7 | drought window earlier: FAO 3–10 days, S–L 1–6 | 7 / 4 days | HELD |
 | P8 | W1 FAO ~2.8–2.9, S–L ~2.5–2.6; early use falls toward the trial's | 2.853 (HELD); 2.607 (**0.007 over**); early use falls under both (HELD) | mostly held |
 | P9 | dark steps ~8 % of the water | 5.7 % fully dark (+ 11.0 % partly lit) | FAILED (low) |
@@ -201,19 +201,32 @@ steps carry **5.7 %** of the row's water and partly lit steps 11.0 %.
    barely drinks, so the invented early drought goes. The closed canopy drinks more, so a summer
    drought comes sooner and deeper (`drought_window` 7 or 4 days earlier; the deep-water crop's
    grain WITH its deep store falls 12.52 → 11.07 / 10.89).
-2. **The deep-water rescue collapses to ~1.** Under FAO the store-less crop reaches the same canopy
-   (9.836 both), and grain differs by only 3.6 % — the rescue the frozen pin records was mostly the
-   seedling drought the constant resistance invents.
-3. **The sealed chambers drink 29–65 % less** — their canopies never close, so their resistance sits
-   above 70 on every step. In an adoption every sealed golden's water stocks would move.
-4. **The trial's early water curve fits Szeicz–Long closely** (0.17 / 0.40 / 0.74 / 1.06 against
+2. **The deep-water rescue collapses to ~1 — for two different reasons.** ~~the rescue the frozen pin
+   records was mostly the seedling drought the constant resistance invents~~ (withdrawn the same
+   day, advisor review: the grain numbers contradict it). **The CANOPY gap was the seedling
+   drought:** the store-less crop's peak leaf rises 9.555 → 9.836 / 9.799 and meets the stored crop's.
+   **The GRAIN gap closes mostly from the other side:** the crop WITH the store loses grain (12.515 →
+   11.069 / 10.894, its closed canopy drinking more in summer), while the store-less crop gains only
+   under FAO (10.260 → 10.685) and LOSES under Szeicz–Long (→ 10.008). So the grain ratio now mostly
+   reflects the summer draw, not the seedling.
+3. **The three biosphere sealed chambers drink 29–65 % less** — their canopies never close, so their
+   resistance sits above 70 on every step; their water stocks would move in an adoption. **The
+   station's sealed builds were not run under either form — not measured.**
+4. **The trial's early water curve fits Szeicz–Long better** (0.17 / 0.40 / 0.74 / 1.06 against
    0.21 / 0.47 / 0.71 / 1.18), while FAO's rises too slowly and the frozen constant is flat from day
-   5. One trial, one figure read by eye, a model LAI trajectory of its own: suggestive, not decisive.
-   Neither form closes the LEVEL (2.6–2.9 against ~6), which stays the air-coupling question of the
-   Step 6 record.
+   5. ⚠ **Only two of those points are clean:** the trays sat under acrylic lids for the first 120 h
+   to hold humidity (TM 102788 p. 4), which suppresses water use whatever the leaf area, so day 5 is
+   not clean; and 12 of 64 trays were reseeded on day 6 (p. 5), which touches day 8. On the clean days
+   11 and 14 Szeicz–Long is still the closer (0.74 / 1.06 against 0.71 / 1.18; FAO 0.44 / 0.73). And the
+   fit tests the form TOGETHER WITH the model's own LAI curve, with Teh's `Lcr` = 4 setting where it
+   flattens. One trial, one figure read by eye: suggestive, not decisive. Neither form closes the
+   LEVEL (2.6–2.9 against ~6), which stays the air-coupling question of the Step 6 record.
 5. **FAO's form runs outside its source's scope below full cover**, and it is the one that fits the
    early curve worse. Szeicz–Long is the form whose source addresses low LAI — with a composite leaf
-   value and no light response (worth ~6 % of the water here, in the dark).
+   value and no light response. ~~(worth ~6 % of the water here, in the dark)~~ **The light
+   response's effect is unsized:** fully dark steps carry 5.7 % of the row's water and partly lit
+   steps 11.0 %, and without wheat coefficients the lit-step Jarvis value could sit above or below
+   100, so 5.7–17 % of the water falls where it would act.
 
 ### 7d. The gates
 

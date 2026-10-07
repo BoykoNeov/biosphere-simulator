@@ -27,11 +27,16 @@ keeps the frozen constant, and the frozen path is the old code path (asserted bi
 * Each form reaches the water flow to 1e-12; forcing it back to constant turns that check red.
 * Water moves, carbon does not, until drought. The seedling barely drinks (winter use −82 % FAO,
   −68 % Szeicz–Long); the closed canopy drinks more (+20 % / +11 %); the season −5 %.
-* The deep-water rescue collapses to ~1 (grain 1.036 / 1.089 against the pinned 1.22): it was
-  mostly the seedling drought the constant resistance invents. A summer drought now bites sooner.
-* The sealed chambers drink 29–65 % less; their canopies never close.
-* TM 102788's early water curve fits Szeicz–Long closely (0.17 / 0.40 / 0.74 / 1.06 against
-  0.21 / 0.47 / 0.71 / 1.18 on days 5–14); FAO rises too slowly; the constant is flat. One trial.
+* The deep-water rescue collapses to ~1 (grain 1.036 / 1.089 against the pinned 1.22), for two
+  reasons. The CANOPY gap was the seedling drought the constant invents (the store-less crop's peak
+  leaf 9.56 → 9.84 / 9.80). The GRAIN gap closes mostly because the crop WITH the store loses grain to
+  the summer draw (12.52 → 11.07 / 10.89); under Szeicz–Long the store-less crop loses grain too.
+  (First recorded as "mostly the seedling drought" — wrong for the grain; corrected the same day.)
+* The three biosphere sealed chambers drink 29–65 % less; their canopies never close. The station's
+  sealed builds were not run under either form.
+* TM 102788's early water curve fits Szeicz–Long better (0.17 / 0.40 / 0.74 / 1.06 against
+  0.21 / 0.47 / 0.71 / 1.18 on days 5–14); FAO rises too slowly; the constant is flat. Only days 11
+  and 14 are clean (lids for 120 h, reseeding on day 6), and Szeicz–Long is closer on both. One trial.
 * Neither closes the trial's level (2.6–2.9 against ~6). Of 10 predictions 7 held, 2 in part, 1
   failed: drainage stayed 0 (irrigation is deficit-driven), and the dark share was 5.7 %, not 8 %.
 * Decisions owed to the user: which form to price for adoption, a constant or light-dependent leaf
