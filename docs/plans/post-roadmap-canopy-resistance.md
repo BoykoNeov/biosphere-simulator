@@ -235,3 +235,15 @@ steps carry **5.7 %** of the row's water and partly lit steps 11.0 %.
 * `cargo test --no-fail-fast`: **1354 passed, 0 failed, 6 ignored** (run before the measurement was
   marked `#[ignore]`, so it ran once inside the suite; it is run on demand from here on).
 * `repo_gates` re-run after the doc edits.
+
+---
+
+## 8. Decisions TAKEN (the user, 2026-10-07) — price, not yet adopt
+
+1. **Price Teh / Szeicz & Long for adoption** (over FAO-56 and over keeping both lab-only).
+2. **A constant leaf resistance, 100 s m⁻¹** (FAO-56 Box 5), over the light-dependent Jarvis form.
+3. **Teh's threshold LAI, 4.0**, over searching for a cited wheat maximum.
+
+So the candidate reference form is `rc = 100 / min(LAI, 2.0)` s m⁻¹. Pricing it means measuring what
+an adoption would move — every golden, every pinned test, every gate — with predictions first.
+Adoption itself is a further decision and a biosphere + station unfreeze, not taken here.
