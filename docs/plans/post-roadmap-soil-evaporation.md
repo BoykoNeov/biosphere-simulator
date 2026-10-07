@@ -541,3 +541,21 @@ harvest (Eqn 14.12's store has no outflow, and the credit is capped at 1, so per
 there until the next re-sowing mixes it up). It is bounded — flat from season 9, and the chamber's free
 water does not drain into it (~65 kg held) — so it is a resting place, not a leak. In a real chamber
 that water would pond at the bottom of the container. Left as is; the user's to reopen.
+
+**Advisor review of §10f, summarized (2026-10-07):** both commits sound; but (1) **the 69 % level is
+partly the overfilled layer's water** — each re-sowing mixes the ~19 kg held above the bottom layer's
+capacity back into the deep store; without it the level is ≈ **0.58** (`(0.693·164.7 − 19.3)/164.7`).
+The roots result does not depend on it (it holds by construction). The overfill now bears on the number
+the user accepted, so it is the user's decision, not a footnote. (2) Measured on one scenario, not the
+worst — the consumer chamber was the old ratchet's worst case (0.156 m); run it. (3) Push and watch
+Linux CI.
+
+**The consumer chamber, fifteen years** (`W:\temp\claude\rootcredit\probe15_consumer.log`): roots
+**1.30 m in all fifteen seasons** (book credit: 1.30 → ~0.70–0.80 m); the deep wetness after re-sowing
+swings **0.68–0.95** with no trend (it follows the root zone's fill at harvest, i.e. how recently the
+last event came), ≈ 0.57–0.83 without the overfill; the overfill 16–22 kg, bounded; peak grain identical
+in all three. **P1–P4 hold here too.**
+
+**Corrected statement of the accepted drying:** the deep soil settles at roughly 0.6–0.7 of full after
+each re-sowing (perennial 0.69, consumer 0.68–0.95), of which ~0.1 is water held above the bottom
+layer's capacity; ≈ 0.58 without it.

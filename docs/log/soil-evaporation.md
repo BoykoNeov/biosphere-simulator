@@ -76,3 +76,7 @@ to the book while the store is full), and accept the slow residual drying.
   book's deep store has no outflow).
 * Still owed before a flip: regenerate the stale twins and the §8a/§9a event rows under the settled
   watering + credit.
+* ⚠ Corrected after review: the 69 % includes ~19 kg held above the bottom layer's capacity, mixed back
+  in at each re-sowing — ≈ 58 % without it. The consumer chamber (the old ratchet's worst case): roots
+  1.30 m in all fifteen seasons; deep wetness 68–95 % with no trend; grain identical. Whether to let that
+  overfill drain away is the user's open decision.
