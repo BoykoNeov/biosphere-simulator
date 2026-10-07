@@ -522,3 +522,64 @@ lit**.
 Stop rule for sources: the shelf, then NTRS for Prince et al. 1987, Sager et al. 1988, Prince & Knott
 1989, then one search for HPS radiant output. Paywalled or blocked → recorded as blocked, and the
 row stops at the arithmetic.
+
+### 10d. Graded (2026-10-07)
+
+**The run** (`scorecard_tm102788.rs`, three new tests, WHAT-IF, nothing pinned):
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| A1 (arithmetic, now a test) | no `ra` gives more than ~3.9 L m⁻² d⁻¹ at `rs` = 70 | W1 as `ra → 0`: **3.9486** (frozen `ra` 50: 2.3762) | HELD |
+| R1 | `ra` 50 → 10 moves W1 to Penman–Monteith on the same forcings, ~1e-9 | model **3.249631** = by hand 3.249631 | HELD |
+| R2 | net radiation × 4.2: W1 5.8–6.2; carbon bit-identical; FTSW ≥ 0.30 | W1 **6.0541**; every CO₂ step and the end crop bit-identical; lowest FTSW **0.9257** | HELD |
+
+**The sources** (stop rule followed: the shelf held nothing; one NTRS report and one lamp paper
+read off their page images; both now on the git-ignored shelf):
+
+* **NASA TM 103494** — Wheeler, Mackowiak, Dreschel, Sager, Prince, Knott, Hinkle & Strayer (March
+  1990), *System Development and Early Biological Tests in NASA's Biomass Production Chamber*
+  (`sources/wheeler_et_al_1990_TM103494.pdf`; US-Government work, public domain). ⚠ Locus: the two
+  canopy measurements below are from the **Phase II crop** (May–Aug 1988: 24-h light at 660 µmol,
+  23 °C, 65 % RH), not TM 102788's Phase IV crop.
+  * p. 4: shoots were confined to *"60 cm of vertical growing dimension between the culture trays
+    and lamp barriers"* — the lamps sat behind barriers; their material and infrared absorption
+    are not stated in the pages read.
+  * p. 8: *"Air velocities as measured with a hot wire anemometer typically ranged from 0.2 to 1.2
+    m s⁻¹, while infrared temperatures of plant shoots typically stayed within ± 1 °C of the
+    surrounding air temperature."*
+  * p. 8: Phase II condensate **6.1 L m⁻² d⁻¹**, "closely represented transpiration".
+  * p. 14 (Phase IV, TM 102788's crop): condensate exceeded the water added, *"likely a result of
+    residual water in the air handling system from supplementary humidification during the first
+    2 weeks"*; after full ground cover transpiration *"remained relatively constant"*.
+* **Tazawa (1999)**, *JARQ* 33:177–183, Table 2 (`sources/tazawa_1999_JARQ33_177.pdf`; JIRCAS,
+  free to read; facts cited): a 360 W clear HPS lamp emits **39.0 %** of its input as visible
+  radiation (380–780 nm). It gives no infrared share, so "how much an HPS lamp radiates outside
+  PAR" stays unsized from this source.
+
+| | prediction | what the sources say | grade |
+|---|---|---|---|
+| A1 | (b) airflow alone cannot close the gap | arithmetic holds; and the premise "the BPC blew air hard" is **not supported**: 0.2–1.2 m s⁻¹ is gentle air, which raises `ra` if anything | HELD, strengthened |
+| A2 | (a) at ×4.2 is implausible; non-PAR radiation adds well under 3× | **not answered by the infrared figure** (Tazawa gives visible only). But see the energy balance below: the ×4.2 is the MODEL's need, not the lamp's | NOT TESTED as written; reframed |
+| A3 | lamps behind barriers | barriers existed (p. 4); their absorption unknown | HELD on existence |
+| A4 | the TM gives no way to separate solution-surface evaporation | none found; the only stated contamination is early humidifier water, outside the W1 window (days 25–80) | HELD |
+| A5 | (a) and (b) together, no single cause | supported, in the form below | HELD |
+
+**The energy balance the sources allow (an inference, from the Phase II crop).** Leaves within
+± 1 °C of the air means little sensible heat: at `ra` = 50 s m⁻¹, 1 K is `ρcp/ra` ≈ 24 W m⁻². So the
+canopy's latent heat ≈ its net radiation ± ~24. Phase II's 6.1 L m⁻² d⁻¹ under continuous light is a
+latent flux of ~173 W m⁻²; its 660 µmol of PAR is 144 W m⁻² radiant, 111 net of the 0.23 albedo. So
+the canopy absorbed **at least ~1.3×** the energy of its PAR alone — extra lamp radiation was there,
+but a modest multiple, not 4×.
+
+**So the ×4.2 belongs to the model's split, not to the lamp alone.** At the frozen `ra` 50 / `rs` 70
+the model's Penman–Monteith sends only about half of its net radiation into evaporation
+(`Δ / (Δ + γ(1 + rs/ra))` ≈ 0.47 at 20 °C) and warms the leaf with the rest, while the chamber's
+leaves sat at air temperature. The gap is therefore **both**: more radiant energy than PAR (a), and
+a surface/air coupling in the model that does not put it into evaporation the way the chamber's
+canopy did (a resistance question — but toward a lower `rs`/`ra` ratio, not "hard airflow"). Neither
+is named the cause; "not refuted" is what (a) earns, and (b) in its "airflow" form is refuted.
+
+**Not done, the user's call:** whether the station's own lamp (a PWM-dimmed LED in the record,
+mostly PAR) has the same gap is not measured here — this row is an HPS chamber. A lower `rs` at high
+CO₂ would go against the expected stomatal response, so a resistance change would need a source of
+its own.

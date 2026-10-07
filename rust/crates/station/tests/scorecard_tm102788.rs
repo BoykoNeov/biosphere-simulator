@@ -22,18 +22,19 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::light_path::top_hat_window_mean;
-use domains::biosphere::params;
+use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::science;
 use domains::biosphere::stocks::{
     CI_VAR, CO2_ATMOS, CO2_RESP, DAYLENGTH_VAR, FERTILIZATION_VAR, IRRIGATION_VAR, LEAF_C, PAR_VAR,
     PLANT_N, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C,
     LITTER_SINK, TEMP_VAR, VPD_VAR,
 };
-use domains::biosphere::system::{build_season, weather_forcings, weather_shared};
+use domains::biosphere::system::{build_season, build_season_with, weather_forcings, weather_shared};
 use domains::biosphere::weather::saturation_vapor_pressure;
 use domains::biosphere::{SeasonScenario, BIO_DT, DEFAULT_SCENARIO, STEPS_PER_DAY};
 use simcore::environment::{constant, Schedule, SourceResolver};
 use simcore::integrator::EulerIntegrator;
+use simcore::registry::Registry;
 use simcore::state::State;
 use station::lighting::lamp_net_radiation;
 
@@ -95,12 +96,16 @@ fn scenario(ca: f64) -> SeasonScenario {
     }
 }
 
-/// The trial's chamber as forcings, and the keys it replaced.
-fn chamber_resolver(s: &SeasonScenario) -> (SourceResolver, Vec<String>) {
+/// The trial's chamber as forcings, and the keys it replaced. `rn_scale` multiplies the lamp's
+/// net radiation — 1 for the row, other values only in the water-gap WHAT-IF (plan §10).
+fn chamber_resolver(s: &SeasonScenario, rn_scale: f64) -> (SourceResolver, Vec<String>) {
     let mut forcings = weather_forcings(s, 1).expect("weather forcings");
     let replaced: Vec<(&str, Schedule)> = vec![
         (PAR_VAR, Box::new(|n, dt| par_on(n) * lit(n, dt))),
-        (RN_VAR, Box::new(|n, dt| lamp_net_radiation(par_on(n)) * lit(n, dt))),
+        (
+            RN_VAR,
+            Box::new(move |n, dt| rn_scale * lamp_net_radiation(par_on(n)) * lit(n, dt)),
+        ),
         (DAYLENGTH_VAR, constant(PHOTOPERIOD_S).unwrap()),
         (TEMP_VAR, Box::new(temp)),
         (
@@ -136,9 +141,19 @@ struct Run {
 
 fn run(ca: f64) -> Run {
     let s = scenario(ca);
-    let (state0, registry) = build_season(&s).expect("build");
+    run_built(&s, build_season(&s).expect("build"), 1.0)
+}
+
+/// The water-gap WHAT-IF (plan §10): other params and/or a scaled lamp net radiation.
+fn run_what_if(p: &BiosphereParams, rn_scale: f64) -> Run {
+    let s = scenario(CA_ROW);
+    run_built(&s, build_season_with(&s, p).expect("build"), rn_scale)
+}
+
+fn run_built(s: &SeasonScenario, built: (State, Registry), rn_scale: f64) -> Run {
+    let (state0, registry) = built;
     let integrator = EulerIntegrator::new(registry);
-    let (resolver, _) = chamber_resolver(&s);
+    let (resolver, _) = chamber_resolver(s, rn_scale);
     let steps = DAYS * STEPS_PER_DAY;
     let mut state = state0;
     let mut out = Run {
@@ -240,7 +255,7 @@ fn the_unit_arithmetic_reproduces_the_tms_own() {
 fn every_weather_forcing_is_the_chambers() {
     let s = scenario(CA_ROW);
     let weather: Vec<String> = weather_forcings(&s, 1).unwrap().into_keys().collect();
-    let (_, replaced) = chamber_resolver(&s);
+    let (_, replaced) = chamber_resolver(&s, 1.0);
     let scenario_constants = [CI_VAR, IRRIGATION_VAR, FERTILIZATION_VAR];
     for k in &weather {
         assert!(
@@ -368,5 +383,91 @@ fn scorecard() {
             daily_water(&r, d),
             plant_c(&r.states[(d - TM_DAY0) * STEPS_PER_DAY])
         );
+    }
+}
+
+// --- the water gap, split (plan §10) — WHAT-IF, lab-only, pinning nothing ----------------------
+
+/// TM days 25–80: the full-cover window the W1 row averages.
+const W1_DAYS: std::ops::RangeInclusive<usize> = 25..=80;
+
+/// W1 from the forcings alone: Penman–Monteith on every step's lamp net radiation, VPD and
+/// temperature, at the given resistances, with no soil-water factor (the conditions test holds
+/// FTSW above `wssg`, where that factor is exactly 1).
+fn w1_by_hand(ra: f64, rs: f64, rn_scale: f64) -> f64 {
+    mean(W1_DAYS.map(|d| {
+        let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
+        (first..first + STEPS_PER_DAY as u64)
+            .map(|n| {
+                let t = temp(n, BIO_DT);
+                let rn = rn_scale * lamp_net_radiation(par_on(n)) * lit(n, BIO_DT);
+                let vpd = saturation_vapor_pressure(t) * (1.0 - RH);
+                science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * BIO_DT
+            })
+            .sum::<f64>()
+    }))
+}
+
+fn transpiration_params() -> (f64, f64) {
+    let p = params::biosphere();
+    (p.transp.aerodynamic_resistance, p.transp.surface_resistance)
+}
+
+/// A1 — airflow alone cannot close the gap: with the air resistance near 0, full-cover water use
+/// tops out below the trial's ~6 L m⁻² d⁻¹ at the frozen surface resistance.
+#[test]
+fn airflow_alone_cannot_reach_the_trials_water_use() {
+    let (ra, rs) = transpiration_params();
+    let frozen = w1_by_hand(ra, rs, 1.0);
+    let limit = w1_by_hand(1e-6, rs, 1.0);
+    eprintln!("A1: W1 at the frozen ra {ra} = {frozen:.4}; as ra -> 0: {limit:.4} L m⁻² d⁻¹ (TM ~6.0)");
+    assert!(limit < 6.0, "infinite airflow would close the gap: {limit}");
+}
+
+/// R1 — a WHAT-IF air resistance reaches `Transpiration`: the run's W1 equals Penman–Monteith on
+/// the same forcings at the substituted value.
+#[test]
+fn a_what_if_air_resistance_reaches_the_water_flow() {
+    let (_, rs) = transpiration_params();
+    let p = domains::lab::biosphere_what_if(&[domains::lab::Substitution::new(
+        "transpiration.yaml",
+        "aerodynamic_resistance",
+        10.0,
+    )])
+    .expect("what-if params");
+    let r = run_what_if(&p, 1.0);
+    let model = mean(W1_DAYS.map(|d| daily_water(&r, d)));
+    let hand = w1_by_hand(10.0, rs, 1.0);
+    eprintln!("R1 (WHAT-IF ra = 10): W1 model {model:.6}, by hand {hand:.6}");
+    assert!((model - hand).abs() <= 1e-9 * hand, "{model} vs {hand}");
+}
+
+/// R2 — a WHAT-IF lamp heating moves water only: every CO₂ step and the end crop bit-identical to
+/// the row, the root zone never below `wssg`.
+#[test]
+fn a_what_if_lamp_heating_moves_water_and_nothing_else() {
+    let scale = 4.2;
+    let base = run(CA_ROW);
+    let hot = run_what_if(&params::biosphere(), scale);
+    let min_ftsw = hot
+        .states
+        .iter()
+        .map(|s| {
+            let depth = s.aux.get(ROOTED_DEPTH).copied().unwrap_or(0.0);
+            let cap = science::transpirable_capacity(
+                depth,
+                DEFAULT_SCENARIO.soil_extractable_water,
+                DEFAULT_SCENARIO.ground_area,
+            );
+            science::fraction_transpirable(s.stocks[SOIL_WATER].amount, cap)
+        })
+        .fold(f64::MAX, f64::min);
+    let w1 = mean(W1_DAYS.map(|d| daily_water(&hot, d)));
+    eprintln!("R2 (WHAT-IF net radiation x{scale}): W1 {w1:.4} L m⁻² d⁻¹; lowest FTSW {min_ftsw:.4}");
+    assert!(min_ftsw >= DEFAULT_SCENARIO.wssg, "the soil dried: {min_ftsw}");
+    assert!(base.co2.iter().zip(&hot.co2).all(|(a, b)| a.to_bits() == b.to_bits()));
+    let (a, b) = (base.states.last().unwrap(), hot.states.last().unwrap());
+    for k in [LEAF_C, STEM_C, ROOT_C, STORAGE_C, STEM_RESERVE_C, PLANT_N] {
+        assert_eq!(a.stocks[k].amount.to_bits(), b.stocks[k].amount.to_bits(), "{k} moved");
     }
 }
