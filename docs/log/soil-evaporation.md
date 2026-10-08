@@ -123,3 +123,15 @@ still the default — or `RootZone`, the book's) and measured under events:
   identical everywhere; the drought bites 3 days sooner.
 * Logged, not changed: the book restarts its dry-day count at 1 (first dry day 0.41 of the potential), ours at 0
   (1.0).
+
+**Re-priced under the book's supply (2026-10-08,** plan §13; the user: *"go with your recommendation"*). Evidence
+for the supply choice, not the choice. The local branch rebased, a control first (the cap's price reproduced
+byte for byte), then the book's supply in the loader:
+
+* The same 10 goldens move, the same 24 + 2 reds by name and class, the three unexplained reds fail with the same
+  messages — **the two caps cost the same ceremony.**
+* Water only again, station included; no carbon value moves anywhere.
+* The sealed chamber's end air: **0.125 kg** under the book's supply against 0.000002 kg under the cap (frozen
+  0.25); the 7-day station chambers' air 1.1–1.2 kg against 0.5–0.7 (frozen 1.9). More soil water used in the
+  open field (soil evaporation 33.6 → 45.9 kg).
+* The choice is the user's; the recommendation is the book's supply (cited; the cap was ours).

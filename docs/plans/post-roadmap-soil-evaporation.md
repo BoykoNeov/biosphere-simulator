@@ -961,3 +961,55 @@ the sealed chamber under the book's supply:
 **So:** the dead years' trend IS the book's Stage II decline (no watering intervenes); the mean 0.605 is
 lifted by the death-time watering's Stage I start; and the air still falls to ~4 % of its target at the
 season's low point. The success test fails on the Stage II tail.
+
+## 13. The price under the book's supply — both caps side by side (2026-10-08)
+
+**Asked (the user, "go with your recommendation"):** re-price §11d with the soil's evaporation drawing on
+the whole root zone (§12's `SoilSupply::RootZone`, the book's program) instead of our top-layer cap. **This
+is evidence for the choice, not the choice:** which supply an adoption carries stays the user's call (§12c).
+
+**Method.** `wip/three-forms-price` rebased onto `1a8c86e` (clean), its loader line given a `supply`.
+Control first: with `supply: TopLayer` a throwaway `regen_goldens --write` reproduced all 21 files of §11d's
+`W:\temp\claude\threeforms\branch_goldens\` **byte for byte** — the rebase added nothing. Then `RootZone`:
+`regen_goldens --write` (throwaway, restored), the full suite `--no-fail-fast` (debug), the ignored tests in
+release. Branch commit `3cfa280` (local, never pushed). Logs and both golden sets:
+`W:\temp\claude\booksupply\` (`regen_rootzone.log`, `diff_cap_vs_book.txt`, `diff_main_vs_book.txt`,
+`suite.log`, `ignored.log`, `fail_book.txt`; predictions written before the run in `predictions.md`).
+
+### 13a. Graded
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| B1 | the same 10 goldens change against main | the same 10; the other 10 identical | HELD |
+| B2 | against the cap's price all 10 move again, water only | all 10 move; only soil water, condensate, vapour, the soil aux keys and `boundary.soil_evaporation` | HELD |
+| B3 | `sealed_chamber` (915 d, the §12c probe's horizon): air vapour ≈ 0.125 kg | **0.124996 kg** (cap 1.95e-6; frozen 0.2505) | HELD |
+| B4 | biosphere: no carbon / N / O₂ / root depth / development value moves against main | none moves | HELD |
+| B5 | station goldens: carbon UNCERTAIN (a tank-capped watering could stress the crop) | **no carbon value moves** in any of the four; the lowest tank level over the run was not traced (end states only) | carbon: unchanged |
+| B6 | soil water lower than the cap's price in every moved golden; sealed condensate/vapour higher | lower in 8 of 10; **higher** in `consumer_chamber` (+0.9 %) and `sealed_station` (+5.5 %, condensate −13 %) — an end state sits wherever the last watering left it | PARTLY |
+| B7 | the same 24 + 2 reds by name, same classes, no new red | **identical lists** (`comm` empty both ways); the ignored run 7 passed (the §12c probe now among them), 2 failed — the same two; the three unexplained reds fail with the **same messages** (WSFD bound; the knockout's `[]`; `soil_shade_lai` inf); the re-sow cycle test's below-root store reads 144.7, 154.1, 101.3, 123.9 (cap: 125.7, 126.2, 134.6, 95.9); the grain rescue still 1.2199 | HELD |
+
+### 13b. Both prices, end states against main
+
+| golden | top-layer cap (§11d) | book's root-zone supply |
+|---|---|---|
+| `season_euler` | soil −41.7 %; soil evaporation 33.6 kg | soil −48.9 %; soil evaporation **45.9 kg** (+36 %) |
+| `sealed_chamber` | air vapour **2e-6** kg; condensate 52.3 | air vapour **0.125** kg (half of frozen 0.25); condensate 62.5 |
+| `perennial_chamber` / long | condensate 76.1 / 69.6 | condensate 88.3 / 74.1 |
+| `consumer_chamber` / long | condensate 60.9 / 48.8 | condensate 59.9 / 68.6 |
+| `greenhouse` / `harvest` (7 d) | air vapour 0.70 / 0.51 (frozen 1.90) | air vapour **1.21 / 1.08** |
+| `lighting` (7 d) | condensate 0.88 (frozen 3.96) | condensate 4.37 |
+| `sealed_station` | condensate 71.6; soil 100.4 | condensate 62.3; soil 105.9 |
+
+Water only in both; every carbon, nitrogen, oxygen and energy value identical to main in both.
+
+**What it says for the choice.** The two caps cost the same ceremony: the same ten goldens, the same 24 + 2
+reds in the same classes, the same three unexplained reds. The book's supply moves water further from the
+frozen model in the open field and the long chambers, but holds the sealed chambers' and the 7-day station
+goldens' air **closer** to the frozen model's — the cap's version leaves the sealed chamber with essentially
+no air vapour at its end and the 7-day station chambers at a third to a quarter of frozen. It does not make
+the never-re-sown chamber's success test pass (§12b–c). Nothing in the run favours the cap; the cap is our
+build-time departure (§12), the root-zone supply is the cited program.
+
+**Still owed whichever is chosen:** the §11d design item (the plain re-sow must reset the soil values from the
+one frozen param load), the reds' restatements, the ceremony list after §11d, and the unmeasured cross-port
+bands (a Linux CI push). The book's `DYSE = 1` start (§12) stays its own item, not folded in.
