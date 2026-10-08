@@ -96,3 +96,15 @@ watered from — the condensate in a sealed chamber, the irrigation source in th
   the chamber holds too little free water to refill a 1.30 m zone. The drained 19 kg is spent on those
   refills (fill after an event 0.91 → 0.955), so more returns to the deep soil at each re-sowing.
   ⚠ For the pricing: "the whole deficit per event" is impossible in the sealed chambers at full depth.
+
+**The stale comparisons re-run and the price measured (2026-10-08,** plan §11). The "three changes" are
+five loader settings (the two deep-soil fixes come with watering in events).
+
+* Re-run under the settled watering: the re-sown chambers water about a third as often (perennial 63 → 23
+  events in five years), the soil replaces ~0.43 of the dead crop's phantom water (was ~0.21); carbon
+  untouched. The six biosphere twins regenerated.
+* The price, on a local branch (`wip/three-forms-price`, never pushed): 10 of 20 goldens move, each
+  biosphere one equal to its twin byte for byte; **water only** everywhere, station included. Suite 24 red +
+  2 ignored red, all classified: 19 regenerate or restate by construction, 4 need a design choice (the
+  plain re-sow refuses the soil state — found by the golden producer crashing before anything ran), 3 are
+  unexplained behaviour changes in instrument tests. Manifests: 26 lines; ~11 constants owed to param files.

@@ -755,3 +755,80 @@ reds; then back to main. Never pushed.
 | V4 | red by design: `golden_regression` and `tier_contract` on the moved goldens; the domains manifest writer **even in report mode** (new flow/aux types enter the frozen registries — unlike the canopy price, where only values moved); canopy P1; scorecard R1; soil-evaporation S1; the deep-water rescue's grain pin; the five-year re-sow cycle test; any test asserting the loader keeps the book's credit or `Held` |
 | V5 | possibly red, classified after: tests pinning a water stock or humidity in a run with a crop; the watering-trigger and air-split tests (the station's own trigger now meets a biosphere that waters in events) |
 | V6 | green: every carbon, energy and gas test; the conservation and determinism laws; `chamber_walls` trajectory pins |
+
+### 11d. The price, measured on a local branch (2026-10-08) — graded
+
+Branch `wip/three-forms-price` (local, never pushed): `196f875` the five loader lines; `3563e06` a second
+line the run forced (below). Logs: `W:\temp\claude\threeforms\` (`regen_report.log`, `suite.log`,
+`ignored.log`, `suite_after_write.log`, `station_diff.txt`, `manifest_diff.txt`). Main untouched.
+
+**Forced before anything ran — a cost the twins could not show:** `regen_goldens` panicked at once. The
+golden producer re-sows the perennial chambers through the plain `annual_reset`, which REFUSES a state
+carrying the soil account (built that way so a lab state could never be re-sown wrongly). The branch
+routed `run_perennial` through `annual_reset_with(.., &params::biosphere())` to price the rest — which
+itself reddens `param_funnel` (a second production param load). An adoption has to choose the real
+route: let the plain reset reset the soil values from the one frozen param load.
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| V1 | 10 goldens change; biosphere ones equal their twins | **20 run, 10 would change** — the predicted ten; all six biosphere goldens equal their §11b twins **byte for byte** | HELD |
+| V2 | station goldens: water only, 5 aux keys; carbon uncertain | water only; the 5 aux keys; **no carbon value moves** in any of the four | HELD (carbon: unchanged) |
+| V3 | each station registry carries the new flows once, the watering under its old id | greenhouse, lighting, harvest, sealed station: `biosphere.recycling = EventRecycling`, `SubsoilOverflow` and `SoilSurfaceAccount` exactly once each; the cabin / power / fast registries none | HELD |
+| V4 | the reds by design | all the named ones red; the domains manifest writer red in report mode as predicted; after `--write` the station's too | HELD |
+| V5 | possibly red | the watering-trigger and air-split tests stayed **green** | none fired |
+| V6 | carbon, energy, gas, laws, `chamber_walls` green | green; both sealed session resumes green | HELD |
+
+**Suite:** 1337 passed, **24 failed**, 8 ignored (debug); ignored in release: 6 passed, 2 failed (the
+sealed station's golden and band). After the throwaway `--write`: 21 failed (the four golden/band reds
+go, the station manifest writer joins). Then discarded (`git checkout`), main restored.
+
+**The 24 + 2 reds, classified:**
+
+| class | tests | what an adoption does |
+|---|---|---|
+| goldens and bands (6) | `golden_regression` ×2 + the expensive sealed station, `tier_contract` ×2 + the expensive band | regenerate; re-measure the tier bands (the aux key count 3 → 8 trips them) |
+| manifests (2) | domains + station `manifest_writer` | regenerate: 10 `golden_sha256` rows; `flow_set` −`Irrigation` −`Recycling` +`EventIrrigation` +`EventRecycling` +`SubsoilOverflow`; `aux_set` +`SoilSurfaceAccount` (26 lines) |
+| "the old form through the switch is frozen" (4) | canopy P1 and its exact-by-hand check, soil-evaporation S1, scorecard R1 | restate against the new loader (the by-hand check lacks the soil split) |
+| tests of the BOOK's deep store that took the loader as "the book" (6) | dry store stops roots, clean vs naive deep-water controls, the clamp on an emptying store, the actual-wetness credit, the overflow switch, the deep-water grain rescue (1.0 vs 1.22) | pin `FullCapacity` / `Held` explicitly — the book's behaviour is still the subject; with the new credit the roots reach 1.30 m by construction |
+| the re-sow route (4) | three tests calling the plain `annual_reset` on a loader state + `param_funnel` | the design item above |
+| cycle-flow ring check (1) | `biosphere.recycling` returns no legs at a state where no event is due | construct the state below the trigger |
+| re-sow fixed point (1) | `the_resow_makes_a_cycle_and_not_a_ratchet…`: the below-root store 125.7, 126.2, 134.6, 95.9 | restate: under events each cycle depends on when the last watering fell — it cycles, it does not settle |
+| **behaviour findings, not yet explained (3)** | `drought_acceleration…`: the 1 + WSSD bound on season thermal time exceeded on the manufactured dry chamber; lab knockout: dropping root capture no longer kills the perennial runs; lab non-finite check: an infinite param now fails at a new aux (`soil_shade_lai`) and is reported as an error, not "dead" | each needs a look before adoption |
+
+**What moves (end states):**
+
+| golden | moves |
+|---|---|
+| `season_euler` | soil −41.7 %; transpired −14.4 %; drawn from the source −20.6 %; +`boundary.soil_evaporation` 33.6 kg |
+| `sealed_chamber` | condensate 8.2 → 52.3 kg; soil −27 %; **air vapour 0.25 → 2e-6 kg** (the dead-crop years, §8c, unchanged in kind) |
+| `perennial_chamber` / long | condensate 8.2 → 76.1 / 69.6 kg; soil −43 % / −39 %; subsoil +7 % (to capacity) |
+| `consumer_chamber` / long | condensate 8.1 → 60.9 / 48.8 kg; soil −34 % / −26 %; subsoil +8 % |
+| `greenhouse` (7 d) | condensate −59 %; vapour −63 %; soil +13 % |
+| `harvest` (7 d) | condensate −66 %; vapour −73 %; soil +2.6 % |
+| `lighting` (7 d) | condensate −78 %; soil +10 % |
+| `sealed_station` | condensate 5.5 → 71.6 kg; soil −38 %; subsoil −15 % |
+| the other ten | identical |
+
+**Water only:** no carbon, nitrogen, oxygen, energy, root depth or development value moves anywhere.
+
+**Observed, not investigated:** the top-layer account ends at exactly 0 in all ten moved goldens. Read
+in the code (`Transpiration::split`): the soil's evaporation is capped by what the account holds
+(`room = top.min(..)`), and Stage I needs more than 1 mm in it — so an empty top means NO soil
+evaporation until the next watering refills it. Every end state falls in such a dry spell. Consistent with the form; how
+much of each run the surface spends fully dry was not measured.
+
+**Ceremony the run cannot show:**
+
+1. **Constants into param files with their sources** (the reference may not hard-code coefficients):
+   `100` s/m and the leaf-area cap (Szeicz–Long), `0.55` (FAO-56), `0.75` / `0.90` (FAO Manual 4), soil
+   albedo `0.12` and extinction `0.5` (Soltani & Sinclair), the top layer `0.15` m, its wet threshold,
+   the Stage I fill `0.5`, silt loam `SAT − DUL` (Table 13.1). Each edited file's `param_files` row
+   regenerates. The floor `1.5` mm/day stays lab-only.
+2. **Lab forms kept or retired:** the constant 70, the book's full-capacity credit and `Held` become the
+   old forms — kept as lab switches (the deep-store tests above need them) or retired.
+3. **Prose:** each contract's dated entry; "every frozen run waters continuously" and "transpiration
+   does not read the canopy" become false; §10's "the whole deficit per event" restated — the sealed
+   chambers water from a short tank (§10h).
+4. **The separate-air lab option** (`air_split.rs`): its `TriggeredWatering` does not feed the top-layer
+   account — an open lab gap, not in any golden.
+5. **Potato** adopts with wheat (§11 of the canopy plan, decided); its tests stayed green.
