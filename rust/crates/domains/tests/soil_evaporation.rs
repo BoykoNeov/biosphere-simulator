@@ -312,3 +312,23 @@ fn measurement() {
     }
     let _ = THERMAL_TIME;
 }
+
+/// Probe (plan §12c): when the book-supply sealed chamber's waterings fell against its dead years.
+#[test]
+#[ignore = "a printed lab probe; run with --ignored --release"]
+fn probe_book_supply_sealed_events() {
+    let s = sealed_chamber_scenario();
+    let r = run(&s, &settled(params(Rs::SzeiczLong, BOOK_SUPPLY, Water::Fao56Trigger)), 3, false, None);
+    let days: Vec<usize> = r.states.windows(2).enumerate()
+        .filter(|(_, w)| w[1].stocks[SOIL_WATER].amount - w[0].stocks[SOIL_WATER].amount > 5.0 * s.ground_area)
+        .map(|(n, _)| n / STEPS_PER_DAY).collect();
+    let dead: Vec<usize> = (0..r.states.len() / STEPS_PER_DAY).filter(|&d| lai(&r.states[d * STEPS_PER_DAY], &s) < 0.1).collect();
+    println!("events on days {days:?}");
+    println!("dead days: first {:?}, last {:?}, count {}", dead.first(), dead.last(), dead.len());
+    let end = r.states.last().unwrap();
+    println!("end: soil_dry_days {:.2}, FTSW {:.3}, top {:.3}", end.aux[SOIL_DRY_DAYS], ftsw(end, &s), end.aux[TOP_SOIL_WATER]);
+    for d in (0..r.states.len() / STEPS_PER_DAY).step_by(30) {
+        let st = &r.states[d * STEPS_PER_DAY];
+        println!("day {d:>4}: LAI {:.3} vapour {:.4} FTSW {:.3} dry_days {:.1} top {:.2}", lai(st, &s), st.stocks[WATER_VAPOR].amount, ftsw(st, &s), st.aux[SOIL_DRY_DAYS], st.aux[TOP_SOIL_WATER]);
+    }
+}
