@@ -630,12 +630,12 @@ Rationing 0 in all six runs (two outflows now draw on the deep store in one step
 * **Q1 HELD:** the deep store sits at its capacity (25.97 kg) at harvest; what remains above it is the
   tail of an event's pulse, gone in days (worst step 9.3 kg, against 38).
 * **Q2 PARTLY:** the level fell — perennial 0.684 → **0.626** — but less than the predicted ≈ 0.58, and
-  the feedback I predicted (drier deep soil → more percolation → lower still) had the WRONG sign. The 19
-  kg did not all leave the soil: water is conserved (held 45.2 + 84.8 + 64.9 = 194.9 kg; recycled 26.0 +
-  94.9 + 74.1 = 195.0 kg), and about half of it went back into the root zone through the watering, so the
-  zone holds more at harvest (~95 kg against ~85) and returns more at each re-sowing. Consumer within the
-  predicted 0.57–0.83, no trend.
-* **Q3 PARTLY:** free water rose by ~9 kg, not ~20 — the other half is the root-zone share above.
+  the feedback I predicted (drier deep soil → more percolation → lower still) had the WRONG sign. Consumer
+  within the predicted 0.57–0.83, no trend. **Why — measured, see "The tank caps every deep watering"
+  below:** the 19 kg drained into the condensate is spent on the next waterings, so the root zone is
+  fuller after each event and returns more water to the deep store at each re-sowing.
+* **Q3 PARTLY:** free water rose by ~9 kg, not ~20 — the rest is in the fuller root zone (water conserved:
+  held 45.2 + 84.8 + 64.9 = 194.9 kg; recycled 26.0 + 94.9 + 74.1 = 195.0 kg).
 * **Q4 HELD:** roots 1.30 m in all fifteen seasons, both chambers.
 * **Q5 HELD:** peak grain identical to four digits, every season, both chambers.
 * **Q6 HELD:** `regen_goldens` report 20 of 20 identical.
@@ -643,3 +643,30 @@ Rationing 0 in all six runs (two outflows now draw on the deep store in one step
 **The accepted drying, restated:** with the overfill drained and recycled the deep soil settles at about
 **0.6–0.7 of full after each re-sowing** (perennial mean 0.63, consumer 0.69), now with no stranded water
 in it. That is the honest number the user's decision was after.
+
+**Advisor review of §10h, summarized (2026-10-08):** the build, tests, census and frozen check are
+sound; but my first explanation of Q2/Q3 ("about half the drained water came back into the root zone")
+was asserted from single harvest snapshots that swing 79–157 kg with event timing. Its sharper candidate,
+from the totals: a sealed chamber holds ~195 kg; refilling a 1.30 m root zone from the trigger (0.45)
+needs ~93 kg net, ~103 kg gross at drip 90 %, but the air and condensate together hold only ~74–93 kg —
+so a deep watering may never deliver the whole deficit. Count it.
+
+**The tank caps every deep watering — measured** (throwaway `W:\temp\claude\overflow\zz_capped.rs`,
+output `capped.log`; an event = one step where the zone gains and the condensate loses > 3 kg; capped =
+the gross wanted, `deficit / 0.90`, exceeds the condensate held). Fifteen seasons:
+
+| | events, roots at full depth | capped by the condensate | zone fill after, mean (min) | events, shallower roots | capped |
+|---|---|---|---|---|---|
+| perennial, held | 52 | **52** | 0.910 (0.773) | 13 | 0 |
+| perennial, recycled | 48 | **48** | 0.955 (0.943) | 22 | 0 |
+| consumer, held | 43 | **43** | 0.918 (0.808) | 10 | 0 |
+| consumer, recycled | 42 | **41** | 0.956 (0.941) | 17 | 0 |
+
+* **Every watering of a full-depth root zone in a sealed chamber is limited by the tank**, held or
+  recycled; none while the roots are shallow. The fill after an event is whatever water is not in the
+  deep store or the air — so moving the 19 kg out of the deep store raises every deep refill (0.91 →
+  0.955), which is the Q2/Q3 mechanism.
+* ⚠ **For the pricing:** §10's candidate reference says *"the whole deficit per event"*. In the sealed
+  chambers that is physically impossible at full depth: the chamber holds too little free water. The
+  crop is never stressed by it (carbon identical), but any pricing that reads event sizes or the
+  watering rule must state that the sealed chambers water from a short tank.

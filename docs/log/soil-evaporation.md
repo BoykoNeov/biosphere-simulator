@@ -90,6 +90,9 @@ watered from — the condensate in a sealed chamber, the irrigation source in th
 * Fifteen seasons, both chambers: the deep store sits at its capacity at harvest (was 16–38 kg over);
   roots 1.30 m every season; grain identical to four digits; nothing rationed.
 * The deep wetness after re-sowing settles at ~0.63 (perennial) and ~0.69 (consumer), with no stranded
-  water in it — less of a drop than the predicted 0.58, because about half the drained water came back
-  into the root zone through the watering (water conserved to 0.1 kg). The predicted feedback had the
-  wrong sign.
+  water in it — less of a drop than the predicted 0.58 (the predicted feedback had the wrong sign).
+* Why, measured after review: **every watering of a full-depth root zone in a sealed chamber is capped by
+  the condensate tank** (52/52, 48/48, 43/43, 41/42 over fifteen seasons; none while roots are shallow) —
+  the chamber holds too little free water to refill a 1.30 m zone. The drained 19 kg is spent on those
+  refills (fill after an event 0.91 → 0.955), so more returns to the deep soil at each re-sowing.
+  ⚠ For the pricing: "the whole deficit per event" is impossible in the sealed chambers at full depth.
