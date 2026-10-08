@@ -985,7 +985,7 @@ release. Branch commit `3cfa280` (local, never pushed). Logs and both golden set
 | B3 | `sealed_chamber` (915 d, the §12c probe's horizon): air vapour ≈ 0.125 kg | **0.124996 kg** (cap 1.95e-6; frozen 0.2505) | HELD |
 | B4 | biosphere: no carbon / N / O₂ / root depth / development value moves against main | none moves | HELD |
 | B5 | station goldens: carbon UNCERTAIN (a tank-capped watering could stress the crop) | **no carbon value moves** in any of the four; the lowest tank level over the run was not traced (end states only) | carbon: unchanged |
-| B6 | soil water lower than the cap's price in every moved golden; sealed condensate/vapour higher | lower in 8 of 10; **higher** in `consumer_chamber` (+0.9 %) and `sealed_station` (+5.5 %, condensate −13 %) — an end state sits wherever the last watering left it | PARTLY |
+| B6 | soil water lower than the cap's price in every moved golden; sealed condensate/vapour higher | lower in 8 of 10; **higher** in `consumer_chamber` (+0.9 %) and `sealed_station` (+5.5 %, condensate −13 %, and its below-root store **+19 %**: 19.7 → 23.5 kg, ~1 % above main where the cap left it 15 % below) — **not explained**; end states only, the watering timing not traced | PARTLY |
 | B7 | the same 24 + 2 reds by name, same classes, no new red | **identical lists** (`comm` empty both ways); the ignored run 7 passed (the §12c probe now among them), 2 failed — the same two; the three unexplained reds fail with the **same messages** (WSFD bound; the knockout's `[]`; `soil_shade_lai` inf); the re-sow cycle test's below-root store reads 144.7, 154.1, 101.3, 123.9 (cap: 125.7, 126.2, 134.6, 95.9); the grain rescue still 1.2199 | HELD |
 
 ### 13b. Both prices, end states against main
@@ -1004,9 +1004,10 @@ Water only in both; every carbon, nitrogen, oxygen and energy value identical to
 
 **What it says for the choice.** The two caps cost the same ceremony: the same ten goldens, the same 24 + 2
 reds in the same classes, the same three unexplained reds. The book's supply moves water further from the
-frozen model in the open field and the long chambers, but holds the sealed chambers' and the 7-day station
-goldens' air **closer** to the frozen model's — the cap's version leaves the sealed chamber with essentially
-no air vapour at its end and the 7-day station chambers at a third to a quarter of frozen. It does not make
+frozen model in the open field and the long chambers, but keeps the never-re-sown sealed chamber's air at half the frozen model's where the cap leaves essentially none
+(the success test is defined against frozen, so that comparison is fair). The 7-day station chambers' air is
+also nearer frozen, but part of their drop is the leaf-area resistance working on seedlings — not a merit
+either way. It does not make
 the never-re-sown chamber's success test pass (§12b–c). Nothing in the run favours the cap; the cap is our
 build-time departure (§12), the root-zone supply is the cited program.
 
