@@ -1061,9 +1061,24 @@ pub enum DeepSoilCredit {
     ActualWetness,
 }
 
+/// What happens to water the store below the roots holds above its own capacity — LAB-ONLY
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §10g).
+///
+/// [`DeepOverflow::Held`] is the loader's value and the book's: Soltani & Sinclair Eqn 14.12 gives
+/// `WSTORG` no outflow, so percolated water waits there until a re-sowing mixes it up.
+/// [`DeepOverflow::Recycled`] — the user's instruction (2026-10-08), mapped by us and NOT in the book
+/// — drains the excess at the book's own Eqn 14.11 factor back to the water the crop is watered from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DeepOverflow {
+    #[default]
+    Held,
+    Recycled,
+}
+
 /// How full the store below the roots is, `min(1, WSTORG / ((SOLDEP − DEPORT) · EXTR · ρ · A))` —
 /// the store spread evenly over the unrooted soil, as Eqn 14.28 seeds it (a uniform `MAI`). Capped at
-/// 1 because Eqn 14.12 gives the store no outflow, so percolation can push it past its own capacity;
+/// 1 because Eqn 14.12 gives the store no outflow, so percolation can push it past its own capacity
+/// (under [`DeepOverflow::Recycled`] an event's pulse still sits above it for the few days it drains);
 /// 0 when no soil is left below the roots.
 pub fn deep_soil_wetness(
     subsoil_water: f64,

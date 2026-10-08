@@ -1439,6 +1439,54 @@ impl Flow for Drainage {
     }
 }
 
+/// LAB-ONLY WATER `subsoil_water -> reservoir` (`science::DeepOverflow::Recycled`).
+///
+/// The store below the roots drains what it holds above its own capacity,
+/// `(SOLDEP − DEPORT) · EXTR · ρ · A` (as [`science::deep_soil_wetness`] reads it), at the book's
+/// Eqn 14.11 factor: `OVERFLOW = max(0, WSTORG − capacity) · DRAINF · dt`. ⚠ OURS, not the book's —
+/// Eqn 14.12 gives `WSTORG` no outflow. The `reservoir` is the water the crop is watered from: the
+/// condensate store in a sealed chamber, the irrigation source in the open field. Shares `DRAINF`
+/// with [`Drainage`], so its valve (`0.0`) shuts both.
+pub struct SubsoilOverflow {
+    pub id: String,
+    pub subsoil_water: String,
+    pub reservoir: String,
+    pub drainage_factor: f64,
+    pub rooted_depth_aux: String,
+    pub soil_depth: f64,
+    pub soil_extractable_water: f64,
+    pub ground_area: f64,
+}
+
+impl Flow for SubsoilOverflow {
+    fn type_name(&self) -> &'static str {
+        "SubsoilOverflow"
+    }
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let capacity = science::captured_water(
+            self.soil_depth - aux_of(snapshot, &self.rooted_depth_aux),
+            self.soil_extractable_water,
+            self.ground_area,
+        )
+        .max(0.0);
+        let excess = (amt(snapshot, &self.subsoil_water) - capacity).max(0.0);
+        // Donor clamp, as `Drainage`'s: never more than the excess, whatever DRAINF a scenario declares.
+        let flux = (excess * self.drainage_factor * dt).min(excess);
+        FlowResult::new(vec![
+            leg(&self.subsoil_water, -flux)?,
+            leg(&self.reservoir, flux)?,
+        ])
+    }
+}
+
 /// NITROGEN `soil_n -> plant_n` (DEMAND-DEFICIT uptake, supply-gated).
 ///
 /// `flux = min(target * biomass_c - plant_n, capacity * availability) * dt`. Greenwood's `W`

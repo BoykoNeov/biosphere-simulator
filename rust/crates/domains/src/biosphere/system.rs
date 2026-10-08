@@ -28,8 +28,8 @@ use super::flows::{
     Irrigation, LeafAreaExpansion, LitterNitrogenTransfer, MaintenanceRespiration,
     MicrobialNitrogenRelease,
     MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, RootDepthExtension,
-    RootZoneCapture, Senescence, StemRemobilization, ThermalTimeAccumulation, Transpiration,
-    VapourSaturation, VernalizationAccumulation,
+    RootZoneCapture, Senescence, StemRemobilization, SubsoilOverflow, ThermalTimeAccumulation,
+    Transpiration, VapourSaturation, VernalizationAccumulation,
 };
 use super::light_path;
 use super::params;
@@ -552,6 +552,21 @@ fn build_soil(
             true,
         )?);
         flows.push(irrigation_flow(scenario, p));
+    }
+    // The lab's deep overflow (`docs/plans/post-roadmap-soil-evaporation.md` §10g), back to the
+    // water the crop is watered from. Registered only under `Recycled`, so the frozen flow set is
+    // untouched.
+    if p.water.deep_overflow == science::DeepOverflow::Recycled {
+        flows.push(Box::new(SubsoilOverflow {
+            id: "biosphere.subsoil_overflow".to_string(),
+            subsoil_water: SUBSOIL_WATER.to_string(),
+            reservoir: if scenario.sealed { CONDENSATE } else { WATER_SOURCE }.to_string(),
+            drainage_factor: scenario.drainage_factor,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_depth: scenario.soil_depth,
+            soil_extractable_water: scenario.soil_extractable_water,
+            ground_area: scenario.ground_area,
+        }));
     }
     if scenario.sealed {
         stocks.push(pool_stock(
@@ -1896,6 +1911,90 @@ mod tests {
             (book_depth - dry_at).abs() < 0.01 && book_depth < cap - 0.3,
             "the book's roots stop at {book_depth}, predicted {dry_at}"
         );
+    }
+
+    /// **The lab's deep overflow** (`DeepOverflow::Recycled`,
+    /// `docs/plans/post-roadmap-soil-evaporation.md` §10g), on CONSTRUCTED stores: no golden runs
+    /// it, and under continuous watering no scenario over-fills the deep store at all.
+    #[test]
+    fn the_deep_overflow_drains_only_the_excess_back_to_the_reservoir() {
+        let (extr, area, soil) = (0.13, 2.0, 1.5); // non-unit area: a dropped factor is invisible at 1.0
+        let flow = SubsoilOverflow {
+            id: "biosphere.subsoil_overflow".to_string(),
+            subsoil_water: SUBSOIL_WATER.to_string(),
+            reservoir: CONDENSATE.to_string(),
+            drainage_factor: 0.3,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_depth: soil,
+            soil_extractable_water: extr,
+            ground_area: area,
+        };
+        let env = NoEnv;
+        let depth = 1.0;
+        let capacity = science::captured_water(soil - depth, extr, area);
+
+        // (a) At or below the store's own capacity: nothing moves.
+        for held in [0.0, 0.5 * capacity, capacity] {
+            let legs = flow.evaluate(&water_state(0.0, held, depth), &env, 1.0).unwrap();
+            assert_eq!(leg_amount(&legs, SUBSOIL_WATER), 0.0, "drained a store at {held}");
+            assert_eq!(leg_amount(&legs, CONDENSATE), 0.0);
+        }
+        // (b) Over it: a DRAINF share of the EXCESS, into the reservoir, balanced; scaled by dt.
+        let st = water_state(0.0, capacity + 50.0, depth);
+        let legs = flow.evaluate(&st, &env, 1.0).unwrap();
+        let moved = leg_amount(&legs, CONDENSATE);
+        assert!((moved - 15.0).abs() < 1e-12, "moved {moved}, want 15");
+        assert_eq!(leg_amount(&legs, SUBSOIL_WATER), -moved, "unbalanced");
+        let quarter = leg_amount(&flow.evaluate(&st, &env, 0.25).unwrap(), CONDENSATE);
+        assert!((quarter - 15.0 * 0.25).abs() < 1e-12, "dt is not applied: {quarter}");
+        // (c) The capacity is BELOW the roots: deeper roots leave less room, so more drains.
+        let deeper = leg_amount(
+            &flow.evaluate(&water_state(0.0, capacity + 50.0, 1.4), &env, 1.0).unwrap(),
+            CONDENSATE,
+        );
+        assert!(deeper > moved, "the rooted depth is not read: {deeper} <= {moved}");
+        // (d) Roots at the soil's full depth: the whole store is overflow.
+        let full = leg_amount(&flow.evaluate(&water_state(0.0, 40.0, soil), &env, 1.0).unwrap(), CONDENSATE);
+        assert!((full - 12.0).abs() < 1e-12, "full-depth roots: {full}, want 12");
+        // (e) The donor clamp, on the only input that reaches it (DRAINF > 1).
+        let wild = SubsoilOverflow { drainage_factor: 5.0, ..flow };
+        let clamped = leg_amount(&wild.evaluate(&st, &env, 1.0).unwrap(), CONDENSATE);
+        assert!((clamped - 50.0).abs() < 1e-9, "overdrew the excess: {clamped}");
+    }
+
+    /// The switch's two sides: the book's `Held` registers NO overflow flow (the frozen flow set
+    /// is untouched), and `Recycled` returns the water to the reservoir each build waters from —
+    /// the condensate in a sealed chamber, the irrigation source in the open field.
+    #[test]
+    fn the_deep_overflow_is_registered_only_when_recycled_and_returns_to_the_watering_reservoir() {
+        let recycled =
+            crate::lab::with_deep_overflow(params::biosphere(), science::DeepOverflow::Recycled);
+        for (scenario, reservoir) in
+            [(DEFAULT_SCENARIO, WATER_SOURCE), (perennial_chamber_scenario(), CONDENSATE)]
+        {
+            let (_, frozen) = build_season(&scenario).unwrap();
+            assert!(
+                frozen.flows().iter().all(|f| f.type_name() != "SubsoilOverflow"),
+                "the book's Held must register no overflow flow"
+            );
+            let (state, registry) = build_season_with(&scenario, &recycled).unwrap();
+            let flow = registry
+                .flows()
+                .iter()
+                .find(|f| f.type_name() == "SubsoilOverflow")
+                .expect("Recycled registers the overflow");
+            // Over-fill the deep store past everything below the sowing roots.
+            let mut over = state.stocks.clone();
+            over.insert(
+                SUBSOIL_WATER.to_string(),
+                state.stocks[SUBSOIL_WATER].with_amount(1e4).unwrap(),
+            );
+            let over = State::new(state.n, over, state.rng_seed, state.aux.clone()).unwrap();
+            let result = flow.evaluate(&over, &NoEnv, 1.0).unwrap();
+            assert!(leg_amount(&result, reservoir) > 0.0, "no water reached {reservoir}");
+            simcore::flow::assert_flow_balanced_default(&result, &over.stocks)
+                .expect("the overflow must balance");
+        }
     }
 
     /// The donor clamp ([F] Eqn 14.10's `min`) and the re-sow return, on a plot whose

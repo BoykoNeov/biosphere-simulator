@@ -41,7 +41,7 @@
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
 use crate::biosphere::science::{
-    Co2Read, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
+    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
     SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{with_override, ConfigError, ParamFile};
@@ -251,6 +251,17 @@ pub fn biosphere_with_soil_evaporation(
 /// [`DeepSoilCredit::FullCapacity`] (Soltani & Sinclair Eqn 14.10) is the reference and stays it.
 pub fn with_deep_credit(mut p: BiosphereParams, form: DeepSoilCredit) -> BiosphereParams {
     p.water.deep_credit = form;
+    p
+}
+
+/// `p` with the deep store's overflow handled by `form` ([`DeepOverflow`]) — lab-only
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §10g). Composes as [`with_deep_credit`].
+///
+/// # ⚠ This endorses no form
+///
+/// [`DeepOverflow::Held`] (Soltani & Sinclair Eqn 14.12, no outflow) is the reference and stays it.
+pub fn with_deep_overflow(mut p: BiosphereParams, form: DeepOverflow) -> BiosphereParams {
+    p.water.deep_overflow = form;
     p
 }
 

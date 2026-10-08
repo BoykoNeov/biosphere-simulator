@@ -80,3 +80,16 @@ to the book while the store is full), and accept the slow residual drying.
   in at each re-sowing — ≈ 58 % without it. The consumer chamber (the old ratchet's worst case): roots
   1.30 m in all fifteen seasons; deep wetness 68–95 % with no trend; grain identical. Whether to let that
   overfill drain away is the user's open decision.
+
+**The deep overfill drains and is recycled, built lab-only (2026-10-08,** plan §10g–h). The user's
+decision: *"Let it drain and be recycled."* A fifth lab switch (`DeepOverflow`; the loader keeps the
+book's `Held`, which registers nothing, so the frozen path is untouched — 20 of 20 goldens identical):
+water above the deep store's own capacity drains at the book's 30 % a day back to the water the crop is
+watered from — the condensate in a sealed chamber, the irrigation source in the open field (our mapping).
+
+* Fifteen seasons, both chambers: the deep store sits at its capacity at harvest (was 16–38 kg over);
+  roots 1.30 m every season; grain identical to four digits; nothing rationed.
+* The deep wetness after re-sowing settles at ~0.63 (perennial) and ~0.69 (consumer), with no stranded
+  water in it — less of a drop than the predicted 0.58, because about half the drained water came back
+  into the root zone through the watering (water conserved to 0.1 kg). The predicted feedback had the
+  wrong sign.

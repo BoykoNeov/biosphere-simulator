@@ -37,7 +37,7 @@
 //! `docs/biosphere-reference.md`.
 
 use super::science::{
-    Co2Read, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
+    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
     SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{
@@ -411,6 +411,10 @@ pub struct WaterCycleParams {
     /// file: the loader sets the book's [`DeepSoilCredit::FullCapacity`]; the other is lab-only
     /// (`docs/plans/post-roadmap-soil-evaporation.md` §10e).
     pub deep_credit: DeepSoilCredit,
+    /// Whether water above the deep store's own capacity leaves it ([`DeepOverflow`]). Never loaded
+    /// from the file: the loader sets the book's [`DeepOverflow::Held`]; the other is lab-only
+    /// (`docs/plans/post-roadmap-soil-evaporation.md` §10g).
+    pub deep_overflow: DeepOverflow,
 }
 
 /// Minimal-consumer params (grazing + respiration + mortality + f_O2 Monod).
@@ -1192,6 +1196,7 @@ pub fn water_cycle_from_bounded(
         vpd_read: VpdRead::Chamber,
         watering: WateringForm::Continuous,
         deep_credit: DeepSoilCredit::FullCapacity,
+        deep_overflow: DeepOverflow::Held,
     }
 }
 

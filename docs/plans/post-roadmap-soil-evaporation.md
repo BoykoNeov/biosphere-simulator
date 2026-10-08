@@ -559,3 +559,87 @@ in all three. **P1–P4 hold here too.**
 **Corrected statement of the accepted drying:** the deep soil settles at roughly 0.6–0.7 of full after
 each re-sowing (perennial 0.69, consumer 0.68–0.95), of which ~0.1 is water held above the bottom
 layer's capacity; ≈ 0.58 without it.
+
+### 10g. The deep overfill drains and is recycled (the user, 2026-10-08)
+
+**DECIDED (the user): *"Let it drain and be recycled."*** The ~19 kg held above the bottom layer's
+capacity (§10f) leaves the soil and returns to the water the crop is watered from.
+
+**The form — MINE, on the user's instruction; NOT in the book** (Eqn 14.12 gives `WSTORG` no outflow).
+A fifth lab switch, a sibling of `DeepSoilCredit` (`DeepOverflow`; the loader keeps the book's `Held`,
+and on `Held` no flow is registered at all, so the frozen flow set — and every golden — is untouched).
+Under `Recycled`, one new flow `SubsoilOverflow`:
+
+```
+excess = WSTORG − (SOLDEP − DEPORT) · EXTR · ρ · A          (the store's own capacity, as §10e)
+OVERFLOW = max(0, excess) · DRAINF · dt                      (DRAINF = the scenario's 0.3 / day)
+WATER  subsoil_water → condensate (sealed)  |  → water_source (open field)
+```
+
+* **The rate is the book's own** Eqn 14.11 drainage factor — the rule [F] applies to water above the
+  root zone's upper limit, applied one store down. Not same-day: the root zone's drainage is not
+  same-day either, and a pulse of event loss then leaves over ~3 days (e-folding 1/0.3).
+* **The destination is the watering reservoir:** in a sealed chamber the condensate store that
+  `EventRecycling` draws from (a container's drain collected back to the drip tank); in the open field
+  the irrigation source boundary (drainage collected and returned to supply — our mapping, changeable;
+  the open field is single-season and barely reaches the overflow).
+* **Stays capped at 1:** `deep_soil_wetness` keeps its clamp (a pulse may sit above capacity for a few
+  days before it drains).
+* Bounded by construction: overflow ≤ 0.3·dt·excess < excess, and capture takes at most the capacity
+  of the newly explored slice, so the two outflows never overdraw the store (no rationing).
+
+**Predictions (before code), all lab forms + actual-wetness credit + this, fifteen seasons:**
+
+* **Q1 (tests the build):** at each harvest the water below full-depth roots sits within a few kg of
+  its 25.97 kg capacity (residue of the last event's pulse only), not 16–38 kg over.
+* **Q2 (the number the user accepted):** the deep wetness after each re-sowing falls from 0.69 to
+  ≈ **0.58** in the perennial chamber (the advisor's `(0.693·164.7 − 19.3)/164.7`), minus a little
+  feedback: a drier deep store credits new roots less water, events come sooner, more percolates — and
+  that percolation now leaves rather than accumulating. Consumer chamber: ≈ 0.57–0.83, no trend.
+* **Q3:** free water (air + condensate) rises by about what no longer sits in the soil: perennial
+  ~65 → ~85 kg.
+* **Q4:** roots still reach 1.30 m every season (by construction, §10e P1).
+* **Q5:** carbon identical to four digits (events still trigger above `wssg`).
+* **Q6:** the frozen path bit-identical (20/20 goldens); the switch off registers nothing.
+
+### 10h. BUILT lab-only and measured — graded (2026-10-08)
+
+Built as §10g (`science::DeepOverflow`, `flows::SubsoilOverflow`, `lab::with_deep_overflow`; registered
+in `system.rs` only under `Recycled`). Two new unit tests: the flow on constructed stores (nothing at or
+below capacity; a 0.3 share of the EXCESS, times `dt`, into the reservoir; a deeper root leaves less room;
+full-depth roots make the whole store overflow; the donor clamp at `DRAINF = 5`), and the switch (the
+book's `Held` registers no overflow flow; `Recycled` returns to the condensate in the perennial chamber
+and to the irrigation source in the open field). ⚠ Checked first (advisor): lab flows never enter a
+frozen manifest's flow list (those are written from the frozen builds), and the station builds its
+greenhouse through the same builder and filters flows only by named ids, so the flow reaches it.
+
+Throwaway probe `W:\temp\claude\overflow\zz_overflow15.rs` (output `probe15.log`), fifteen seasons, all
+lab forms + actual-wetness credit, with the overflow `Held` (§10f) and `Recycled`:
+
+| | over capacity at harvest | over capacity, worst step | deep wetness after re-sowing | free water (air + condensate), late seasons | roots | peak grain |
+|---|---|---|---|---|---|---|
+| perennial, held | 19–38 kg | 38.0 kg | 0.67–0.94, last six mean **0.684** | ~65 kg | 1.30 m | — |
+| perennial, **recycled** | 0.00–0.16 kg (one season 7.8) | 9.3 kg | 0.55–0.98, last six mean **0.626** | ~70–79 kg | 1.30 m, all 15 | identical |
+| consumer, held | 16–32 kg | 31.8 kg | 0.68–0.95, last six mean 0.813 | 12–65 kg | 1.30 m | — |
+| consumer, **recycled** | 0.00–0.05 kg (two seasons 0.5, 1.5) | 9.3 kg | 0.55–0.84, last six mean **0.689** | 31–90 kg | 1.30 m, all 15 | identical |
+
+Rationing 0 in all six runs (two outflows now draw on the deep store in one step).
+
+**Graded:**
+
+* **Q1 HELD:** the deep store sits at its capacity (25.97 kg) at harvest; what remains above it is the
+  tail of an event's pulse, gone in days (worst step 9.3 kg, against 38).
+* **Q2 PARTLY:** the level fell — perennial 0.684 → **0.626** — but less than the predicted ≈ 0.58, and
+  the feedback I predicted (drier deep soil → more percolation → lower still) had the WRONG sign. The 19
+  kg did not all leave the soil: water is conserved (held 45.2 + 84.8 + 64.9 = 194.9 kg; recycled 26.0 +
+  94.9 + 74.1 = 195.0 kg), and about half of it went back into the root zone through the watering, so the
+  zone holds more at harvest (~95 kg against ~85) and returns more at each re-sowing. Consumer within the
+  predicted 0.57–0.83, no trend.
+* **Q3 PARTLY:** free water rose by ~9 kg, not ~20 — the other half is the root-zone share above.
+* **Q4 HELD:** roots 1.30 m in all fifteen seasons, both chambers.
+* **Q5 HELD:** peak grain identical to four digits, every season, both chambers.
+* **Q6 HELD:** `regen_goldens` report 20 of 20 identical.
+
+**The accepted drying, restated:** with the overfill drained and recycled the deep soil settles at about
+**0.6–0.7 of full after each re-sowing** (perennial mean 0.63, consumer 0.69), now with no stranded water
+in it. That is the honest number the user's decision was after.
