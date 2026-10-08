@@ -212,6 +212,8 @@ reset's refusal had not been applied by the first edit — the S10 test went red
 
 ### 8a. The measurement (per year of the run)
 
+⚠ **The event rows below are superseded** by §11a (re-run 2026-10-08 under the settled watering and deep soil).
+
 | scenario | config | water out of the root zone | of it soil | at LAI < 0.5 | Stage I share | watering events | lowest FTSW | carbon = frozen | dead-crop vapour / frozen |
 |---|---|---|---|---|---|---|---|---|---|
 | default (1 y) | frozen | 587.29 | 0 | 95.40 | — | 0 | 0.993 | — | — |
@@ -313,6 +315,8 @@ stops counting — that water is already in the root zone below, so no stock mov
 * T4: the four instrument tests stay green.
 
 ### 9a. Measured with the cap — graded
+
+⚠ **The event rows below are superseded** by §11a (re-run 2026-10-08 under the settled watering and deep soil).
 
 | run | config | water out (kg/yr) | of it soil | Stage I share | events | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill |
 |---|---|---|---|---|---|---|---|---|
@@ -670,3 +674,84 @@ the gross wanted, `deficit / 0.90`, exceeds the condensate held). Fifteen season
   chambers that is physically impossible at full depth: the chamber holds too little free water. The
   crop is never stressed by it (carbon identical), but any pricing that reads event sizes or the
   watering rule must state that the sealed chambers water from a short tank.
+
+---
+
+## 11. The stale comparisons re-run under the settled forms, then the price (the user, 2026-10-08)
+
+**Asked (the user):** *"re-run the out-of-date comparison runs under the final settings, then estimate
+together what making the three changes official would cost."* The three changes are Szeicz–Long, soil
+evaporation and watering in events — but watering in events needs the two deep-soil fixes the user
+chose (§10e, §10g), or the root ratchet of §10b returns. **So the candidate is five loader settings:**
+`rs_form = SzeiczLong`, `soil_evap = TwoStage { floor: false }`, `watering = Fao56Trigger` (its
+application efficiencies — sprinkler 0.75, drip 0.90 — and same-day percolation come with it, in
+`system.rs`'s two watering builders), `deep_credit = ActualWetness`, `deep_overflow = Recycled`.
+
+### 11a. The event rows of §8a / §9a, re-run (they supersede those rows)
+
+`measurement()` in `domains/tests/soil_evaporation.rs` now runs its event rows under the settled deep
+forms (a `settled` helper; the frozen, S–L-alone and daily rows unchanged and reproduced to the digit).
+Log: `W:\temp\claude\threeforms\measure.log`.
+
+| run | config | water out (kg/yr) | of it soil | at LAI < 0.5 | Stage I share | events | lowest FTSW | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill |
+|---|---|---|---|---|---|---|---|---|---|---|
+| default (1 y) | + soil, events | 536.26 | 33.63 | 38.20 | 0.204 | 5 | 0.448 | — | 0.744 | 2.65 |
+| | + soil + floor, events | 592.70 | 88.57 | 38.20 | 0.180 | 6 | 0.449 | — | 0.744 | 2.65 |
+| sealed chamber (3 y) | + soil, events | 156.67 | 38.66 | 37.88 | 0.091 | 5 | 0.449 | 0.176 | 0.011 | 2.65 |
+| | + soil + floor, events | 157.32 | 39.32 | 38.20 | 0.088 | 5 | 0.449 | 0.176 | 0.011 | 2.65 |
+| perennial (5 y) | + soil, events | 351.49 | 109.48 | 123.61 | 0.204 | **23** | 0.448 | 0.999 | 0.438 | 2.65 |
+| | + soil + floor, events | 355.18 | 113.17 | 126.93 | 0.212 | 24 | 0.445 | 0.999 | 0.486 | 2.65 |
+| consumer (5 y) | + soil, events | 298.57 | 102.20 | 145.07 | 0.174 | **21** | 0.447 | 0.992 | 0.424 | 2.65 |
+| | + soil + floor, events | 299.41 | 103.07 | 143.38 | 0.177 | 21 | 0.447 | 0.994 | 0.418 | 2.65 |
+
+Carbon bit-identical to frozen in every row. `drought_window` under events: first stressed day 244
+(floor 240), as §9a.
+
+**What changed against §9a:**
+
+* **The open field: nothing** (single season, the deep store full throughout, so the credit equals the
+  book's; the efficiency changes only what the source supplies, not what leaves the root zone).
+* **The re-sown chambers water far less often** — perennial 63 → **23** events in five years, consumer
+  25 → 21 — and lose a quarter less water (perennial 481.79 → 351.49 kg/yr; consumer 333.34 → 298.57).
+  The roots now reach 1.30 m every season, so the root zone is deep and each watering (capped by the
+  tank, §10h) refills a large store: fewer, larger events, and a surface that is wet less often (the
+  perennial Stage I share 0.416 → 0.204).
+* **The soil replaces more of the dead crop's phantom water:** perennial 0.220 → **0.438**, consumer
+  0.209 → **0.424** of what the frozen dead crop transpired over its dead days; the air holds (0.999,
+  0.992).
+* **The never-re-sown sealed chamber is unchanged in kind:** its dead phase still dries the air (0.176).
+  Re-sowing, not watering, is what keeps a sealed chamber's air.
+* The floor still adds almost nothing in the chambers (≤ 1 %): the switch stays off as decided.
+
+### 11b. The biosphere twins, regenerated
+
+`W:\temp\claude\threeforms\zz_twins5.rs` (throwaway; staged into `domains/tests/` for one run and
+removed). Each CONTROL equals its committed golden byte for byte; twins in
+`W:\temp\claude\threeforms\twins\`; the diff (`twins_diff.txt`) by key:
+
+| golden | moves (end state) | new keys |
+|---|---|---|
+| `season_euler` | soil water −41.7 %; vapour sink −14.4 % (transpired); water source drawn −20.6 %; subsoil +0.5 % | the 5 soil aux keys; stock `boundary.soil_evaporation` (33.63 kg) |
+| `sealed_chamber` | condensate 8.15 → 52.33 kg; soil −27.4 %; **air vapour 0.25 → 2.0e-6 kg** | the 5 soil aux keys |
+| `perennial_chamber` / long horizon | condensate 8.15 → 76.10 / 69.63 kg; soil −42.9 % / −38.9 %; subsoil +7.2 % (to its capacity, 25.97) | the 5 soil aux keys |
+| `consumer_chamber` / long horizon | condensate 8.14 → 60.87 / 48.78 kg; soil −33.6 % / −26.2 %; subsoil +7.7 % / +7.9 % | the 5 soil aux keys |
+
+**Water only:** no carbon, nitrogen, oxygen stock or `rooted_depth` / `thermal_time` /
+`vernalization_days` moves in any twin. Water moves from the soil to the chamber's free water
+(the root zone sits between the trigger and full instead of near full).
+
+### 11c. Predictions for the branch run (written before it)
+
+Method as the canopy pricing (`post-roadmap-canopy-resistance.md` §9–§10): a local branch
+`wip/three-forms-price` from main, the five loader lines only, `regen_goldens` in REPORT mode, the full
+suite `--no-fail-fast`, the ignored tests in release; then a throwaway `--write` to count the manifest
+reds; then back to main. Never pushed.
+
+| | prediction |
+|---|---|
+| V1 | `regen_goldens` report: the six biosphere goldens + `lighting`, `greenhouse`, `harvest`, `sealed_station` would change (10); each biosphere one equals its §11b twin byte for byte. Unchanged: `drift_summary` (leaf carbon only), `sealed_energy_drift_summary`, the eight crop-free goldens, `state_snapshot.json` |
+| V2 | the four station goldens: water stocks move and the 5 soil aux keys appear; no `boundary.soil_evaporation` (sealed). Carbon: **uncertain** — the station's chambers may hold less free water than the biosphere's, and a capped watering could stress the crop; classified after |
+| V3 | the station registries carry `SoilSurfaceAccount`, `SubsoilOverflow` once each and the event watering under its old id (`biosphere.recycling`), counted on the branch |
+| V4 | red by design: `golden_regression` and `tier_contract` on the moved goldens; the domains manifest writer **even in report mode** (new flow/aux types enter the frozen registries — unlike the canopy price, where only values moved); canopy P1; scorecard R1; soil-evaporation S1; the deep-water rescue's grain pin; the five-year re-sow cycle test; any test asserting the loader keeps the book's credit or `Held` |
+| V5 | possibly red, classified after: tests pinning a water stock or humidity in a run with a crop; the watering-trigger and air-split tests (the station's own trigger now meets a biosphere that waters in events) |
+| V6 | green: every carbon, energy and gas test; the conservation and determinism laws; `chamber_walls` trajectory pins |

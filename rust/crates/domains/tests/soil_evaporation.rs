@@ -8,7 +8,8 @@
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::perturbations::window_override;
 use domains::biosphere::science::{
-    self, SoilEvaporationForm as Soil, SurfaceResistanceForm as Rs, WateringForm as Water,
+    self, DeepOverflow, DeepSoilCredit, SoilEvaporationForm as Soil, SurfaceResistanceForm as Rs,
+    WateringForm as Water,
 };
 use domains::biosphere::stocks::{
     IRRIGATION_VAR, LEAF_C, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_DRY_DAYS, SOIL_EVAP_TODAY,
@@ -23,7 +24,7 @@ use domains::biosphere::{
     season_setup_composed, season_setup_with, season_steps, steps_for_years, BIO_DT,
     STEPS_PER_DAY,
 };
-use domains::lab::biosphere_with_soil_evaporation;
+use domains::lab::{biosphere_with_soil_evaporation, with_deep_credit, with_deep_overflow};
 use simcore::environment::{Environment, SourceResolver};
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
@@ -117,6 +118,14 @@ fn soil_by_day(r: &Run) -> Vec<f64> {
     (1..r.states.len() / STEPS_PER_DAY)
         .map(|d| r.states[d * STEPS_PER_DAY].aux[SOIL_EVAP_TODAY])
         .collect()
+}
+
+/// Watering in events with the deep soil as settled (plan §10e, §10g); every other form as given.
+fn settled(p: BiosphereParams) -> BiosphereParams {
+    if p.water.watering != Water::Fao56Trigger {
+        return p;
+    }
+    with_deep_overflow(with_deep_credit(p, DeepSoilCredit::ActualWetness), DeepOverflow::Recycled)
 }
 
 const ON: Soil = Soil::TwoStage { floor: true };
@@ -225,6 +234,8 @@ fn a_re_sow_resets_the_soil_values_and_the_plain_reset_refuses_them() {
 
 /// The measurement (§6), printed, never asserted:
 /// `cargo test --release -p domains --test soil_evaporation -- --ignored --nocapture`.
+/// The event rows run under the settled watering (plan §10c–§10h): new roots credited with the
+/// deep soil's actual wetness, and the deep overflow drained and recycled.
 #[test]
 #[ignore = "a printed lab measurement; run with --ignored --release"]
 fn measurement() {
@@ -245,7 +256,7 @@ fn measurement() {
         let frozen = run(s, &params::biosphere(), *years, *perennial, None);
         println!("\n{name} ({years} y): water out of the root zone (kg/yr) | of it soil | at LAI<0.5 | Stage I share | events | lowest FTSW | carbon == frozen | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill / capacity");
         for (label, rs, soil, water) in configs {
-            let p = params(rs, soil, water);
+            let p = settled(params(rs, soil, water));
             let r = run(s, &p, *years, *perennial, None);
             let total: f64 = r.out.iter().sum::<f64>() / *years as f64;
             let soil_total: f64 = if soil == Soil::Off { 0.0 } else { soil_by_day(&r).iter().sum::<f64>() / *years as f64 };
@@ -291,7 +302,7 @@ fn measurement() {
     }
     println!("\ndrought window (watering cut days 220-260), first day below FTSW 0.30:");
     for (label, rs, soil, water) in configs {
-        let r = run(&DEFAULT_SCENARIO, &params(rs, soil, water), 1, false, Some((220, 260)));
+        let r = run(&DEFAULT_SCENARIO, &settled(params(rs, soil, water)), 1, false, Some((220, 260)));
         let first = r.states.iter().position(|st| ftsw(st, &DEFAULT_SCENARIO) < DEFAULT_SCENARIO.wssg).map(|n| n / STEPS_PER_DAY);
         println!("  {label:<20} {first:?}");
     }
