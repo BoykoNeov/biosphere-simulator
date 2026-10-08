@@ -786,10 +786,10 @@ go, the station manifest writer joins). Then discarded (`git checkout`), main re
 
 | class | tests | what an adoption does |
 |---|---|---|
-| goldens and bands (6) | `golden_regression` ×2 + the expensive sealed station, `tier_contract` ×2 + the expensive band | regenerate; re-measure the tier bands (the aux key count 3 → 8 trips them) |
+| goldens and bands (6) | `golden_regression` ×2 + the expensive sealed station, `tier_contract` ×2 + the expensive band | regenerate (all four band reds cleared on the throwaway `--write` alone — measured; the real band cost is the cross-port line below) |
 | manifests (2) | domains + station `manifest_writer` | regenerate: 10 `golden_sha256` rows; `flow_set` −`Irrigation` −`Recycling` +`EventIrrigation` +`EventRecycling` +`SubsoilOverflow`; `aux_set` +`SoilSurfaceAccount` (26 lines) |
 | "the old form through the switch is frozen" (4) | canopy P1 and its exact-by-hand check, soil-evaporation S1, scorecard R1 | restate against the new loader (the by-hand check lacks the soil split) |
-| tests of the BOOK's deep store that took the loader as "the book" (6) | dry store stops roots, clean vs naive deep-water controls, the clamp on an emptying store, the actual-wetness credit, the overflow switch, the deep-water grain rescue (1.0 vs 1.22) | pin `FullCapacity` / `Held` explicitly — the book's behaviour is still the subject; with the new credit the roots reach 1.30 m by construction |
+| tests of the BOOK's deep store that took the loader as "the book" (6) | dry store stops roots, clean vs naive deep-water controls, the clamp on an emptying store, the actual-wetness credit, the overflow switch, the deep-water grain rescue (1.0 vs 1.22) | pin the old forms these tests assume — the credit and overflow, and likely the watering too (unverified: event watering's same-day percolation also wets the below-root store a "dry subsoil" test relies on); with the new credit the roots reach 1.30 m by construction |
 | the re-sow route (4) | three tests calling the plain `annual_reset` on a loader state + `param_funnel` | the design item above |
 | cycle-flow ring check (1) | `biosphere.recycling` returns no legs at a state where no event is due | construct the state below the trigger |
 | re-sow fixed point (1) | `the_resow_makes_a_cycle_and_not_a_ratchet…`: the below-root store 125.7, 126.2, 134.6, 95.9 | restate: under events each cycle depends on when the last watering fell — it cycles, it does not settle |
@@ -811,11 +811,17 @@ go, the station manifest writer joins). Then discarded (`git checkout`), main re
 
 **Water only:** no carbon, nitrogen, oxygen, energy, root depth or development value moves anywhere.
 
-**Observed, not investigated:** the top-layer account ends at exactly 0 in all ten moved goldens. Read
-in the code (`Transpiration::split`): the soil's evaporation is capped by what the account holds
-(`room = top.min(..)`), and Stage I needs more than 1 mm in it — so an empty top means NO soil
-evaporation until the next watering refills it. Every end state falls in such a dry spell. Consistent with the form; how
-much of each run the surface spends fully dry was not measured.
+**⚠ The headline for the decision: the package does NOT fix the defect that opened this item in one
+golden.** `sealed_chamber_state.json` (never re-sown) would be frozen with **2e-6 kg of air vapour against
+0.25** — the success test S4 still fails under events (0.176, §11a). The mechanism, read in the code: the
+soil's evaporation is capped by the top-layer account (`Transpiration::split`, `room = top.min(..)`, and
+Stage I needs > 1 mm in it), and the account's ONLY inflow is the watering flow's legs into the root zone
+(`SoilSurfaceAccount`, `inflow`; a re-sowing also re-seeds it). Under events a chamber whose deep root zone
+never reaches the trigger is never watered, so once the top empties its soil evaporation is **zero for
+good** — the dry air comes from the model having no upward supply into the top layer (capillary rise),
+not from a soil that has physically dried. The account ends at exactly 0 in all ten moved goldens; the
+share of steps with an empty top was not measured. Under daily watering S4 held (0.999), because the
+top is refilled every step.
 
 **Ceremony the run cannot show:**
 
@@ -831,4 +837,10 @@ much of each run the surface spends fully dry was not measured.
    chambers water from a short tank (§10h).
 4. **The separate-air lab option** (`air_split.rs`): its `TriggeredWatering` does not feed the top-layer
    account — an open lab gap, not in any golden.
-5. **Potato** adopts with wheat (§11 of the canopy plan, decided); its tests stayed green.
+5. **The cross-port tolerance contract (`docs/native-port-reference.md`) is part of the unfreeze, and
+   UNMEASURED.** The soil path adds new transcendental sites to all ten moved goldens — `sqrt` in Stage
+   II (`stage_two_factor`) and `exp` in the soil's shade — which `rust/data/tiers.json`'s
+   `_transcendental_sites` and each golden's `transcendentals` list do not name. On Windows the bands
+   demand byte-exactness, so local green says nothing about Linux; measuring them needs the branch run
+   on Linux CI (a push — the user's call).
+6. **Potato** adopts with wheat (§11 of the canopy plan, decided); its tests stayed green.
