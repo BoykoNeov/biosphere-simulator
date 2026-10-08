@@ -1019,8 +1019,22 @@ pub enum SoilEvaporationForm {
     #[default]
     Off,
     /// `floor`: the book's 1.5 mm/day minimum (`EOSMIN`), met as a daily total; a switch so it is
-    /// measured on and off (the user's decision).
-    TwoStage { floor: bool },
+    /// measured on and off (the user's decision). `supply`: what caps the soil's evaporation.
+    TwoStage { floor: bool, supply: SoilSupply },
+}
+
+/// What caps the soil's evaporation under [`SoilEvaporationForm::TwoStage`] — LAB-ONLY
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §12).
+///
+/// [`SoilSupply::TopLayer`] caps it at the top layer's account, as built in §8 — a mapping choice of
+/// ours, NOT in the book. [`SoilSupply::RootZone`] is the book's program (Box 14.1, p. 187): `SEVP`
+/// comes from `EOS` and the Stage II factor alone and is taken from the whole root zone (`ATSW`); the
+/// top account only floors at 0. Either way it never exceeds the root zone's water after the crop's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SoilSupply {
+    #[default]
+    TopLayer,
+    RootZone,
 }
 
 /// How the root zone is watered — LAB-ONLY (`docs/plans/post-roadmap-soil-evaporation.md` §7).

@@ -957,8 +957,9 @@ fn transpiration_flow(
         // The lab soil-evaporation form only; `None` on every frozen build.
         soil: match p.transp.soil_evap {
             science::SoilEvaporationForm::Off => None,
-            science::SoilEvaporationForm::TwoStage { floor } => Some(SoilEvapRead {
+            science::SoilEvaporationForm::TwoStage { floor, supply } => Some(SoilEvapRead {
                 floor,
+                supply,
                 leaf_c: LEAF_C.to_string(),
                 sla_per_mol_c: p.canopy.sla_per_mol_c,
                 leaf_area_aux: stores_leaf_area(p).then(|| LEAF_AREA_INDEX.to_string()),

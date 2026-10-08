@@ -8,7 +8,7 @@
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::perturbations::window_override;
 use domains::biosphere::science::{
-    self, DeepOverflow, DeepSoilCredit, SoilEvaporationForm as Soil, SurfaceResistanceForm as Rs,
+    self, DeepOverflow, DeepSoilCredit, SoilEvaporationForm as Soil, SoilSupply, SurfaceResistanceForm as Rs,
     WateringForm as Water,
 };
 use domains::biosphere::stocks::{
@@ -128,8 +128,10 @@ fn settled(p: BiosphereParams) -> BiosphereParams {
     with_deep_overflow(with_deep_credit(p, DeepSoilCredit::ActualWetness), DeepOverflow::Recycled)
 }
 
-const ON: Soil = Soil::TwoStage { floor: true };
-const OFF_FLOOR: Soil = Soil::TwoStage { floor: false };
+const ON: Soil = Soil::TwoStage { floor: true, supply: SoilSupply::TopLayer };
+const OFF_FLOOR: Soil = Soil::TwoStage { floor: false, supply: SoilSupply::TopLayer };
+/// The book's program: the soil's evaporation is not capped at the top layer's water (plan §12).
+const BOOK_SUPPLY: Soil = Soil::TwoStage { floor: false, supply: SoilSupply::RootZone };
 
 /// S1 — with the soil off, the constant resistance and continuous watering, the new path is the
 /// frozen run to the bit.
@@ -239,12 +241,13 @@ fn a_re_sow_resets_the_soil_values_and_the_plain_reset_refuses_them() {
 #[test]
 #[ignore = "a printed lab measurement; run with --ignored --release"]
 fn measurement() {
-    let configs: [(&str, Rs, Soil, Water); 5] = [
+    let configs: [(&str, Rs, Soil, Water); 6] = [
         ("frozen", Rs::Constant, Soil::Off, Water::Continuous),
         ("S-L alone", Rs::SzeiczLong, Soil::Off, Water::Continuous),
         ("S-L+soil, daily", Rs::SzeiczLong, OFF_FLOOR, Water::Continuous),
         ("S-L+soil, events", Rs::SzeiczLong, OFF_FLOOR, Water::Fao56Trigger),
         ("S-L+soil+floor, ev", Rs::SzeiczLong, ON, Water::Fao56Trigger),
+        ("S-L+soil, ev, book", Rs::SzeiczLong, BOOK_SUPPLY, Water::Fao56Trigger),
     ];
     let named: [(&str, SeasonScenario, usize, bool); 4] = [
         ("default", DEFAULT_SCENARIO, 1, false),
@@ -254,7 +257,7 @@ fn measurement() {
     ];
     for (name, s, years, perennial) in &named {
         let frozen = run(s, &params::biosphere(), *years, *perennial, None);
-        println!("\n{name} ({years} y): water out of the root zone (kg/yr) | of it soil | at LAI<0.5 | Stage I share | events | lowest FTSW | carbon == frozen | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill / capacity");
+        println!("\n{name} ({years} y): water out of the root zone (kg/yr) | of it soil | at LAI<0.5 | Stage I share | events | lowest FTSW | carbon == frozen | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill / capacity | end vapour (kg)");
         for (label, rs, soil, water) in configs {
             let p = settled(params(rs, soil, water));
             let r = run(s, &p, *years, *perennial, None);
@@ -297,7 +300,8 @@ fn measurement() {
             } else {
                 r.states.iter().map(|st| st.aux[TOP_SOIL_WATER]).fold(0.0, f64::max) / cap
             };
-            println!("  {label:<20} {total:>9.2} | {soil_total:>8.2} | {winter:>8.2} | {stage1:>6.3} | {events:>5} | {low:.4} | {same} | {vap:.3} | {ratio:.3} | {peak:.2}");
+            let end_vapour = if s.sealed { r.states.last().unwrap().stocks[WATER_VAPOR].amount } else { f64::NAN };
+            println!("  {label:<20} {total:>9.2} | {soil_total:>8.2} | {winter:>8.2} | {stage1:>6.3} | {events:>5} | {low:.4} | {same} | {vap:.3} | {ratio:.3} | {peak:.2} | {end_vapour:.3e}");
         }
     }
     println!("\ndrought window (watering cut days 220-260), first day below FTSW 0.30:");

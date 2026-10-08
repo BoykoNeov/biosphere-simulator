@@ -803,6 +803,7 @@ impl CanopyRead {
 /// `None` on every frozen build.
 pub struct SoilEvapRead {
     pub floor: bool,
+    pub supply: science::SoilSupply,
     pub leaf_c: String,
     pub sla_per_mol_c: f64,
     /// The stored LAI when the lab leaf form keeps one ([`CarbonContext::lai_at`]'s rule).
@@ -897,7 +898,8 @@ impl Transpiration {
     /// radiation, the soil `exp(−KET·ETLAI)` of the incident (ETLAI ≥ LAI_green, so the shares
     /// never exceed 1; what dead leaves intercept goes to neither). The soil runs at its potential
     /// in Stage I, at the book's per-day Stage II factor otherwise, never beyond the top layer's
-    /// water; with the floor on, the day's last step tops the day up to 1.5 mm when the day's
+    /// water under [`science::SoilSupply::TopLayer`] (the root zone's under `RootZone`, the
+    /// book's); with the floor on, the day's last step tops the day up to 1.5 mm when the day's
     /// bare-soil potential exceeded it. An error when the form is off.
     pub fn split(
         &self,
@@ -959,7 +961,11 @@ impl Transpiration {
         } else {
             eos * science::stage_two_factor(aux_of(snapshot, &s.dry_days_aux))
         };
-        let room = top.min((soil_water - crop).max(0.0));
+        let root_zone_room = (soil_water - crop).max(0.0);
+        let room = match s.supply {
+            science::SoilSupply::TopLayer => top.min(root_zone_room),
+            science::SoilSupply::RootZone => root_zone_room,
+        };
         let mut soil = (rate * self.ground_area * dt).min(room);
         let bare_potential = science::soil_evaporation_potential(
             net_radiation,

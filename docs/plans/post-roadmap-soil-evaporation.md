@@ -844,3 +844,95 @@ top is refilled every step.
    demand byte-exactness, so local green says nothing about Linux; measuring them needs the branch run
    on Linux CI (a push — the user's call).
 6. **Potato** adopts with wheat (§11 of the canopy plan, decided); its tests stayed green.
+
+## 12. The top-layer cap is OUR departure from the book — a switch, measured (the user, 2026-10-08)
+
+**Asked (the user, on the recommendation after §11d):** fix the price's headline — the never-re-sown
+sealed chamber's air still dries — before anything is adopted. The recommendation was "an upward
+supply into the top layer (capillary rise)". **Re-read first-hand, that framing was wrong:**
+
+* The book leaves capillary rise out on purpose: *"capillary rise of water may occur if there is a high
+  water table in the soil, but it is not considered here"* (p. 171). A chamber has no water table, so a
+  capillary-rise form would be uncited (WHAT-IF).
+* **The book's own program never caps the soil's evaporation at the top layer's water** (Box 14.1,
+  p. 187): `SEVP` is set from `EOS` and the Stage II factor alone; `ATSW1 = ATSW1 + … − TR1 − SEVP`,
+  then `If ATSW1 < 0 Then ATSW1 = 0`; and `ATSW = ATSW + … − TR − SEVP` takes it from the whole root
+  zone. Stage II is *defined* as the regime after the top layer has dried (p. 181), so Stage II's
+  √-decline IS the book's supply from below; the account only floors at 0.
+* Our `Transpiration::split` caps it: `room = top.min(..)`. Introduced with the build (`09db450`);
+  §4b's "all of the soil evaporation [comes out of the top account]" was read as a cap. **Not a user
+  decision and not a fix for a measured problem — a mapping choice made at build time.**
+
+**Advisor review (2026-10-08), summarized:** drop capillary rise; this is correcting a departure, not
+adding science. Do not claim it fixes S4: the book's Stage II factor `√(d+1) − √d` decays toward zero,
+so a never-watered chamber still decays by construction, only slower. Compute (a) the flux that holds
+the air, (b) the uncapped Stage II flux over the dead years, (c) whether the slow drain reaches the
+trigger in the run (a watering would restart Stage I — the feedback may decide S4). Build it as a
+switch beside the cap, both in one table. Afterwards re-price §11d: every event row moves.
+
+**A second departure, logged, NOT changed here:** the book starts and re-starts `DYSE` at **1**
+(`DYSE = 1` at initialisation, Box 14.1 p. 185; `If (RAIN + IRGW) > WETWAT Then DYSE = 1`), so its first
+Stage II day runs at `√2 − 1 ≈ 0.41` of `EOS`; ours resets `soil_dry_days` to 0, a first day at
+**1.0**. Its own item.
+
+**The switch:** `SoilEvaporationForm::TwoStage { floor, supply }`, `SoilSupply::TopLayer` (the cap,
+what §8–§11 measured) or `SoilSupply::RootZone` (the book's program: capped only by the root zone's
+water after the crop's share). The account is unchanged (it already floors at 0).
+
+### 12a. Predictions (written before the build)
+
+Numbers: the sealed chamber is 1 m², its condenser takes `0.5 · min(v, target)` per day
+(`condensation_rate` 0.5), the target ≈ 0.25 kg.
+
+* **(a)** to hold the air at its target needs ≈ **0.125 kg/day** of evaporation.
+* **(b)** the soil's wet-surface potential in that chamber ≈ 1.07 kg/day (§9a's daily-watering row,
+  392.40 kg/yr at a Stage I share of 1.000). Over the dead years `d` runs into the hundreds, the factor
+  `≈ 1/(2√d)` ≈ 0.05 → 0.02, so the uncapped flux is ≈ **0.02–0.05 kg/day** — below (a). The air
+  settles near `flux / 0.5` ≈ 0.04–0.1 kg.
+* **(c)** the cumulative Stage II drain over ~2 dead years ≈ `EOS · √730` ≈ 29 kg against a 1.3 m root
+  zone's ≈ 93 kg to the trigger. Whether it reaches the trigger depends on where the zone stands when
+  the crop dies (not known before the run): **not predicted**; if it fires, the air recovers in pulses.
+
+| | prediction |
+|---|---|
+| P1 | sealed chamber, events: the dead-crop vapour ratio **rises** from 0.176 but stays **well below 0.9** — S4 still fails; the end-state vapour rises from 2e-6 kg to ~0.04–0.1 kg |
+| P2 | every event row: soil evaporation and water out of the root zone **rise**; Stage I share unchanged or lower; events equal or more; lowest FTSW still ≈ the trigger (0.45) |
+| P3 | carbon bit-identical to frozen in every row (the trigger at 0.45 sits above the stress threshold) |
+| P4 | daily-watering rows: essentially unchanged (the top is refilled every step, so the cap rarely binds) |
+| P5 | `drought_window` under events: the first stressed day comes **earlier** than 244 |
+| P6 | the four instrument tests stay green on the cap (they keep `TopLayer`) |
+
+### 12b. Measured (2026-10-08) — graded
+
+`measurement()` gained the row `S-L+soil, ev, book` (`SoilSupply::RootZone`, floor off, events, the
+settled deep forms) and an end-of-run air-vapour column. Log: `W:\temp\claude\caprise\measure.log`.
+Every other row reproduced §11a to the digit.
+
+| run | cap | water out (kg/yr) | of it soil | Stage I share | events | lowest FTSW | carbon = frozen | dead-crop vapour / frozen | dead-crop soil / frozen crop water | end vapour (kg) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| default (1 y) | top layer | 536.26 | 33.63 | 0.204 | 5 | 0.448 | yes | — | 0.744 | — |
+| | **book** | 548.51 | 45.83 | 0.200 | 5 | 0.448 | yes | — | 0.810 | — |
+| sealed chamber (3 y) | top layer | 156.67 | 38.66 | 0.091 | 5 | 0.449 | yes | 0.176 | 0.011 | 1.95e-6 |
+| | **book** | 187.94 | 70.74 | 0.157 | 6 | 0.450 | yes | **0.605** | 0.040 | **0.125** |
+| perennial (5 y) | top layer | 351.49 | 109.48 | 0.204 | 23 | 0.448 | yes | 0.999 | 0.438 | 0.2505 |
+| | **book** | 419.00 | 176.93 | 0.223 | 26 | 0.447 | yes | 0.999 | 0.447 | 0.2505 |
+| consumer (5 y) | top layer | 298.57 | 102.20 | 0.174 | 21 | 0.447 | yes | 0.992 | 0.424 | 0.5010 |
+| | **book** | 381.78 | 185.49 | 0.209 | 26 | 0.447 | yes | 0.996 | 0.443 | 0.5010 |
+
+`drought_window` under events: first stressed day 244 (cap) → **241** (book).
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| P1 | dead-crop vapour rises from 0.176, stays well below 0.9; end vapour ~0.04–0.1 kg | **0.605**; end vapour **0.125 kg** (half the 0.25 target) | HELD in kind; the end vapour **above** the range (≈ 0.06 kg/day of evaporation, not 0.02–0.05) |
+| P2 | soil and water out rise in every event row; Stage I share unchanged or lower; events equal or more; lowest FTSW ≈ 0.45 | soil +36 % / +83 % / +62 % / +81 %; events 5/6/26/26 against 5/5/23/21; FTSW ≈ 0.45 — HELD; **the Stage I share ROSE** in three of four (sealed 0.091 → 0.157): faster drying → more watering events → the top wetted more often | HELD except the Stage I share |
+| P3 | carbon bit-identical everywhere | identical in every row | HELD |
+| P4 | daily-watering rows essentially unchanged | **not measured** — no daily row runs under the book's supply | NOT MEASURED |
+| P5 | drought's first stressed day earlier than 244 | 241 | HELD |
+| P6 | the instrument tests stay green on the cap | green; full suite 1361 passed, 0 failed, 8 ignored; clippy clean (logs `suite.log`, `clippy.log` beside the measurement) | HELD |
+
+**What it says.** Following the book's program instead of our cap roughly doubles the soil's share of
+the water use in the chambers and lifts the never-re-sown chamber's dead-crop air from 18 % to 61 % of
+the frozen model's, ending at half its target instead of at zero. **It does not make S4 pass** — the
+Stage II decline is the book's own, and that is what the remaining gap is. The sealed chamber also
+watered once more (5 → 6); when that event fell (the dead years or before) was not measured, so (c)
+is open. The bigger soil loss is paid for with more watering, not with carbon.

@@ -108,3 +108,17 @@ five loader settings (the two deep-soil fixes come with watering in events).
   2 ignored red, all classified: 19 regenerate or restate by construction, 4 need a design choice (the
   plain re-sow refuses the soil state — found by the golden producer crashing before anything ran), 3 are
   unexplained behaviour changes in instrument tests. Manifests: 26 lines; ~11 constants owed to param files.
+
+**The top-layer cap was ours, not the book's (2026-10-08,** plan §12). The proposed fix, "capillary rise into the
+top layer", was dropped on reading the book: it leaves capillary rise out (no water table), and its own program
+never caps the soil's evaporation at the top layer's water — Stage II draws from the whole root zone and the top
+account only floors at 0. Our build had added that cap. Built as a lab switch (`SoilSupply::TopLayer` — the cap,
+still the default — or `RootZone`, the book's) and measured under events:
+
+* The never-re-sown chamber's dead-crop air: 18 % → **61 %** of the frozen model's, ending at half its target
+  (0.125 kg) instead of zero. **The success test still fails** — the remaining gap is the book's own Stage II
+  decline.
+* Soil evaporation rises 36–83 % in the event rows, paid for by more watering (5→6, 23→26, 21→26 events); carbon
+  identical everywhere; the drought bites 3 days sooner.
+* Logged, not changed: the book restarts its dry-day count at 1 (first dry day 0.41 of the potential), ours at 0
+  (1.0).
