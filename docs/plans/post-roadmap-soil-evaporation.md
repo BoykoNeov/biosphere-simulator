@@ -932,7 +932,32 @@ Every other row reproduced §11a to the digit.
 
 **What it says.** Following the book's program instead of our cap roughly doubles the soil's share of
 the water use in the chambers and lifts the never-re-sown chamber's dead-crop air from 18 % to 61 % of
-the frozen model's, ending at half its target instead of at zero. **It does not make S4 pass** — the
-Stage II decline is the book's own, and that is what the remaining gap is. The sealed chamber also
-watered once more (5 → 6); when that event fell (the dead years or before) was not measured, so (c)
-is open. The bigger soil loss is paid for with more watering, not with carbon.
+the frozen model's. **It does not make S4 pass.** Where the remaining gap comes from: §12c. The bigger
+soil loss is paid for with more watering, not with carbon.
+
+### 12c. When the waterings fell — the attribution checked (advisor, 2026-10-08)
+
+**Advisor review of §12b, summarized:** "the remaining gap is the book's own Stage II decline" was an
+untested attribution: the extra watering (5 → 6) and the end vapour above the predicted range both fit
+a watering IN the dead years, which would make part of 0.605 a pulse, not the tail. Probe it. Also: the
+local `wip/three-forms-price` branch no longer compiles over this commit (its loader line has no
+`supply`) — re-pricing means choosing `supply` there, which is the user's adoption decision, not a
+default.
+
+**Probe** (`probe_book_supply_sealed_events`, `#[ignore]`d; log `W:\temp\claude\caprise\probe.log`),
+the sealed chamber under the book's supply:
+
+* Waterings on days 125, 191, 219, 246, 276, **339** — all in the first year. The last falls as the crop
+  dies (LAI 0.17 on day 330, 0.08 on day 360); it re-wets the top (14.2 kg on day 360), so the dead
+  phase **opens with ~50 days of Stage I** — part of the 0.605 mean.
+* After that, **no watering in the dead years**: the dry clock runs unbroken from ~day 410 to the end
+  (502.9 days), FTSW drifts 0.88 → 0.63, never near the 0.45 trigger. (c): the drain does NOT reach the
+  trigger in this run.
+* The air in the dead years **swings with the time of year** rather than settling: 0.23 kg (day 540),
+  **0.010 kg (day 720)**, back to 0.12 kg (day 900). The end vapour 0.125 kg is on the upswing, not a
+  steady tail — P1's "above the range" is a seasonal reading. Which forcing drives the swing (light,
+  temperature, the target) was not separated.
+
+**So:** the dead years' trend IS the book's Stage II decline (no watering intervenes); the mean 0.605 is
+lifted by the death-time watering's Stage I start; and the air still falls to ~4 % of its target at the
+season's low point. The success test fails on the Stage II tail.

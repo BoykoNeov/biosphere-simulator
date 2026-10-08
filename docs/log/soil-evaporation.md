@@ -115,9 +115,10 @@ never caps the soil's evaporation at the top layer's water — Stage II draws fr
 account only floors at 0. Our build had added that cap. Built as a lab switch (`SoilSupply::TopLayer` — the cap,
 still the default — or `RootZone`, the book's) and measured under events:
 
-* The never-re-sown chamber's dead-crop air: 18 % → **61 %** of the frozen model's, ending at half its target
-  (0.125 kg) instead of zero. **The success test still fails** — the remaining gap is the book's own Stage II
-  decline.
+* The never-re-sown chamber's dead-crop air: 18 % → **61 %** of the frozen model's, but **the success test still
+  fails**. A probe: no watering falls in the dead years (the last, as the crop dies, opens them with ~50 wet
+  days); after that the air swings with the season, down to ~4 % of its target at the low point — the book's
+  Stage II tail.
 * Soil evaporation rises 36–83 % in the event rows, paid for by more watering (5→6, 23→26, 21→26 events); carbon
   identical everywhere; the drought bites 3 days sooner.
 * Logged, not changed: the book restarts its dry-day count at 1 (first dry day 0.41 of the potential), ours at 0
