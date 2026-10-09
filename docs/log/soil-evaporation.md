@@ -141,3 +141,10 @@ what is closer to reality"*). A drying surface keeps evaporating, more slowly, f
 the cap stopped it dead at an empty bookkeeping layer. Not yet the go-ahead to adopt. Owed first: trace why the
 sealed station's below-root store ends 19 % wetter. Logged as a separate realism lead: the condenser draws
 vapour below its humidity setting, which a real dehumidifier would not, and may be what dries the dead chamber's air.
+
+**2026-10-09, after the dehumidifier fix** (plan §14–§15). The condenser drew vapour below its setting; fixed
+as its own biosphere unfreeze (`log/chamber-dehumidifier.md`). The never-re-sown chamber's dead-crop air is now
+0.981 of frozen under the root-zone supply (S4 passes) and 0.704 under the old cap. §13's sealed readings are
+stale. **B6 explained:** over the run the sealed station's below-root store is the same under both supplies
+(78.7 vs 78.8 kg mean). It swings ~20–160 kg each season, and the run ends at a trough whose depth depends on
+when the last waterings fell. A snapshot, not a wetter store.

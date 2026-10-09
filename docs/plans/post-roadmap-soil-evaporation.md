@@ -1053,3 +1053,45 @@ forms. It does not waive the unfreeze ceremony.
 2. The old cap's fate (ceremony item 2): keep `TopLayer` as a lab switch (the four instrument tests
    pin it) or retire it.
 3. Then the adoption list of §11d/§13, on the user's go.
+
+⚠ **§14's condenser lead, CONFIRMED and FIXED 2026-10-09** (`post-roadmap-chamber-dehumidifier.md`, a biosphere
+unfreeze on the user's *"Fix the dehumidifier. Then step 1"*). The condenser now removes only the excess over
+its setting. In this plan's measurement the never-re-sown chamber's dead-crop air went **0.605 → 0.981** under
+the chosen root-zone supply (S4 passes) and **0.176 → 0.704** under the cap (still fails). **So §12b's sealed
+row, §12c's air readings and §13's sealed numbers (`sealed_chamber` 0.125 kg, `sealed_station`) are STALE:
+they were measured with the old condenser.** Their soil, water-out and event columns are unaffected (the
+measurement re-ran them to the digit).
+
+## 15. B6 explained: the sealed station's below-root store is not wetter, it is read at a different moment (2026-10-09)
+
+**Method.** `wip/three-forms-price` rebased onto the dehumidifier fix (`f1ba3a3`). Control: `git range-diff`
+shows the branch's three commits **byte-identical** (`=`) before and after. §13's golden control could not be
+repeated, because main moved. A probe (`station/examples/probe_b6.rs`, untracked, kept with the logs) ran
+`sealed_station` on the rebased branch under each supply (the loader's `supply` line flipped for the cap run
+and restored) and on main. It printed every day's water stores, a per-season summary, the run means, and each
+watering against the condensate tank. Logs: `W:\temp\claude\dehumidifier\` (`b6_book.log`, `b6_cap.log`,
+`b6_main.log`).
+
+**First, re-measured after the fix** (the condenser fills the tank that caps the waterings, so it could have
+moved B6). End-state below-root store: root zone **24.39 kg**, cap **20.75 kg**, main **23.24 kg**. The gap is
++17.5 % (was +19 %), so the fix did not remove it.
+
+| | cap | root zone | main (frozen forms) |
+|---|---|---|---|
+| below-root store, **mean over the run** | **78.70 kg** | **78.80 kg** | 97.91 kg |
+| root zone, mean | 63.80 | 64.30 | 90.76 |
+| condensate, mean | 50.12 | 49.51 | 3.94 |
+| waterings / tank-capped | 22 / 13 | 23 / 12 | 0 / 0 |
+| below-root store at each 305-day chunk's low (kg) | 25.88, 21.12, 24.97, 18.70 | 24.88, 19.68, 23.69, 24.39 | 23.15–23.24 |
+
+**What it says.** Over the run the two supplies keep the same deep store, to 0.1 %. The store swings from
+~20 to ~160 kg within every season: re-sowing and the waterings' losses fill it, and the descending roots
+draw it down. The run ends ~80 days into a new crop, with the roots at 1.27 m of 1.30. So the end value is
+the trough, and the trough's depth depends on when that season's last waterings fell (cap days 1181 and 1204;
+root zone 1196). Within ONE supply, the troughs differ by as much as the two supplies do at the end (cap
+18.70–25.88). **B6 is a snapshot of a cycling store, not a wetter one.** The tank capped about half the
+waterings under both supplies (the "wanted" column is approximate: the deficit to full at the day-before
+depth, over 0.90), so a capping difference does not explain it either. Against main the package does lower
+the deep store's mean by ~20 %: the accepted residual drying of §10f–h, and not new.
+
+**Grade of §13's B6 row:** PARTLY → explained. Nothing in the price changes.
