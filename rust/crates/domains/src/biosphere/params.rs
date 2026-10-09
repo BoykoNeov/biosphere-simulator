@@ -391,10 +391,14 @@ pub struct HumificationParams {
 // identically, so the free N rate was redundant with the carbon one. The N legs therefore
 // take `DecompositionParams` / `MicrobialRespirationParams`.
 
-/// Water-cycle params (condensation + recycling + the humidity the condenser holds).
+/// Water-cycle params (recycling + the humidity the condenser holds).
+///
+/// ⚠ `condensation_rate` was deleted 2026-10-09: its only job was a first-order draw on the
+/// vapour BELOW the setting, which a dehumidifier does not make
+/// (`docs/plans/post-roadmap-chamber-dehumidifier.md`). The condenser now removes exactly the
+/// excess over the setting.
 #[derive(Debug, Clone, Copy)]
 pub struct WaterCycleParams {
-    pub condensation_rate: f64,
     pub recycling_rate: f64,
     /// Fraction of saturation, `(0, 1]` — BVAD's "about 75%" (2026-09-29).
     pub humidity_setpoint: f64,
@@ -1168,16 +1172,17 @@ pub fn water_cycle_from_bounded(
     bounds: Bounds,
 ) -> WaterCycleParams {
     let g = Range { bounds, name };
-    let units: [(&str, &str); 3] = [
-        ("condensation_rate", "1/day"),
+    let units: [(&str, &str); 2] = [
         ("recycling_rate", "1/day"),
         ("humidity_setpoint", "dimensionless"),
     ];
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
-    for field in ["condensation_rate", "recycling_rate"] {
-        g.check(require_non_negative(v[field], field, name));
-    }
+    g.check(require_non_negative(
+        v["recycling_rate"],
+        "recycling_rate",
+        name,
+    ));
     // A fraction of saturation: zero would condense every drop the plants give off, and above
     // one the air would hold more than it can.
     g.check(require_half_open(
@@ -1188,7 +1193,6 @@ pub fn water_cycle_from_bounded(
         name,
     ));
     WaterCycleParams {
-        condensation_rate: v["condensation_rate"],
         recycling_rate: v["recycling_rate"],
         humidity_setpoint: v["humidity_setpoint"],
         // CHAMBER since the Step 3b freeze (2026-10-01): this line moved 9 goldens, water
@@ -1671,7 +1675,6 @@ mod tests {
                 "humi.slow_decomposition_rate",
                 p.humi.slow_decomposition_rate,
             ),
-            ("water.condensation_rate", p.water.condensation_rate),
             ("water.recycling_rate", p.water.recycling_rate),
             ("herb.grazing_rate", p.herb.grazing_rate),
             ("herb.respiration_rate", p.herb.respiration_rate),
@@ -2492,30 +2495,46 @@ parameters:
         );
     }
 
-    /// The two water-cycle rates, and the positivity argument that rests on them.
+    /// The water ring's one rate, and the positivity argument that rests on it.
     ///
-    /// Both are DESIGN values (a ~2-day engineered-condenser turnover), deliberately equal
-    /// so neither half of the ring is the bottleneck. What makes them load-bearing rather
-    /// than decorative is `k·dt < 1`: each first-order draw self-limits against the
+    /// A DESIGN value (a ~2-day condensate-return turnover). What makes it load-bearing
+    /// rather than decorative is `k·dt < 1`: the first-order draw self-limits against the
     /// start-of-step pool, which is why the closed water ring never needs the arbitration
     /// backstop. Asserted at the engine's ACTUAL step, not at 1.0 day.
     /// Mirrors `test_loader_reads_committed_rates`.
+    ///
+    /// ⚠ Until 2026-10-09 this pinned a MATCHED PAIR with `condensation_rate`, deleted with the
+    /// condenser's draw below its setting (`docs/plans/post-roadmap-chamber-dehumidifier.md`).
+    /// The file must not carry it back: an unknown key is refused at the loader.
     #[test]
     fn the_committed_water_cycle_rates_are_the_matched_design_pair() {
         let p = water_cycle();
-        assert_eq!(p.condensation_rate, 0.5);
         assert_eq!(p.recycling_rate, 0.5);
-        assert_eq!(
-            p.condensation_rate, p.recycling_rate,
-            "the two halves of the ring must stay matched"
+        assert!(
+            p.recycling_rate * super::super::BIO_DT < 1.0,
+            "k*dt = {} would let a first-order draw exceed its own pool",
+            p.recycling_rate * super::super::BIO_DT
         );
-        for k in [p.condensation_rate, p.recycling_rate] {
-            assert!(
-                k * super::super::BIO_DT < 1.0,
-                "k*dt = {} would let a first-order draw exceed its own pool",
-                k * super::super::BIO_DT
-            );
-        }
+        assert!(
+            !WATER_CYCLE_YAML.contains("condensation_rate:"),
+            "the deleted condenser rate is back in the file"
+        );
+        let from = "  recycling_rate:\n";
+        assert_eq!(WATER_CYCLE_YAML.matches(from).count(), 1);
+        let revived = Box::leak(
+            WATER_CYCLE_YAML
+                .replace(
+                    from,
+                    "  condensation_rate:\n    value: 0.5\n    unit: \"1/day\"\n  recycling_rate:\n",
+                )
+                .into_boxed_str(),
+        );
+        rejects(
+            || {
+                water_cycle_from(revived, "water_cycle.yaml");
+            },
+            "the deleted condensation_rate key",
+        );
     }
 
     /// A NEGATIVE cycle rate is rejected; a ZERO one is legal, and that asymmetry is a
@@ -2530,27 +2549,22 @@ parameters:
     /// Mirrors `test_loader_rejects_negative_rate`.
     #[test]
     fn a_negative_water_cycle_rate_is_rejected_but_a_zero_one_is_legal() {
-        for field in ["condensation_rate", "recycling_rate"] {
-            let broken = value_of(WATER_CYCLE_YAML, field, "-0.1");
-            rejects(
-                || {
-                    water_cycle_from(broken, "water_cycle.yaml");
-                },
-                &format!("{field} = -0.1"),
-            );
-            // THE LEGAL BOUNDARY: zero is a chamber with no condenser, not a bad file —
-            // the file header's own rule. ⚠ No scenario in the tree declares one (the ring
-            // is built only in the sealed branch, which omits the flows rather than zeroing
-            // them), so this half asserts the GUARD's shape and nothing about the roster.
-            let off = value_of(WATER_CYCLE_YAML, field, "0.0");
-            let loaded = water_cycle_from(off, "water_cycle.yaml");
-            let got = if field == "condensation_rate" {
-                loaded.condensation_rate
-            } else {
-                loaded.recycling_rate
-            };
-            assert_eq!(got, 0.0, "a zero {field} must load, not be rejected");
-        }
+        // One rate since `condensation_rate` was deleted (2026-10-09).
+        let field = "recycling_rate";
+        let broken = value_of(WATER_CYCLE_YAML, field, "-0.1");
+        rejects(
+            || {
+                water_cycle_from(broken, "water_cycle.yaml");
+            },
+            &format!("{field} = -0.1"),
+        );
+        // THE LEGAL BOUNDARY: zero is a chamber with no condensate return, not a bad file —
+        // the file header's own rule. ⚠ No scenario in the tree declares one (the ring
+        // is built only in the sealed branch, which omits the flows rather than zeroing
+        // them), so this half asserts the GUARD's shape and nothing about the roster.
+        let off = value_of(WATER_CYCLE_YAML, field, "0.0");
+        let got = water_cycle_from(off, "water_cycle.yaml").recycling_rate;
+        assert_eq!(got, 0.0, "a zero {field} must load, not be rejected");
     }
 
     /// The humidity the condenser holds is BVAD's *"about 75%"*, and only a fraction of
@@ -2582,18 +2596,19 @@ parameters:
     /// A wrong declared unit on `water_cycle.yaml` is rejected.
     ///
     /// `1/year` is the plausible slip: the same dimension at 365× the scale, so it would
-    /// load a condenser that recovers half the standing vapour per YEAR and still produce
-    /// a run that conserves water perfectly.
+    /// load a ring that returns half the standing condensate per YEAR and still produce
+    /// a run that conserves water perfectly. (Pinned on `condensation_rate` until that key
+    /// was deleted, 2026-10-09; `recycling_rate` is the file's one rate now.)
     /// Mirrors `test_loader_rejects_bad_unit`.
     #[test]
     fn a_wrong_water_cycle_unit_is_rejected() {
-        let from = "  condensation_rate:\n    value: 0.5\n    unit: \"1/day\"";
+        let from = "  recycling_rate:\n    value: 0.5\n    unit: \"1/day\"";
         assert_eq!(WATER_CYCLE_YAML.matches(from).count(), 1);
         let broken = Box::leak(
             WATER_CYCLE_YAML
                 .replace(
                     from,
-                    "  condensation_rate:\n    value: 0.5\n    unit: \"1/year\"",
+                    "  recycling_rate:\n    value: 0.5\n    unit: \"1/year\"",
                 )
                 .into_boxed_str(),
         );
@@ -2601,7 +2616,7 @@ parameters:
             || {
                 water_cycle_from(broken, "water_cycle.yaml");
             },
-            "a condensation rate declared per year",
+            "a recycling rate declared per year",
         );
     }
 

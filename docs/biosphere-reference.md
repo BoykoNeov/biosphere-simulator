@@ -915,6 +915,22 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-09 — the chamber's condenser draws nothing below its humidity setting: 5 goldens here
+  (3 on the station), their `golden_sha256` rows and `water_cycle.yaml`'s digest; one param DELETED
+  (`water.condensation_rate`). Water only; no flow id, flow type, aux key or `simcore` byte changed.**
+  The user's *"Fix the dehumidifier"*. Plan, predictions (committed before the code) and grading:
+  `docs/plans/post-roadmap-chamber-dehumidifier.md`; record `docs/log/chamber-dehumidifier.md`.
+  **The form.** `science::condensed_vapour_kg` was `max(0, v − target) + rate·dt·min(v, target)`; it is
+  now `max(0, v − target)`. The first-order draw below the setting (recorded as a flaw in the 2026-09-29
+  entry and in `water_cycle.yaml`) is gone, and with it the rate, which had no other job: an uncited
+  DESIGN value leaves the model. Sealed transpiration's headroom, the formula's second reader, becomes
+  `max(0, target − v)`. **What moved.** The five chambers only at rounding (≤ 5e-14 relative), as the
+  algebra predicts: where the crop's flux covers the old draw, the condensate's inflow was the flux either
+  way. So the 2026-10-01 entry's "load-bearing on 3.2 % of steps" left no trace at any run's end. No carbon,
+  N, O₂ or energy byte moved; `water_vapor` ends every run unchanged; `season_euler` and `drift_summary`
+  are byte-identical. ⚠ **Scope.** The decisive effect is outside the goldens: a sealed chamber whose crop
+  supplies no vapour (the lab's soil-evaporation work) no longer has its air pumped dry. Advisor-reviewed
+  before code. `git diff rust/crates/simcore/` empty.
 - **2026-10-06 — no tissue is shed from age before anthesis: a FORM change to `Senescence` and
   `NitrogenSenescence`; 7 biosphere goldens move (and 3 station goldens, delegated).**
   `docs/plans/post-roadmap-leaf-shedding.md` §10 (design, predictions and roster, advisor-reviewed

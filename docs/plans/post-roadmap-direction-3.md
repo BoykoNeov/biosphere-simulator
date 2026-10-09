@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `soil-evaporation.md`
+**Re-read against the record's last row:** `chamber-dehumidifier.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -530,6 +530,12 @@ that a leaf-area resistance would move the same water stocks; recorded, not acte
 ⚠ *Re-read 2026-10-07* (`log/soil-evaporation.md`, OPENED, designed, nothing built): grepped this
 plan for soil evaporation, bare soil and evaporation. It carries no such item; this discharges
 nothing and adds nothing to §2 or §3.
+⚠ *Re-read 2026-10-09* (`log/chamber-dehumidifier.md`, ADOPTED, a biosphere unfreeze): grepped this
+plan for condenser, condensation, dehumidifier and humidity. Its only condenser mention is the
+saturation item's history above ("the condenser alone could not" bound the air), which this does not
+touch: the excess over the setting is still removed whole. The plan never carried the below-setting
+draw as an item (it was recorded only in `water_cycle.yaml`), so this discharges nothing and adds
+nothing to §2 or §3.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

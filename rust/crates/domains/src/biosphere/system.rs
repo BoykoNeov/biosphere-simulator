@@ -452,7 +452,6 @@ fn build_atmosphere(
             id: "biosphere.condensation".to_string(),
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
-            condensation_rate: p.water.condensation_rate,
             temp_var: TEMP_VAR.to_string(),
             air_capacity_mol: scenario.chamber_air_capacity_mol,
             humidity_setpoint: p.water.humidity_setpoint,
@@ -940,7 +939,6 @@ fn transpiration_flow(
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
             air_capacity_mol: scenario.chamber_air_capacity_mol,
-            condensation_rate: p.water.condensation_rate,
             humidity_setpoint: p.water.humidity_setpoint,
             vpd_read: p.water.vpd_read,
         }),
@@ -3233,6 +3231,11 @@ mod tests {
         // the old 5 kg charge was ~12× a 1000-mol room's cap and would have all but hidden the
         // vapour leg. Below the target the flux reaches the air first and any remainder
         // condenses, so transpiration may have TWO sinks, air first.
+        //
+        // ⚠ And since 2026-10-09 the condenser draws NOTHING below the target
+        // (docs/plans/post-roadmap-chamber-dehumidifier.md), so one state cannot run all three
+        // flows: `Condensation` is evaluated at a second state whose vapour sits ABOVE the
+        // target (0.9 of saturation), where it draws the excess.
         let resolver = super::super::weather_resolver(&scenario, 1).expect("resolver");
         let temp = resolver.bind(&base, 1.0).get(TEMP_VAR).expect("temp");
         let cap = science::saturation_vapour_kg(temp, scenario.chamber_air_capacity_mol);
@@ -3246,8 +3249,13 @@ mod tests {
         }
         let mut aux = base.aux.clone();
         aux.insert(ROOTED_DEPTH.to_string(), 1.3);
-        let state = State::new(base.n, stocks, base.rng_seed, aux).expect("ring state");
-        let env = resolver.bind(&state, 1.0);
+        let mut humid = stocks.clone();
+        humid.insert(
+            WATER_VAPOR.to_string(),
+            humid[WATER_VAPOR].with_amount(0.9 * cap).unwrap(),
+        );
+        let state = State::new(base.n, stocks, base.rng_seed, aux.clone()).expect("ring state");
+        let humid = State::new(base.n, humid, base.rng_seed, aux).expect("humid ring state");
 
         let expected: [(&str, &str, &[&str]); 3] = [
             (
@@ -3264,7 +3272,9 @@ mod tests {
                 .iter()
                 .find(|f| f.id() == id)
                 .unwrap_or_else(|| panic!("{id} is not in the sealed registry"));
-            let result = flow.evaluate(&state, &env, 1.0).expect("evaluate");
+            let state = if id == "biosphere.condensation" { &humid } else { &state };
+            let env = resolver.bind(state, 1.0);
+            let result = flow.evaluate(state, &env, 1.0).expect("evaluate");
             // WATER only: every touched stock carries WATER and nothing else.
             for leg in &result.legs {
                 let stock = &state.stocks[&leg.stock];

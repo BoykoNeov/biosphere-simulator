@@ -297,17 +297,19 @@ pub fn humidity_target_kg(temp_c: f64, air_capacity_mol: f64, humidity_setpoint:
 /// The vapour (**kg**) a sealed chamber's condenser removes in one step, from `vapour` at the
 /// start of the step against the humidity `target` ([`humidity_target_kg`]).
 ///
-/// `max(0, v − target) + rate·dt·min(v, target)`: the whole excess above the target, plus the
-/// engineered condenser's first-order draw on the remainder. Withdraws at most `v` while
-/// `rate·dt < 1`. ⚠ The first-order draw runs below the target too, which a real dehumidifier
-/// would not; that is a recorded scope line, not a claim.
+/// `max(0, v − target)`: the whole excess above the target, and nothing below it. A
+/// dehumidifier switches off below its setting. ⚠ Until 2026-10-09 this also drew
+/// `water.condensation_rate·dt·min(v, target)` first-order on the vapour BELOW the target,
+/// which emptied the air of a chamber whose crop no longer supplied any
+/// (`docs/plans/post-roadmap-chamber-dehumidifier.md`; the cabin's condenser was fixed for the
+/// same fault on 2026-10-03). The rate went with the term: it had no other job.
 ///
 /// ⚠ **One formula with two readers.** `Condensation` moves this amount, and sealed
-/// transpiration adds it to its headroom so the air ends the step at the target rather than at
-/// `target / (1 + rate·dt)`, a value set by the step size
-/// (`docs/plans/post-roadmap-vapour-step-artefact.md`). Two copies would let one go stale.
-pub fn condensed_vapour_kg(vapour: f64, target: f64, condensation_rate: f64, dt: f64) -> f64 {
-    (vapour - target).max(0.0) + condensation_rate * vapour.min(target) * dt
+/// transpiration adds it to its headroom, so the air ends the step at the target and only the
+/// excess condenses (`docs/plans/post-roadmap-vapour-step-artefact.md`). Two copies would let
+/// one go stale.
+pub fn condensed_vapour_kg(vapour: f64, target: f64) -> f64 {
+    (vapour - target).max(0.0)
 }
 
 /// A chamber's live O₂ in mmol per mol of the chamber's **reference** air fill.

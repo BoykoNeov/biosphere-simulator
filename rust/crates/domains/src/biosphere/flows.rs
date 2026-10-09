@@ -750,7 +750,9 @@ impl Flow for Senescence {
 /// step. So a flux that can fill the room leaves it AT the target at the end of the step, at any
 /// step size. Before 2026-09-29 the target was saturation and the condenser's term was missing,
 /// so the air settled at `cap / (1 + rate·dt)`, 0.889 at `dt = ¼`
-/// (`docs/plans/post-roadmap-vapour-step-artefact.md`).
+/// (`docs/plans/post-roadmap-vapour-step-artefact.md`). Since 2026-10-09 the condenser draws
+/// nothing below the target, so the headroom is `max(0, target − vapour)`
+/// (`docs/plans/post-roadmap-chamber-dehumidifier.md`).
 ///
 /// Measured 2026-09-23: one ¼-day step transpires up to **4.85×** a 1000-mol room's whole
 /// saturation capacity, so the bound cannot live in `Condensation` alone — that flow sees only
@@ -763,9 +765,6 @@ pub struct VapourSaturation {
     pub condensate: String,
     /// The room's reference fill (mol), `chamber_air_capacity_mol`.
     pub air_capacity_mol: f64,
-    /// The condenser's rate (1/day) — the SAME `water.condensation_rate` `Condensation` is
-    /// built from, so the headroom counts what the condenser takes in the same step.
-    pub condensation_rate: f64,
     /// The humidity the condenser holds (fraction of saturation) — the SAME
     /// `water.humidity_setpoint` `Condensation` is built from.
     pub humidity_setpoint: f64,
@@ -1009,7 +1008,7 @@ impl Transpiration {
             ]);
         };
         let temp_c = env.get(&self.temp_var)?;
-        self.sealed_legs(sat, snapshot, temp_c, dt, split.crop + split.soil)
+        self.sealed_legs(sat, snapshot, temp_c, split.crop + split.soil)
     }
 
     /// A sealed chamber's legs for `flux` leaving the root zone: the air takes what the humidity
@@ -1020,7 +1019,6 @@ impl Transpiration {
         sat: &VapourSaturation,
         snapshot: &State,
         temp_c: f64,
-        dt: f64,
         flux: f64,
     ) -> Result<FlowResult, SimError> {
         let target =
@@ -1028,9 +1026,10 @@ impl Transpiration {
         let vapour = amt(snapshot, &sat.water_vapor);
         // The room left at the END of the step: the target, less the vapour now, plus what the
         // condenser takes this step (never negative: above the target the excess is part of
-        // what condenses). Without the condenser's term the air ends at `target − rate·dt·v`,
-        // which settles at `target / (1 + rate·dt)` — a step-size number, not a humidity.
-        let condensed = science::condensed_vapour_kg(vapour, target, sat.condensation_rate, dt);
+        // what condenses). Since 2026-10-09 the condenser takes nothing below the target, so
+        // this is `max(0, target − vapour)`; before, it also counted a first-order draw below
+        // it, without which the air settled at `target / (1 + rate·dt)`.
+        let condensed = science::condensed_vapour_kg(vapour, target);
         let headroom = (target - vapour + condensed).max(0.0);
         let to_air = flux.min(headroom);
         FlowResult::new(vec![
@@ -1104,7 +1103,7 @@ impl Flow for Transpiration {
                 leg(&self.vapor_sink, flux)?,
             ]);
         };
-        self.sealed_legs(sat, snapshot, temp_c, dt, flux)
+        self.sealed_legs(sat, snapshot, temp_c, flux)
     }
 }
 
@@ -1979,18 +1978,18 @@ impl Flow for HumusNitrogenRelease {
 
 /// WATER `water_vapor -> condensate`.
 ///
-/// `max(0, v − target) + rate·dt·min(v, target)` ([`science::condensed_vapour_kg`]): everything
-/// above the humidity target at this step's temperature (a cooler day lowers it), plus the
-/// engineered condenser's first-order draw on the remainder. Withdraws at most `v` while
-/// `rate·dt < 1`. Transpiration's split keeps new vapour at or below the target; this term is
-/// what brings vapour *already* above it back down. The target is `humidity_setpoint` ×
+/// `max(0, v − target)` ([`science::condensed_vapour_kg`]): everything above the humidity
+/// target at this step's temperature (a cooler day lowers it), and nothing below it — a
+/// dehumidifier switches off below its setting. Withdraws at most `v`. Transpiration's split
+/// keeps new vapour at or below the target; this term is what brings vapour *already* above it
+/// back down. ⚠ Until 2026-10-09 it also drew `condensation_rate·dt·min(v, target)` below the
+/// target, which emptied a dead crop's air (`docs/plans/post-roadmap-chamber-dehumidifier.md`). The target is `humidity_setpoint` ×
 /// saturation since 2026-09-29, saturation itself before
 /// (`docs/plans/post-roadmap-vapour-step-artefact.md`).
 pub struct Condensation {
     pub id: String,
     pub water_vapor: String,
     pub condensate: String,
-    pub condensation_rate: f64,
     pub temp_var: String,
     pub air_capacity_mol: f64,
     /// The humidity the condenser holds (fraction of saturation), `water.humidity_setpoint`.
@@ -2008,7 +2007,7 @@ impl Flow for Condensation {
         &self,
         snapshot: &State,
         env: &dyn Environment,
-        dt: f64,
+        _dt: f64,
     ) -> Result<FlowResult, SimError> {
         let vapour = amt(snapshot, &self.water_vapor);
         let target = science::humidity_target_kg(
@@ -2016,7 +2015,7 @@ impl Flow for Condensation {
             self.air_capacity_mol,
             self.humidity_setpoint,
         );
-        let condensed = science::condensed_vapour_kg(vapour, target, self.condensation_rate, dt);
+        let condensed = science::condensed_vapour_kg(vapour, target);
         FlowResult::new(vec![
             leg(&self.water_vapor, -condensed)?,
             leg(&self.condensate, condensed)?,
@@ -3725,50 +3724,53 @@ mod tests {
         assert_eq!(legs[SOIL_WATER], 0.0);
     }
 
-    /// `Condensation` and `Recycling` are first-order in their OWN donor pool — the
-    /// engineered-condenser framing, and the structural positivity that keeps the
-    /// arbitration backstop out of the closed water ring.
+    /// `Recycling` is first-order in its OWN donor pool, and `Condensation` draws only its own
+    /// pool's excess over the humidity setting — the engineered ring, and the structural
+    /// positivity that keeps the arbitration backstop out of it.
     ///
     /// ⚠ Pinned against a hand rate rather than the committed one, so the LAW is the
     /// subject and not the parameter. The before-battery is the reason both halves are
-    /// here: doubling the condensation rate reddened NOTHING in the lib binary, and
-    /// making `Recycling` read `soil_water` instead of `condensate` — a change of donor
+    /// here: making `Recycling` read `soil_water` instead of `condensate` — a change of donor
     /// that stays perfectly balanced — reddened nine tests, every one of them a
     /// compensation-point or chamber gate. A balanced mutation is invisible to
     /// conservation by construction; only the rate law itself can catch it.
-    /// Mirrors `test_condensation_flux_is_first_order_in_vapor`,
-    /// `test_recycling_flux_is_first_order_in_condensate`,
+    /// Mirrors `test_recycling_flux_is_first_order_in_condensate`,
     /// `test_fluxes_are_zero_at_empty_pools` and `test_cycle_flows_are_dt_linear`.
+    ///
+    /// ⚠ **The condenser's first-order half was RETIRED 2026-10-09** (a biosphere unfreeze,
+    /// `docs/plans/post-roadmap-chamber-dehumidifier.md`): `test_condensation_flux_is_first_order_in_vapor`
+    /// pinned a draw on the vapour BELOW the setting, which a dehumidifier does not make and
+    /// which emptied a dead crop's air. Restated here as its opposite: below the setting the
+    /// condenser moves nothing, at any pool and any step; above it, exactly the excess.
     #[test]
-    fn the_two_cycle_flows_are_first_order_in_their_own_donor_pool() {
+    fn the_two_cycle_flows_read_their_own_donor_pool() {
         let cond = Condensation {
             id: "biosphere.condensation".to_string(),
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
-            condensation_rate: 0.5,
             temp_var: "temp".to_string(),
-            // A room so large (≈415 kg of saturation at 20 °C) that every pool below sits
-            // under the cap: this test is the first-order law's, and the above-cap term has
-            // its own test (`vapour_above_saturation_condenses_and_transpiration_stops_at_the_cap`).
+            // A room so large (≈415 kg of saturation at 20 °C) that the small pools below sit
+            // under the setting; the above-setting term has its own test
+            // (`vapour_above_saturation_condenses_and_transpiration_stops_at_the_cap`).
             air_capacity_mol: 1.0e6,
             humidity_setpoint: 0.75,
         };
+        let target = science::humidity_target_kg(20.0, 1.0e6, 0.75);
         let rec = Recycling {
             id: "biosphere.recycling".to_string(),
             condensate: CONDENSATE.to_string(),
             soil_water: SOIL_WATER.to_string(),
             recycling_rate: 0.5,
         };
-        // k = 0.5 per day: half the standing pool per day, linear in the pool.
+        // Recycling, k = 0.5 per day: half the standing pool per day, linear in the pool.
+        // Condensation below the setting: nothing, at either pool and either step.
         for (vapor, condensate) in [(2.0, 2.0), (4.0, 4.0)] {
             let s = water_only_state(100.0, TEST_DEPTH, vapor, condensate);
-            let c = water_legs(&cond, &s, 200.0, 0.0, 1.0);
-            assert!(
-                (c[CONDENSATE] - 0.5 * vapor).abs() <= 1e-12 * vapor,
-                "condensation {} != 0.5 x {vapor}",
-                c[CONDENSATE]
-            );
-            assert_eq!(c[WATER_VAPOR], -c[CONDENSATE], "condensation is unbalanced");
+            for dt in [1.0, 0.0625] {
+                let c = water_legs(&cond, &s, 200.0, 0.0, dt);
+                assert_eq!(c[CONDENSATE], 0.0, "v={vapor} dt={dt}: drew below the setting");
+                assert_eq!(c[WATER_VAPOR], 0.0, "v={vapor} dt={dt}: drew below the setting");
+            }
             let r = water_legs(&rec, &s, 200.0, 0.0, 1.0);
             assert!(
                 (r[SOIL_WATER] - 0.5 * condensate).abs() <= 1e-12 * condensate,
@@ -3777,25 +3779,28 @@ mod tests {
             );
             assert_eq!(r[CONDENSATE], -r[SOIL_WATER], "recycling is unbalanced");
         }
+        // Above the setting, exactly the excess, from the vapour pool (a full condensate pool
+        // beside it changes nothing), balanced.
+        for condensate in [0.0, 50.0] {
+            let s = water_only_state(100.0, TEST_DEPTH, target + 3.0, condensate);
+            let c = water_legs(&cond, &s, 200.0, 0.0, 1.0);
+            assert!((c[CONDENSATE] - 3.0).abs() <= 1e-12 * target, "excess {}", c[CONDENSATE]);
+            assert_eq!(c[WATER_VAPOR], -c[CONDENSATE], "condensation is unbalanced");
+        }
         // ⚠ EACH READS ITS OWN DONOR. With a full 100 kg root zone and an empty
         // condensate pool, `Recycling` must move NOTHING — the mutation that reads
         // `soil_water` instead would move 50 kg here and still balance perfectly.
         let s = water_only_state(100.0, TEST_DEPTH, 6.0, 0.0);
         assert_eq!(water_legs(&rec, &s, 200.0, 0.0, 1.0)[SOIL_WATER], 0.0);
-        // ...and symmetrically for condensation against an empty vapour pool.
+        // ...and condensation against an empty vapour pool beside a full condensate one.
         let s = water_only_state(100.0, TEST_DEPTH, 0.0, 6.0);
         assert_eq!(water_legs(&cond, &s, 200.0, 0.0, 1.0)[CONDENSATE], 0.0);
         // Self-limiting: no standing pool, no flux, so positivity is structural.
         let empty = water_only_state(0.0, TEST_DEPTH, 0.0, 0.0);
         assert_eq!(water_legs(&cond, &empty, 200.0, 0.0, 1.0)[CONDENSATE], 0.0);
         assert_eq!(water_legs(&rec, &empty, 200.0, 0.0, 1.0)[SOIL_WATER], 0.0);
-        // dt-linear BELOW the saturation cap (every pool here is below it). Above the cap the
-        // excess is removed whole, a per-step amount, not a rate — see the saturation test.
+        // Recycling is dt-linear. (The condenser's excess is a per-step amount, not a rate.)
         let s = water_only_state(100.0, TEST_DEPTH, 4.0, 4.0);
-        assert_eq!(
-            water_legs(&cond, &s, 200.0, 0.0, 0.5)[CONDENSATE],
-            0.5 * water_legs(&cond, &s, 200.0, 0.0, 1.0)[CONDENSATE]
-        );
         assert_eq!(
             water_legs(&rec, &s, 200.0, 0.0, 0.5)[SOIL_WATER],
             0.5 * water_legs(&rec, &s, 200.0, 0.0, 1.0)[SOIL_WATER]
@@ -3870,10 +3875,14 @@ mod tests {
     /// * transpiration sends the air only its headroom and the rest to condensate — the same
     ///   flux, split, never a negative vapour leg;
     /// * the headroom is the room left at the END of the step: `target − v` plus what the
-    ///   condenser takes this step, so at or above the target the air gets exactly the
-    ///   condenser's draw (before 2026-09-29 it got nothing, and the air settled below the cap
-    ///   by a step-size factor — `docs/plans/post-roadmap-vapour-step-artefact.md`);
-    /// * condensation removes the whole excess plus the first-order draw on the target.
+    ///   condenser takes this step, so below the target the air fills to it and at or above it
+    ///   the air gets nothing;
+    /// * condensation removes the whole excess, and nothing below the target.
+    ///
+    /// ⚠ Restated 2026-10-09 (`docs/plans/post-roadmap-chamber-dehumidifier.md`): until then
+    /// the condenser also drew `rate·dt·min(v, target)` below the target and the headroom
+    /// counted it, so the air got `target − v + rate·v` below the target and `rate·target`
+    /// above it.
     ///
     /// The target is the humidity setting (0.75, the committed value) times the cap, written
     /// out by hand here rather than read back from `science::humidity_target_kg`.
@@ -3898,7 +3907,6 @@ mod tests {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
                 air_capacity_mol: ROOM_MOL,
-                condensation_rate: 0.5,
                 humidity_setpoint: 0.75,
                 // The subject is the SPLIT of one flux, taken from the open flow below; reading
                 // the weather's deficit keeps the sealed flux equal to it. The chamber reading
@@ -3922,14 +3930,9 @@ mod tests {
         for vapour in [0.0, 0.25 * cap, target, cap, 3.0 * cap] {
             let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
             let legs = water_legs(&sealed, &s, 200.0, 0.0, 1.0);
-            // By hand, dt = 1, rate 0.5: below the target the air lacks `target − v` and the
-            // condenser frees `0.5·v`; above it the excess condenses whole and the condenser
-            // frees `0.5·target`.
-            let to_air = if vapour <= target {
-                target - vapour + 0.5 * vapour
-            } else {
-                0.5 * target
-            };
+            // By hand: below the target the air lacks `target − v`; at or above it the excess
+            // condenses whole and the air has no room.
+            let to_air = (target - vapour).max(0.0);
             assert_eq!(
                 legs[SOIL_WATER], -flux,
                 "the split must not change the flux"
@@ -3947,7 +3950,6 @@ mod tests {
             id: "biosphere.condensation".to_string(),
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
-            condensation_rate: 0.5,
             temp_var: "temp".to_string(),
             air_capacity_mol: ROOM_MOL,
             humidity_setpoint: 0.75,
@@ -3957,13 +3959,15 @@ mod tests {
             (3.0 * cap, 1.0),
             (0.9 * cap, 0.25),
             (0.5 * cap, 0.25),
+            (0.5 * cap, 1.0),
+            (target, 1.0),
         ];
         for (vapour, dt) in cases {
             let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
             let got = water_legs(&cond, &s, 200.0, 0.0, dt)[CONDENSATE];
-            let want = (vapour - target).max(0.0) + 0.5 * vapour.min(target) * dt;
+            let want = (vapour - target).max(0.0);
             assert!(
-                (got - want).abs() <= 1e-12 * want,
+                (got - want).abs() <= 1e-12 * target,
                 "v={vapour} dt={dt}: {got} vs {want}"
             );
             assert!(
@@ -3971,8 +3975,13 @@ mod tests {
                 "condensation withdrew more vapour than there is"
             );
             assert!(
-                vapour - got <= target,
+                vapour - got <= target * (1.0 + 1e-12),
                 "vapour left above the target: {}",
+                vapour - got
+            );
+            assert!(
+                vapour - got >= vapour.min(target) * (1.0 - 1e-12),
+                "condensation drew below the target: {} left of {vapour}",
                 vapour - got
             );
         }
@@ -3997,7 +4006,6 @@ mod tests {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
                 air_capacity_mol: ROOM_MOL,
-                condensation_rate: 0.5,
                 humidity_setpoint: 0.75,
                 vpd_read: read,
             }),
@@ -4044,7 +4052,10 @@ mod tests {
     /// `target − rate·dt·v`, which settles at `target / (1 + rate·dt)`. With saturation as the
     /// target (the model then) that was 0.889 at `dt = ¼` and 0.941 at `dt = ⅛`, and the
     /// chambers' humidity was measured at 0.8890–0.8903, so the number was the step's, not the
-    /// chamber's (`docs/plans/post-roadmap-vapour-step-artefact.md`).
+    /// chamber's (`docs/plans/post-roadmap-vapour-step-artefact.md`). Since 2026-10-09 the
+    /// condenser draws nothing below the target, so no step-size fixed point exists to fall
+    /// into; the old one's value (`target / (1 + 0.5·dt)`) stays among the starting points
+    /// (`docs/plans/post-roadmap-chamber-dehumidifier.md`).
     ///
     /// Evaluated through the real flow objects at one state and summed, which is what one
     /// Euler step does to the vapour pool, from below the target, at the old fixed point, at
@@ -4054,7 +4065,8 @@ mod tests {
     #[test]
     fn the_air_ends_a_filling_step_at_the_cap_at_any_step_size() {
         const ROOM_MOL: f64 = 1000.0;
-        const RATE: f64 = 0.5;
+        // The retired condenser rate, kept only to place the old fixed point among the starts.
+        const OLD_RATE: f64 = 0.5;
         const SETPOINT: f64 = 0.75;
         let target = SETPOINT * science::saturation_vapour_kg(20.0, ROOM_MOL);
         let sealed = Transpiration {
@@ -4065,7 +4077,6 @@ mod tests {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
                 air_capacity_mol: ROOM_MOL,
-                condensation_rate: RATE,
                 humidity_setpoint: SETPOINT,
                 // The subject is where a filling step ENDS; the weather's deficit keeps the
                 // flux the fixture's, whatever the vapour (the chamber reading would shrink it
@@ -4078,14 +4089,13 @@ mod tests {
             id: "biosphere.condensation".to_string(),
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
-            condensation_rate: RATE,
             temp_var: "temp".to_string(),
             air_capacity_mol: ROOM_MOL,
             humidity_setpoint: SETPOINT,
         };
         let full = science::transpirable_capacity(TEST_DEPTH, EXTR, 2.0);
         for dt in [0.25, 0.125] {
-            let stale = target / (1.0 + RATE * dt);
+            let stale = target / (1.0 + OLD_RATE * dt);
             let saturated = target / SETPOINT;
             for vapour in [0.0, 0.5 * target, stale, target, saturated, 3.0 * target] {
                 let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
@@ -4100,9 +4110,8 @@ mod tests {
                 assert!(
                     (end - target).abs() <= 1e-12 * target,
                     "dt={dt}: from {vapour} kg the step ended at {end} kg, not the target \
-                     {target} kg ({:.4} of it; the step-size fixed point is {:.4})",
-                    end / target,
-                    1.0 / (1.0 + RATE * dt)
+                     {target} kg ({:.4} of it)",
+                    end / target
                 );
             }
         }

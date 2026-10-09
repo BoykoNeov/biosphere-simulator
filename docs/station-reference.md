@@ -358,6 +358,13 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-09 — the biosphere's chamber condenser draws nothing below its setting, delegated: 3
+  station goldens move (`greenhouse`, `harvest`, `sealed_station`) and their 3 `golden_sha256` rows
+  follow. No station flow, param, seam or claim changed.** The biosphere entry of the same date has the
+  form; plan `docs/plans/post-roadmap-chamber-dehumidifier.md`. `greenhouse` / `harvest`: condensate
+  −0.25 %, soil +0.04 % / +0.007 %; `sealed_station` only at ~1e-9. Water only. `lighting` was predicted to
+  move and is byte-identical (not traced). The cabin's own condenser (2026-10-03) is a different one-sided
+  form and is untouched; `cabin_gas`, `eclss` and `water_recovery` are byte-identical.
 - **2026-10-06 — the crop is re-sown when it MATURES, slice 4 stage 2: 1 golden moves
   (`sealed_station`).** `docs/plans/post-roadmap-room-temperature.md` §25f (predictions,
   committed before code) and §25g (graded). The sealed re-sow hook fires on the first master-day

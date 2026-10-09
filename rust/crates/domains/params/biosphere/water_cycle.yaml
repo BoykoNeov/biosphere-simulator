@@ -1,5 +1,10 @@
 # chamber — water cycle closure (condensation + recycling) params
-# Currency/units: WATER (kg). This file groups the TWO first-order rates (1/day) that
+# ⚠ SINCE 2026-10-09 THE FILE HOLDS ONE RATE, NOT TWO (docs/plans/post-roadmap-chamber-dehumidifier.md).
+#   condensation_rate was DELETED: its only remaining job was a first-order draw on the vapour
+#   BELOW the humidity setting, which a dehumidifier does not make and which emptied the air of a
+#   chamber whose crop no longer supplied any. The condenser now removes exactly the excess over
+#   humidity_setpoint and nothing below it. The history below describes the rate as it was.
+# Currency/units: WATER (kg). This file grouped the TWO first-order rates (1/day) that
 #   close the chamber's water cycle — the one cycle Phase 1/2 left open (transpiration
 #   drained soil_water to a vapor_sink BOUNDARY; irrigation refilled it from a
 #   water_source BOUNDARY). With the plants-owned Transpiration (retargeted to the
@@ -46,6 +51,7 @@
 #       entry — a number set by the step size, not by the chamber.
 #   So condensation_rate is now the condenser's draw below the SETTING. ⚠ It still runs below
 #   the setting, which a real dehumidifier would not; recorded, not changed.
+#   ⚠ CHANGED 2026-10-09: the draw below the setting and its rate are gone (header above).
 #
 # Sizing discipline (the Step-3 linchpin). The rates are chosen large enough that the
 #   in-flight water (water_vapor + condensate ≈ T/k_cond + T/k_rec, T = transpiration
@@ -67,7 +73,8 @@
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
-#   condensation_rate and recycling_rate are DESIGN choices; humidity_setpoint is cited ([C]).
+#   recycling_rate is a DESIGN choice (condensation_rate was one too, deleted 2026-10-09);
+#   humidity_setpoint is cited ([C]).
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
 #   Both TODO(cite) tags discharged as DESIGN. [A]/[B] establish that an engineered
@@ -100,14 +107,10 @@ name: chamber
 process: water_cycle
 
 parameters:
-  condensation_rate:
-    value: 0.5
-    unit: "1/day"
-    source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day engineered-condenser turnover, fast enough that the closed water ring visibly closes on a season-scale run. No source can fix it — this is the condenser of a FICTIONAL sealed chamber, and a real unit's rate follows from its coolant temperature, airflow and surface area. Since 2026-09-23 it applies only to vapour BELOW saturation; the excess above the saturation ceiling condenses whole (docs/plans/post-roadmap-vapour-saturation.md). Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."
   recycling_rate:
     value: 0.5
     unit: "1/day"
-    source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day condensate-return turnover, deliberately matched to condensation_rate so neither half of the ring is the bottleneck. No source can fix a plumbing cadence we invented for a fictional chamber. Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."
+    source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day condensate-return turnover, matched to the condenser's former condensation_rate (deleted 2026-10-09, when the condenser stopped drawing below its setting) so neither half of the ring was the bottleneck. No source can fix a plumbing cadence we invented for a fictional chamber. Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."
   humidity_setpoint:
     value: 0.75
     unit: "dimensionless"

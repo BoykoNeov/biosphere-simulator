@@ -121,9 +121,11 @@ fn scrub_flux(cabin_co2: f64, co2_scrub_rate: f64) -> f64 {
 /// One-sided: a condensing heat exchanger dries the air above its setpoint and cannot humidify
 /// it below. ⚠ Until 2026-10-03 this was `k_cond · cabin_h2o`, first-order on ALL the cabin's
 /// vapour, which held every cabin at `P/k` ≈ 1.5 % relative humidity
-/// (`docs/plans/post-roadmap-room-temperature.md` §15). Do not "simplify" it to the biosphere's
-/// `science::condensed_vapour_kg`: that draws first-order below its target too, which is the
-/// same bug.
+/// (`docs/plans/post-roadmap-room-temperature.md` §15). Not the biosphere's
+/// `science::condensed_vapour_kg` either: that drew first-order below its target too (the same
+/// bug) until 2026-10-09, and now removes the whole excess in one step, where this cabin draws
+/// it first-order. Two different one-sided forms, on purpose
+/// (`docs/plans/post-roadmap-chamber-dehumidifier.md`).
 fn condense_flux(cabin_h2o: f64, condense_rate: f64, humidity_setpoint: f64) -> f64 {
     condense_rate * (cabin_h2o - humidity_setpoint).max(0.0)
 }
