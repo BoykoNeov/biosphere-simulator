@@ -82,7 +82,7 @@ goldens regenerated (`regen_goldens --write`), both manifests rewritten. Logs: `
 
 | | predicted | measured | grade |
 |---|---|---|---|
-| D1 | 9 goldens move, 12 identical | **8 move**: the five biosphere chambers, `greenhouse`, `harvest`, `sealed_station`. **`lighting` is byte-identical**: in that run the crop's flux apparently always covered the old draw. Not traced. The other 12 identical as predicted (`cabin_gas`, `eclss`, `season_euler`, both drift summaries among them). | MISSED by one |
+| D1 | 9 goldens move, 12 identical | **8 move**: the five biosphere chambers, `greenhouse`, `harvest`, `sealed_station`. **`lighting` is byte-identical.** Its lamp is off 8 h a day (16 h photoperiod), so a dark period exists; why the old draw left no trace there was **not traced**. The other 12 identical as predicted (`cabin_gas`, `eclss`, `season_euler`, both drift summaries among them). | MISSED by one |
 | D2 | water only | water only: `condensate`, `soil_water`, `subsoil_water`. No carbon, N, O₂, energy, temperature, root-depth or development byte moved. `water_vapor` ends every run exactly where it did (at the target). | HELD |
 | D3 | soil wetter or equal, condensate lower or equal; under 1 % | **Size HELD:** the five biosphere chambers move only at rounding (≤ 5e-14 relative). `greenhouse` / `harvest` (7 days): condensate **−0.25 %**, soil **+0.04 % / +0.007 %**. `sealed_station`: soil −4e-10, below-root +2.8e-9, condensate −1e-13. **Direction:** held where anything moved materially. `sealed_station`'s soil is the wrong sign, but at 4e-10, which is noise-scale. | HELD in size; direction where material |
 | D4 | `water_cycle.yaml`'s digest + 5 + 4 `golden_sha256` rows | digest + **5** (biosphere) + **3** (station; `lighting` did not move). Nothing else. | HELD (with D1's correction) |
@@ -104,3 +104,14 @@ was restated as above.
 
 **Owed:** §13 of `post-roadmap-soil-evaporation.md` is stale for the sealed rows; step 1 (B6) runs on the
 rebased branch.
+
+**Corrections after the build (advisor, 2026-10-09):**
+* §2's warning that S4 "may stop telling the two soil supplies apart" was wrong, and D6's reasoning was
+  right. Under the cap, the dead air falls only when a cooler step lowers the setting and is never
+  refilled, so it ends at 0.704 and still fails.
+* The claim census still mapped `test_condensation_flux_is_first_order_in_vapor` as `ported` to a test
+  that now asserts the opposite. Moved to `retired-subject` with a dated header note. The six recycling
+  rows beside it stay `ported`. The census pins no per-disposition count except `open`, so no literal moved.
+* Prose outside the crates was grepped (`docs/` live sections, `godot/`, `scenarios/`, the param
+  conventions): nothing describes the old draw except dated entries, which stay as written. One code
+  comment in `system.rs` (the ring's positivity) was updated.

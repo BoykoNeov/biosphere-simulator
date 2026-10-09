@@ -48,6 +48,11 @@
 #   retired-subject the subject existed in the reference and was DELETED
 #   python-only     the subject is the Python tree itself; it dies with it
 #   open            no successor and no decision -- a gap, carried forward
+#
+# AMENDED 2026-10-09 (a biosphere unfreeze, docs/plans/post-roadmap-chamber-dehumidifier.md):
+# test_condensation_flux_is_first_order_in_vapor moved ported -> retired-subject. The condenser's
+# first-order draw below its humidity setting was DELETED; its named successor now asserts the
+# opposite (nothing below the setting). The six recycling rows beside it stay ported.
 P	test_photosynthesis.py	test_rubisco_limited_rate_known_value	ported	docstring	rubisco_limited_rate_is_the_hand_computed_fvcb_value
 P	test_photosynthesis.py	test_electron_transport_rate_known_value	ported	S6	electron_transport_is_the_smaller_root_and_saturates_below_jmax
 P	test_photosynthesis.py	test_electron_transport_zero_par_is_zero	ported	S6	electron_transport_is_the_smaller_root_and_saturates_below_jmax
@@ -212,7 +217,7 @@ P	test_soil_layers.py	test_drought_declares_a_stratified_profile_deliberately	fo
 P	test_soil_layers.py	test_every_scenarios_water_stores_are_geometric	open	S6	-
 P	test_soil_layers.py	test_the_roster_this_covers_is_not_empty_and_includes_the_station	folded	§5ag	a_dry_below_root_store_stops_extension_for_the_whole_season
 P	test_soil_layers.py	test_the_harvest_injection_keeps_depth_and_water_together	open	S6	-
-P	test_water_cycle.py	test_condensation_flux_is_first_order_in_vapor	ported	docstring	the_two_cycle_flows_read_their_own_donor_pool
+P	test_water_cycle.py	test_condensation_flux_is_first_order_in_vapor	retired-subject	dehumidifier-2026-10-09	the_two_cycle_flows_read_their_own_donor_pool
 P	test_water_cycle.py	test_recycling_flux_is_first_order_in_condensate	ported	docstring	the_two_cycle_flows_read_their_own_donor_pool
 P	test_water_cycle.py	test_fluxes_are_zero_at_empty_pools	ported	docstring	the_two_cycle_flows_read_their_own_donor_pool
 P	test_water_cycle.py	test_condensation_transfers_vapor_to_condensate	ported	S6	the_two_cycle_flows_read_their_own_donor_pool

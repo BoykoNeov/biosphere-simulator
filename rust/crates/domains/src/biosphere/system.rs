@@ -3355,8 +3355,9 @@ mod tests {
             &mut observe,
         )
         .expect("sealed season");
-        // Structural positivity through the ring: each first-order draw self-limits
-        // against the start-of-step pool, so the Euler backstop never fires.
+        // Structural positivity through the ring: each draw self-limits against the
+        // start-of-step pool (recycling first-order; the condenser, since 2026-10-09, only the
+        // excess over its setting), so the Euler backstop never fires.
         assert_eq!(rationed, 0, "the closed water ring needed the backstop");
         // CONSERVED. `soil_water` is O(1e2-1e3) kg, so the band is absolute rather than
         // relative — the float-subtraction noise of the large pool.
