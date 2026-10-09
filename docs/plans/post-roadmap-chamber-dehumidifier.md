@@ -115,3 +115,6 @@ rebased branch.
 * Prose outside the crates was grepped (`docs/` live sections, `godot/`, `scenarios/`, the param
   conventions): nothing describes the old draw except dated entries, which stay as written. One code
   comment in `system.rs` (the ring's positivity) was updated.
+* **Linux CI on `750783f`: green** (run 37873021869: `cargo test`, the ignored expensive sealed-station golden
+  and band, `clippy -D warnings`). The cross-port bands hold on Linux for all 8 moved goldens. Log:
+  `W:\temp\claude\dehumidifier\ci.log` (kept at `sources\temp-evidence\dehumidifier\`).
