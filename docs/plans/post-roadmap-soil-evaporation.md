@@ -1014,3 +1014,42 @@ build-time departure (§12), the root-zone supply is the cited program.
 **Still owed whichever is chosen:** the §11d design item (the plain re-sow must reset the soil values from the
 one frozen param load), the reds' restatements, the ceremony list after §11d, and the unmeasured cross-port
 bands (a Linux CI push). The book's `DYSE = 1` start (§12) stays its own item, not folded in.
+
+## 14. DECIDED: the whole root zone supplies the soil's evaporation (the user, 2026-10-09)
+
+**The user:** *"Strive for what is closer to reality."* Asked which supply an adoption carries (§13), this
+picks **`SoilSupply::RootZone`**, the book's program.
+
+**Why it is the closer one, physically (not only "the book's"):** once a real soil's surface dries,
+evaporation does not stop. It slows, because water keeps moving up from the moist soil under the dry
+crust, and Stage II's √-time decline is the book's description of exactly that supply from below. The
+top-layer cap stops evaporation dead the moment a 150 mm *bookkeeping* account reaches zero while the
+soil beneath it is still ~63 % full (§12c's probe). No physical process does that. Here the cited program
+and physical realism point the same way.
+
+**What this decision is NOT:** it is not the go-ahead to adopt. Regenerating goldens and manifests,
+restating the 26 reds, the param-file ceremony and the Linux CI push for the cross-port bands all
+wait for the user's explicit go (advisor, 2026-10-09). "Closer to reality" is a rule for choosing between
+forms. It does not waive the unfreeze ceremony.
+
+**Not decided by this principle:**
+
+* **The book's `DYSE = 1` start (§12).** Neither start is shown to be more realistic. It is one
+  convention against another, so it stays its own item.
+* **A realism lead found while recording this, not acted on:** the sealed chamber's condenser keeps
+  drawing vapour out *below* its humidity setting (`science::condensed_vapour_kg`:
+  `(v − target)⁺ + rate · min(v, target) · dt`). `water_cycle.yaml` already records that *"a real
+  dehumidifier would not; recorded, not changed."* That draw, not the soil, may be what pulls the
+  never-re-sown chamber's dead-phase air down to ~4 % of its target (§12c) while the soil below is
+  still moist. If so, the success test S4 that "still fails" is partly a condenser artefact, and
+  reading it as a mark against either supply would be wrong. The condenser is frozen science (every
+  sealed golden), so this would be its own unfreeze item, the user's call. It is not folded into this
+  adoption.
+
+**Owed next, in order:**
+
+1. Trace B6 (§13a): the sealed station's below-root store ends 19 % wetter under this supply. This is
+   read-only: when the waterings fell, where the drained water landed. Do it before any golden moves.
+2. The old cap's fate (ceremony item 2): keep `TopLayer` as a lab switch (the four instrument tests
+   pin it) or retire it.
+3. Then the adoption list of §11d/§13, on the user's go.

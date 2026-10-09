@@ -135,3 +135,9 @@ byte for byte), then the book's supply in the loader:
   0.25); the 7-day station chambers' air 1.1–1.2 kg against 0.5–0.7 (frozen 1.9). More soil water used in the
   open field (soil evaporation 33.6 → 45.9 kg).
 * The choice is the user's; the recommendation is the book's supply (cited; the cap was ours).
+
+**DECIDED 2026-10-09: the whole root zone supplies the soil's evaporation** (plan §14; the user: *"Strive for
+what is closer to reality"*). A drying surface keeps evaporating, more slowly, from the moist soil beneath it;
+the cap stopped it dead at an empty bookkeeping layer. Not yet the go-ahead to adopt. Owed first: trace why the
+sealed station's below-root store ends 19 % wetter. Logged as a separate realism lead: the condenser draws
+vapour below its humidity setting, which a real dehumidifier would not, and may be what dries the dead chamber's air.
