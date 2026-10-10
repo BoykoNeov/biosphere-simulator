@@ -25,7 +25,12 @@ const THIS_FILE: &str = include_str!("golden_regression.rs");
 /// failure mode it exists to catch.
 const DOMAINS_FILE: &str = include_str!("../../domains/tests/golden_regression.rs");
 
-/// The workflow, so the CI step that runs the ignored test is itself guarded.
+/// The always-loaded project instructions, so the command that runs the ignored tests is
+/// itself guarded. Until 2026-10-10 this was `.github/workflows/ci.yml` and its
+/// `cargo test -- --ignored` step; the user deleted the CI job that ran the reference's tests
+/// ("I don't care about Linux"), so the run's only owner is now the line in CLAUDE.md's
+/// Commands that tells whoever finishes a piece of work to type it. A check became a habit;
+/// this pins the habit's instruction, which is all a test can do.
 ///
 /// ⚠⚠ **This exists because the first draft claimed it could not.** The comment on
 /// `the_ignored_set_is_exactly_the_expensive_roster` said *"nothing inside the suite can
@@ -34,7 +39,7 @@ const DOMAINS_FILE: &str = include_str!("../../domains/tests/golden_regression.r
 /// a recorded bound, both for exactly this reason (a check the type system cannot make).
 /// A deleted CI step does not fail anything; it silently stops running the only gate on the
 /// largest assembly in the repo. So the step is pinned textually here.
-const CI_WORKFLOW: &str = include_str!("../../../../.github/workflows/ci.yml");
+const CLAUDE_MD: &str = include_str!("../../../../CLAUDE.md");
 
 fn check(golden: &Golden) {
     let produced = (golden.run)();
@@ -70,16 +75,20 @@ fn every_cheap_station_golden_is_still_this_reference_s_output() {
 /// ⚠⚠ **`#[ignore]`d, and the cost is the run rather than the build.** Measured
 /// 2026-08-19: 378 s at the stock dev profile, 116 s at `opt-level = 2`, 93 s in release.
 /// So no build knob buys this back and the choice was between paying it on every
-/// `cargo test` and paying it in CI. CI runs it (`cargo test -- --ignored`); the control
-/// below is what stops `#[ignore]` from spreading quietly to anything else.
+/// `cargo test` and paying it in CI. CI ran it (`cargo test -- --ignored`) until the job was
+/// deleted on 2026-10-10; it is now run by hand, by the CLAUDE.md line pinned below. The
+/// control below is what stops `#[ignore]` from spreading quietly to anything else.
 ///
 /// ⚠⚠⚠ **KNOWN CONSEQUENCE, and it is an INTERACTION neither decision names on its own:
 /// this golden's BYTE-exactness is checked by nothing automatic.** Trace it:
 ///
 /// * on Windows — the generation platform, the only place its bytes are meaningful — it is
 ///   `#[ignore]`d, so `cargo test` skips it;
-/// * on CI it runs, but CI is Linux, so `compare` finds unequal bytes and routes to the
-///   **structural** branch, which passes.
+/// * on CI it ran, but CI was Linux, so `compare` found unequal bytes and routed to the
+///   **structural** branch, which passed.
+///
+/// ⚠ Since 2026-10-10 there is no CI run at all, so not even the structural check is
+/// automatic: the whole golden is checked only when `cargo test -- --ignored` is typed.
 ///
 /// So byte-exactness for the largest assembly in the repo happens only when a human types
 /// `cargo test -- --ignored` **on Windows**. Structural equality is checked automatically,
@@ -94,7 +103,7 @@ fn every_cheap_station_golden_is_still_this_reference_s_output() {
 /// like-for-like successor. The remedies, neither taken here: un-ignore and pay ~100 s on
 /// every `cargo test`, or add a Windows CI runner.
 #[test]
-#[ignore = "~100s: 1.3M sub-steps over five domains. CI runs it via `cargo test -- --ignored`"]
+#[ignore = "~100s: 1.3M sub-steps over five domains. Run by hand: `cargo test -- --ignored`"]
 fn the_sealed_station_golden_is_still_this_reference_s_output() {
     let golden = STATION
         .iter()
@@ -117,7 +126,7 @@ fn the_sealed_station_golden_is_still_this_reference_s_output() {
 /// `Expensive` golden nobody wrote a test for is red. The census reads **both**
 /// golden-regression files, so a skip added on the `domains` side is not invisible here.
 ///
-/// ⚠ The companion [`ci_still_runs_the_ignored_tests`] guards the direction this comment
+/// ⚠ The companion [`the_ignored_tests_still_have_a_named_run`] guards the direction this comment
 /// once claimed was unguardable — *"nothing inside the suite can guard this line"*. That
 /// was false by this repo's own idiom (`manifest_writer.rs` greps the writer's source;
 /// `science_gates` greps a file for a recorded bound), and it is corrected here rather
@@ -133,7 +142,7 @@ fn the_ignored_set_is_exactly_the_expensive_roster() {
         expensive,
         vec!["sealed_station_state.json"],
         "the expensive roster moved. Every `Cost::Expensive` golden needs its own \
-         `#[ignore]`d test here AND a CI step that runs it, or it is checked nowhere."
+         `#[ignore]`d test here AND a named command that runs it, or it is checked nowhere."
     );
 
     // ⚠ Anchored on the *attribute*, not on the bare string. The first draft counted
@@ -162,42 +171,31 @@ fn the_ignored_set_is_exactly_the_expensive_roster() {
     );
 }
 
-/// ⚠⚠ The other half of the `#[ignore]` discipline: **CI must still run it.**
+/// ⚠⚠ The other half of the `#[ignore]` discipline: **something must still run it.**
 ///
 /// The roster control above guards one direction (a skip appearing without a measured
 /// cost). This guards the other, and it is the one that actually loses coverage: an
-/// `#[ignore]`d test that nothing runs anywhere is not a slow gate, it is **no gate**, and
-/// deleting the workflow step fails nothing. A malformed workflow is worse still — GitHub
-/// silently does not run it, which is this repo's two recorded green-by-skip incidents in
-/// their purest form.
+/// `#[ignore]`d test that nothing runs anywhere is not a slow gate, it is **no gate**.
 ///
-/// Crude on purpose, and with the same standing as `manifest_writer.rs`'s source greps: it
-/// cannot check that CI is *green*, only that the step is still spelled in the file.
+/// ⚠ Until 2026-10-10 this was `ci_still_runs_the_ignored_tests` and read the CI workflow.
+/// The user deleted the CI job that ran the reference's tests, so the run's owner is now the
+/// instruction in CLAUDE.md's Commands section, and that is what is pinned. ⚠ Weaker, said
+/// plainly: CI ran the step on every push; an instruction runs only when it is followed.
+/// Crude on purpose, with the same standing as `manifest_writer.rs`'s source greps: it cannot
+/// check that anyone typed the command, only that the instruction to type it still exists.
 #[test]
-fn ci_still_runs_the_ignored_tests() {
+fn the_ignored_tests_still_have_a_named_run() {
+    // ⚠ The control on the anchor: the command must sit in the Commands section, not anywhere
+    // in the file — a mention in some other section's prose would pass while no instruction
+    // tells anyone to run it. Same lesson as the `#[ignore]` count in this file.
+    let commands = CLAUDE_MD
+        .split("
+## ")
+        .find(|s| s.starts_with("Commands"))
+        .expect("CLAUDE.md has a `## Commands` section");
     assert!(
-        CI_WORKFLOW.contains("cargo test -- --ignored"),
-        "the `cargo test -- --ignored` step is gone from .github/workflows/ci.yml. \
-         `the_sealed_station_golden_is_still_this_reference_s_output` is `#[ignore]`d, so \
-         that step is the ONLY thing that runs it — without it the largest assembly in the \
-         repo is checked nowhere. Restore the step, or un-ignore the test and accept the \
-         ~100 s on every `cargo test`."
-    );
-    // ⚠ The control on the anchor: the string must be a `run:` command, not a mention in
-    // the explanatory comment block that sits directly above it. Same lesson as the
-    // `#[ignore]` count in this file, which the first draft got wrong in exactly this way.
-    let as_command = CI_WORKFLOW
-        .lines()
-        .filter(|l| {
-            let t = l.trim_start();
-            !t.starts_with('#') && t.contains("cargo test -- --ignored")
-        })
-        .count();
-    assert_eq!(
-        as_command, 1,
-        "expected exactly one uncommented `cargo test -- --ignored` line in ci.yml, found \
-         {as_command} — a match that is only inside the comment means this test passes \
-         while nothing runs the ignored gate"
+        commands.contains("cargo test -- --ignored"),
+        "the `cargo test -- --ignored` instruction is gone from CLAUDE.md's Commands.          `the_sealed_station_golden_is_still_this_reference_s_output` is `#[ignore]`d and no          CI job runs the reference's tests (deleted 2026-10-10), so that instruction is the          ONLY thing that runs it — without it the largest assembly in the repo is checked          nowhere. Restore the line, or un-ignore the test and accept the ~100 s on every          `cargo test`."
     );
 }
 

@@ -176,9 +176,10 @@ fn every_cheap_station_golden_is_inside_its_measured_band() {
 }
 
 /// The expensive ones, on the same terms `golden_regression.rs` gives them: `#[ignore]`d
-/// locally, run by CI's `cargo test -- --ignored` step.
+/// locally, run by hand with `cargo test -- --ignored` (CI's step for it was deleted with the
+/// reference's CI job on 2026-10-10; the instruction is in CLAUDE.md's Commands).
 #[test]
-#[ignore = "minutes — the sealed-station horizon; CI runs it via --ignored"]
+#[ignore = "minutes — the sealed-station horizon; run by hand via --ignored"]
 fn every_expensive_station_golden_is_inside_its_measured_band() {
     let mut checked = 0;
     for golden in all() {

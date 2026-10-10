@@ -29,8 +29,9 @@
 //! against the Windows golden fails off the generation platform. That is physically
 //! meaningless noise, not a regression.
 //!
-//! ⚠⚠ **And `cargo test` runs on a Linux runner** (pinned in `.github/workflows/ci.yml`;
-//! `ubuntu-26.04` since 2026-10-04, glibc's libm either way). Python's answer is
+//! ⚠⚠ **And `cargo test` ran on a Linux runner** (pinned in `.github/workflows/ci.yml`;
+//! `ubuntu-26.04` since 2026-10-04, glibc's libm either way) until that job was deleted on
+//! 2026-10-10; the Godot parity job still runs the reference there, so this stays. Python's answer is
 //! `windows_golden_only`, a pytest skip. Rust has no skip, and the obvious translation —
 //! `#[cfg(windows)]` — is the shape this repo has been bitten by twice: a gate that
 //! compiles out is a gate nobody can see is gone. So the translation here is
@@ -97,7 +98,7 @@ pub enum Numerics {
 /// station is ~1.3 M sub-steps over five domains and takes ~100 s at *any* optimization
 /// level (measured 2026-08-19: 378 s at the stock dev profile, 116 s at `opt-level = 2`,
 /// 93 s in release — the cost is the run, not the build). It therefore runs off by default
-/// and explicitly in CI. A bare `#[ignore]` would make that invisible; naming it here lets
+/// and explicitly by `cargo test -- --ignored` (CI until 2026-10-10, by hand since). A bare `#[ignore]` would make that invisible; naming it here lets
 /// `the_ignored_set_is_exactly_the_expensive_roster` assert that the set of skipped
 /// goldens is *exactly* this one — so a second golden quietly joining the skipped set is
 /// red, which is the failure mode `#[ignore]` alone cannot see.
@@ -114,7 +115,7 @@ pub enum Cost {
     /// prose, and no entry moved sides. The real boundary is `Expensive`'s ~100 s, which
     /// IS measured, three ways, right above.
     Cheap,
-    /// Minutes. `#[ignore]`d, run by CI with `--ignored`.
+    /// Minutes. `#[ignore]`d, run by hand with `--ignored` (no CI job since 2026-10-10).
     Expensive,
 }
 

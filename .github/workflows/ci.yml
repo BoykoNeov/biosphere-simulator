@@ -5,7 +5,8 @@ name: CI
 # so the Python comparator gated the Rust port's snapshots against the 20 frozen goldens.
 # ⚠⚠ **That job is gone (2026-08-27, S6 items 1-3) and so is its premise.** There is no
 # Python reference to compare against: Rust is the reference, the goldens are its own
-# bytes, and every gate the job carried runs under `cargo test` below. The paragraph that
+# bytes, and every gate the job carried runs under `cargo test` (locally since 2026-10-10,
+# when the `rust` job below was deleted). The paragraph that
 # followed here — "the Rust port has NO reference authority; a parity failure is a finding
 # about the Python reference" — inverted with the flip and is kept nowhere as advice.
 #
@@ -26,7 +27,7 @@ on:
 # version (it stopped publishing `@vN` tags at v8). A platform change should arrive as a
 # commit you can see, not under you: on 2026-10-01 a stable-Rust bump alone turned the
 # clippy step red for three days with no code change. Moving to the next image is the
-# three `runs-on:` lines below — re-diff each job's test counts against the old image when you do.
+# two `runs-on:` lines below — re-diff each job's test counts against the old image when you do.
 jobs:
   python:
     name: Python (ruff · pyright · pytest)
@@ -49,37 +50,15 @@ jobs:
       - name: Pytest (the carve-out's fixture tests; oracle skips unless `-m oracle`)
         run: uv run pytest
 
-  rust:
-    name: Rust (test · clippy)
-    runs-on: ubuntu-26.04
-    defaults:
-      run:
-        working-directory: rust
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - name: Cargo test
-        run: cargo test
-      # ⚠⚠ The ONLY place the expensive goldens run. Stage-3 slice S2 gave the reference
-      # its own golden comparison (`*/tests/golden_regression.rs`, plan FINDING 3); one
-      # entry — the fully-coupled sealed station, ~1.3 M sub-steps over five domains — is
-      # `#[ignore]`d because it costs ~100 s at every optimization level (measured: 378 s
-      # dev, 116 s at opt-level 2, 93 s release; the cost is the run, not the build). It is
-      # therefore off by default locally and ON here. Deleting this step does not fail a
-      # test — it silently stops checking the largest assembly in the repo, which is the
-      # green-by-skip shape this project has been bitten by twice. The paired control
-      # `the_ignored_set_is_exactly_the_expensive_roster` guards the other direction (a
-      # second `#[ignore]` appearing), and `ci_still_runs_the_ignored_tests` pins THIS line
-      # textually — so deleting the step below is red in `cargo test`, not silent. That
-      # guard was added on review after the first draft asserted here that no test could
-      # make it, which was false by this repo's own source-grep idiom.
-      - name: Cargo test (ignored — the expensive sealed-station golden)
-        run: cargo test -- --ignored
-      - name: Cargo clippy (deny warnings)
-        run: cargo clippy --all-targets -- -D warnings
+  # ⚠⚠ THE `rust` JOB WAS DELETED HERE ON 2026-10-10 — the user's call ("I don't care about
+  # Linux"), after Linux read one tolerance check's last-digit sensitivity at 9x Windows'.
+  # It ran `cargo test`, `cargo test -- --ignored` and clippy on this Linux runner. All three
+  # now run only on the developer's Windows machine, and nothing runs them on a push. The
+  # six `#[ignore]`d slow tests (the sealed-station golden and its band among them) had no
+  # other automatic runner: their owner is now the `cargo test -- --ignored` line in
+  # CLAUDE.md's Commands, which `station/tests/golden_regression.rs` pins textually.
+  # The Godot job below still builds and runs the reference on Linux, so the structural
+  # (off-platform) golden comparison in `domains::goldens` stays.
 
   # ⚠⚠ THE `crossport` JOB WAS DELETED HERE ON 2026-08-27 (S6 build items 1-3), and the
   # deletion is the point rather than a tidy-up. It ran `uv run pytest tests/crossport/`;
@@ -93,8 +72,9 @@ jobs:
   # `config/tests/manifest_cli.rs` (item 1); the golden byte census into
   # `{domains,station}/tests/golden_regression.rs` (S2); the provenance/classification
   # census into the same file, plus `station/tests/regen.rs` for the frozen-golden claim and
-  # the regeneration path's validator (items 2-3). All of them run in the `cargo test` job
-  # above, on every push — a strictly wider trigger than the Python job they left.
+  # the regeneration path's validator (items 2-3). All of them ran in the `cargo test` job
+  # above, on every push, until that job was deleted on 2026-10-10 (see its note); since
+  # then they run under the developer's local `cargo test` only.
   #
   # ⚠ What the `python` job above IS, said plainly, because this paragraph claimed for six
   # days that no Python job existed while one ran on every push: it lints and type-checks
