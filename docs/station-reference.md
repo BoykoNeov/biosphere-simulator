@@ -358,6 +358,16 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-10 — the biosphere's water forms adopted, delegated: 4 station goldens move (`greenhouse`,
+  `harvest`, `lighting`, `sealed_station`) and their 4 `golden_sha256` rows follow. No station flow,
+  param, seam or claim changed.** The biosphere entry of the same date has the forms; plan
+  `docs/plans/post-roadmap-soil-evaporation.md` §16. The 7-day chambers: condensate −15.9 % / −18.4 % /
+  +10.2 %, root zone +2.4 % / +0.5 % / −1.3 % (`greenhouse` / `harvest` / `lighting`); `sealed_station`:
+  condensate 5.51 → 75.6 kg, root zone −43.7 %, the store below the roots +5.0 %. Water only, the air's
+  vapour unchanged everywhere. The separate-air lab option reads FAO-56's depletion
+  fraction from the biosphere's `water_cycle.yaml` instead of its own copy (the plumbing commit before
+  this one). `cabin_gas`, `eclss`, `water_recovery`, `station` and `sealed_energy_drift_summary` are
+  byte-identical.
 - **2026-10-09 — the biosphere's chamber condenser draws nothing below its setting, delegated: 3
   station goldens move (`greenhouse`, `harvest`, `sealed_station`) and their 3 `golden_sha256` rows
   follow. No station flow, param, seam or claim changed.** The biosphere entry of the same date has the

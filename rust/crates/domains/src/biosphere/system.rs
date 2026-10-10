@@ -954,7 +954,7 @@ fn transpiration_flow(
                 threshold_lai: p.transp.threshold_lai,
             }
         }),
-        // The lab soil-evaporation form only; `None` on every frozen build.
+        // The two-stage soil evaporation (the reference's since 2026-10-10); `None` under `Off`.
         soil: match p.transp.soil_evap {
             science::SoilEvaporationForm::Off => None,
             science::SoilEvaporationForm::TwoStage { floor, supply } => Some(SoilEvapRead {
@@ -983,7 +983,8 @@ fn event_trigger(p: &params::BiosphereParams) -> Option<f64> {
 }
 
 /// The open field's watering — ONE builder for the season's flow and the soil account's copy:
-/// `Irrigation` (continuous, the frozen form), or `EventIrrigation` wrapping it (lab).
+/// `EventIrrigation` (the reference's since the water-forms adoption, 2026-10-10) wrapping the
+/// continuous `Irrigation`, or that alone (a lab switch).
 fn irrigation_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Box<dyn Flow> {
     let inner = Irrigation {
         id: "biosphere.irrigation".to_string(),
@@ -1831,8 +1832,11 @@ mod tests {
         assert_eq!(wet(10.0, soil), 0.0);
 
         let cap = params::root_depth().max_rooted_depth;
+        // ⚠ Over the book's other forms ([`pre_adoption_params`]) since the water-forms adoption
+        // (2026-10-10): the subject is the CREDIT alone, and the reference's event watering and
+        // recycled overflow also move this store, so the capture would not be the only change.
         let run = |form| {
-            let p = crate::lab::with_deep_credit(params::biosphere(), form);
+            let p = crate::lab::with_deep_credit(pre_adoption_params(), form);
             let (state, integrator, resolver) =
                 super::super::season_setup_with(&scenario, 1, &p).unwrap();
             let mut seen: Vec<(f64, f64)> = Vec::new();
@@ -1933,17 +1937,20 @@ mod tests {
         assert!((clamped - 50.0).abs() < 1e-9, "overdrew the excess: {clamped}");
     }
 
-    /// The switch's two sides: the book's `Held` registers NO overflow flow (the frozen flow set
-    /// is untouched), and `Recycled` returns the water to the reservoir each build waters from —
-    /// the condensate in a sealed chamber, the irrigation source in the open field.
+    /// The switch's two sides: the book's `Held` registers NO overflow flow, and `Recycled` (the
+    /// reference's since the water-forms adoption, 2026-10-10) returns the water to the reservoir
+    /// each build waters from — the condensate in a sealed chamber, the irrigation source in the
+    /// open field.
     #[test]
     fn the_deep_overflow_is_registered_only_when_recycled_and_returns_to_the_watering_reservoir() {
         let recycled =
             crate::lab::with_deep_overflow(params::biosphere(), science::DeepOverflow::Recycled);
+        let held = crate::lab::with_deep_overflow(params::biosphere(), science::DeepOverflow::Held);
+        assert_eq!(params::biosphere().water.deep_overflow, science::DeepOverflow::Recycled);
         for (scenario, reservoir) in
             [(DEFAULT_SCENARIO, WATER_SOURCE), (perennial_chamber_scenario(), CONDENSATE)]
         {
-            let (_, frozen) = build_season(&scenario).unwrap();
+            let (_, frozen) = build_season_with(&scenario, &held).unwrap();
             assert!(
                 frozen.flows().iter().all(|f| f.type_name() != "SubsoilOverflow"),
                 "the book's Held must register no overflow flow"
@@ -2002,7 +2009,13 @@ mod tests {
             sealed: true,
             ..DEFAULT_SCENARIO
         };
-        let (state, integrator, resolver) = super::super::season_setup(&scenario, 2).unwrap();
+        // ⚠ Under the book's forms ([`pre_adoption_params`]) since the water-forms adoption
+        // (2026-10-10): the reference's actual-wetness credit never empties the store (capture
+        // scales with its wetness) and its watering losses refill it, so the clamp is reachable
+        // only under the book's full-capacity credit (measured: the store bottomed at 5.9 kg).
+        let book = pre_adoption_params();
+        let (state, integrator, resolver) =
+            super::super::season_setup_with(&scenario, 2, &book).unwrap();
         let mut lowest = f64::INFINITY;
         let mut returned_at_reset: Vec<f64> = Vec::new();
         let mut fraction_at_reset: Vec<(f64, f64, f64, f64)> = Vec::new();
@@ -2030,7 +2043,7 @@ mod tests {
             &integrator,
             state,
             &scenario,
-            &params::biosphere(),
+            &book,
             &resolver,
             super::super::BIO_DT,
             steps,
@@ -2161,16 +2174,17 @@ mod tests {
             subsoil_water0: 8.775,
             ..DEFAULT_SCENARIO
         };
-        let thermal_time_after = |wssd: Option<f64>| -> f64 {
+        // The thermal time at every state of the dry season.
+        let thermal_times = |wssd: Option<f64>| -> Vec<f64> {
             let scenario = SeasonScenario { wssd, ..dry };
-            let (last, rationed, _) =
-                super::super::run_season_final(&scenario, 1).expect("dry run");
-            assert_eq!(rationed, 0);
-            last.aux[THERMAL_TIME]
+            trace_season(&scenario, 1)
+                .iter()
+                .map(|s| s.aux[THERMAL_TIME])
+                .collect()
         };
-        let off = thermal_time_after(None);
-        let accelerated = thermal_time_after(Some(0.40));
-        let delayed = thermal_time_after(Some(-0.40));
+        let (off_tt, acc_tt) = (thermal_times(None), thermal_times(Some(0.40)));
+        let (off, accelerated) = (*off_tt.last().unwrap(), *acc_tt.last().unwrap());
+        let delayed = *thermal_times(Some(-0.40)).last().unwrap();
         // Drought HASTENS development (Table 15.2), so the season accumulates MORE
         // thermal time; a negative coefficient is [F]'s provision for the species it
         // delays, and must move the other way.
@@ -2179,11 +2193,31 @@ mod tests {
             "wssd = 0.40 must accelerate: {accelerated} vs {off}"
         );
         assert!(delayed < off, "wssd = -0.40 must delay: {delayed} vs {off}");
-        // ...and the effect is bounded by 1 + wssd, never runaway.
-        assert!(
-            accelerated <= off * 1.40,
-            "WSFD exceeded its 1 + WSSD bound"
-        );
+        // ...and the effect is bounded by 1 + wssd, never runaway — PER STEP, over the steps where
+        // both crops are in the same phase. ⚠ Restated at the water-forms adoption (2026-10-10,
+        // `docs/plans/post-roadmap-soil-evaporation.md` §16b): this used to bound the SEASON's
+        // thermal time, which is not what Eqn 15.8 states. A crop that flowers first leaves the
+        // vegetative phase's vernalization and photoperiod factors (both < 1) behind, so against
+        // one still vegetative it gains more than `1 + wssd` per step. Under event watering the
+        // dry chamber gets one watering and sits at FTSW 0-0.05, the factor runs at its ceiling,
+        // the crop flowers 20 days early, and the season ratio read 1.40126 (all 136 steps above
+        // 1.4x were mixed-phase); on the old continuous recycling it read 1.148.
+        let pheno = params::phenology();
+        let vegetative =
+            |tt: f64| science::development_stage(tt, pheno.tsum_anthesis, pheno.tsum_maturity) < 1.0;
+        let mut same_phase = 0usize;
+        for i in 1..off_tt.len() {
+            if vegetative(off_tt[i - 1]) != vegetative(acc_tt[i - 1]) {
+                continue;
+            }
+            same_phase += 1;
+            let (d_off, d_acc) = (off_tt[i] - off_tt[i - 1], acc_tt[i] - acc_tt[i - 1]);
+            assert!(
+                d_acc <= 1.40 * d_off * (1.0 + 1e-12),
+                "WSFD exceeded its 1 + WSSD bound at step {i}: {d_acc} vs {d_off}"
+            );
+        }
+        assert!(same_phase > 4000, "the per-step bound must actually run ({same_phase} steps)");
         // The identity, on a WET run: unstressed, the coefficient changes nothing at all.
         let wet = |wssd: Option<f64>| -> f64 {
             let scenario = SeasonScenario {
@@ -2636,9 +2670,37 @@ mod tests {
         }
     }
 
+    /// The five water forms the reference carried before the water-forms adoption (2026-10-10,
+    /// `docs/plans/post-roadmap-soil-evaporation.md` §16) — the constant surface resistance, no
+    /// soil evaporation, continuous watering, the book's full-capacity credit and the held deep
+    /// store — now lab switches. The tests of [F]'s own deep store pin it through these: the
+    /// reference's event watering wets the store below the roots on every watering (its
+    /// application loss), recycles that store's excess, and refills the whole deficit whatever the
+    /// open field's `irrigation_mm_day` (only `0` switches it off), so a dry store, a fixed-point
+    /// cycle and a crop watered below its demand can only be built under the book's forms.
+    fn pre_adoption_params() -> params::BiosphereParams {
+        let mut p = params::biosphere();
+        p.transp.rs_form = science::SurfaceResistanceForm::Constant;
+        p.transp.soil_evap = science::SoilEvaporationForm::Off;
+        p.water.watering = science::WateringForm::Continuous;
+        p.water.deep_credit = science::DeepSoilCredit::FullCapacity;
+        p.water.deep_overflow = science::DeepOverflow::Held;
+        p
+    }
+
     /// Run a scenario, returning every emitted state.
     fn trace_season(scenario: &SeasonScenario, years: usize) -> Vec<State> {
-        let (state, integrator, resolver) = super::super::season_setup(scenario, years).unwrap();
+        trace_season_with(scenario, years, &params::biosphere())
+    }
+
+    /// [`trace_season`] against `p`.
+    fn trace_season_with(
+        scenario: &SeasonScenario,
+        years: usize,
+        p: &params::BiosphereParams,
+    ) -> Vec<State> {
+        let (state, integrator, resolver) =
+            super::super::season_setup_with(scenario, years, p).unwrap();
         let mut seen: Vec<State> = Vec::new();
         let mut observe = |s: &State| seen.push(s.clone());
         let (_, rationed, events) = run_season(
@@ -2675,9 +2737,16 @@ mod tests {
     /// it is differenced against stops controlling the moment the two bodies diverge, and
     /// every gate stays green while it does. `tests/one_assembly_body.rs` now keeps this
     /// from being re-forked.
-    fn trace_without_flow(scenario: &SeasonScenario, drop_id: &str) -> Vec<State> {
+    ///
+    /// Against `p`: since the water-forms adoption (2026-10-10) its only callers pin the book's
+    /// forms ([`pre_adoption_params`]).
+    fn trace_without_flow_with(
+        scenario: &SeasonScenario,
+        drop_id: &str,
+        p: &params::BiosphereParams,
+    ) -> Vec<State> {
         let (state, registry) =
-            crate::lab::mechanism::build_season_without(scenario, &params::biosphere(), &[drop_id])
+            crate::lab::mechanism::build_season_without(scenario, p, &[drop_id])
                 .expect("the knockout build");
         let integrator = EulerIntegrator::new(registry);
         let resolver = super::super::weather_resolver(scenario, 1).expect("resolver");
@@ -2825,14 +2894,20 @@ mod tests {
     /// decorative, and it is the season-level companion to the equation-level pin in
     /// `science.rs`. The dry declaration is the Python `DROUGHT_SCENARIO`'s, which the
     /// Rust roster has no entry for.
+    ///
+    /// ⚠ Under the book's forms ([`pre_adoption_params`]) since the water-forms adoption
+    /// (2026-10-10): the reference's event watering puts its application loss below the roots
+    /// on every watering, so its store is never dry and the roots reach the cap (measured: 1.30 m).
+    /// That is the gate working on a store that is wet, not the gate failing.
     /// Mirrors `test_a_dry_subsoil_stops_root_extension`.
     #[test]
     fn a_dry_below_root_store_stops_extension_for_the_whole_season() {
+        let book = pre_adoption_params();
         let dry = SeasonScenario {
             subsoil_water0: 0.0,
             ..DEFAULT_SCENARIO
         };
-        let depths: Vec<f64> = trace_season(&dry, 1)
+        let depths: Vec<f64> = trace_season_with(&dry, 1, &book)
             .iter()
             .map(|s| s.aux[ROOTED_DEPTH])
             .collect();
@@ -2844,7 +2919,7 @@ mod tests {
         // ⚠ Non-vacuity, and it is the whole point: the SAME season with water below
         // reaches the crop's cap. Without this half the test passes on a build where
         // extension is broken outright.
-        let wet: Vec<f64> = trace_season(&DEFAULT_SCENARIO, 1)
+        let wet: Vec<f64> = trace_season_with(&DEFAULT_SCENARIO, 1, &book)
             .iter()
             .map(|s| s.aux[ROOTED_DEPTH])
             .collect();
@@ -3072,12 +3147,18 @@ mod tests {
     /// unrelated to what it measures (WSFD in 2026-08-12, the depth-resolved canopy in
     /// 2026-08-15), each time with nothing red because the bound had slack — which is why
     /// it is re-measured on this port rather than copied across.
+    ///
+    /// ⚠ Under the book's forms ([`pre_adoption_params`]) since the water-forms adoption
+    /// (2026-10-10): the reference's event watering refills the whole deficit whatever
+    /// `irrigation_mm_day`, so a crop watered below its demand cannot be built under it (measured:
+    /// the grain ratio fell to 1.0).
     /// Mirrors `test_reaching_the_subsoil_is_what_saves_the_deep_water_crop`.
     #[test]
     fn reaching_the_below_root_store_is_what_saves_the_deep_water_crop() {
+        let book = pre_adoption_params();
         let scenario = deep_water_scenario();
-        let subject = trace_season(&scenario, 1);
-        let control = trace_without_flow(&scenario, "biosphere.root_zone_capture");
+        let subject = trace_season_with(&scenario, 1, &book);
+        let control = trace_without_flow_with(&scenario, "biosphere.root_zone_capture", &book);
         let peak = |states: &[State]| -> f64 {
             states
                 .iter()
@@ -3152,17 +3233,22 @@ mod tests {
     /// ("one cause, two symptoms") come back at 39 % before, so the attribution is
     /// measured rather than asserted — and pinned so nobody "simplifies" the headline test
     /// back onto the cheaper control.
+    ///
+    /// ⚠ Under the book's forms, as the claim above (and the naive control needs a store nothing
+    /// re-wets: under event watering the application loss would refill it).
     /// Mirrors `test_the_deep_water_effect_is_water_and_not_the_nitrogen_gate`.
     #[test]
     fn the_clean_and_naive_deep_water_controls_are_not_interchangeable() {
+        let book = pre_adoption_params();
         let scenario = deep_water_scenario();
-        let clean = trace_without_flow(&scenario, "biosphere.root_zone_capture");
-        let naive = trace_season(
+        let clean = trace_without_flow_with(&scenario, "biosphere.root_zone_capture", &book);
+        let naive = trace_season_with(
             &SeasonScenario {
                 subsoil_water0: 0.0,
                 ..scenario
             },
             1,
+            &book,
         );
         let last_clean = clean.last().unwrap();
         let last_naive = naive.last().unwrap();
@@ -3228,8 +3314,20 @@ mod tests {
             WATER_VAPOR.to_string(),
             humid[WATER_VAPOR].with_amount(0.9 * cap).unwrap(),
         );
+        // ⚠ And since the water-forms adoption (2026-10-10) the chamber waters in EVENTS: the
+        // recycling returns nothing until the root zone has used FAO-56's `p` of its water. So it
+        // is evaluated at a third state whose root zone sits BELOW the trigger (50 kg in the 1.3 m
+        // zone's 169 kg is FTSW 0.30, under 0.45), where it waters — and sends the drip's
+        // application loss below the roots, the ring's soil too (`subsoil_water`).
+        let mut thirsty = stocks.clone();
+        thirsty.insert(
+            SOIL_WATER.to_string(),
+            thirsty[SOIL_WATER].with_amount(50.0).unwrap(),
+        );
         let state = State::new(base.n, stocks, base.rng_seed, aux.clone()).expect("ring state");
-        let humid = State::new(base.n, humid, base.rng_seed, aux).expect("humid ring state");
+        let humid =
+            State::new(base.n, humid, base.rng_seed, aux.clone()).expect("humid ring state");
+        let thirsty = State::new(base.n, thirsty, base.rng_seed, aux).expect("thirsty ring state");
 
         let expected: [(&str, &str, &[&str]); 3] = [
             (
@@ -3238,7 +3336,7 @@ mod tests {
                 &[WATER_VAPOR, CONDENSATE],
             ),
             ("biosphere.condensation", WATER_VAPOR, &[CONDENSATE]),
-            ("biosphere.recycling", CONDENSATE, &[SOIL_WATER]),
+            ("biosphere.recycling", CONDENSATE, &[SOIL_WATER, SUBSOIL_WATER]),
         ];
         for (id, want_source, want_sinks) in expected {
             let flow = registry
@@ -3246,7 +3344,11 @@ mod tests {
                 .iter()
                 .find(|f| f.id() == id)
                 .unwrap_or_else(|| panic!("{id} is not in the sealed registry"));
-            let state = if id == "biosphere.condensation" { &humid } else { &state };
+            let state = match id {
+                "biosphere.condensation" => &humid,
+                "biosphere.recycling" => &thirsty,
+                _ => &state,
+            };
             let env = resolver.bind(state, 1.0);
             let result = flow.evaluate(state, &env, 1.0).expect("evaluate");
             // WATER only: every touched stock carries WATER and nothing else.
@@ -3374,12 +3476,21 @@ mod tests {
     /// caught instead by the exact-value pins in `science.rs` and in
     /// `the_resow_returns_the_abandoned_fraction_and_preserves_ftsw`. The three tests are a
     /// set, and this is the one that covers the shape no single golden can see.
+    ///
+    /// ⚠ Under the book's forms ([`pre_adoption_params`]) since the water-forms adoption
+    /// (2026-10-10). Under event watering each cycle's start depends on when that season's last
+    /// watering fell, so the store CYCLES without a fixed point to converge to (measured: 144.7,
+    /// 154.1, 101.3, 123.9 kg at the cycle starts); the sealed station's run, traced day by day,
+    /// showed no trend over four seasons (`docs/plans/post-roadmap-soil-evaporation.md` §15). The
+    /// return RULE this pins is the same under either watering.
     /// Mirrors `test_the_resow_returns_the_abandoned_zones_water_so_there_is_no_ratchet`.
     #[test]
     fn the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years() {
+        let book = pre_adoption_params();
         let scenario = perennial_chamber_scenario();
         let years = PERENNIAL_CHAMBER_YEARS;
-        let (state, integrator, resolver) = super::super::season_setup(&scenario, years).unwrap();
+        let (state, integrator, resolver) =
+            super::super::season_setup_with(&scenario, years, &book).unwrap();
         let mut below: Vec<f64> = Vec::new();
         let mut both: Vec<f64> = Vec::new();
         let mut observe = |s: &State| {
@@ -3391,7 +3502,7 @@ mod tests {
             &integrator,
             state,
             &scenario,
-            &params::biosphere(),
+            &book,
             &resolver,
             super::super::BIO_DT,
             super::super::steps_for_years(years),

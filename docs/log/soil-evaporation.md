@@ -148,3 +148,17 @@ as its own biosphere unfreeze (`log/chamber-dehumidifier.md`). The never-re-sown
 stale. **B6 explained:** over the run the sealed station's below-root store is the same under both supplies
 (78.7 vs 78.8 kg mean). It swings ~20–160 kg each season, and the run ends at a trough whose depth depends on
 when the last waterings fell. A snapshot, not a wetter store.
+
+**ADOPTED 2026-10-10** on the user's *"Step 2"* (plan §16), in two commits. The plumbing first, with no
+golden moving: twelve coefficients moved from code into `transpiration.yaml` and `water_cycle.yaml` with their
+sources, and the params-free re-sow retired (a re-sow now takes the params the run was built from). Then the
+switch: Szeicz–Long, the two-stage soil evaporation drawing on the whole root zone, watering in events, the
+actual-wetness credit and the recycled overflow are the loader's. **10 goldens moved, water only** — the
+sealed chambers keep 6–11× more water in the tank between waterings, the root zone sits lower, the air ends
+where it did; the open field's soil evaporates 45.9 kg into its own sink. Every prediction held except a
+miscount of the reds (I wrote 18; the arithmetic gave 20). The three reds that looked like findings had
+ordinary causes: the drought bound was a per-step law stated as a season one; the recycled overflow is a
+second route to the deep water; an infinite param is now refused at the build. ⚠ **Under event watering the
+open field's `irrigation_mm_day` is only an on/off switch** — the book's deep-store tests, which need a crop
+watered below its demand, a dry store or a fixed-point re-sow cycle, now pin the five old forms, kept as lab
+switches. The cross-port bands for the ten moved goldens are read on Linux CI.

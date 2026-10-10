@@ -1252,3 +1252,50 @@ from §14's note.
 | F7 | the three §16b reds fail with §16b's messages, and their restatements pass |
 
 Not predicted: the cross-port bands on Linux (measured only by CI after the push).
+
+### 16g. Commit B, built and graded (2026-10-10)
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| F1 | the same 10 goldens change; the other 10 identical | exactly those 10 (`regen_goldens` report); `drift_summary`, `sealed_energy_drift_summary` and the eight crop-free goldens identical | HELD |
+| F2 | water only; the five soil aux keys; `boundary.soil_evaporation` in `season_euler` | no non-water stock and no existing aux key moved in any of the 10; the five keys in all 10; the new stock in `season_euler` only (45.87 kg) | HELD |
+| F3 | biosphere goldens equal §13's root-zone set except the sealed family; `season_euler` equal | `season_euler` byte-identical to §13's; the five sealed-family files differ (the dehumidifier fix) | HELD |
+| F4 | `sealed_chamber` air vapour within 10 % of 0.2505 kg | **0.250476 kg**, unchanged from before the flip | HELD |
+| F5 | 18 debug reds + the memory red; ignored: the sealed station's golden and band | **20** flip reds + the memory red + one census red; the ignored tests were not run before regenerating | MISCOUNTED — see below |
+| F6 | after `--write` and both manifests: golden, band and manifest reds clear; station manifest moves its `golden_sha256` rows | cleared; the biosphere manifest: 6 `golden_sha256` rows, `flow_set` −`Irrigation` −`Recycling` +`EventIrrigation` +`EventRecycling` +`SubsoilOverflow` (24), `aux_set` +`SoilSurfaceAccount` (4); the station manifest: its 4 `golden_sha256` rows only | HELD |
+| F7 | the three §16b reds fail with §16b's messages; their restatements pass | the same messages; restated, all three pass | HELD |
+
+**F5, read honestly.** The arithmetic was wrong, not the model: §16a's 24 minus the four commit A discharged
+(`param_funnel`, `the_params_aware_resow…` retired, the two re-sow tests that had called the plain reset) is
+**20**, and I also subtracted the two refusal tests' successors, which were never on the list. The census red
+was **commit A's**, not the flip's: the new loader test was added after commit A's suite run and carries no
+census row, so `20fe5b7` went to `main` with `every_test_in_an_s5_surface_is_claimed_or_declared` red. Fixed on
+its own (`0f025e9`, the A-row count 82 → 83) before the flip was committed. The lesson: re-run the suite after
+the last edit, not before it.
+
+**The 20 reds, restated by class** (§11d's table, §16b's causes):
+
+* **Goldens and bands (4 + 2 ignored), manifests (2):** regenerated.
+* **The switch identities (4):** `canopy_resistance` P1, `soil_evaporation` S1 → *the loader's forms through the
+  switches are the reference run*; `canopy_resistance` P2 and the scorecard's R1 → run with the soil's
+  evaporation off (and R1 the constant resistance), because their by-hand formulas have no energy split and
+  their subject is the resistance's reach. The measurement's "frozen" row is now `pre_adoption()`, all five old
+  forms, so it is still the model the forms were priced against.
+* **The book's own deep store (7):** the dry store, the rescue and its two controls, the actual-wetness credit,
+  the overflow's two sides, the clamp, the re-sow fixed point — each pins the five old forms through
+  `pre_adoption_params()`. Under the reference none of the conditions can be built: event watering wets the
+  store below the roots with every watering's loss and refills the whole deficit (so `irrigation_mm_day` is only
+  an on/off switch), and the re-sown chamber has no fixed point to converge to.
+* **The ring (1):** recycling is evaluated at a third state below the trigger, and its sinks include the
+  store below the roots (the drip's loss).
+* **§16b's three:** the drought bound per step in the same phase (mutation control: scaling the factor ×1.2
+  reddens it at step 928); the knockout drops both routes; the infinite param asserts the build's refusal and
+  keeps the fold guard's witness under `Off`.
+* **One source-scan guard** (`the_knockout_helper_goes_through_the_lab_seam`) followed the helper's rename to
+  `trace_without_flow_with`.
+
+**Gate.** Debug suite after the last edit: 1361 passed, 1 failed (the memory-index red), 9 ignored. Ignored,
+release: 9 passed, 0 failed (the sealed station's golden and band, both session resumes). Clippy clean. Logs: `W:\temp\claude\water-adoption\` (`regenB.log`, `regenB_write.log`, `golden_diff.txt`,
+`suiteB0.log`, `suiteB1.log`, `suiteB2.log`, `ignoredB.log`, `clippyB.log`, `mutant2.log`).
+
+**Owed:** the cross-port bands on Linux CI for the ten moved goldens (the push after this commit).

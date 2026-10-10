@@ -38,7 +38,7 @@
 
 use super::science::{
     Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
-    SurfaceResistanceForm, VpdRead, WateringForm,
+    SoilSupply, SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
@@ -259,12 +259,14 @@ pub struct TranspirationParams {
     pub aerodynamic_resistance: f64,
     pub surface_resistance: f64,
     /// How the canopy surface resistance is obtained ([`SurfaceResistanceForm`]). Never loaded
-    /// from the file: the loader sets the frozen [`SurfaceResistanceForm::Constant`]; the two
-    /// leaf-area forms are lab-only (`docs/plans/post-roadmap-canopy-resistance.md`).
+    /// from the file: the loader sets [`SurfaceResistanceForm::SzeiczLong`] since the water-forms
+    /// adoption (2026-10-10); the constant 70 s/m and FAO's full-cover form are lab-only
+    /// (`docs/plans/post-roadmap-canopy-resistance.md`, `post-roadmap-soil-evaporation.md` §16).
     pub rs_form: SurfaceResistanceForm,
     /// Whether the soil evaporates ([`SoilEvaporationForm`]). Never loaded from the file: the loader
-    /// sets [`SoilEvaporationForm::Off`] (the frozen model has none); the two-stage form is lab-only
-    /// (`docs/plans/post-roadmap-soil-evaporation.md`).
+    /// sets the two-stage form, floor off, drawing on the whole root zone, since the water-forms
+    /// adoption (2026-10-10); `Off`, the floor and the top-layer cap are lab-only
+    /// (`docs/plans/post-roadmap-soil-evaporation.md` §16).
     pub soil_evap: SoilEvaporationForm,
     /// `rl`, a well-watered leaf's stomatal resistance (s/m), read by the two leaf-area forms of
     /// [`SurfaceResistanceForm`] (FAO-56 Box 5's 100 s/m).
@@ -437,16 +439,18 @@ pub struct WaterCycleParams {
     /// reading, kept runnable through `domains::lab`.
     pub vpd_read: VpdRead,
     /// How the root zone is watered ([`WateringForm`]). Never loaded from the file: the loader sets
-    /// [`WateringForm::Continuous`]; watering in events is lab-only
-    /// (`docs/plans/post-roadmap-soil-evaporation.md` §7).
+    /// [`WateringForm::Fao56Trigger`] since the water-forms adoption (2026-10-10); continuous
+    /// watering is lab-only (`docs/plans/post-roadmap-soil-evaporation.md` §7, §16).
     pub watering: WateringForm,
     /// What new roots capture from the store below them ([`DeepSoilCredit`]). Never loaded from the
-    /// file: the loader sets the book's [`DeepSoilCredit::FullCapacity`]; the other is lab-only
-    /// (`docs/plans/post-roadmap-soil-evaporation.md` §10e).
+    /// file: the loader sets [`DeepSoilCredit::ActualWetness`] since the water-forms adoption
+    /// (2026-10-10); the book's full-capacity credit is lab-only
+    /// (`docs/plans/post-roadmap-soil-evaporation.md` §10e, §16).
     pub deep_credit: DeepSoilCredit,
     /// Whether water above the deep store's own capacity leaves it ([`DeepOverflow`]). Never loaded
-    /// from the file: the loader sets the book's [`DeepOverflow::Held`]; the other is lab-only
-    /// (`docs/plans/post-roadmap-soil-evaporation.md` §10g).
+    /// from the file: the loader sets [`DeepOverflow::Recycled`] since the water-forms adoption
+    /// (2026-10-10); the book's `Held` is lab-only (`docs/plans/post-roadmap-soil-evaporation.md`
+    /// §10g, §16).
     pub deep_overflow: DeepOverflow,
     /// FAO-56's `p` for wheat: [`WateringForm::Fao56Trigger`] waters at `FTSW = 1 − p`.
     pub depletion_fraction: f64,
@@ -770,8 +774,14 @@ pub fn transpiration_from_bounded(
             top_layer_room_above_dul: v["top_layer_saturation"]
                 - v["top_layer_drained_upper_limit"],
         },
-        rs_form: SurfaceResistanceForm::Constant,
-        soil_evap: SoilEvaporationForm::Off,
+        // SZEICZ–LONG and the two-stage soil evaporation drawing on the whole root zone since the
+        // water-forms adoption (2026-10-10): these two lines and the three in `water_cycle_from_bounded`
+        // moved 10 goldens, water only (docs/plans/post-roadmap-soil-evaporation.md §16).
+        rs_form: SurfaceResistanceForm::SzeiczLong,
+        soil_evap: SoilEvaporationForm::TwoStage {
+            floor: false,
+            supply: SoilSupply::RootZone,
+        },
     }
 }
 
@@ -1296,9 +1306,12 @@ pub fn water_cycle_from_bounded(
         // CHAMBER since the Step 3b freeze (2026-10-01): this line moved 9 goldens, water
         // stocks only (docs/plans/post-roadmap-chamber-dryness.md §4.6).
         vpd_read: VpdRead::Chamber,
-        watering: WateringForm::Continuous,
-        deep_credit: DeepSoilCredit::FullCapacity,
-        deep_overflow: DeepOverflow::Held,
+        // Watering in EVENTS, new roots credited with the deep store's actual wetness, the deep
+        // overflow recycled — since the water-forms adoption (2026-10-10), with the two lines in
+        // `transpiration_from_bounded` (docs/plans/post-roadmap-soil-evaporation.md §16).
+        watering: WateringForm::Fao56Trigger,
+        deep_credit: DeepSoilCredit::ActualWetness,
+        deep_overflow: DeepOverflow::Recycled,
     }
 }
 

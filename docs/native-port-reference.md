@@ -429,6 +429,14 @@ Every `**` / `math.*` site maps to its exact Rust equivalent:
 | transpiration `(t+c)**2` | `**` (C `pow`) | `.powf(2.0)` | `domains/src/biosphere/science.rs:128` |
 | `biosphere/transpiration.py:108` | `math.exp` | `.exp()` | `domains/src/biosphere/science.rs:107` |
 | `biosphere/weather.py:43-48` | `radians`/`sin`/`tan`/`acos` | `.to_radians()`/`.sin()`/`.tan()`/`.acos()` | `domains/src/biosphere/weather.rs:81-87` |
+| — (Rust-born: the soil's Stage II decline, since 2026-10-10) | — | `.sqrt()` | `domains/src/biosphere/science.rs:1145` |
+| — (Rust-born: the soil–crop energy split, since 2026-10-10) | — | `.exp()` | `domains/src/biosphere/science.rs:1134, 1151` |
+
+⚠ **The last two rows have no Python twin.** The water-forms adoption (2026-10-10,
+`docs/plans/post-roadmap-soil-evaporation.md` §16) put the bare soil's evaporation into the
+reference after the Python checker was retired, so there is no op-for-op mirror to match: they
+matter for the **bands**, which they enter on all 10 water-moved goldens (`rust/data/tiers.json`
+names both sites), and those are read on Linux CI, never on the Windows box.
 
 Beyond libm, bit-exactness lives on **operation order, not math**: float `+`/`*` are
 commutative but not associative, so every integrator grouping and every `sorted()` reduction

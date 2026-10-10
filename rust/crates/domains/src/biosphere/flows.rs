@@ -774,8 +774,9 @@ pub struct VapourSaturation {
     pub vpd_read: science::VpdRead,
 }
 
-/// Where [`Transpiration`] reads its canopy under a lab [`science::SurfaceResistanceForm`]
-/// (`docs/plans/post-roadmap-canopy-resistance.md`). `None` on every frozen build.
+/// Where [`Transpiration`] reads its canopy under a leaf-area [`science::SurfaceResistanceForm`]
+/// (`docs/plans/post-roadmap-canopy-resistance.md`) — the reference's Szeicz–Long since
+/// the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16). `None` only under the constant (a lab switch).
 pub struct CanopyRead {
     pub form: science::SurfaceResistanceForm,
     pub leaf_c: String,
@@ -886,11 +887,12 @@ pub struct Transpiration {
     pub soil_extractable_water: f64,
     pub wssg: f64,
     pub saturation: Option<VapourSaturation>,
-    /// `Some` only under a lab surface-resistance form; `None` reads `surface_resistance` as
-    /// before, on every frozen build.
+    /// `Some` under a leaf-area surface-resistance form (the reference's since the water-forms
+    /// adoption, 2026-10-10); `None` reads `surface_resistance`, the constant lab switch.
     pub canopy: Option<CanopyRead>,
-    /// `Some` only under the lab soil-evaporation form; `None` on every frozen build, which then
-    /// takes exactly the code path it took before the form existed.
+    /// `Some` under the two-stage soil evaporation (the reference's since the water-forms adoption,
+    /// 2026-10-10); `None` under the `Off` lab switch, which then takes exactly the code path the
+    /// model took before the form existed.
     pub soil: Option<SoilEvapRead>,
 }
 
@@ -1118,8 +1120,8 @@ impl Flow for Transpiration {
     }
 }
 
-/// The top layer's own account and the soil-evaporation clocks — LAB-ONLY
-/// (`docs/plans/post-roadmap-soil-evaporation.md` §4b).
+/// The top layer's own account and the soil-evaporation clocks
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §4b) — in the reference since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16).
 ///
 /// Soltani & Sinclair track the top layer as an account OVERLAPPING the root zone (Eqn 14.2): the
 /// water stays in `soil_water`; this process advances `ATSW1` by the same inflow (`inflow`'s leg
@@ -1235,7 +1237,8 @@ fn root_zone(snapshot: &State, soil_water: &str, rooted_aux: &str, extr: f64, ar
     )
 }
 
-/// LAB-ONLY watering in EVENTS (`WateringForm::Fao56Trigger`, open field): nothing until the root
+/// Watering in EVENTS (`WateringForm::Fao56Trigger`, open field; the reference's since the
+/// water-forms adoption, 2026-10-10): nothing until the root
 /// zone has fallen to `FTSW ≤ 1 − p`, then the whole deficit to full in that step. Wraps the
 /// season's own `Irrigation` (its wiring); its system capacity does not cap an event.
 pub struct EventIrrigation {
@@ -1287,7 +1290,8 @@ impl Flow for EventIrrigation {
     }
 }
 
-/// LAB-ONLY watering in EVENTS (`WateringForm::Fao56Trigger`, sealed chamber): the condensate store
+/// Watering in EVENTS (`WateringForm::Fao56Trigger`, sealed chamber; the reference's since the
+/// water-forms adoption, 2026-10-10): the condensate store
 /// is the reservoir; at a trigger step it draws `min(condensate, deficit / ea)`, the `ea` share into
 /// the root zone and the rest below it, and nothing otherwise. Wraps the season's own `Recycling`.
 pub struct EventRecycling {
@@ -1455,7 +1459,8 @@ impl Flow for Drainage {
     }
 }
 
-/// LAB-ONLY WATER `subsoil_water -> reservoir` (`science::DeepOverflow::Recycled`).
+/// WATER `subsoil_water -> reservoir` (`science::DeepOverflow::Recycled`; the reference's since the
+/// water-forms adoption, 2026-10-10).
 ///
 /// The store below the roots drains what it holds above its own capacity,
 /// `(SOLDEP − DEPORT) · EXTR · ρ · A` (as [`science::deep_soil_wetness`] reads it), at the book's
@@ -3818,8 +3823,8 @@ mod tests {
         );
     }
 
-    /// **Watering in events loses `gross − net` below the roots IN THE EVENT STEP** (lab-only,
-    /// `docs/plans/post-roadmap-soil-evaporation.md` §10d): the root zone gets the deficit, the
+    /// **Watering in events loses `gross − net` below the roots IN THE EVENT STEP**
+    /// (`docs/plans/post-roadmap-soil-evaporation.md` §10d): the root zone gets the deficit, the
     /// store below gets the rest, the reservoir pays the gross. Before §10d the whole gross went
     /// into the root zone and `Drainage` carried the excess at 30 % a day, which the crop pulled
     /// back first — so a leg that ignored the efficiency, or sent the loss to the root zone,

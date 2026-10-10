@@ -977,16 +977,17 @@ pub enum LeafAreaForm {
     NodeEnvelope,
 }
 
-/// How transpiration's canopy surface resistance is obtained — LAB-ONLY
+/// How transpiration's canopy surface resistance is obtained
 /// (`docs/plans/post-roadmap-canopy-resistance.md`).
 ///
 /// Not a fitted coefficient and never loaded from a param file — like [`LeafAreaForm`], it selects
-/// between the frozen form and a lab one. Neither lab form is endorsed; which one, if any, is ever
-/// priced for adoption is the user's call after the measurement.
+/// a form. [`SurfaceResistanceForm::SzeiczLong`] is the reference since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16); the
+/// constant and FAO's full-cover form are lab switches. (The `Default` is still the constant:
+/// nothing builds the reference from it, the loader names its form.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SurfaceResistanceForm {
-    /// The frozen reference: `transpiration.yaml`'s constant `surface_resistance`, whatever the
-    /// canopy's leaf area.
+    /// `transpiration.yaml`'s constant `surface_resistance`, whatever the canopy's leaf area — the
+    /// reference until the water-forms adoption (2026-10-10), a lab switch since.
     #[default]
     Constant,
     /// FAO-56 (Allen et al. 1998) Ch. 2 Eq. 5, `rs = rl / LAI_active`, with Box 5's
@@ -1006,11 +1007,13 @@ pub enum SurfaceResistanceForm {
 /// resistance `rl` and Teh's `Lcr` are params (`transpiration.yaml`, since 2026-10-10).
 pub const FAO_ACTIVE_LAI_FRACTION: f64 = 0.5;
 
-/// Whether the soil evaporates — LAB-ONLY (`docs/plans/post-roadmap-soil-evaporation.md`).
+/// Whether the soil evaporates (`docs/plans/post-roadmap-soil-evaporation.md`).
 ///
-/// [`SoilEvaporationForm::Off`] is the loader's value: the frozen model has no bare-soil
-/// evaporation. [`SoilEvaporationForm::TwoStage`] is Soltani & Sinclair (2012) Ch. 14 after Amir &
-/// Sinclair (1991), with the energy split between soil and crop and the user's three choices.
+/// [`SoilEvaporationForm::TwoStage`] — Soltani & Sinclair (2012) Ch. 14 after Amir & Sinclair
+/// (1991), with the energy split between soil and crop and the user's three choices — is the
+/// reference since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16), floor off, drawing on the whole root zone.
+/// [`SoilEvaporationForm::Off`] (the model before it, with no bare-soil evaporation) is a lab
+/// switch, and still the `Default`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SoilEvaporationForm {
     #[default]
@@ -1020,8 +1023,10 @@ pub enum SoilEvaporationForm {
     TwoStage { floor: bool, supply: SoilSupply },
 }
 
-/// What caps the soil's evaporation under [`SoilEvaporationForm::TwoStage`] — LAB-ONLY
-/// (`docs/plans/post-roadmap-soil-evaporation.md` §12).
+/// What caps the soil's evaporation under [`SoilEvaporationForm::TwoStage`]
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §12). [`SoilSupply::RootZone`] is the reference's
+/// since the adoption (§14, the user's *"closer to reality"*); [`SoilSupply::TopLayer`] is a lab
+/// switch, and still the `Default`.
 ///
 /// [`SoilSupply::TopLayer`] caps it at the top layer's account, as built in §8 — a mapping choice of
 /// ours, NOT in the book. [`SoilSupply::RootZone`] is the book's program (Box 14.1, p. 187): `SEVP`
@@ -1034,12 +1039,15 @@ pub enum SoilSupply {
     RootZone,
 }
 
-/// How the root zone is watered — LAB-ONLY (`docs/plans/post-roadmap-soil-evaporation.md` §7).
+/// How the root zone is watered (`docs/plans/post-roadmap-soil-evaporation.md` §7).
 ///
-/// [`WateringForm::Continuous`] is the loader's value: the open field topped up to full every step,
-/// the sealed chamber's condensate recycled as a steady fraction. [`WateringForm::Fao56Trigger`]
-/// waters in EVENTS: nothing until the root zone has used `p` of its transpirable water, then the
-/// whole deficit at once (FAO-56 applies the net depth `Dr` in one irrigation).
+/// [`WateringForm::Fao56Trigger`] waters in EVENTS: nothing until the root zone has used `p` of its
+/// transpirable water, then the whole deficit at once (FAO-56 applies the net depth `Dr` in one
+/// irrigation) — the reference since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16). ⚠ So the open field's
+/// `irrigation_mm_day` is only a switch under it: any positive value refills the whole deficit,
+/// and `0` cuts the watering. [`WateringForm::Continuous`] (the open field topped up to full every
+/// step, the sealed chamber's condensate recycled as a steady fraction) is a lab switch, and still
+/// the `Default`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WateringForm {
     #[default]
@@ -1051,13 +1059,14 @@ pub enum WateringForm {
 // efficiencies are params since 2026-10-10: `water_cycle.yaml` (`depletion_fraction`,
 // `sprinkler_efficiency`, `drip_efficiency`), with their sources.
 
-/// What a metre of new root captures from the store below the roots — LAB-ONLY
+/// What a metre of new root captures from the store below the roots
 /// (`docs/plans/post-roadmap-soil-evaporation.md` §10e).
 ///
-/// [`DeepSoilCredit::FullCapacity`] is the loader's value and the book's: Soltani & Sinclair Eqn
-/// 14.10, `EWAT = min(GRTD · EXTR, WSTORG)`, the new depth at its drained upper limit whatever the
-/// store holds. [`DeepSoilCredit::ActualWetness`] scales it by [`deep_soil_wetness`] — the user's
-/// instruction, mapped by us and NOT in the book; it equals the book whenever the store is full.
+/// [`DeepSoilCredit::ActualWetness`] scales the book's credit by [`deep_soil_wetness`] — the user's
+/// instruction, mapped by us and NOT in the book; it equals the book whenever the store is full — and
+/// is the reference since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16). [`DeepSoilCredit::FullCapacity`] is
+/// the book's: Soltani & Sinclair Eqn 14.10, `EWAT = min(GRTD · EXTR, WSTORG)`, the new depth at its
+/// drained upper limit whatever the store holds; a lab switch, and still the `Default`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeepSoilCredit {
     #[default]
@@ -1065,13 +1074,14 @@ pub enum DeepSoilCredit {
     ActualWetness,
 }
 
-/// What happens to water the store below the roots holds above its own capacity — LAB-ONLY
+/// What happens to water the store below the roots holds above its own capacity
 /// (`docs/plans/post-roadmap-soil-evaporation.md` §10g).
 ///
-/// [`DeepOverflow::Held`] is the loader's value and the book's: Soltani & Sinclair Eqn 14.12 gives
-/// `WSTORG` no outflow, so percolated water waits there until a re-sowing mixes it up.
 /// [`DeepOverflow::Recycled`] — the user's instruction (2026-10-08), mapped by us and NOT in the book
-/// — drains the excess at the book's own Eqn 14.11 factor back to the water the crop is watered from.
+/// — drains the excess at the book's own Eqn 14.11 factor back to the water the crop is watered
+/// from; the reference since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16). [`DeepOverflow::Held`] is the
+/// book's: Soltani & Sinclair Eqn 14.12 gives `WSTORG` no outflow, so percolated water waits there
+/// until a re-sowing mixes it up; a lab switch, and still the `Default`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeepOverflow {
     #[default]

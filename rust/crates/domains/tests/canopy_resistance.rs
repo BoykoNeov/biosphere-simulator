@@ -1,10 +1,13 @@
-//! **A canopy surface resistance that reads leaf area** — LAB-ONLY measurement.
+//! **A canopy surface resistance that reads leaf area** — the measurement that priced it.
 //!
 //! Plan: `docs/plans/post-roadmap-canopy-resistance.md` (§3 the forms, §5 the predictions). Two
-//! cited forms, switched in through [`domains::lab::biosphere_with_rs_form`]; the loader's value
-//! stays the frozen constant. This file asserts only its instrument — the frozen form through the
-//! switch is the frozen run, and each lab form reaches `Transpiration` exactly — and PRINTS the
-//! measurement (`--nocapture`). No ratio is pinned: nothing here is adopted.
+//! cited forms, switched in through [`domains::lab::biosphere_with_rs_form`]. ⚠ **Szeicz–Long is
+//! the loader's form since the water-forms adoption (2026-10-10,
+//! `docs/plans/post-roadmap-soil-evaporation.md` §16)**, with the soil's evaporation on; the
+//! constant 70 s/m and FAO's full-cover form are the lab's. This file asserts only its instrument —
+//! the loader's form through the switch is the reference run, and each leaf-area form reaches
+//! `Transpiration` exactly — and PRINTS the measurement (`--nocapture`), whose rows now carry the
+//! reference's soil evaporation and event watering. No ratio is pinned.
 
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::perturbations::window_override;
@@ -129,12 +132,15 @@ fn deep_water() -> SeasonScenario {
     SeasonScenario { irrigation_mm_day: 1.0, ..DEFAULT_SCENARIO }
 }
 
-/// P1 — the frozen constant form, routed through the switch, is the frozen run to the bit.
+/// P1 — the loader's form, routed through the switch, is the reference run to the bit. (Until
+/// 2026-10-10 the loader's form was the constant, and this pinned that one; restated at the
+/// water-forms adoption, plan §16.)
 #[test]
-fn the_constant_form_through_the_switch_is_the_frozen_run() {
+fn the_loaders_form_through_the_switch_is_the_reference_run() {
+    assert_eq!(params::biosphere().transp.rs_form, SurfaceResistanceForm::SzeiczLong);
     for s in [DEFAULT_SCENARIO, sealed_chamber_scenario()] {
         let frozen = run(&s, &params::biosphere(), &[], None);
-        let switched = run(&s, &params_for(SurfaceResistanceForm::Constant), &[], None);
+        let switched = run(&s, &params_for(SurfaceResistanceForm::SzeiczLong), &[], None);
         let bits = |st: &State| -> Vec<u64> {
             st.stocks.values().map(|k| k.amount.to_bits()).collect()
         };
@@ -142,17 +148,21 @@ fn the_constant_form_through_the_switch_is_the_frozen_run() {
     }
 }
 
-/// P2 — each lab form reaches `Transpiration`: on every state of a frozen run, the flow's water
-/// leg equals Penman–Monteith at that form's resistance for the state's LAI, times the soil-water
-/// factor, to rounding. Open field and a sealed chamber (whose leg splits into air + condensate,
-/// but whose root-zone leg is the same flux).
+/// P2 — each leaf-area form reaches `Transpiration`: on every state of a reference run, the flow's
+/// water leg equals Penman–Monteith at that form's resistance for the state's LAI, times the
+/// soil-water factor, to rounding. Open field and a sealed chamber (whose leg splits into air +
+/// condensate, but whose root-zone leg is the same flux). ⚠ With the soil's evaporation switched
+/// OFF for the flow under test: the by-hand formula has no soil–crop energy split, and the claim is
+/// the resistance's reach, not the split's (that one is `soil_evaporation.rs`'s S3). Restated at the
+/// water-forms adoption (2026-10-10, plan §16), when the loader turned the soil on.
 #[test]
 fn each_lab_form_reaches_the_water_flow_exactly() {
     let p0 = params::biosphere();
     for s in [DEFAULT_SCENARIO, sealed_chamber_scenario()] {
         let frozen = run(&s, &p0, &[], None);
         for form in [SurfaceResistanceForm::FaoFullCover, SurfaceResistanceForm::SzeiczLong] {
-            let p = params_for(form);
+            let mut p = params_for(form);
+            p.transp.soil_evap = science::SoilEvaporationForm::Off;
             let (_, registry): (State, Registry) = build_season_with(&s, &p).expect("build");
             let flow = registry
                 .flows()

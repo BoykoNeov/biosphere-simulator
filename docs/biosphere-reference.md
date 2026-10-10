@@ -397,6 +397,18 @@ irrigation/fertilization), the decomposer
 legs), the water cycle (condensation, recycling, root-zone capture), and the consumer
 (grazing, consumer respiration, consumer mortality), plus the soil's `Drainage`.
 
+⚠ **24 since 2026-10-10, and `aux_set` 3 → 4: the water-forms adoption**
+(`docs/plans/post-roadmap-soil-evaporation.md` §16). `Irrigation` and `Recycling` left the set;
+`EventIrrigation` and `EventRecycling` (watering in events, FAO-56's trigger, each wrapping the old
+flow as its wiring) and `SubsoilOverflow` (the store below the roots drains its excess back to the
+watering reservoir) joined it. `SoilSurfaceAccount` joined `aux_set`: the top layer's account and the
+soil evaporation's clocks. Two changes are invisible to both sets and are stated here instead:
+`Transpiration` now reads the canopy's leaf area (Szeicz–Long) and carries the bare soil's
+evaporation as a second water leg, with the energy split between soil and crop; and
+`RootZoneCapture` credits new roots with the deep store's actual wetness. ⚠ Under event watering the
+open field's `irrigation_mm_day` is only an on/off switch: any positive value refills the whole
+deficit at the trigger.
+
 ⚠ **23 since 2026-08-12: `StemRemobilization` was ADDED** by the stem-reserve build
 (`docs/plans/post-roadmap-stem-reserves.md`), together with **one new stock**,
 `stem_reserve_c`. ⚠ The count also absorbs a correction: this line read **21** while the
@@ -915,6 +927,34 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-10 — THE WATER FORMS ADOPTED: Szeicz–Long's leaf-area canopy resistance, the bare soil's
+  two-stage evaporation drawing on the whole root zone, watering in events (FAO-56's trigger), new roots
+  credited with the deep store's actual wetness, and the deep store's excess recycled. 6 goldens here
+  (4 on the station), their `golden_sha256` rows; `flow_set` −`Irrigation` −`Recycling` +`EventIrrigation`
+  +`EventRecycling` +`SubsoilOverflow` (24); `aux_set` +`SoilSurfaceAccount` (4). Water only.** The user's
+  *"Step 2"*, after the forms were built in the lab, priced twice and the soil's supply chosen on
+  *"Strive for what is closer to reality"* (2026-10-09). Plan, predictions (committed before the loader
+  lines changed) and grading: `docs/plans/post-roadmap-soil-evaporation.md` §16; the canopy form's own
+  record `docs/plans/post-roadmap-canopy-resistance.md`. **The change** is five loader lines
+  (`params.rs`): the forms were built lab-only and their coefficients moved into `transpiration.yaml` and
+  `water_cycle.yaml` by the entry below, so this one moves no file. **What moved.** `season_euler`: root
+  zone −48.9 %; the soil evaporated 45.87 kg into its own new boundary sink (`boundary.soil_evaporation`).
+  The sealed chambers: condensate up 6–11× (8.15 kg → 62.0 `sealed_chamber`, 88.3 / 74.1 perennial, 59.0
+  / 89.7 consumer), root zone −33 % to −51 %, the store below the roots +7–8 % (to its capacity, 26 kg) —
+  the water sits in the tank between waterings instead of in the soil. Air vapour ends every run where it
+  did (`sealed_chamber` 0.2505 kg). No carbon, nitrogen, oxygen, energy, root-depth or development value
+  moved anywhere; `drift_summary` and `sealed_energy_drift_summary` are byte-identical, and so is every
+  crop-free golden. `season_euler` equals the pre-dehumidifier pricing's golden byte for byte (§13); the
+  chambers differ from it by that fix, as predicted. **The tolerance contract.** The soil path adds `sqrt`
+  (the Stage II decline) and `exp` (the energy split) to all 10 moved goldens' graphs; `tiers.json` names
+  both sites, and the bands are measured on Linux CI, not here. **The 20 reds** were restated by class
+  (plan §11d, §16b): the switch-identity instruments now route the loader's forms; the tests of the
+  book's own deep store pin the five old forms, which stay lab switches (a dry store, a fixed-point
+  re-sow cycle and a crop watered below its demand exist only there — event watering re-wets the store
+  below the roots and refills the whole deficit, so `irrigation_mm_day` is only an on/off switch now);
+  the drought bound is asserted per step, as Eqn 15.8 states it; the knockout drops both routes to the
+  deep water; the infinite-param check asserts the build's refusal and keeps the fold guard's witness
+  under `Off`. Advisor-reviewed before code. `git diff rust/crates/simcore/` empty.
 - **2026-10-10 — plumbing ahead of the water-forms adoption: twelve coefficients moved from code into
   `transpiration.yaml` (nine) and `water_cycle.yaml` (three), and the params-free re-sow retired. No golden
   moved; `transpiration.yaml`'s and `water_cycle.yaml`'s digests are the only manifest change.** The first of

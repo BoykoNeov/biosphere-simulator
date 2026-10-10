@@ -1,10 +1,15 @@
 {
   "aux": {
     "rooted_depth": "0x1.4cdb27d755978p+0",
+    "soil_dry_days": "0x1.9c00000000000p+3",
+    "soil_evap_today": "0x1.f6c7718b27fd2p-6",
+    "soil_potential_today": "0x1.999f1a494f4e2p+0",
+    "soil_shade_lai": "0x1.ff870bca5db0bp+1",
     "station.plant_window.par": "0x0.0p+0",
     "station.plant_window.temp": "0x1.60cc82fb19f60p+4",
     "station.sown_step": "0x1.1600000000000p+14",
     "thermal_time": "0x1.2475addf5cbf3p+10",
+    "top_soil_water": "0x0.0p+0",
     "vernalization_days": "0x1.bee79052eabe4p+5"
   },
   "n": 19520,
@@ -38,7 +43,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.60f2c7e87de90p+2",
+      "amount": "0x1.2e624c1fb874bp+6",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -194,7 +199,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.45c4d1f374e19p+7",
+      "amount": "0x1.6e9bb76c79e56p+6",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -246,7 +251,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.73dc09036d512p+4",
+      "amount": "0x1.86473c686962cp+4",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },

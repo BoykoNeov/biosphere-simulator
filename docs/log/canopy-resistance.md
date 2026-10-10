@@ -62,3 +62,8 @@ branch never pushed (plan §9–§10).
 
 **DECIDED 2026-10-07 (the user):** bare-soil evaporation first, as its own item, then re-price both
 together; potato adopts with wheat; the pricing branch is kept. Nothing adopted.
+
+**ADOPTED 2026-10-10** together with the bare soil's evaporation (`log/soil-evaporation.md`, plan
+`post-roadmap-soil-evaporation.md` §16): Szeicz–Long is the loader's form, its leaf resistance (100 s/m) and
+Teh's threshold LAI (4.0) are `transpiration.yaml` entries, and the constant 70 s/m and FAO's full-cover form
+stay as lab switches. Potato adopted with wheat.

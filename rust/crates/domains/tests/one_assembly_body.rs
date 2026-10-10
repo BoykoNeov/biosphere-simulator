@@ -345,18 +345,20 @@ fn the_compartments_definition_is_still_excluded_for_the_right_reason() {
 
 /// The lifted helper really did move onto the seam, named rather than inferred.
 ///
-/// The gate above would also pass if `trace_without_flow` had simply been **deleted**, which
+/// The gate above would also pass if `trace_without_flow_with` had simply been **deleted**, which
 /// would take the two root-zone-capture diagnostics with it. This pins the other half: the
-/// helper is still there and it goes through the lab.
+/// helper is still there and it goes through the lab. (It was `trace_without_flow` until the
+/// water-forms adoption, 2026-10-10, when it began taking the params its two callers pin — the
+/// book's forms, `docs/plans/post-roadmap-soil-evaporation.md` §16.)
 #[test]
 fn the_knockout_helper_goes_through_the_lab_seam() {
     let text = std::fs::read_to_string(spine_dir().join(ASSEMBLY_FILE)).expect("system.rs");
     assert!(
-        text.contains("fn trace_without_flow("),
+        text.contains("fn trace_without_flow_with("),
         "the knockout helper is gone — the root-zone-capture diagnostics lost their control"
     );
     assert!(
         text.contains("lab::mechanism::build_season_without("),
-        "trace_without_flow no longer calls the lab seam — it has been re-forked"
+        "trace_without_flow_with no longer calls the lab seam — it has been re-forked"
     );
 }

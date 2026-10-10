@@ -1,9 +1,14 @@
-//! **Bare-soil evaporation, with the leaf-area canopy resistance and watering in events** — LAB-ONLY.
+//! **Bare-soil evaporation, with the leaf-area canopy resistance and watering in events** — the
+//! measurement that priced them.
 //!
 //! Plan: `docs/plans/post-roadmap-soil-evaporation.md` (§4b the design, §6 the predictions, §7 the
-//! watering). Asserts only the instrument — the frozen path through the three new switches is the
-//! frozen run, the floor meets its daily total, the soil and crop shares stay inside the net
-//! radiation, every re-sow resets the new values — and prints the measurement (`--ignored`).
+//! watering). ⚠ **ADOPTED 2026-10-10 (§16):** the loader carries Szeicz–Long, the two-stage soil
+//! evaporation drawing on the whole root zone, watering in events and the settled deep forms. The
+//! old forms are lab switches, and `pre_adoption()` assembles all five of them, so the measurement's
+//! "frozen" row is still the model it was priced against. Asserts only the instrument — the
+//! loader's forms through the switches are the reference run, the floor meets its daily total, the
+//! soil and crop shares stay inside the net radiation, every re-sow resets the new values — and
+//! prints the measurement (`--ignored`).
 
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::perturbations::window_override;
@@ -120,12 +125,21 @@ fn soil_by_day(r: &Run) -> Vec<f64> {
         .collect()
 }
 
-/// Watering in events with the deep soil as settled (plan §10e, §10g); every other form as given.
+/// The deep soil paired with the watering as priced: events with the settled deep forms (plan
+/// §10e, §10g), continuous watering with the book's (the pre-adoption pairing); every other form as
+/// given. Explicit both ways since the adoption (§16), when the loader's own deep forms became the
+/// settled ones.
 fn settled(p: BiosphereParams) -> BiosphereParams {
     if p.water.watering != Water::Fao56Trigger {
-        return p;
+        return with_deep_overflow(with_deep_credit(p, DeepSoilCredit::FullCapacity), DeepOverflow::Held);
     }
     with_deep_overflow(with_deep_credit(p, DeepSoilCredit::ActualWetness), DeepOverflow::Recycled)
+}
+
+/// The model before the water-forms adoption (2026-10-10, plan §16): the constant resistance, no
+/// soil evaporation, continuous watering and the book's deep store — all five as lab switches.
+fn pre_adoption() -> BiosphereParams {
+    settled(params(Rs::Constant, Soil::Off, Water::Continuous))
 }
 
 const ON: Soil = Soil::TwoStage { floor: true, supply: SoilSupply::TopLayer };
@@ -133,13 +147,15 @@ const OFF_FLOOR: Soil = Soil::TwoStage { floor: false, supply: SoilSupply::TopLa
 /// The book's program: the soil's evaporation is not capped at the top layer's water (plan §12).
 const BOOK_SUPPLY: Soil = Soil::TwoStage { floor: false, supply: SoilSupply::RootZone };
 
-/// S1 — with the soil off, the constant resistance and continuous watering, the new path is the
-/// frozen run to the bit.
+/// S1 — the loader's forms, routed through the switches, are the reference run to the bit. (Until
+/// 2026-10-10 the loader's forms were the old ones, and this pinned those; restated at the
+/// adoption, plan §16.)
 #[test]
-fn the_frozen_forms_through_the_switches_are_the_frozen_run() {
+fn the_loaders_forms_through_the_switches_are_the_reference_run() {
     for s in [DEFAULT_SCENARIO, sealed_chamber_scenario()] {
         let frozen = run(&s, &params::biosphere(), 1, false, None);
-        let switched = run(&s, &params(Rs::Constant, Soil::Off, Water::Continuous), 1, false, None);
+        let switched =
+            run(&s, &settled(params(Rs::SzeiczLong, BOOK_SUPPLY, Water::Fao56Trigger)), 1, false, None);
         let bits = |st: &State| -> Vec<u64> {
             st.stocks
                 .values()
@@ -271,7 +287,7 @@ fn measurement() {
         ("consumer chamber", consumer_chamber_scenario(), 5, true),
     ];
     for (name, s, years, perennial) in &named {
-        let frozen = run(s, &params::biosphere(), *years, *perennial, None);
+        let frozen = run(s, &pre_adoption(), *years, *perennial, None);
         println!("\n{name} ({years} y): water out of the root zone (kg/yr) | of it soil | at LAI<0.5 | Stage I share | events | lowest FTSW | carbon == frozen | dead-crop vapour / frozen | dead-crop soil / frozen crop water | peak top fill / capacity | end vapour (kg)");
         for (label, rs, soil, water) in configs {
             let p = settled(params(rs, soil, water));

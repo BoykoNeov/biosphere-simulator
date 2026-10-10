@@ -207,14 +207,15 @@ pub fn biosphere_with_vpd_read(
     Ok(p)
 }
 
-/// The frozen params under an alternative **canopy surface resistance** form — lab-only
+/// The frozen params under a chosen **canopy surface resistance** form
 /// (`docs/plans/post-roadmap-canopy-resistance.md`).
 ///
-/// [`SurfaceResistanceForm::Constant`] is the loader's value (the file's 70 s m⁻¹, whatever the
-/// leaf area). The two lab forms read the crop's LAI: FAO-56 Eq. 5 (scoped by its source to dense
-/// full cover) and Teh Eq. 4.80 after Szeicz & Long (a composite leaf value; no light response).
+/// [`SurfaceResistanceForm::SzeiczLong`] — Teh Eq. 4.80 after Szeicz & Long (a composite leaf value;
+/// no light response) — is the loader's since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16). The lab's are the
+/// constant (the file's 70 s m⁻¹, whatever the leaf area; the reference before) and FAO-56 Eq. 5
+/// (scoped by its source to dense full cover).
 ///
-/// # ⚠ This endorses no form
+/// # ⚠ A switch, not an endorsement of the form switched to
 pub fn biosphere_with_rs_form(
     subs: &[Substitution],
     form: SurfaceResistanceForm,
@@ -224,11 +225,14 @@ pub fn biosphere_with_rs_form(
     Ok(p)
 }
 
-/// The frozen params with **bare-soil evaporation** switched on, under a canopy-resistance form —
-/// lab-only (`docs/plans/post-roadmap-soil-evaporation.md`). The user's order: soil evaporation is
-/// built and then priced together with the canopy resistance, so the two are set together here.
+/// The frozen params under a chosen **soil evaporation**, canopy-resistance form and watering
+/// (`docs/plans/post-roadmap-soil-evaporation.md`). The user's order: soil evaporation was built and
+/// then priced together with the canopy resistance, so the two are set together here. The loader's
+/// own three since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16) are the two-stage soil evaporation (floor off,
+/// the whole root zone), Szeicz–Long and watering in events; routed through here they are the
+/// reference run to the bit (`tests/soil_evaporation.rs` S1).
 ///
-/// # ⚠ This endorses no form
+/// # ⚠ A switch, not an endorsement of the forms switched to
 pub fn biosphere_with_soil_evaporation(
     subs: &[Substitution],
     rs_form: SurfaceResistanceForm,
@@ -242,24 +246,26 @@ pub fn biosphere_with_soil_evaporation(
     Ok(p)
 }
 
-/// `p` with new roots credited by `form` ([`DeepSoilCredit`]) — lab-only
+/// `p` with new roots credited by `form` ([`DeepSoilCredit`])
 /// (`docs/plans/post-roadmap-soil-evaporation.md` §10e). Takes built params so it composes with the
 /// other forms: alone over [`biosphere_with`], or over [`biosphere_with_soil_evaporation`].
 ///
-/// # ⚠ This endorses no form
+/// # ⚠ A switch, not an endorsement of the form switched to
 ///
-/// [`DeepSoilCredit::FullCapacity`] (Soltani & Sinclair Eqn 14.10) is the reference and stays it.
+/// [`DeepSoilCredit::ActualWetness`] is the reference's since the water-forms adoption (2026-10-10);
+/// [`DeepSoilCredit::FullCapacity`] (Soltani & Sinclair Eqn 14.10) was, and is the lab's now.
 pub fn with_deep_credit(mut p: BiosphereParams, form: DeepSoilCredit) -> BiosphereParams {
     p.water.deep_credit = form;
     p
 }
 
-/// `p` with the deep store's overflow handled by `form` ([`DeepOverflow`]) — lab-only
+/// `p` with the deep store's overflow handled by `form` ([`DeepOverflow`])
 /// (`docs/plans/post-roadmap-soil-evaporation.md` §10g). Composes as [`with_deep_credit`].
 ///
-/// # ⚠ This endorses no form
+/// # ⚠ A switch, not an endorsement of the form switched to
 ///
-/// [`DeepOverflow::Held`] (Soltani & Sinclair Eqn 14.12, no outflow) is the reference and stays it.
+/// [`DeepOverflow::Recycled`] is the reference's since the water-forms adoption (2026-10-10);
+/// [`DeepOverflow::Held`] (Soltani & Sinclair Eqn 14.12, no outflow) was, and is the lab's now.
 pub fn with_deep_overflow(mut p: BiosphereParams, form: DeepOverflow) -> BiosphereParams {
     p.water.deep_overflow = form;
     p
@@ -785,10 +791,22 @@ mod tests {
     /// the infinity in a FOLD, not in a stock, and the fold is marked dead rather than printed.
     /// Reached here only by bypassing the refusal above — which is the point: it is the second
     /// line, and before 2026-09-29 it printed peak LAI as `inf`.
+    ///
+    /// ⚠ Since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md`
+    /// §16b) the reference STORES a value folded from this param: the soil account's
+    /// `soil_shade_lai` starts at the seedling's leaf area, so the infinity reaches a stored value
+    /// and the build refuses it (`State::new`), earlier and louder than the fold guard. Both halves
+    /// are pinned: the refusal on the reference, and the fold guard on the same params with the
+    /// soil's evaporation off (a lab switch), where the infinity again reaches only a fold.
     #[test]
     fn an_infinite_param_that_reaches_a_run_is_reported_dead_not_printed() {
         let subs = [Substitution::new("canopy.yaml", "carbon_fraction", 0.0)];
-        let p = build(&subs, Bounds::WhatIf).expect("the unguarded build");
+        let mut p = build(&subs, Bounds::WhatIf).expect("the unguarded build");
+        let Err(refused) = report::measure_composed("inf", &p, false, None) else {
+            panic!("the reference stores the infinite seedling shade, so the build must refuse");
+        };
+        assert!(refused.to_string().contains("soil_shade_lai"), "{refused}");
+        p.transp.soil_evap = crate::biosphere::science::SoilEvaporationForm::Off;
         let col = report::measure_composed("inf", &p, false, None).expect("measured");
         assert!(
             col.values.iter().all(|(_, v)| v.is_finite()),

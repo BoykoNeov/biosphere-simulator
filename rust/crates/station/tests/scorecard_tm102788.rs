@@ -426,15 +426,22 @@ fn airflow_alone_cannot_reach_the_trials_water_use() {
 
 /// R1 — a WHAT-IF air resistance reaches `Transpiration`: the run's W1 equals Penman–Monteith on
 /// the same forcings at the substituted value.
+///
+/// ⚠ Run under the constant surface resistance and no soil evaporation (both lab switches since
+/// the water-forms adoption, 2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16): the
+/// by-hand formula is the full-canopy one, with neither the leaf-area resistance nor the soil–crop
+/// energy split, and the claim is about the air resistance reaching the flow, not about the forms.
 #[test]
 fn a_what_if_air_resistance_reaches_the_water_flow() {
     let (_, rs) = transpiration_params();
-    let p = domains::lab::biosphere_what_if(&[domains::lab::Substitution::new(
+    let mut p = domains::lab::biosphere_what_if(&[domains::lab::Substitution::new(
         "transpiration.yaml",
         "aerodynamic_resistance",
         10.0,
     )])
     .expect("what-if params");
+    p.transp.rs_form = science::SurfaceResistanceForm::Constant;
+    p.transp.soil_evap = science::SoilEvaporationForm::Off;
     let r = run_what_if(&p, 1.0);
     let model = mean(W1_DAYS.map(|d| daily_water(&r, d)));
     let hand = w1_by_hand(10.0, rs, 1.0);

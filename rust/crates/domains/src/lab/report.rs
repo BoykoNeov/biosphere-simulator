@@ -1005,9 +1005,16 @@ mod tests {
 
     /// ⚠⚠ **Requirement 8**, and it is the finding this slice did not go looking for: a
     /// knockout can **end the run**, and that is the ordinary case rather than the exception.
-    /// Without root water uptake the crop never stores enough carbon to re-sow, so both
+    /// Without the deep water the crop never stores enough carbon to re-sow, so both
     /// perennial chambers raise at the annual reset while the two non-perennial runs complete
     /// normally.
+    ///
+    /// ⚠ Two flows dropped since the water-forms adoption (2026-10-10,
+    /// `docs/plans/post-roadmap-soil-evaporation.md` §16b): the reference's recycled deep
+    /// overflow is a second route to the same deep water (as roots deepen, the store below them
+    /// rises over its own capacity, drains to the tank and is watered back), so dropping root
+    /// capture alone left every run alive with the intact run's grain. Dropping both is the
+    /// knockout this test was written about.
     ///
     /// Before this was handled the whole report panicked from inside `readouts`, four levels
     /// below the caller, on the first mechanism column anyone would think to run.
@@ -1018,13 +1025,13 @@ mod tests {
     #[test]
     fn a_knockout_that_kills_the_run_reports_it_and_keeps_the_runs_that_survived() {
         let (columns, text) = short_report(
-            "drop root_zone_capture",
-            Composition::dropping(&["biosphere.root_zone_capture"]),
+            "drop root_zone_capture + subsoil_overflow",
+            Composition::dropping(&["biosphere.root_zone_capture", "biosphere.subsoil_overflow"]),
         );
         let col = &columns[1];
         assert!(
             col.not_applicable.is_empty(),
-            "root_zone_capture is in all four builds: {:?}",
+            "root_zone_capture and subsoil_overflow are in all four builds: {:?}",
             col.not_applicable
         );
         let dead: Vec<&str> = col.failed.iter().map(|(i, _)| SPECS[*i].scenario).collect();
