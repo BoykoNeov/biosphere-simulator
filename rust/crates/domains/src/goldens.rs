@@ -68,6 +68,7 @@ use crate::power::{
     build_power, power_resolver, BOUNDED_SOC_DAYS, BOUNDED_SOC_SCENARIO, SELF_DISCHARGE_DAYS,
 };
 use crate::thermal::{build_thermal, thermal_resolver, EQUILIBRIUM_SCENARIO, EQUILIBRIUM_STEPS};
+use crate::biosphere::params as bio_params;
 use crate::{params, run};
 
 // --------------------------------------------------------------------------- //
@@ -477,7 +478,7 @@ pub fn sealed_chamber() -> String {
 pub fn perennial_chamber(years: usize) -> String {
     let scenario = perennial_chamber_scenario();
     let (final_state, rationed, events) =
-        run_perennial_final(&scenario, years).expect("run_perennial");
+        run_perennial_final(&scenario, years, &bio_params::biosphere()).expect("run_perennial");
     assert_eq!(rationed, 0, "Tier-0: perennial rationed must be 0");
     assert!(events.is_empty(), "Tier-0: perennial events must be empty");
     snapshot(&final_state)
@@ -487,7 +488,7 @@ pub fn perennial_chamber(years: usize) -> String {
 pub fn consumer_chamber(years: usize) -> String {
     let scenario = consumer_chamber_scenario();
     let (final_state, rationed, events) =
-        run_perennial_final(&scenario, years).expect("run_perennial");
+        run_perennial_final(&scenario, years, &bio_params::biosphere()).expect("run_perennial");
     assert_eq!(rationed, 0, "Tier-0: consumer rationed must be 0");
     assert!(events.is_empty(), "Tier-0: consumer events must be empty");
     snapshot(&final_state)
@@ -634,8 +635,8 @@ pub fn thermal() -> String {
 pub fn drift_summary() -> String {
     use crate::biosphere::drift::{is_period_2, year_summaries};
     use crate::biosphere::stocks::{CONSUMER_CARBON, LEAF_C};
-    use crate::biosphere::{consumer_chamber_scenario, perennial_chamber_scenario, run_perennial};
-    use crate::biosphere::{season_setup, season_steps};
+    use crate::biosphere::{consumer_chamber_scenario, perennial_chamber_scenario, run_perennial_with};
+    use crate::biosphere::{season_setup_with, season_steps};
     use simcore::hexfloat;
     use std::fmt::Write as _;
 
@@ -652,13 +653,17 @@ pub fn drift_summary() -> String {
     let steps = steps_for_years(years);
     let year = season_steps();
 
+    // One frozen load per run, handed to the build and to the re-sow alike (§16d).
+    let frozen = bio_params::biosphere();
     let perennial = perennial_chamber_scenario();
-    let (p_state, p_integ, p_res) = season_setup(&perennial, years).expect("perennial setup");
+    let (p_state, p_integ, p_res) =
+        season_setup_with(&perennial, years, &frozen).expect("perennial setup");
     let mut perennial_leaf: Vec<f64> = Vec::new();
-    let (_final, rationed, events) = run_perennial(
+    let (_final, rationed, events) = run_perennial_with(
         &p_integ,
         p_state,
         &perennial,
+        &frozen,
         &p_res,
         BIO_DT,
         steps,
@@ -673,13 +678,15 @@ pub fn drift_summary() -> String {
     );
 
     let consumer = consumer_chamber_scenario();
-    let (c_state, c_integ, c_res) = season_setup(&consumer, years).expect("consumer setup");
+    let (c_state, c_integ, c_res) =
+        season_setup_with(&consumer, years, &frozen).expect("consumer setup");
     let mut consumer_leaf: Vec<f64> = Vec::new();
     let mut consumer_carbon: Vec<f64> = Vec::new();
-    let (_final, rationed, events) = run_perennial(
+    let (_final, rationed, events) = run_perennial_with(
         &c_integ,
         c_state,
         &consumer,
+        &frozen,
         &c_res,
         BIO_DT,
         steps,

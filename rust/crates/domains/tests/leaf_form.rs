@@ -15,15 +15,18 @@
 //!   comparison catches the type — *until someone regenerates the manifest*, which is the hole
 //!   `lab_only_mechanisms.rs` names for lab flow types. That scan does not see this type (it
 //!   lives in the spine, like the forms' branches do), so the manifests are read here as text;
-//! * a perennial run of the form re-sown by the frozen `annual_reset`, which cannot reset the
-//!   stored area. On the Python branch that rationed 85 times. It is an error now, pinned below.
+//! * a perennial run of the form re-sown without resetting the stored area. On the Python
+//!   branch that rationed 85 times. Until 2026-10-10 a params-free `annual_reset` refused such a
+//!   state; it was retired when the soil account entered the reference (soil-evaporation plan
+//!   §16d), so the only re-sow takes the params and the omission cannot be written. The reset
+//!   itself is pinned below.
 
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::readouts::{leaf_thickness_ratio, peak_lai, step_draws, trajectory};
 use domains::biosphere::science::{self, LeafAreaForm};
 use domains::biosphere::stocks::{CARBON_POOL, LEAF_AREA_INDEX, LEAF_C};
 use domains::biosphere::system::{
-    annual_reset, annual_reset_with, build_season, build_season_with, consumer_chamber_scenario,
+    annual_reset_with, build_season, build_season_with, consumer_chamber_scenario,
     perennial_chamber_scenario, sealed_chamber_scenario, SeasonScenario, DEFAULT_SCENARIO,
 };
 use domains::lab::biosphere_with_leaf_form;
@@ -97,36 +100,34 @@ fn the_form_seeds_the_seedlings_derived_area_and_wires_the_process() {
     }
 }
 
-/// The frozen re-sow refuses a stored leaf area rather than silently skip resetting it.
+/// The re-sow resets a stored leaf area to the seedling's own derived area. (Until 2026-10-10 this
+/// also pinned the params-free `annual_reset` refusing the state; that reset is retired, §16d.)
 #[test]
-fn the_frozen_resow_refuses_a_stored_leaf_area() {
+fn the_resow_resets_a_stored_leaf_area_to_the_seedlings() {
     let s = perennial_chamber_scenario();
     let (mut state, _) = build_season_with(&s, &lab()).expect("build");
     // A crop worth re-sowing: enough grain for the seed bank.
     let grown = state.stocks["biosphere.storage_c"].with_amount(1.0).expect("amount");
     state.stocks.insert("biosphere.storage_c".to_string(), grown);
     state.aux.insert(LEAF_AREA_INDEX.to_string(), 4.0);
-    let err = annual_reset(&state, &s).expect_err("must refuse");
-    assert!(err.to_string().contains("annual_reset_with"), "{err}");
-
     let resown = annual_reset_with(&state, &s, &lab()).expect("re-sow");
     assert_eq!(resown.aux[LEAF_AREA_INDEX].to_bits(), derived_seedling_lai(&s).to_bits());
     assert_eq!(resown.stocks[LEAF_C].amount, s.leaf_c0);
 }
 
-/// On a state that stores no leaf area the two re-sows are the same function.
+/// On a state that stores no leaf area the re-sow adds none: the stored key exists only under
+/// the lab form. (Until 2026-10-10 this compared the params-free `annual_reset` with the
+/// params-taking one; with one route left, what survives of that claim is this, §16d.)
 #[test]
-fn the_params_aware_resow_is_the_frozen_one_on_a_frozen_state() {
+fn the_resow_adds_no_leaf_area_to_a_state_that_stores_none() {
     let s = perennial_chamber_scenario();
     let (mut state, _) = build_season(&s).expect("build");
     let grown = state.stocks["biosphere.storage_c"].with_amount(1.0).expect("amount");
     state.stocks.insert("biosphere.storage_c".to_string(), grown);
-    let a = annual_reset(&state, &s).expect("frozen");
-    let b = annual_reset_with(&state, &s, &params::biosphere()).expect("with");
-    assert_eq!(a.aux, b.aux);
-    for (id, stock) in &a.stocks {
-        assert_eq!(stock.amount.to_bits(), b.stocks[id].amount.to_bits(), "{id}");
-    }
+    let b = annual_reset_with(&state, &s, &params::biosphere()).expect("re-sow");
+    assert!(!b.aux.contains_key(LEAF_AREA_INDEX));
+    let keys = |st: &simcore::state::State| st.aux.keys().cloned().collect::<Vec<_>>();
+    assert_eq!(keys(&state), keys(&b));
 }
 
 /// The node rate, from its closed form: at emergence `MSNN = 1`, so the rate is

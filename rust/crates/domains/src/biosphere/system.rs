@@ -5,7 +5,7 @@
 //! flow/aux registry (the integrator stays global — one clock, one ledger, one gate).
 //! `weather_resolver` builds the tiled forcing tables from the raw facts. `run_season`
 //! carries the optional `reset` hook (its conservation checkpoint included) that
-//! `run_perennial` drives with `annual_reset` at each year boundary.
+//! `run_perennial_with` drives with `annual_reset_with` at each year boundary.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -950,6 +950,8 @@ fn transpiration_flow(
                 leaf_c: LEAF_C.to_string(),
                 sla_per_mol_c: p.canopy.sla_per_mol_c,
                 leaf_area_aux: stores_leaf_area(p).then(|| LEAF_AREA_INDEX.to_string()),
+                leaf_resistance: p.transp.leaf_stomatal_resistance,
+                threshold_lai: p.transp.threshold_lai,
             }
         }),
         // The lab soil-evaporation form only; `None` on every frozen build.
@@ -968,6 +970,7 @@ fn transpiration_flow(
                 today_evap_aux: SOIL_EVAP_TODAY.to_string(),
                 today_potential_aux: SOIL_POTENTIAL_TODAY.to_string(),
                 soil_sink: (!scenario.sealed).then(|| SOIL_EVAP_SINK.to_string()),
+                coef: p.transp.soil,
             }),
         },
     }
@@ -976,7 +979,7 @@ fn transpiration_flow(
 /// The trigger `FTSW = 1 − p` for watering in events, or `None` (continuous, the loader's).
 fn event_trigger(p: &params::BiosphereParams) -> Option<f64> {
     (p.water.watering == science::WateringForm::Fao56Trigger)
-        .then_some(1.0 - science::FAO56_WHEAT_DEPLETION)
+        .then_some(1.0 - p.water.depletion_fraction)
 }
 
 /// The open field's watering — ONE builder for the season's flow and the soil account's copy:
@@ -996,7 +999,7 @@ fn irrigation_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Bo
         Some(trigger_ftsw) => Box::new(EventIrrigation {
             inner,
             trigger_ftsw,
-            application_efficiency: science::SPRINKLER_APPLICATION_EFFICIENCY,
+            application_efficiency: p.water.sprinkler_efficiency,
             subsoil_water: SUBSOIL_WATER.to_string(),
         }),
     }
@@ -1015,7 +1018,7 @@ fn recycling_flow(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Box
         Some(trigger_ftsw) => Box::new(EventRecycling {
             inner,
             trigger_ftsw,
-            application_efficiency: science::DRIP_APPLICATION_EFFICIENCY,
+            application_efficiency: p.water.drip_efficiency,
             subsoil_water: SUBSOIL_WATER.to_string(),
             rooted_depth_aux: ROOTED_DEPTH.to_string(),
             soil_extractable_water: scenario.soil_extractable_water,
@@ -1064,7 +1067,7 @@ fn soil_surface_initial(
     rooted_depth: f64,
 ) -> [(String, f64); 5] {
     let share = if rooted_depth > 0.0 {
-        (science::TOP_LAYER_DEPTH_M / rooted_depth).min(1.0)
+        (p.transp.soil.top_layer_depth / rooted_depth).min(1.0)
     } else {
         1.0
     };
@@ -1364,33 +1367,19 @@ pub fn weather_resolver(
     SourceResolver::new(weather_forcings(scenario, years)?, weather_shared(scenario))
 }
 
-/// The annual phenology reset / re-sow (P3.4) — a pure, carbon-conserving transform.
+/// The annual phenology reset / re-sow (P3.4) — a pure, carbon-conserving transform, for a
+/// state built from `p`.
 ///
-/// ⚠ **Refuses a state that stores leaf area** (the lab `LeafAreaForm::NodeEnvelope`). That
-/// state must be re-sown by [`annual_reset_with`], which has the params to compute the
-/// seedling's area; this signature does not, and reaching for `params::canopy()` here would be
-/// the step-time escape `tests/param_funnel.rs` exists to catch. Omitting the reset is not
-/// harmless — on the Python branch it handed each seedling the dead crop's canopy and rationed
-/// 85 times on `consumer_long_horizon` — so a path that cannot do it errors instead.
-pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, SimError> {
-    if state.aux.contains_key(LEAF_AREA_INDEX) {
-        return Err(SimError::Validation(format!(
-            "annual_reset: this state stores {LEAF_AREA_INDEX:?} (the lab leaf form) and \
-             must be re-sown by annual_reset_with, which can reset it"
-        )));
-    }
-    if state.aux.contains_key(TOP_SOIL_WATER) {
-        return Err(SimError::Validation(format!(
-            "annual_reset: this state stores {TOP_SOIL_WATER:?} (the lab soil-evaporation form) \
-             and must be re-sown by annual_reset_with, which can reset it"
-        )));
-    }
-    reset_crop(state, scenario)
-}
-
-/// [`annual_reset`] for a state built from `p` — also re-sows a stored leaf area, to the
-/// seedling's own derived area (the expression `build_season_with` seeds), so a re-sown crop
-/// starts exactly where a sown one does. Identical to [`annual_reset`] when `p` stores none.
+/// ⚠ **It takes the params the run was built from, and there is no params-free twin.** The
+/// state can store values whose re-sown value depends on params: the soil account's
+/// (`soil_surface_initial`: the seedling's leaf area shades the soil, the top layer takes its
+/// share of the zone) and the lab leaf form's stored area. Until 2026-10-10 a params-free
+/// `annual_reset` refused such a state instead; once the loader carried the soil account it would
+/// have refused every reference run, so it was retired (`docs/plans/post-roadmap-soil-evaporation.md`
+/// §16d). Loading the frozen params here instead would be the step-time escape
+/// `tests/param_funnel.rs` exists to catch: a run built from an override would be re-sown with
+/// frozen values. Omitting the reset is not harmless either — on the Python branch it handed each
+/// seedling the dead crop's canopy and rationed 85 times on `consumer_long_horizon`.
 pub fn annual_reset_with(
     state: &State,
     scenario: &SeasonScenario,
@@ -1553,25 +1542,8 @@ pub fn run_season(
     Ok((state, total_rationed, events))
 }
 
-/// `run_season` with `annual_reset` applied every `year` steps (P3.4).
-#[allow(clippy::too_many_arguments)]
-pub fn run_perennial(
-    integrator: &EulerIntegrator,
-    initial: State,
-    scenario: &SeasonScenario,
-    resolver: &SourceResolver,
-    dt: f64,
-    steps: usize,
-    year: usize,
-    observer: &mut dyn FnMut(&State),
-) -> Result<(State, u64, Vec<Event>), SimError> {
-    let resow = |current: &State| annual_reset(current, scenario);
-    perennial_body(integrator, initial, resolver, dt, steps, year, &resow, observer)
-}
-
-/// [`run_perennial`] re-sowing through [`annual_reset_with`] — the route for a state built from
-/// `p` under the lab leaf form, whose stored leaf area must reset with the crop. Identical to
-/// [`run_perennial`] for any `p` that stores none.
+/// `run_season` with [`annual_reset_with`] applied every `year` steps (P3.4), re-sowing with the
+/// params the run was built from — the caller's `p`, the same object it built the season with.
 #[allow(clippy::too_many_arguments)]
 pub fn run_perennial_with(
     integrator: &EulerIntegrator,
@@ -1588,7 +1560,7 @@ pub fn run_perennial_with(
     perennial_body(integrator, initial, resolver, dt, steps, year, &resow, observer)
 }
 
-/// The schedule both perennial runs share — one copy of *when* a re-sow happens.
+/// The perennial schedule — one copy of *when* a re-sow happens.
 #[allow(clippy::too_many_arguments)]
 fn perennial_body(
     integrator: &EulerIntegrator,
@@ -2054,10 +2026,11 @@ mod tests {
             prev = Some((depth, below, held));
         };
         let steps = super::super::steps_for_years(2);
-        let (_, rationed, _) = run_perennial(
+        let (_, rationed, _) = run_perennial_with(
             &integrator,
             state,
             &scenario,
+            &params::biosphere(),
             &resolver,
             super::super::BIO_DT,
             steps,
@@ -2379,7 +2352,7 @@ mod tests {
         aux.insert(ROOTED_DEPTH.to_string(), grown_depth);
         let before = State::new(state.n, stocks, state.rng_seed, aux).unwrap();
 
-        let after = annual_reset(&before, &scenario).expect("re-sow");
+        let after = annual_reset_with(&before, &scenario, &params::biosphere()).expect("re-sow");
         let returned = after.stocks[SUBSOIL_WATER].amount - below0;
         let lost = held - after.stocks[SOIL_WATER].amount;
 
@@ -2460,7 +2433,7 @@ mod tests {
     #[test]
     fn perennial_chamber_resows_and_stays_closed() {
         let (final_state, rationed, events) =
-            run_perennial_final(&perennial_chamber_scenario(), PERENNIAL_CHAMBER_YEARS)
+            run_perennial_final(&perennial_chamber_scenario(), PERENNIAL_CHAMBER_YEARS, &params::biosphere())
                 .expect("perennial");
         assert_eq!(
             final_state.n as usize,
@@ -2485,7 +2458,7 @@ mod tests {
         let scenario = perennial_chamber_scenario();
         let (state, _) = build_season(&scenario).unwrap();
         // storage_c starts at 0 < seedling_total, so a reset must error.
-        let err = annual_reset(&state, &scenario);
+        let err = annual_reset_with(&state, &scenario, &params::biosphere());
         assert!(matches!(err, Err(SimError::Validation(_))));
     }
 
@@ -3005,10 +2978,11 @@ mod tests {
         let (state, integrator, resolver) = super::super::season_setup(&scenario, 3).unwrap();
         let mut depths: Vec<f64> = Vec::new();
         let mut observe = |s: &State| depths.push(s.aux[ROOTED_DEPTH]);
-        let (_, rationed, _) = run_perennial(
+        let (_, rationed, _) = run_perennial_with(
             &integrator,
             state,
             &scenario,
+            &params::biosphere(),
             &resolver,
             super::super::BIO_DT,
             super::super::steps_for_years(3),
@@ -3413,10 +3387,11 @@ mod tests {
             both.push(s.stocks[SUBSOIL_WATER].amount + s.stocks[SOIL_WATER].amount);
         };
         let year = super::super::season_steps();
-        let (_, rationed, _) = run_perennial(
+        let (_, rationed, _) = run_perennial_with(
             &integrator,
             state,
             &scenario,
+            &params::biosphere(),
             &resolver,
             super::super::BIO_DT,
             super::super::steps_for_years(years),
@@ -3568,7 +3543,7 @@ mod tests {
         let litter_n0 = stocks[LITTER_N].amount;
         let before = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).unwrap();
 
-        let after = annual_reset(&before, &scenario).expect("re-sow");
+        let after = annual_reset_with(&before, &scenario, &params::biosphere()).expect("re-sow");
 
         // (a) THE SPLIT: the seedling inherits the parent's tissue concentration.
         // old_veg = 4 + 2 + 2 = 8 mol C, so conc = 0.2 / 8 = 0.025 kg N per mol C.
@@ -3642,10 +3617,11 @@ mod tests {
             };
             let steps = super::super::steps_for_years(years);
             if perennial {
-                run_perennial(
+                run_perennial_with(
                     &integrator,
                     state,
                     scenario,
+                    &params::biosphere(),
                     &resolver,
                     BIO_DT,
                     steps,

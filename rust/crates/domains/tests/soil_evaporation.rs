@@ -17,7 +17,7 @@ use domains::biosphere::stocks::{
     TOP_SOIL_WATER, WATER_VAPOR,
 };
 use domains::biosphere::system::{
-    annual_reset, annual_reset_with, consumer_chamber_scenario, perennial_chamber_scenario,
+    annual_reset_with, consumer_chamber_scenario, perennial_chamber_scenario,
     sealed_chamber_scenario, SeasonScenario, DEFAULT_SCENARIO,
 };
 use domains::biosphere::{
@@ -164,8 +164,9 @@ fn the_floor_meets_its_daily_total_and_stage_two_is_a_daily_factor() {
     for (d, evap) in by_day.iter().enumerate() {
         let last = &r.states[(d + 1) * STEPS_PER_DAY - 1];
         let potential = r.states[(d + 1) * STEPS_PER_DAY].aux[SOIL_POTENTIAL_TODAY];
-        let room = last.aux[TOP_SOIL_WATER] > floor + science::TOP_LAYER_WET_MM * s.ground_area;
-        if potential > floor && room && ftsw(last, &s) > science::STAGE_ONE_FTSW {
+        let coef = params::transpiration().soil;
+        let room = last.aux[TOP_SOIL_WATER] > floor + coef.top_layer_wet * s.ground_area;
+        if potential > floor && room && ftsw(last, &s) > coef.stage_one_ftsw {
             checked += 1;
             if *evap < floor - 1e-9 {
                 short += 1;
@@ -202,13 +203,27 @@ fn soil_and_crop_together_stay_inside_the_net_radiation() {
             continue;
         }
         let t = env.get(TEMP_VAR).unwrap();
-        let soil = science::soil_evaporation_potential(rn, 0.23, t, st.aux[SOIL_SHADE_LAI]);
+        let (c, tp) = (p.transp.soil, &p.transp);
+        let soil = science::soil_evaporation_potential(
+            rn,
+            0.23,
+            t,
+            st.aux[SOIL_SHADE_LAI],
+            c.soil_albedo,
+            c.shade_extinction,
+        );
         let crop = science::penman_monteith_transpiration(
-            rn * science::crop_radiation_share(lai(st, &s)),
+            rn * science::crop_radiation_share(lai(st, &s), c.shade_extinction),
             0.0,
             t,
             p.transp.aerodynamic_resistance,
-            science::canopy_surface_resistance(Rs::SzeiczLong, 70.0, lai(st, &s)),
+            science::canopy_surface_resistance(
+                Rs::SzeiczLong,
+                70.0,
+                lai(st, &s),
+                tp.leaf_stomatal_resistance,
+                tp.threshold_lai,
+            ),
         );
         worst = worst.max((to_w(soil) + to_w(crop)) / rn);
     }
@@ -216,21 +231,21 @@ fn soil_and_crop_together_stay_inside_the_net_radiation() {
     assert!(worst <= 1.0 + 1e-9, "energy counted twice: {worst}");
 }
 
-/// S10 — every re-sow resets the new values, and the plain reset refuses a state carrying them.
+/// S10 — every re-sow resets the new values. (Until 2026-10-10 this also pinned the params-free
+/// `annual_reset` refusing the state; that reset is retired, plan §16d.)
 #[test]
-fn a_re_sow_resets_the_soil_values_and_the_plain_reset_refuses_them() {
+fn a_re_sow_resets_the_soil_values() {
     let s = perennial_chamber_scenario();
     let p = params(Rs::SzeiczLong, ON, Water::Fao56Trigger);
     let r = run(&s, &p, 1, false, None);
     let end = r.states.last().unwrap();
-    assert!(annual_reset(end, &s).is_err(), "the plain reset must refuse the lab state");
     let sown = annual_reset_with(end, &s, &p).expect("re-sow");
     let seedling = science::leaf_area_index(s.leaf_c0, p.canopy.sla_per_mol_c, s.ground_area);
     assert_eq!(sown.aux[SOIL_DRY_DAYS], 0.0);
     assert_eq!(sown.aux[SOIL_EVAP_TODAY], 0.0);
     assert_eq!(sown.aux[SOIL_POTENTIAL_TODAY], 0.0);
     assert_eq!(sown.aux[SOIL_SHADE_LAI], seedling);
-    let share = (science::TOP_LAYER_DEPTH_M / sown.aux[ROOTED_DEPTH]).min(1.0);
+    let share = (p.transp.soil.top_layer_depth / sown.aux[ROOTED_DEPTH]).min(1.0);
     assert_eq!(sown.aux[TOP_SOIL_WATER], sown.stocks[SOIL_WATER].amount * share);
 }
 
@@ -294,7 +309,10 @@ fn measurement() {
                     .sum();
                 soil_dead / frozen_dead
             };
-            let cap = science::TOP_LAYER_DEPTH_M * s.soil_extractable_water * 1000.0 * s.ground_area;
+            let cap = params::transpiration().soil.top_layer_depth
+                * s.soil_extractable_water
+                * 1000.0
+                * s.ground_area;
             let peak = if soil == Soil::Off {
                 f64::NAN
             } else {

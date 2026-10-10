@@ -270,8 +270,8 @@ pub fn with_deep_overflow(mut p: BiosphereParams, form: DeepOverflow) -> Biosphe
 /// [`LeafAreaForm::NodeEnvelope`] makes leaf area a state (the parked leaf mechanism,
 /// re-implemented for re-measurement: `docs/plans/post-roadmap-leaf-rust-remeasure.md`). Unlike
 /// the two siblings above it changes the build's SHAPE — it adds an aux process and an aux key
-/// — so a perennial run of these params must re-sow through `annual_reset_with`; the plain
-/// `annual_reset` refuses the state rather than skip the reset.
+/// — so a perennial run of these params must re-sow with these params (`annual_reset_with`, the
+/// only re-sow since 2026-10-10), which resets the stored area with the crop.
 ///
 /// # ⚠ This endorses no form
 ///

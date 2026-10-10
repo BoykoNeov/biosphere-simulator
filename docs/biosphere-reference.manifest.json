@@ -172,8 +172,8 @@
     "root_depth.yaml": "fefdbcc39e3e5cb1ef88368a30afe467b7be6ac3dd825657574bcdc020b358e7",
     "senescence.yaml": "02517d8459e63ffb8e591d85cd8135e64de1168de213090c785bb5cd9fb565ca",
     "stem_reserves.yaml": "65ae25bf8ec5ad213763c41282221837b3d0e6e8de14a70d2c5ed53ed9cbe39e",
-    "transpiration.yaml": "8859b2a8612372f9ae7d4468754d3b2d5a3e4530941281fb81327fc2daf303eb",
-    "water_cycle.yaml": "f2ad523b99881ef567641e4bcd79ac2680d24f0e764492ca89317fd0796fc6fa"
+    "transpiration.yaml": "d9eea06c1117d2066defd5ef6a09339b75a88a34e4c5a2c8220d004d851e16af",
+    "water_cycle.yaml": "6970680ca7b92ac58401532ee3f51700deae7e460e717853d02f1d4b6cc60657"
   },
   "reference_doc": "docs/biosphere-reference.md",
   "scenarios": {

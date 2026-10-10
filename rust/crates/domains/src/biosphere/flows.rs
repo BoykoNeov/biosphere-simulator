@@ -20,7 +20,7 @@ use super::light_path;
 use super::params;
 use super::params::{
     CanopyParams, NitrogenParams, PartitionRow, PhenologyParams, PhotosynthesisParams,
-    RespirationParams,
+    RespirationParams, SoilEvaporationParams,
 };
 use super::science;
 
@@ -782,9 +782,23 @@ pub struct CanopyRead {
     pub sla_per_mol_c: f64,
     /// The stored LAI when the lab leaf form keeps one ([`CarbonContext::lai_at`]'s rule).
     pub leaf_area_aux: Option<String>,
+    /// FAO-56's `rl` and Teh's `Lcr` (`transpiration.yaml`).
+    pub leaf_resistance: f64,
+    pub threshold_lai: f64,
 }
 
 impl CanopyRead {
+    /// The surface resistance this form gives on `snapshot`; `constant` is the file's own value.
+    fn surface_resistance(&self, snapshot: &State, ground_area: f64, constant: f64) -> f64 {
+        science::canopy_surface_resistance(
+            self.form,
+            constant,
+            self.lai(snapshot, ground_area),
+            self.leaf_resistance,
+            self.threshold_lai,
+        )
+    }
+
     fn lai(&self, snapshot: &State, ground_area: f64) -> f64 {
         match &self.leaf_area_aux {
             None => science::leaf_area_index(
@@ -816,6 +830,8 @@ pub struct SoilEvapRead {
     pub today_potential_aux: String,
     /// An open build's own sink for the soil's vapour; `None` when sealed (both go to the air).
     pub soil_sink: Option<String>,
+    /// The soil's coefficients (`transpiration.yaml`).
+    pub coef: SoilEvaporationParams,
 }
 
 impl SoilEvapRead {
@@ -919,14 +935,10 @@ impl Transpiration {
         let lai_green = s.lai_green(snapshot, self.ground_area);
         let surface_resistance = match &self.canopy {
             None => self.surface_resistance,
-            Some(c) => science::canopy_surface_resistance(
-                c.form,
-                self.surface_resistance,
-                c.lai(snapshot, self.ground_area),
-            ),
+            Some(c) => c.surface_resistance(snapshot, self.ground_area, self.surface_resistance),
         };
         let crop_potential = science::penman_monteith_transpiration(
-            net_radiation * science::crop_radiation_share(lai_green),
+            net_radiation * science::crop_radiation_share(lai_green, s.coef.shade_extinction),
             vpd,
             temp_c,
             self.aerodynamic_resistance,
@@ -946,14 +958,15 @@ impl Transpiration {
             soil_water,
             science::transpirable_capacity(rooted, self.soil_extractable_water, self.ground_area),
         );
-        let wet = top > science::TOP_LAYER_WET_MM * self.ground_area
-            && ftsw > science::STAGE_ONE_FTSW;
+        let wet = top > s.coef.top_layer_wet * self.ground_area && ftsw > s.coef.stage_one_ftsw;
         let shade = aux_of(snapshot, &s.shade_aux);
         let eos = science::soil_evaporation_potential(
             net_radiation,
             s.reference_albedo,
             temp_c,
             shade,
+            s.coef.soil_albedo,
+            s.coef.shade_extinction,
         );
         let rate = if wet {
             eos
@@ -971,6 +984,8 @@ impl Transpiration {
             s.reference_albedo,
             temp_c,
             0.0,
+            s.coef.soil_albedo,
+            s.coef.shade_extinction,
         ) * self.ground_area
             * dt;
         let steps_per_day = (1.0 / dt).round() as u64;
@@ -1071,11 +1086,7 @@ impl Flow for Transpiration {
         let soil_water = amt(snapshot, &self.soil_water);
         let surface_resistance = match &self.canopy {
             None => self.surface_resistance,
-            Some(c) => science::canopy_surface_resistance(
-                c.form,
-                self.surface_resistance,
-                c.lai(snapshot, self.ground_area),
-            ),
+            Some(c) => c.surface_resistance(snapshot, self.ground_area, self.surface_resistance),
         };
         let potential = science::penman_monteith_transpiration(
             net_radiation,
@@ -1132,8 +1143,8 @@ pub struct SoilSurfaceAccount {
 }
 
 impl SoilSurfaceAccount {
-    fn top_capacity(&self) -> f64 {
-        science::TOP_LAYER_DEPTH_M
+    fn top_capacity(&self, coef: &SoilEvaporationParams) -> f64 {
+        coef.top_layer_depth
             * self.water.soil_extractable_water
             * science::WATER_DENSITY
             * self.water.ground_area
@@ -1166,10 +1177,10 @@ impl AuxProcess for SoilSurfaceAccount {
             .map(|l| l.amount)
             .sum();
         let top = aux_of(snapshot, &s.top_aux);
-        let capacity = self.top_capacity();
+        let capacity = self.top_capacity(&s.coef);
         let drain = (top - capacity).max(0.0) * self.drainage_factor * dt;
         let rooted = aux_of(snapshot, &self.water.rooted_depth_aux);
-        let top_crop = if rooted <= science::TOP_LAYER_DEPTH_M {
+        let top_crop = if rooted <= s.coef.top_layer_depth {
             split.crop
         } else {
             split.crop * (science::fraction_transpirable(top, capacity) / self.water.wssg).min(1.0)
@@ -1181,8 +1192,8 @@ impl AuxProcess for SoilSurfaceAccount {
         // Saturation caps the account (Table 13.1, silt loam): above it the water has passed into
         // the root zone below, where it already is — no stock moves.
         let saturated = capacity
-            + science::TOP_LAYER_DEPTH_M
-                * science::TOP_LAYER_SAT_ABOVE_DUL
+            + s.coef.top_layer_depth
+                * s.coef.top_layer_room_above_dul
                 * science::WATER_DENSITY
                 * self.water.ground_area;
         if top + d_top > saturated {
@@ -3816,17 +3827,18 @@ mod tests {
     #[test]
     fn an_event_puts_the_deficit_in_the_root_zone_and_the_loss_below_it_the_same_step() {
         const SUBSOIL: &str = "biosphere.subsoil_water";
-        const TRIGGER: f64 = 1.0 - science::FAO56_WHEAT_DEPLETION;
+        let w = params::water_cycle();
+        let trigger = 1.0 - w.depletion_fraction;
         // 39 kg in the 130 kg zone is FTSW 0.30, under the 0.45 trigger: the deficit is 91 kg.
         let net = 91.0;
         let close = |a: f64, b: f64| (a - b).abs() <= 1e-12 * b.abs().max(1.0);
         let event = EventIrrigation {
             inner: irrigation_flow(1.0),
-            trigger_ftsw: TRIGGER,
-            application_efficiency: science::SPRINKLER_APPLICATION_EFFICIENCY,
+            trigger_ftsw: trigger,
+            application_efficiency: w.sprinkler_efficiency,
             subsoil_water: SUBSOIL.to_string(),
         };
-        let gross = net / science::SPRINKLER_APPLICATION_EFFICIENCY;
+        let gross = net / w.sprinkler_efficiency;
         let legs = water_legs(&event, &water_only_state(39.0, TEST_DEPTH, 0.0, 0.0), 200.0, 1.0, 1.0);
         assert!(close(legs[SOIL_WATER], net), "root zone {} != {net}", legs[SOIL_WATER]);
         assert!(close(legs[SUBSOIL], gross - net), "below {} != {}", legs[SUBSOIL], gross - net);
@@ -3843,15 +3855,15 @@ mod tests {
                 soil_water: SOIL_WATER.to_string(),
                 recycling_rate: 0.5,
             },
-            trigger_ftsw: TRIGGER,
-            application_efficiency: science::DRIP_APPLICATION_EFFICIENCY,
+            trigger_ftsw: trigger,
+            application_efficiency: w.drip_efficiency,
             subsoil_water: SUBSOIL.to_string(),
             rooted_depth_aux: ROOTED_DEPTH.to_string(),
             soil_extractable_water: EXTR,
             ground_area: 1.0,
         };
         // Ample condensate: the same split at the drip efficiency.
-        let gross = net / science::DRIP_APPLICATION_EFFICIENCY;
+        let gross = net / w.drip_efficiency;
         let legs = water_legs(&recycle, &water_only_state(39.0, TEST_DEPTH, 0.0, 500.0), 200.0, 0.0, 1.0);
         assert!(close(legs[SOIL_WATER], net), "chamber root zone {}", legs[SOIL_WATER]);
         assert!(close(legs[SUBSOIL], gross - net), "chamber below {}", legs[SUBSOIL]);
@@ -3859,7 +3871,7 @@ mod tests {
         // ⚠ SHORT OF CONDENSATE: the 50 kg held is the gross, so the root zone gets only its
         // efficiency share and the loss stays proportional — never the whole 50 into the zone.
         let legs = water_legs(&recycle, &water_only_state(39.0, TEST_DEPTH, 0.0, 50.0), 200.0, 0.0, 1.0);
-        let net_short = 50.0 * science::DRIP_APPLICATION_EFFICIENCY;
+        let net_short = 50.0 * w.drip_efficiency;
         assert!(close(legs[CONDENSATE], -50.0), "short condensate {}", legs[CONDENSATE]);
         assert!(close(legs[SOIL_WATER], net_short), "short root zone {}", legs[SOIL_WATER]);
         assert!(close(legs[SUBSOIL], 50.0 - net_short), "short below {}", legs[SUBSOIL]);

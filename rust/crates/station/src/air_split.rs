@@ -179,10 +179,10 @@ pub fn water_on_fast_step(
 /// The watering flow's id (§18).
 pub const WATERING: &str = "station.watering";
 
-/// FAO-56 (Allen et al. 1998, FAO Irrigation and Drainage Paper 56) **Table 22**, "Ranges of
-/// maximum effective rooting depth (Zr), and soil water depletion fraction for no stress (p)":
-/// spring and winter wheat, **p = 0.55** (`RAW = p TAW`). The watering trigger is `1 − p`.
-pub const FAO56_WHEAT_DEPLETION_FRACTION: f64 = 0.55;
+// FAO-56 Table 22's wheat depletion fraction `p = 0.55` (the trigger is `1 − p`) was a constant
+// here until 2026-10-10; it is now the biosphere's `water_cycle.yaml` `depletion_fraction`, read
+// below, so the separate-air option and the biosphere's own watering cannot hold two copies
+// (`docs/plans/post-roadmap-soil-evaporation.md` §16d).
 
 /// Watering on a depletion trigger (§18b): the inner refill runs only on a plant step whose root
 /// zone has fallen below `trigger_ftsw` of its transpirable capacity, and gives NO legs
@@ -375,7 +375,7 @@ pub fn build_split_station(
                 rooted_depth_aux: ROOTED_DEPTH.to_string(),
                 soil_extractable_water: resized.bio.soil_extractable_water,
             },
-            trigger_ftsw: 1.0 - FAO56_WHEAT_DEPLETION_FRACTION,
+            trigger_ftsw: 1.0 - domains::biosphere::params::water_cycle().depletion_fraction,
         }));
         Registry::new(flows, &state.stocks, aux)?
     } else {

@@ -266,6 +266,35 @@ pub struct TranspirationParams {
     /// sets [`SoilEvaporationForm::Off`] (the frozen model has none); the two-stage form is lab-only
     /// (`docs/plans/post-roadmap-soil-evaporation.md`).
     pub soil_evap: SoilEvaporationForm,
+    /// `rl`, a well-watered leaf's stomatal resistance (s/m), read by the two leaf-area forms of
+    /// [`SurfaceResistanceForm`] (FAO-56 Box 5's 100 s/m).
+    pub leaf_stomatal_resistance: f64,
+    /// `Lcr`, Teh's threshold leaf area index, read by [`SurfaceResistanceForm::SzeiczLong`].
+    pub threshold_lai: f64,
+    /// The soil's evaporation coefficients, read by [`SoilEvaporationForm::TwoStage`].
+    pub soil: SoilEvaporationParams,
+}
+
+/// The bare soil's evaporation coefficients (`transpiration.yaml`) — Soltani & Sinclair (2012)
+/// Ch. 13–14, read by [`SoilEvaporationForm::TwoStage`]. In the transpiration file because the
+/// soil–crop energy split is computed inside the transpiration flow
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §16d). The `1.5` mm/day floor stays code: its
+/// switch is lab-only.
+#[derive(Debug, Clone, Copy)]
+pub struct SoilEvaporationParams {
+    /// `SALB`, the soil's albedo.
+    pub soil_albedo: f64,
+    /// `KET`, the extinction coefficient of the soil–crop energy split.
+    pub shade_extinction: f64,
+    /// `DEP1`, the top layer's depth (m).
+    pub top_layer_depth: f64,
+    /// Stage I needs more than this in the top layer (mm, `ATSW1 > 1`).
+    pub top_layer_wet: f64,
+    /// Stage I also needs the root zone above this FTSW.
+    pub stage_one_ftsw: f64,
+    /// The top layer's room above its drained upper limit, `SAT − DUL` (m³ m⁻³) — folded at the
+    /// load from the file's two silt-loam values.
+    pub top_layer_room_above_dul: f64,
 }
 
 /// Thermal-time phenology params.
@@ -419,6 +448,12 @@ pub struct WaterCycleParams {
     /// from the file: the loader sets the book's [`DeepOverflow::Held`]; the other is lab-only
     /// (`docs/plans/post-roadmap-soil-evaporation.md` §10g).
     pub deep_overflow: DeepOverflow,
+    /// FAO-56's `p` for wheat: [`WateringForm::Fao56Trigger`] waters at `FTSW = 1 − p`.
+    pub depletion_fraction: f64,
+    /// The share of a sprinkler watering the crop can use (the open field's).
+    pub sprinkler_efficiency: f64,
+    /// The share of a drip watering the crop can use (the sealed chambers').
+    pub drip_efficiency: f64,
 }
 
 /// Minimal-consumer params (grazing + respiration + mortality + f_O2 Monod).
@@ -682,15 +717,59 @@ pub fn transpiration_from_bounded(
         &[
             ("aerodynamic_resistance", "s/m"),
             ("surface_resistance", "s/m"),
+            ("leaf_stomatal_resistance", "s/m"),
+            ("threshold_lai", "m2/m2"),
+            ("soil_albedo", "dimensionless"),
+            ("soil_shade_extinction", "dimensionless"),
+            ("top_layer_depth", "m"),
+            ("top_layer_wet", "mm"),
+            ("stage_one_ftsw", "dimensionless"),
+            ("top_layer_saturation", "m3/m3"),
+            ("top_layer_drained_upper_limit", "m3/m3"),
         ],
         name,
     );
-    for field in ["aerodynamic_resistance", "surface_resistance"] {
+    for field in [
+        "aerodynamic_resistance",
+        "surface_resistance",
+        "leaf_stomatal_resistance",
+        "threshold_lai",
+        "soil_shade_extinction",
+        "top_layer_depth",
+    ] {
         g.check(require_positive(v[field], field, name));
     }
+    g.check(require_non_negative(v["top_layer_wet"], "top_layer_wet", name));
+    // Fractions: an albedo of 1 reflects everything; the Stage I FTSW and the two water contents
+    // are shares of a whole.
+    for field in [
+        "soil_albedo",
+        "stage_one_ftsw",
+        "top_layer_saturation",
+        "top_layer_drained_upper_limit",
+    ] {
+        g.check(require_closed(v[field], 0.0, 1.0, field, name));
+    }
+    // Saturation above the drained upper limit, or the top layer has no room to fill.
+    g.check(require_positive(
+        v["top_layer_saturation"] - v["top_layer_drained_upper_limit"],
+        "top_layer_saturation - top_layer_drained_upper_limit",
+        name,
+    ));
     TranspirationParams {
         aerodynamic_resistance: v["aerodynamic_resistance"],
         surface_resistance: v["surface_resistance"],
+        leaf_stomatal_resistance: v["leaf_stomatal_resistance"],
+        threshold_lai: v["threshold_lai"],
+        soil: SoilEvaporationParams {
+            soil_albedo: v["soil_albedo"],
+            shade_extinction: v["soil_shade_extinction"],
+            top_layer_depth: v["top_layer_depth"],
+            top_layer_wet: v["top_layer_wet"],
+            stage_one_ftsw: v["stage_one_ftsw"],
+            top_layer_room_above_dul: v["top_layer_saturation"]
+                - v["top_layer_drained_upper_limit"],
+        },
         rs_form: SurfaceResistanceForm::Constant,
         soil_evap: SoilEvaporationForm::Off,
     }
@@ -1172,9 +1251,12 @@ pub fn water_cycle_from_bounded(
     bounds: Bounds,
 ) -> WaterCycleParams {
     let g = Range { bounds, name };
-    let units: [(&str, &str); 2] = [
+    let units: [(&str, &str); 5] = [
         ("recycling_rate", "1/day"),
         ("humidity_setpoint", "dimensionless"),
+        ("depletion_fraction", "dimensionless"),
+        ("sprinkler_efficiency", "dimensionless"),
+        ("drip_efficiency", "dimensionless"),
     ];
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
@@ -1192,9 +1274,25 @@ pub fn water_cycle_from_bounded(
         "humidity_setpoint",
         name,
     ));
+    // `p = 0` would water on every step and is refused; `p = 1` waters only a dead-dry zone, an
+    // edge kept.
+    g.check(require_half_open(
+        v["depletion_fraction"],
+        0.0,
+        1.0,
+        "depletion_fraction",
+        name,
+    ));
+    // A share of the applied water: zero would water nothing however much was applied.
+    for field in ["sprinkler_efficiency", "drip_efficiency"] {
+        g.check(require_half_open(v[field], 0.0, 1.0, field, name));
+    }
     WaterCycleParams {
         recycling_rate: v["recycling_rate"],
         humidity_setpoint: v["humidity_setpoint"],
+        depletion_fraction: v["depletion_fraction"],
+        sprinkler_efficiency: v["sprinkler_efficiency"],
+        drip_efficiency: v["drip_efficiency"],
         // CHAMBER since the Step 3b freeze (2026-10-01): this line moved 9 goldens, water
         // stocks only (docs/plans/post-roadmap-chamber-dryness.md §4.6).
         vpd_read: VpdRead::Chamber,
@@ -2346,6 +2444,65 @@ parameters:
             transpiration_from(TRANSPIRATION_YAML, "transpiration.yaml").surface_resistance,
             70.0
         );
+    }
+
+    /// The twelve coefficients moved from code into the two water files on 2026-10-10
+    /// (`docs/plans/post-roadmap-soil-evaporation.md` §16d): the committed values load as the code
+    /// constants they replaced, bit for bit, and every new bound rejects a value on its wrong side.
+    /// A guard no test reaches is a comment (this module's S5 batch C note), so each is reached here.
+    #[test]
+    fn the_moved_water_coefficients_load_as_the_constants_and_are_bounded() {
+        let t = transpiration();
+        assert_eq!(t.leaf_stomatal_resistance, 100.0);
+        assert_eq!(t.threshold_lai, 4.0);
+        assert_eq!(t.soil.soil_albedo, 0.12);
+        assert_eq!(t.soil.shade_extinction, 0.5);
+        assert_eq!(t.soil.top_layer_depth, 0.15);
+        assert_eq!(t.soil.top_layer_wet, 1.0);
+        assert_eq!(t.soil.stage_one_ftsw, 0.5);
+        // The constant was `0.433 - 0.218`; the load folds the same subtraction.
+        assert_eq!(
+            t.soil.top_layer_room_above_dul.to_bits(),
+            (0.433_f64 - 0.218).to_bits()
+        );
+        let w = water_cycle();
+        assert_eq!(
+            (w.depletion_fraction, w.sprinkler_efficiency, w.drip_efficiency),
+            (0.55, 0.75, 0.90)
+        );
+        for (field, bad) in [
+            ("leaf_stomatal_resistance", "0.0"),
+            ("threshold_lai", "-1.0"),
+            ("soil_shade_extinction", "0.0"),
+            ("top_layer_depth", "0.0"),
+            ("top_layer_wet", "-0.1"),
+            ("soil_albedo", "1.5"),
+            ("stage_one_ftsw", "-0.1"),
+            // Below the drained upper limit (0.218): no room to fill.
+            ("top_layer_saturation", "0.2"),
+            ("top_layer_drained_upper_limit", "1.2"),
+        ] {
+            let broken = value_of(TRANSPIRATION_YAML, field, bad);
+            rejects(
+                || {
+                    transpiration_from(broken, "transpiration.yaml");
+                },
+                &format!("{field} = {bad}"),
+            );
+        }
+        for (field, bad) in [
+            ("depletion_fraction", "0.0"),
+            ("sprinkler_efficiency", "0.0"),
+            ("drip_efficiency", "1.1"),
+        ] {
+            let broken = value_of(WATER_CYCLE_YAML, field, bad);
+            rejects(
+                || {
+                    water_cycle_from(broken, "water_cycle.yaml");
+                },
+                &format!("{field} = {bad}"),
+            );
+        }
     }
 
     /// A wrong declared unit, an unknown field and a missing source are each rejected on

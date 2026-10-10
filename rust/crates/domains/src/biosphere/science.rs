@@ -1001,15 +1001,10 @@ pub enum SurfaceResistanceForm {
     SzeiczLong,
 }
 
-/// `rl`, a well-watered single leaf's stomatal resistance (s m⁻¹) — FAO-56 Ch. 2 Box 5, *"about
-/// 100 s m⁻¹ under well-watered conditions"*. Lab-only, beside the form that reads it.
-pub const LEAF_STOMATAL_RESISTANCE: f64 = 100.0;
 /// FAO-56 Ch. 2 Box 5's `LAI_active = 0.5 LAI` (*"only the upper half of dense clipped grass"*).
+/// Code, not a param: its form ([`SurfaceResistanceForm::FaoFullCover`]) is lab-only. The leaf
+/// resistance `rl` and Teh's `Lcr` are params (`transpiration.yaml`, since 2026-10-10).
 pub const FAO_ACTIVE_LAI_FRACTION: f64 = 0.5;
-/// `Lcr`, Teh's threshold leaf area index — *"In this book, we will take Lcr as 4.0, a typical
-/// maximum leaf area index"* (§4.6, p. 98). Taken as the book's choice, never from the model's
-/// own peak LAI.
-pub const TEH_THRESHOLD_LAI: f64 = 4.0;
 
 /// Whether the soil evaporates — LAB-ONLY (`docs/plans/post-roadmap-soil-evaporation.md`).
 ///
@@ -1052,16 +1047,9 @@ pub enum WateringForm {
     Fao56Trigger,
 }
 
-/// FAO-56 (Allen et al. 1998) Table 22, the wheat depletion fraction for no stress, `p = 0.55`
-/// (`RAW = p·TAW`); the watering trigger is `FTSW = 1 − p`. The same citation as
-/// `station::air_split::FAO56_WHEAT_DEPLETION_FRACTION`.
-pub const FAO56_WHEAT_DEPLETION: f64 = 0.55;
-/// Field application efficiency, sprinkler — FAO Irrigation Water Management Training Manual No. 4
-/// (*Irrigation Scheduling*), Annex 1 Table 8: the share of applied water the crop can use; the rest
-/// is lost to deep percolation (and runoff). The open field's, the user's choice (2026-10-07).
-pub const SPRINKLER_APPLICATION_EFFICIENCY: f64 = 0.75;
-/// Field application efficiency, drip — the same table. The sealed chambers', the user's choice.
-pub const DRIP_APPLICATION_EFFICIENCY: f64 = 0.90;
+// FAO-56's depletion fraction (the trigger `FTSW = 1 − p`) and the two field application
+// efficiencies are params since 2026-10-10: `water_cycle.yaml` (`depletion_fraction`,
+// `sprinkler_efficiency`, `drip_efficiency`), with their sources.
 
 /// What a metre of new root captures from the store below the roots — LAB-ONLY
 /// (`docs/plans/post-roadmap-soil-evaporation.md` §10e).
@@ -1110,25 +1098,11 @@ pub fn deep_soil_wetness(
     (subsoil_water / capacity).clamp(0.0, 1.0)
 }
 
-/// `SALB`, the soil's albedo — Soltani & Sinclair (2012) p. 180, *"commonly … close to 0.12"*.
-pub const SOIL_ALBEDO: f64 = 0.12;
-/// `KET`, the canopy extinction coefficient for global radiation — Soltani & Sinclair p. 180
-/// (*"~0.5"*) and p. 184 (fixed at 0.5 in their model). Used for the soil–crop energy split.
-pub const SOIL_SHADE_EXTINCTION: f64 = 0.5;
-/// `EOSMIN`, mm day⁻¹ — Soltani & Sinclair p. 184, after Amir & Sinclair (1991).
+/// `EOSMIN`, mm day⁻¹ — Soltani & Sinclair p. 184, after Amir & Sinclair (1991). Code, not a param:
+/// the floor's switch is lab-only. The soil's other coefficients (albedo, extinction, the top
+/// layer's depth, wet threshold and saturation, the Stage I FTSW) are params since 2026-10-10
+/// (`transpiration.yaml`, `params::SoilEvaporationParams`).
 pub const SOIL_EVAPORATION_FLOOR_MM_DAY: f64 = 1.5;
-/// `DEP1`, the top layer's depth (m) — the user's 150 mm (2026-10-07), the shallow end of Soltani &
-/// Sinclair's *"usually 150 to 600 mm"* (p. 172) and the model's own rooting depth at emergence.
-pub const TOP_LAYER_DEPTH_M: f64 = 0.15;
-/// The top layer must hold more than 1 mm for Stage I (`ATSW1 > 1`, Soltani & Sinclair p. 180).
-pub const TOP_LAYER_WET_MM: f64 = 1.0;
-/// Stage I also needs the profile above half full (`FTSW > 0.5`, p. 181).
-pub const STAGE_ONE_FTSW: f64 = 0.5;
-/// The top layer's room ABOVE its drained upper limit before it is saturated, `SAT − DUL`
-/// (m³ m⁻³) — Soltani & Sinclair Table 13.1, silt loam (`SAT` 0.433, `DUL` 0.218; its `EXTR` 0.132
-/// matches the model's 0.13). The user's choice (2026-10-07). Water above saturation is not counted
-/// by the top-layer account: it is already in the root zone below.
-pub const TOP_LAYER_SAT_ABOVE_DUL: f64 = 0.433 - 0.218;
 
 /// Potential evaporation (kg m⁻² day⁻¹ = mm day⁻¹) from bare wet soil — Soltani & Sinclair Eqns
 /// 14.15–14.18, `SRAD · (1 − SALB) · exp(−KET · ETLAI) · Δ/(Δ + γ)` in water units.
@@ -1136,15 +1110,18 @@ pub const TOP_LAYER_SAT_ABOVE_DUL: f64 = 0.433 - 0.218;
 /// `net_radiation` is the model's own forcing, already `(1 − reference_albedo)` of the incident
 /// shortwave (weather and lamp alike), so the incident value is recovered once and the soil's own
 /// albedo applied once. `Δ` and `γ` are the model's (67 Pa K⁻¹ against the book's 68).
+/// `soil_albedo` is `SALB`, `extinction` the energy split's `KET` (both `transpiration.yaml`).
 pub fn soil_evaporation_potential(
     net_radiation: f64,
     reference_albedo: f64,
     temp_c: f64,
     shade_lai: f64,
+    soil_albedo: f64,
+    extinction: f64,
 ) -> f64 {
     let incident = net_radiation / (1.0 - reference_albedo);
     let delta = slope_svp(temp_c);
-    let latent = incident * (1.0 - SOIL_ALBEDO) * (-SOIL_SHADE_EXTINCTION * shade_lai).exp()
+    let latent = incident * (1.0 - soil_albedo) * (-extinction * shade_lai).exp()
         * delta
         / (delta + GAMMA_PSYCHROMETRIC);
     (latent / LATENT_HEAT_VAPORIZATION * SECONDS_PER_DAY).max(0.0)
@@ -1159,26 +1136,29 @@ pub fn stage_two_factor(dry_days: f64) -> f64 {
 }
 
 /// The share of the net radiation the GREEN canopy takes, `1 − exp(−KET · LAI)` — the crop's side
-/// of the soil–crop energy split.
-pub fn crop_radiation_share(lai_green: f64) -> f64 {
-    1.0 - (-SOIL_SHADE_EXTINCTION * lai_green.max(0.0)).exp()
+/// of the soil–crop energy split, with `extinction` the split's `KET`.
+pub fn crop_radiation_share(lai_green: f64, extinction: f64) -> f64 {
+    1.0 - (-extinction * lai_green.max(0.0)).exp()
 }
 
 /// The canopy surface resistance (s m⁻¹) a [`SurfaceResistanceForm`] gives at leaf area `lai`;
-/// `constant` is the frozen file value, returned unchanged by [`SurfaceResistanceForm::Constant`].
+/// `constant` is the frozen file value, returned unchanged by [`SurfaceResistanceForm::Constant`];
+/// `leaf_resistance` is FAO-56's `rl` and `threshold_lai` Teh's `Lcr` (both `transpiration.yaml`).
 ///
 /// At `lai ≤ 0` both lab forms return `+∞`, which Penman–Monteith turns into exactly zero
 /// transpiration (its denominator diverges); the flux stays finite.
-pub fn canopy_surface_resistance(form: SurfaceResistanceForm, constant: f64, lai: f64) -> f64 {
+pub fn canopy_surface_resistance(
+    form: SurfaceResistanceForm,
+    constant: f64,
+    lai: f64,
+    leaf_resistance: f64,
+    threshold_lai: f64,
+) -> f64 {
     match form {
         SurfaceResistanceForm::Constant => constant,
         _ if lai <= 0.0 => f64::INFINITY,
-        SurfaceResistanceForm::FaoFullCover => {
-            LEAF_STOMATAL_RESISTANCE / (FAO_ACTIVE_LAI_FRACTION * lai)
-        }
-        SurfaceResistanceForm::SzeiczLong => {
-            LEAF_STOMATAL_RESISTANCE / lai.min(0.5 * TEH_THRESHOLD_LAI)
-        }
+        SurfaceResistanceForm::FaoFullCover => leaf_resistance / (FAO_ACTIVE_LAI_FRACTION * lai),
+        SurfaceResistanceForm::SzeiczLong => leaf_resistance / lai.min(0.5 * threshold_lai),
     }
 }
 

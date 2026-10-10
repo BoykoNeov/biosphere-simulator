@@ -110,8 +110,8 @@ use simcore::state::{State, Stock};
 
 use crate::biosphere::stocks::PAR_VAR;
 use crate::biosphere::{
-    consumer_chamber_scenario, perennial_chamber_scenario, run_perennial, season_setup,
-    season_steps, steps_for_years, SeasonScenario, BIO_DT,
+    consumer_chamber_scenario, perennial_chamber_scenario, run_perennial_with,
+    season_setup_with, season_steps, steps_for_years, SeasonScenario, BIO_DT,
 };
 use crate::power::{
     build_power, ChargeParams, PowerScenario, BOUNDED_SOC_DAYS, BOUNDED_SOC_SCENARIO,
@@ -434,13 +434,17 @@ pub fn thermal_snapshot(nudge: Nudge) -> String {
 /// [`crate::goldens::perennial_chamber`] / [`crate::goldens::consumer_chamber`] with the
 /// Beer-Lambert `exp` nudged through the `par` forcing (see the module header).
 pub fn perennial_snapshot(scenario: &SeasonScenario, years: usize, nudge: Nudge) -> String {
-    let (state, integrator, resolver) = season_setup(scenario, years).expect("season_setup");
+    // One frozen load, handed to the build and to the re-sow alike (soil-evaporation plan §16d).
+    let frozen = crate::biosphere::params::biosphere();
+    let (state, integrator, resolver) =
+        season_setup_with(scenario, years, &frozen).expect("season_setup");
     let resolver = nudge_forcing(resolver, PAR_VAR, nudge).expect("nudge par");
     let mut noop = |_: &State| {};
-    let (final_state, _, _) = run_perennial(
+    let (final_state, _, _) = run_perennial_with(
         &integrator,
         state,
         scenario,
+        &frozen,
         &resolver,
         BIO_DT,
         steps_for_years(years),

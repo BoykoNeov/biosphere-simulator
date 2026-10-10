@@ -180,6 +180,8 @@ fn each_lab_form_reaches_the_water_flow_exactly() {
                     form,
                     p.transp.surface_resistance,
                     lai(st, &s),
+                    p.transp.leaf_stomatal_resistance,
+                    p.transp.threshold_lai,
                 );
                 let f_water = science::soil_water_stress(
                     st.stocks[SOIL_WATER].amount,

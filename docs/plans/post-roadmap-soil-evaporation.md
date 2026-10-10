@@ -1196,3 +1196,41 @@ push, and the cross-port bands read on Linux CI.
 
 **Not in this batch:** the book's `DYSE = 1` start (§12, its own item); the separate-air option's watering not
 feeding the top-layer account (§11d ceremony 4, a lab gap); the memory-index gate (§16a).
+
+### 16e. Commit A, built (2026-10-10)
+
+**One change of plan from §16d:** the coefficients went into the two existing files, not two new ones.
+The soil's nine go into `transpiration.yaml`, beside Szeicz–Long's two: the soil–crop energy split is
+computed inside the transpiration flow, so it is one process. The watering three go into `water_cycle.yaml`,
+whose header now says the sprinkler efficiency is the open field's. This keeps the census at 15 files (a count
+pinned in several places) and changes no file list.
+
+**What landed.**
+* `annual_reset` and `run_perennial` (no params) are retired. `annual_reset_with` and `run_perennial_with`
+  are the only routes. `run_perennial_final` takes `&BiosphereParams`, so the spine still has one production
+  param load. The golden producer, `ulp_probe` and `emit_trajectory` load the frozen params once per run and
+  hand the same object to the build and to the re-sow. Three tests that pinned the retired reset's refusal
+  were restated to their surviving claim: the re-sow resets a stored leaf area, adds none to a state that
+  stores none, and resets the soil values.
+* **The station's sealed re-sow hook is NOT threaded, on purpose.** The station builds its season through
+  `build_season` (frozen wheat) and its hook loads the same frozen wheat params. It has no override seam, so
+  there is nothing to escape, and threading would change the signatures of the hook's six callers (palette,
+  `godot_bridge`, the lamp shed, three examples) for no gain. Recorded, not done.
+* Twelve constants are now params, loaded with bounds: `leaf_stomatal_resistance`, `threshold_lai`,
+  `soil_albedo`, `soil_shade_extinction`, `top_layer_depth`, `top_layer_wet`, `stage_one_ftsw`,
+  `top_layer_saturation`, `top_layer_drained_upper_limit` (`transpiration.yaml`); `depletion_fraction`,
+  `sprinkler_efficiency`, `drip_efficiency` (`water_cycle.yaml`). The science functions take them as
+  arguments. The station's separate-air option reads `depletion_fraction` instead of its own copy.
+  A new test pins each value against the constant it replaced (bit for bit) and reaches each new bound.
+  Control: with the `top_layer_wet` bound deleted, it goes red.
+
+**Gate, measured.** `regen_goldens`: 20 of 20 identical, after the re-sow slice and again after the
+coefficients. The biosphere manifest's only change: the digests of `transpiration.yaml` and
+`water_cycle.yaml`. Full suite: 1360 passed, 1 failed (the memory-index red of §16a), 9 ignored. Clippy clean. Ignored, release:
+9 passed, 0 failed (the sealed station's golden, band and both session resumes among them).
+Logs: `W:\temp\claude\water-adoption\` (`regenA1.log`, `regenA.log`, `suiteA2.log`, `clippyA2.log`,
+`mutant.log`, `ignoredA.log`).
+
+⚠ **A slip, caught by the tests and fixed:** the edit scripts wrote Windows line endings, and a first suite
+run had six loader tests red because their text-substitution helpers search for `\n`. Every touched file
+was converted back to LF before the run above.

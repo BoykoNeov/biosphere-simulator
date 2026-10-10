@@ -21,8 +21,8 @@
 //!   season-only slice would leave that unproven.
 
 use domains::biosphere::{
-    perennial_chamber_scenario, run_perennial, run_season, season_setup, season_steps,
-    steps_for_years, SeasonScenario, BIO_DT, DEFAULT_SCENARIO,
+    params, perennial_chamber_scenario, run_perennial_with, run_season, season_setup_with,
+    season_steps, steps_for_years, SeasonScenario, BIO_DT, DEFAULT_SCENARIO,
 };
 use simcore::snapshot::TrajectoryWriter;
 use simcore::state::State;
@@ -46,7 +46,10 @@ fn main() {
         (DEFAULT_SCENARIO, 1)
     };
 
-    let (state, integrator, resolver) = season_setup(&scenario, years).expect("season_setup");
+    // One frozen load, handed to the build and to the re-sow alike (soil-evaporation plan §16d).
+    let frozen = params::biosphere();
+    let (state, integrator, resolver) =
+        season_setup_with(&scenario, years, &frozen).expect("season_setup");
     let steps = steps_for_years(years);
 
     // The observer fires on the initial state and after each step, so the writer ends with
@@ -55,10 +58,11 @@ fn main() {
     let mut observe = |s: &State| writer.push(s);
 
     let (_final_state, rationed, events) = if perennial {
-        run_perennial(
+        run_perennial_with(
             &integrator,
             state,
             &scenario,
+            &frozen,
             &resolver,
             BIO_DT,
             steps,

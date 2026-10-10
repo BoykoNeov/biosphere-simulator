@@ -487,10 +487,13 @@ fn the_surface_resistance_a_full_canopy_would_have() {
         science::leaf_area_index(s.stocks[LEAF_C].amount, sla, DEFAULT_SCENARIO.ground_area)
     }));
     let (ra, rs) = transpiration_params();
+    let tp = params::biosphere().transp;
     let rs_fao = science::canopy_surface_resistance(
         science::SurfaceResistanceForm::FaoFullCover,
         rs,
         lai,
+        tp.leaf_stomatal_resistance,
+        tp.threshold_lai,
     );
     eprintln!(
         "§10e: mean LAI over TM days 25–80 {lai:.3}; FAO-form rs {rs_fao:.2} s m⁻¹ (frozen {rs}); \

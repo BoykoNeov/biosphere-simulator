@@ -91,6 +91,12 @@
 #   LOADED in an oracle run and cannot move that trajectory. (The 7-vs-5 omission is
 #   inherited from scope (A) and is now closed.)
 #
+# ⚠ THREE WATERING COEFFICIENTS ADDED 2026-10-10 (docs/plans/post-roadmap-soil-evaporation.md
+#   §16d), moved out of code where the lab watering-in-events form had carried them. They are not
+#   chamber-only: the sprinkler efficiency is the open field's. Moved ahead of the form's
+#   adoption, so on the day they landed nothing frozen read them (the loader still watered
+#   continuously); the values are the code constants', unchanged.
+#
 # Sources:
 #   [A] MacElroy, R.D. & Bredt, J. (1984), "Current concepts and future directions of
 #       CELSS", Adv. Space Res. 4(12):221–229 (closed-loop water recovery in controlled
@@ -102,6 +108,12 @@
 #   [C] NASA (2022), Life Support Baseline Values and Assumptions Document (BVAD), NASA/TP-2015-
 #       218570/Rev2, Feb 2022 — §4.5.7 p. 130 and §4.14.1 p. 175 (the plant humidity sentence)
 #       and Table 4-1 p. 63 (crew relative humidity 25 / 40 / 75 %).
+#   [D] Allen, R.G., Pereira, L.S., Raes, D. & Smith, M. (1998), "Crop evapotranspiration —
+#       Guidelines for computing crop water requirements", FAO Irrigation and Drainage Paper 56.
+#       Table 22 (the depletion fraction p).
+#   [E] Brouwer, C., Prins, K. & Heibloem, M., "Irrigation Water Management: Irrigation
+#       Scheduling", FAO Training Manual No. 4. Ch. 3 and Annex 1 Table 8 (field application
+#       efficiencies).
 
 name: chamber
 process: water_cycle
@@ -115,3 +127,15 @@ parameters:
     value: 0.75
     unit: "dimensionless"
     source: "[C] BVAD Rev 2 §4.5.7 p. 130 and §4.14.1 p. 175 (the same paragraph printed twice), verbatim: 'Similarly, plants require higher relative humidity – about 75% – to avoid water stress and minimize nutrient solution usage. Such humidity levels are at the high end for crew comfort.' Taken as the relative humidity the chamber's condenser HOLDS (a fraction of saturation at the step's temperature). ⚠ THAT IS A CHOICE OF LOCUS, not a lookup: the sentence states what plants NEED, not what a condenser is set to, and 'about' makes the value approximate. The humidity claim carries no citation of its own (the Wheeler et al. 1993 in the same paragraph belongs to the CO2 sentence). Cross-check (a consistency check, not a second derivation): 75% is Table 4-1 p. 63's UPPER crew relative humidity (NASA-STD-3001; nominal 40%, typical ISS), which is what 'the high end for crew comfort' says. Bounded (0, 1]: 1 is plain saturation, the model before 2026-09-29. Read off the page images, not only pdftotext. docs/plans/post-roadmap-vapour-step-artefact.md §5."
+  depletion_fraction:
+    value: 0.55
+    unit: "dimensionless"
+    source: "[D] Table 22, wheat: the soil water depletion fraction for no stress, p = 0.55 (RAW = p·TAW). Watering in events waters when the root zone has used it, at FTSW = 1 − p. docs/plans/post-roadmap-soil-evaporation.md §7"
+  sprinkler_efficiency:
+    value: 0.75
+    unit: "dimensionless"
+    source: "[E] Annex 1 Table 8, indicative field application efficiency, sprinkler 75 % ('Part of the water is lost through deep percolation and runoff', Ch. 3; d_gross = d_net · 100 / ea). The open field's — the user's choice (2026-10-07). docs/plans/post-roadmap-soil-evaporation.md §10c"
+  drip_efficiency:
+    value: 0.90
+    unit: "dimensionless"
+    source: "[E] Annex 1 Table 8, drip 90 %. The sealed chambers' — the user's choice (2026-10-07). docs/plans/post-roadmap-soil-evaporation.md §10c"

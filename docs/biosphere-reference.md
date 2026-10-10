@@ -915,6 +915,21 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-10 — plumbing ahead of the water-forms adoption: twelve coefficients moved from code into
+  `transpiration.yaml` (nine) and `water_cycle.yaml` (three), and the params-free re-sow retired. No golden
+  moved; `transpiration.yaml`'s and `water_cycle.yaml`'s digests are the only manifest change.** The first of
+  two commits of the adoption the user called with *"Step 2"* (`docs/plans/post-roadmap-soil-evaporation.md`
+  §16d). **The coefficients.** Szeicz–Long's leaf resistance and threshold LAI, the soil's albedo, energy-split
+  extinction, top-layer depth, wet threshold, Stage I FTSW and silt loam's SAT / DUL, and FAO-56's depletion
+  fraction with the two field application efficiencies: each was a `science.rs` constant beside a lab form;
+  each is now a file entry with its source, at the constant's value. The forms that read them were still
+  lab-only that day, so no frozen run read them; the loader's forms did not change. The station's
+  separate-air option reads the same depletion fraction instead of its own copy. The floor's 1.5 mm/day and
+  FAO's full-cover 0.5 stay code: their forms stay lab-only. **The re-sow.** `annual_reset` (no params) is
+  retired and `annual_reset_with` is the only re-sow; `run_perennial` (no params) likewise. Every production
+  caller loads the frozen params once and hands the same object to the build and to the re-sow, so a run
+  built from an override can no longer be re-sown with frozen values. Proven inert: `regen_goldens` reported
+  20 of 20 identical. Advisor-reviewed before code.
 - **2026-10-09 — the chamber's condenser draws nothing below its humidity setting: 5 goldens here
   (3 on the station), their `golden_sha256` rows and `water_cycle.yaml`'s digest; one param DELETED
   (`water.condensation_rate`). Water only; no flow id, flow type, aux key or `simcore` byte changed.**

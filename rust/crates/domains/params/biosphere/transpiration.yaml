@@ -26,6 +26,15 @@
 #   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
 #   source (never backfilled from WOFOST).
 #
+# ⚠ NINE COEFFICIENTS ADDED 2026-10-10 (docs/plans/post-roadmap-soil-evaporation.md §16d), moved
+#   out of code where two lab forms had carried them: the leaf-area surface resistance
+#   (Szeicz–Long, docs/plans/post-roadmap-canopy-resistance.md) and the bare soil's two-stage
+#   evaporation (Soltani & Sinclair Ch. 14). They are here because the soil–crop energy split is
+#   computed inside the transpiration flow. Moved ahead of the forms' adoption, so on the day they
+#   landed nothing frozen read them (the loader still set the constant 70 and no soil
+#   evaporation); the values are the code constants', unchanged. The book's 1.5 mm/day floor
+#   (EOSMIN) stays code: its switch is lab-only.
+#
 # Sources:
 #   [A] Monteith, J.L. (1965), "Evaporation and environment", Symposia of the Society
 #       for Experimental Biology 19:205–234.
@@ -34,6 +43,12 @@
 #   [C] Allen, R.G., Pereira, L.S., Raes, D. & Smith, M. (1998), "Crop
 #       evapotranspiration — Guidelines for computing crop water requirements", FAO
 #       Irrigation and Drainage Paper 56 (operational SVP/slope forms + constants).
+#   [D] Teh, C.B.S. (2006), "Introduction to Mathematical Modeling of Crop Growth: How the
+#       Equations are Derived and Assembled into a Computer Program", BrownWalker Press,
+#       Boca Raton. §4.6, pp. 97–98 (Eq. 4.80 after Szeicz & Long 1969).
+#   [E] Soltani, A. & Sinclair, T.R. (2012), "Modeling Physiology of Crop Development,
+#       Growth and Yield", CABI, Wallingford. Ch. 13 Table 13.1 (soil hydraulic values) and
+#       Ch. 14 (soil evaporation after Amir & Sinclair 1991; Box 14.1, the program).
 
 name: winter_wheat
 process: transpiration
@@ -47,3 +62,39 @@ parameters:
     value: 70.0
     unit: "s/m"
     source: "TODO(cite) — provisional, literature-typical bulk surface/canopy resistance r_s (~50–100 s/m for a well-watered crop) [A][C]; primary citation pending Step 11"
+  leaf_stomatal_resistance:
+    value: 100.0
+    unit: "s/m"
+    source: "[C] FAO-56 Ch. 2 Box 5, verbatim: 'the bulk stomatal resistance, rl, of a single leaf has a value of about 100 s m-1 under well-watered conditions'. The rst of [D] Eq. 4.80, standing in for Teh's light-dependent Jarvis form (Eq. 4.79), for which the shelf has no wheat coefficients — a COMPOSITE, so the leaf-area forms do not close stomata in the dark. docs/plans/post-roadmap-canopy-resistance.md §2"
+  threshold_lai:
+    value: 4.0
+    unit: "m2/m2"
+    source: "[D] §4.6 p. 98, verbatim: 'Lcr is the threshold leaf area index, often taken as the maximum L the plant can achieve. In this book, we will take Lcr as 4.0, a typical maximum leaf area index.' Taken as the book's choice, never from the model's own peak LAI. Eq. 4.80: rc = rst / L for L <= 0.5 Lcr, rst / (0.5 Lcr) above"
+  soil_albedo:
+    value: 0.12
+    unit: "dimensionless"
+    source: "[E] p. 180, SALB: the soil's albedo, 'commonly ... close to 0.12'"
+  soil_shade_extinction:
+    value: 0.5
+    unit: "dimensionless"
+    source: "[E] p. 180 ('~0.5') and p. 184 (fixed at 0.5 in their model), KET: the canopy extinction coefficient for global radiation, used for the soil–crop energy split (Eqns 14.15–14.18)"
+  top_layer_depth:
+    value: 0.15
+    unit: "m"
+    source: "[E] p. 172, DEP1: the top layer's depth, 'usually 150 to 600 mm'; the shallow end, the user's choice (2026-10-07), equal to the model's rooting depth at emergence. docs/plans/post-roadmap-soil-evaporation.md §3"
+  top_layer_wet:
+    value: 1.0
+    unit: "mm"
+    source: "[E] p. 180: Stage I needs the top layer to hold more than 1 mm (ATSW1 > 1)"
+  stage_one_ftsw:
+    value: 0.5
+    unit: "dimensionless"
+    source: "[E] p. 181: Stage I also needs the profile above half full (FTSW > 0.5)"
+  top_layer_saturation:
+    value: 0.433
+    unit: "m3/m3"
+    source: "[E] Table 13.1, silt loam, SAT; the user's choice of soil (2026-10-07) — its EXTR 0.132 matches the model's 0.13. Only SAT − DUL is read: the top layer's room above its drained upper limit, past which the account does not count water (it is already in the root zone below)"
+  top_layer_drained_upper_limit:
+    value: 0.218
+    unit: "m3/m3"
+    source: "[E] Table 13.1, silt loam, DUL; read only as SAT − DUL (see top_layer_saturation)"

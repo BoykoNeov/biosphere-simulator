@@ -3,7 +3,7 @@
 //! Mirrors `domains.biosphere`: the clean-room crop science (FvCB photosynthesis,
 //! Penman–Monteith transpiration, thermal-time phenology, allocation, the coupled carbon
 //! budget, nitrogen, the water cycle, decomposition/mineralization, the minimal consumer),
-//! the compartment builders, and `run_season`/`annual_reset`/`run_perennial`. Every rate
+//! the compartment builders, and `run_season`/`annual_reset_with`/`run_perennial_with`. Every rate
 //! law and flow `evaluate` mirrors the Python arithmetic character-for-character and every
 //! `math.*` op-for-op (`exp` to `.exp()`, `sqrt` to `.sqrt()`, `q10**e` to `.powf(e)`), so
 //! the cross-port deviation is bounded by last-ULP libm differences (all 7 biosphere
@@ -37,8 +37,8 @@ use simcore::registry::Registry;
 use simcore::state::State;
 
 pub use system::{
-    annual_reset, annual_reset_with, build_season, build_season_with, consumer_chamber_scenario,
-    perennial_chamber_scenario, potato_scenario, run_perennial, run_perennial_with, run_season,
+    annual_reset_with, build_season, build_season_with, consumer_chamber_scenario,
+    perennial_chamber_scenario, potato_scenario, run_perennial_with, run_season,
     sealed_chamber_scenario, weather_resolver, SeasonScenario, CONSUMER_CHAMBER_YEARS,
     DEFAULT_SCENARIO, LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
 };
@@ -158,18 +158,24 @@ pub fn run_season_final(
     )
 }
 
-/// Run `scenario` with `annual_reset` every season, final `State` only.
+/// Run `scenario` built from `p` with [`annual_reset_with`] every season, final `State` only.
+///
+/// ⚠ Takes `p` rather than loading the frozen params: the re-sow must see the params the season
+/// was built from, and a load here would be a second production site in the spine, the thing
+/// `tests/param_funnel.rs` gates (`docs/plans/post-roadmap-soil-evaporation.md` §16d).
 pub fn run_perennial_final(
     scenario: &SeasonScenario,
     weather_years: usize,
+    p: &params::BiosphereParams,
 ) -> Result<(State, u64, Vec<simcore::events::Event>), SimError> {
-    let (state, integrator, resolver) = season_setup(scenario, weather_years)?;
+    let (state, integrator, resolver) = season_setup_with(scenario, weather_years, p)?;
     let steps = steps_for_years(weather_years);
     let mut noop = |_: &State| {};
-    run_perennial(
+    run_perennial_with(
         &integrator,
         state,
         scenario,
+        p,
         &resolver,
         BIO_DT,
         steps,
