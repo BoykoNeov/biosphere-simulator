@@ -1095,3 +1095,104 @@ depth, over 0.90), so a capping difference does not explain it either. Against m
 the deep store's mean by ~20 %: the accepted residual drying of §10f–h, and not new.
 
 **Grade of §13's B6 row:** PARTLY → explained. Nothing in the price changes.
+
+## 16. ADOPTION — the user's go (2026-10-10)
+
+**The user:** *"Step 2"*, the adoption of §11d/§13 under §14's root-zone supply, which waited on an explicit go.
+The package is the five loader settings of §11 (`rs_form = SzeiczLong`, `soil_evap = TwoStage { floor: false,
+supply: RootZone }`, `watering = Fao56Trigger`, `deep_credit = ActualWetness`, `deep_overflow = Recycled`) with
+their application efficiencies and same-day percolation. Potato adopts with wheat. A biosphere **and** station
+unfreeze.
+
+**Advisor review before any code (2026-10-10), summarized:** (1) re-measure the reds first: the 24 + 2 list and
+§13's sealed numbers predate the dehumidifier fix, and §15 re-ran only the probe; (2) the three unexplained reds
+BLOCK the flip: each gets a read-only probe and a recorded cause before any test is restated; (3) the re-sow
+route threads the params the run was built from. A reset that loads the frozen params itself is the escape
+`param_funnel` exists to catch (an override built through `build_season_with` would be re-sown with frozen
+values), and `params::biosphere()` is wheat; (4) build in two commits, inert plumbing first; (5) the cross-port
+bands are measured only on Linux CI. The old cap's fate is not a blocker: the deep-store tests already need the
+old forms as switches.
+
+### 16a. The reds re-measured after the dehumidifier fix
+
+`wip/three-forms-price` sits on `f1ba3a3`, and `git diff f1ba3a3 main -- rust/` is empty, so the branch is main
+plus the three pricing commits. Full suite `--no-fail-fast` (debug): **1336 passed, 25 failed, 9 ignored**. The
+25 are §13's 24 **by name** (`comm` against `sources/temp-evidence/booksupply/fail_book.txt`: nothing dropped,
+nothing new from the package) plus one unrelated red,
+`repo_gates::every_memory_index_line_names_a_file_and_vice_versa` (below). Ignored, release: **7 passed, 2
+failed**, the sealed station's golden and band, as §13a. **§13's red list stands.** Logs:
+`W:\temp\claude\water-adoption\` (`suite.log`, `ignored.log`, `fail_now.txt`).
+
+⚠ **The unrelated red, not this batch's:** the memory-index gate reads one link per index line, and only lines
+that start `- [`. The user's memory index was compressed on 2026-10-08 so that finished series share a line, so
+39 indexed notes read as unindexed. It runs only where the profile exists (never on CI). Either the lines split
+again or the scanner reads every link on a line: the user's call, recorded and left.
+
+### 16b. The three unexplained reds: each has a cause
+
+Probe: `domains/tests/zz_adoption_probe.rs` (untracked, run on the branch and on main, then deleted). Logs
+`probe_branch.log`, `probe_knockout.log`, `probe_drought_main.log` in the same folder.
+
+1. **`drought_acceleration…`, "WSFD exceeded its 1 + WSSD bound": the bound was never a season law.** The
+   manufactured dry chamber's season thermal time, wssd 0.40 against off: **2842.27 / 2028.37 = 1.40126** on the
+   branch, **1.14781** on main. Of the steps whose accelerated increment exceeds 1.4× the off run's, **136 of 136**
+   are steps where the accelerated crop is past anthesis and the off crop is still vegetative. Past anthesis the
+   accumulator drops the vernalization and photoperiod factors (both < 1, `ThermalTimeAccumulation`), so a crop
+   that flowers first gains more than `1 + wssd` per step against one that has not. Per step, in the same phase,
+   the factor never exceeds `1 + wssd`. Why it shows now: on main the chamber is fed continuously by recycling
+   (FTSW 0.04–0.29 all season, 72 watering steps), so drought acceleration bites mildly and the crop flowers 7
+   days early. Under events the tank is empty, there is one watering, FTSW sits at 0–0.05, the factor runs at its
+   ceiling, and the crop flowers **20 days** early (day 230.5 against 250.25). **No bug.** Restatement: the bound
+   is asserted per step, over the steps where both runs are in the same phase, which is what Eqn 15.8 states.
+2. **The knockout: dropping root capture no longer kills the perennial runs, because the water has a second
+   route.** Perennial chamber, five years, capture dropped: under events and under continuous watering alike the
+   crop completes with **the same grain as the intact run** (peak 0.7127 → 0.5853 kg C by season, identical to the
+   digit). With **both** `biosphere.root_zone_capture` and `biosphere.subsoil_overflow` dropped it dies at the
+   third re-sow under either watering (`seed bank too small`); with the old `Held` overflow and the book's credit,
+   dropping capture alone kills it, as before. The mechanism: as the roots deepen, the store below them is spread
+   over less soil, so its water rises above its own capacity; `Recycled` drains that excess to the tank and the
+   watering returns it to the root zone. The deep water reaches the crop with or without capture. **No bug: the
+   knockout no longer isolates "the roots reach the deep water".** Restatement: the knockout drops both flows.
+3. **The non-finite check: an infinite param now fails at the build, earlier and louder.** `carbon_fraction = 0`
+   makes `sla_per_mol_c` infinite; the soil account's starting `soil_shade_lai` is the seedling's leaf area, so
+   the infinity is now in a STORED value and `State::new` refuses it (`State.aux["soil_shade_lai"] is not finite:
+   inf`), returned as a setup error before the report's own guard runs. Nothing is printed and nothing is hidden.
+   Restatement: the test asserts the refusal, and the report's fold guard keeps a witness that still reaches it
+   (a param that is infinite only in a fold).
+
+### 16c. The old forms stay as lab switches
+
+The constant 70 s/m, `SoilEvaporationForm::Off` and the `TopLayer` cap, `Continuous` watering, the book's
+full-capacity credit and the `Held` overflow all stay, as lab switches. The six deep-store tests of §11d pin the
+book's own deep store through them, and the four instrument tests pin `TopLayer`; retiring them would cost those
+comparisons. This answers §14's step 2.
+
+### 16d. The design: two commits
+
+**Commit A: plumbing; no golden moves.**
+
+* **The re-sow route.** Once the loader carries the soil account every reference state stores it, so the plain
+  `annual_reset` (which refuses such a state) would refuse every reference run. It is retired; the re-sow takes
+  the params the run was built from. `run_perennial` takes `&BiosphereParams`, and every production caller
+  (`run_perennial_final`, the golden producer, `ulp_probe`, `emit_trajectory`, the station's sealed re-sow hook)
+  loads the frozen params **once** and hands the same object to the build and to the re-sow. `param_funnel`'s
+  blessed site moves with it if the single load has to sit in a named helper.
+* **The constants into param files, with their sources** (the reference may not hard-code coefficients):
+  Szeicz–Long's leaf resistance 100 s/m and Teh's threshold LAI 4.0 into `transpiration.yaml`; the soil's albedo
+  0.12 and extinction 0.5, the top layer's 0.15 m, the 1 mm wet threshold, the Stage I FTSW 0.5 and silt loam's
+  SAT 0.433 / DUL 0.218 into a new `soil_evaporation.yaml`; FAO-56's 0.55 and the two application efficiencies
+  0.75 / 0.90 into a new `watering.yaml`. The station's separate-air option reads the same 0.55 from the domains
+  param instead of its own copy (`air_split::FAO56_WHEAT_DEPLETION_FRACTION`). The floor's 1.5 mm/day and FAO's
+  full-cover 0.5 stay code: their forms stay lab-only.
+* **Gate:** `regen_goldens` reports every golden identical; the manifests change only in `param_files`; the full
+  suite and the ignored tests pass (bar the memory-index red of §16a).
+
+**Commit B: the flip.** The five loader lines and `supply: RootZone`; the goldens and both manifests regenerated;
+`rust/data/tiers.json`'s `_transcendental_sites` and each moved golden's `transcendentals` list given the soil
+path's `sqrt` (Stage II) and `exp` (the soil's shade); each red restated by its §11d class, with §16b's causes for
+the three; dated entries in the biosphere and station contract docs; every "LAB-ONLY / the loader's value"
+comment on the adopted forms flipped. Built fresh on main, not cherry-picked from the pricing commits. Then a
+push, and the cross-port bands read on Linux CI.
+
+**Not in this batch:** the book's `DYSE = 1` start (§12, its own item); the separate-air option's watering not
+feeding the top-layer account (§11d ceremony 4, a lab gap); the memory-index gate (§16a).
