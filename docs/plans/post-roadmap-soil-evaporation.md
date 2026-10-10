@@ -1350,3 +1350,7 @@ records (`post-roadmap-room-temperature.md` §13–§18) are
 
 **The pricing branch** `wip/three-forms-price` (three local commits, never pushed) is superseded by
 `20fe5b7` and `448671c`; deleting it is the user's call.
+
+**Linux CI on `a5332e8` (run 38045315936): green** — `cargo test`, the ignored sealed-station golden and band
+(the first Linux read of the moved station goldens' bands: they hold), clippy, and the Godot parity job. Logs
+of this batch: `W:\temp\claude\water-adoption\` (kept at `sources\temp-evidence\water-adoption\`).

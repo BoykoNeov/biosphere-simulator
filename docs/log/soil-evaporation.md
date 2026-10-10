@@ -169,3 +169,4 @@ held). The user: *"I don't care about Linux, drop its tests if needed"* — that
 only now; why Linux reads higher was not measured. **The real-world check:** TM 102788's water use went
 0.40 → 0.43 of the trial's; carbon uptake unchanged. **Live gap:** the separate-air option's own watering
 does not feed the soil's top-layer account (fix offered).
+Linux CI green on `a5332e8`, the moved goldens' bands included.
