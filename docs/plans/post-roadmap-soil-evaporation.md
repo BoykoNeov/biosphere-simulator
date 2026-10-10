@@ -1234,3 +1234,21 @@ Logs: `W:\temp\claude\water-adoption\` (`regenA1.log`, `regenA.log`, `suiteA2.lo
 ⚠ **A slip, caught by the tests and fixed:** the edit scripts wrote Windows line endings, and a first suite
 run had six loader tests red because their text-substitution helpers search for `\n`. Every touched file
 was converted back to LF before the run above.
+
+### 16f. Commit B, predictions (written before the loader lines change)
+
+Built on main over commit A, so the re-sow needs no pricing hack. The basis: §13 (the book's supply) and
+§16a's re-measure; the sealed rows of §13 are stale (the dehumidifier fix), so their numbers are re-predicted
+from §14's note.
+
+| | prediction |
+|---|---|
+| F1 | `regen_goldens` report: the same 10 goldens change as §13 (`season_euler`, `sealed_chamber`, `perennial_chamber`, `perennial_long_horizon`, `consumer_chamber`, `consumer_long_horizon`, `greenhouse`, `harvest`, `lighting`, `sealed_station`); the other 10 identical, `drift_summary` and `sealed_energy_drift_summary` among them (leaf carbon and energy do not move) |
+| F2 | water only in all 10: no carbon, nitrogen, oxygen, energy, `rooted_depth`, `thermal_time` or `vernalization_days` value moves; the biosphere goldens gain the five soil aux keys; `season_euler` gains `boundary.soil_evaporation` |
+| F3 | the six biosphere goldens equal §13's root-zone set byte for byte **except** the three sealed-family runs the dehumidifier fix touched (`sealed_chamber`, `perennial_*`, `consumer_*`), whose water stocks differ; `season_euler` (open field, no condenser) **equals** §13's byte for byte |
+| F4 | `sealed_chamber`: end air vapour within 10 % of the frozen 0.2505 kg (§14's note: the dead-crop air ratio 0.981 under the fixed condenser), not §13's stale 0.125 |
+| F5 | debug suite reds before any restatement: §16a's 24 minus the four commit A already discharged (`param_funnel`, the two refusal tests' successors, `the_params_aware_resow…` retired) and minus the two re-sow tests that called the plain reset (`the_resow_returns_the_abandoned_fraction…`, `the_resow_splits_the_parents_nitrogen…`), which now re-sow with params: **18**, plus the unrelated memory-index red. The ignored run: the sealed station's golden and band red |
+| F6 | after `--write` and both manifests regenerated: the golden, band and manifest reds clear; the station manifest moves its `golden_sha256` rows and its flow/aux sets as §11d listed |
+| F7 | the three §16b reds fail with §16b's messages, and their restatements pass |
+
+Not predicted: the cross-port bands on Linux (measured only by CI after the push).
