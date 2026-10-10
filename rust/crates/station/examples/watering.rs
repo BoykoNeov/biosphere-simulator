@@ -15,7 +15,7 @@
 use domains::biosphere::science::soil_water_stress;
 use domains::biosphere::stocks::{
     CONDENSATE, LEAF_C, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C, SUBSOIL_WATER,
-    WATER_SOURCE, WATER_VAPOR,
+    TOP_SOIL_WATER, WATER_SOURCE, WATER_VAPOR,
 };
 use domains::crew::WATER_STORE;
 use domains::eclss::CABIN_H2O;
@@ -68,6 +68,9 @@ struct Reading {
     to_air: f64,
     capped_steps: u64,
     plant_steps: u64,
+    /// Plant steps whose top layer held no more than Stage I's wet threshold, so the soil's
+    /// evaporation could not restart (the soil-surface account, `post-roadmap-soil-evaporation.md` §17).
+    top_dry_steps: u64,
     rationed: (u64, u64),
     events: usize,
 }
@@ -122,6 +125,7 @@ fn season(warm: bool, watering: bool) -> (State, State, Reading) {
         ..Reading::default()
     };
     let b = scenario.bio;
+    let top_wet = domains::biosphere::params::biosphere().transp.soil.top_layer_wet * b.ground_area;
     let mut observe = |side: Side, before: &State, _after: &State| match side {
         Side::Reset => {}
         Side::Slow => {
@@ -142,6 +146,8 @@ fn season(warm: bool, watering: bool) -> (State, State, Reading) {
             r.stressed_steps += u64::from(f < 1.0);
             let env = bio_r.bind(before, scenario.bio_dt);
             r.plant_steps += 1;
+            r.top_dry_steps +=
+                u64::from(before.aux.get(TOP_SOIL_WATER).copied().unwrap_or(0.0) <= top_wet);
             for flow in bio.registry().flows() {
                 if flow.id() == TRANSPIRATION {
                     let res = flow
@@ -214,7 +220,7 @@ fn main() {
         println!(
             "{name:<30} | watered {:8.3} kg | fan export {:8.3} kg | plant water {:8.3} → {:8.3} \
              (soil {:7.3}→{:7.3}, subsoil {:7.3}→{:7.3}) | crew store {:+9.3} kg, brine {:+7.3} kg \
-             | transp {:8.3} kg, to air {:6.3} kg, capped on {} of {} plant steps              | FTSW min {:.4} | stress min {:.4} on {} steps | plant C {:7.3} | rationed {:?}, events {}",
+             | transp {:8.3} kg, to air {:6.3} kg, capped on {} of {} plant steps              | top layer dry on {} | FTSW min {:.4} | stress min {:.4} on {} steps | plant C {:7.3} | rationed {:?}, events {}",
             r.watered,
             r.exported,
             plant_water(&s0),
@@ -229,6 +235,7 @@ fn main() {
             r.to_air,
             r.capped_steps,
             r.plant_steps,
+            r.top_dry_steps,
             r.ftsw_min,
             r.stress_min,
             r.stressed_steps,

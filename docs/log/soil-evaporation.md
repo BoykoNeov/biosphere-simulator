@@ -170,3 +170,13 @@ only now; why Linux reads higher was not measured. **The real-world check:** TM 
 0.40 → 0.43 of the trial's; carbon uptake unchanged. **Live gap:** the separate-air option's own watering
 does not feed the soil's top-layer account (fix offered).
 Linux CI green on `a5332e8`, the moved goldens' bands included.
+
+**The separate-air gap closed (plan §17, 2026-10-10).** The soil's top-layer account now counts every flow
+that waters the root zone, not just the biosphere's own: the lab separate-air build hands it its watering
+from the crew's store too. The reference is untouched (20 of 20 goldens identical, the one-source sum adds
+in the same order). The gap was small in practice: that watering fires about 10 and 22 times a season in
+0.5 kg steps, so at most 5 and 11 kg had been missing; the top layer is now dry on 3 and 2 fewer plant steps
+of 4880. **Found on the way, not fixed (an unfreeze, the user's call):** the four station assemblies never
+seed the soil account's starting values, so every station run's first season starts with an EMPTY top layer
+and unshaded soil; the re-sow seeds them. Same day, separately, the user deleted the Linux CI job that ran
+the reference's tests; the slow tests now run only by hand.

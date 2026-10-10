@@ -35,7 +35,7 @@ use domains::biosphere::stocks::{
     CARBON_POOL, CHAMBER_INERT, IRRIGATION_VAR, O2_POOL, RN_VAR, ROOTED_DEPTH, SOIL_WATER,
     TEMP_VAR, WATER_VAPOR,
 };
-use domains::biosphere::system::weather_shared;
+use domains::biosphere::system::{soil_surface_account_with, weather_shared, SOIL_SURFACE_ACCOUNT};
 use domains::crew::{CrewParams, FECAL_WASTE, WATER_STORE};
 use domains::eclss::{EclssParams, CABIN_CO2, CABIN_H2O, CABIN_O2, ECLSS_DOMAIN};
 use domains::power::ChargeParams;
@@ -235,6 +235,23 @@ impl Flow for TriggeredWatering {
     }
 }
 
+/// The watering from the crew's store (§18b) — ONE builder, so the soil account's instance is
+/// built exactly as the registered flow is (the biosphere's own idiom for its watering).
+fn crew_watering(scenario: &SealedStationScenario) -> TriggeredWatering {
+    TriggeredWatering {
+        inner: Irrigation {
+            id: WATERING.to_string(),
+            water_source: WATER_STORE.to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            irrigation_var: IRRIGATION_VAR.to_string(),
+            ground_area: scenario.bio.ground_area,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: scenario.bio.soil_extractable_water,
+        },
+        trigger_ftsw: 1.0 - domains::biosphere::params::water_cycle().depletion_fraction,
+    }
+}
+
 /// The fan: every species crosses by its concentration difference ([module docs](self)).
 pub struct AirExchange {
     pub id: String,
@@ -363,20 +380,29 @@ pub fn build_split_station(
 
     // §18: watered from the crew's supply — the field's top-up, on the plant step (its rate is
     // per day, and it reads the rooted depth the plant step advances).
+    // ⚠ And the soil's top-layer account counts it (`post-roadmap-soil-evaporation.md` §17):
+    // the season's account counts only the biosphere's own watering, so it is replaced, in its
+    // own place in the aux list, by one that also counts this flow. Here and not later:
+    // `wrap_last` rewraps the aux processes to read the chamber, and an account swapped in
+    // after it would not.
     let bio_reg = if split.watering {
-        let (mut flows, aux) = bio_reg.into_parts();
-        flows.push(Box::new(TriggeredWatering {
-            inner: Irrigation {
-                id: WATERING.to_string(),
-                water_source: WATER_STORE.to_string(),
-                soil_water: SOIL_WATER.to_string(),
-                irrigation_var: IRRIGATION_VAR.to_string(),
-                ground_area: resized.bio.ground_area,
-                rooted_depth_aux: ROOTED_DEPTH.to_string(),
-                soil_extractable_water: resized.bio.soil_extractable_water,
-            },
-            trigger_ftsw: 1.0 - domains::biosphere::params::water_cycle().depletion_fraction,
-        }));
+        let (mut flows, mut aux) = bio_reg.into_parts();
+        flows.push(Box::new(crew_watering(&resized)));
+        if let Some(account) = soil_surface_account_with(
+            &resized.bio,
+            &domains::biosphere::params::biosphere(),
+            vec![Box::new(crew_watering(&resized))],
+        ) {
+            let slot = aux
+                .iter()
+                .position(|a| a.id() == SOIL_SURFACE_ACCOUNT)
+                .ok_or_else(|| {
+                    SimError::Validation(format!(
+                        "build_split_station: the soil form is on but the season carries no                          {SOIL_SURFACE_ACCOUNT:?} account to count the crew's watering"
+                    ))
+                })?;
+            aux[slot] = account;
+        }
         Registry::new(flows, &state.stocks, aux)?
     } else {
         bio_reg

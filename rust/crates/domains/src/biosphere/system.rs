@@ -898,7 +898,7 @@ fn build_plants(
         aux.push(Box::new(process));
     }
     if soil_evaporates(p) {
-        aux.push(Box::new(soil_surface_account(scenario, p)));
+        aux.push(Box::new(soil_surface_account(scenario, p, Vec::new())));
         if !scenario.sealed {
             stocks.push(boundary::sink(SOIL_EVAP_SINK.to_string(), Quantity::Water, 0.0)?);
         }
@@ -1038,24 +1038,47 @@ fn seed_growth_dvs(p: &params::BiosphereParams) -> f64 {
     }
 }
 
+/// The soil account's aux-process id — public so a station that adds a watering flow of its own
+/// can find the account and replace it ([`soil_surface_account_with`]).
+pub const SOIL_SURFACE_ACCOUNT: &str = "biosphere.soil_surface";
+
 /// The lab soil account (`SoilSurfaceAccount`), with its own instances of the season's
 /// `Transpiration` and watering inflow — `Irrigation` open, `Recycling` sealed, wired as the
-/// season's own are.
-fn soil_surface_account(scenario: &SeasonScenario, p: &params::BiosphereParams) -> SoilSurfaceAccount {
-    let inflow: Box<dyn Flow> = if scenario.sealed {
+/// season's own are — followed by `extra`, the instances of any watering a station adds.
+fn soil_surface_account(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+    extra: Vec<Box<dyn Flow>>,
+) -> SoilSurfaceAccount {
+    let mut inflows: Vec<Box<dyn Flow>> = vec![if scenario.sealed {
         recycling_flow(scenario, p)
     } else {
         irrigation_flow(scenario, p)
-    };
+    }];
+    inflows.extend(extra);
     SoilSurfaceAccount {
-        id: "biosphere.soil_surface".to_string(),
+        id: SOIL_SURFACE_ACCOUNT.to_string(),
         water: transpiration_flow(scenario, p, &chamber_wiring(scenario.sealed)),
-        inflow,
+        inflows,
         drainage_factor: scenario.drainage_factor,
         thermal_time_aux: THERMAL_TIME.to_string(),
         pheno: p.pheno,
         seed_growth_dvs: seed_growth_dvs(p),
     }
+}
+
+/// The season's soil account built as [`build_season_with`] builds it, with `extra` watering
+/// inflows counted after the season's own: for a station that waters the root zone from a
+/// source of its own, so the top layer sees every drop delivered
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §17). Each `extra` flow must be a SECOND
+/// instance of a flow the caller also registers — the account evaluates it on the same
+/// snapshot and never applies its legs. `None` when the soil-evaporation form is off.
+pub fn soil_surface_account_with(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+    extra: Vec<Box<dyn Flow>>,
+) -> Option<Box<dyn AuxProcess>> {
+    soil_evaporates(p).then(|| Box::new(soil_surface_account(scenario, p, extra)) as Box<dyn AuxProcess>)
 }
 
 /// The lab soil account's starting values: the top layer holds its uniform share of the root

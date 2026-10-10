@@ -1124,18 +1124,22 @@ impl Flow for Transpiration {
 /// (`docs/plans/post-roadmap-soil-evaporation.md` §4b) — in the reference since the water-forms adoption (2026-10-10, `docs/plans/post-roadmap-soil-evaporation.md` §16).
 ///
 /// Soltani & Sinclair track the top layer as an account OVERLAPPING the root zone (Eqn 14.2): the
-/// water stays in `soil_water`; this process advances `ATSW1` by the same inflow (`inflow`'s leg
-/// into `soil_water`), less the top layer's drainage `(ATSW1 − TTSW1)·DRAINF`, its share of the
+/// water stays in `soil_water`; this process advances `ATSW1` by the same inflow (the `inflows`'
+/// legs into `soil_water`), less the top layer's drainage `(ATSW1 − TTSW1)·DRAINF`, its share of the
 /// crop's uptake (`TR1`, the book's program) and the soil's evaporation. Every amount comes from the
-/// same functions the flows run on the same snapshot — `water.split` and `inflow.evaluate` — so the
+/// same functions the flows run on the same snapshot — `water.split` and each inflow's `evaluate` — so the
 /// account and the flows cannot disagree. It also advances the dry-stage clock, the soil-shading
 /// leaf area (held from beginning seed growth) and the day's evaporation and potential (the floor).
 pub struct SoilSurfaceAccount {
     pub id: String,
     /// An instance built exactly as the season's `Transpiration` (one builder, two instances).
     pub water: Transpiration,
-    /// An instance of the season's watering inflow — `Irrigation` (open) or `Recycling` (sealed).
-    pub inflow: Box<dyn Flow>,
+    /// Instances of every flow that waters the root zone, the season's own first — `Irrigation`
+    /// (open) or `Recycling` (sealed) — then any a station adds (the separate-air option's
+    /// watering from the crew's store, `docs/plans/post-roadmap-soil-evaporation.md` §17).
+    /// Their legs into `soil_water` are summed in ONE pass in list order, so a single inflow
+    /// adds exactly as the one-field form did.
+    pub inflows: Vec<Box<dyn Flow>>,
     pub drainage_factor: f64,
     pub thermal_time_aux: String,
     pub pheno: PhenologyParams,
@@ -1170,11 +1174,14 @@ impl AuxProcess for SoilSurfaceAccount {
             SimError::Reference("SoilSurfaceAccount needs the soil-evaporation form".to_string())
         })?;
         let split = self.water.split(snapshot, env, dt)?;
-        let inflow: f64 = self
-            .inflow
-            .evaluate(snapshot, env, dt)?
-            .legs
+        let results = self
+            .inflows
             .iter()
+            .map(|f| f.evaluate(snapshot, env, dt))
+            .collect::<Result<Vec<_>, _>>()?;
+        let inflow: f64 = results
+            .iter()
+            .flat_map(|r| r.legs.iter())
             .filter(|l| l.stock == self.water.soil_water)
             .map(|l| l.amount)
             .sum();

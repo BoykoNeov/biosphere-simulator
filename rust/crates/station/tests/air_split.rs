@@ -5,8 +5,8 @@
 //! over a shorter run so the suite stays cheap.
 
 use domains::biosphere::stocks::{
-    CONDENSATE, LEAF_C, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C, SUBSOIL_WATER, WATER_SOURCE,
-    WATER_VAPOR,
+    CONDENSATE, LEAF_C, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C, SUBSOIL_WATER, TOP_SOIL_WATER,
+    WATER_SOURCE, WATER_VAPOR,
 };
 use domains::crew::WATER_STORE;
 use domains::params;
@@ -374,13 +374,24 @@ fn watered_build() -> (
     simcore::registry::Registry,
     simcore::environment::SourceResolver,
 ) {
+    plant_build(true)
+}
+
+/// The plant registry of a separate-air build, watered from the crew's store or not.
+fn plant_build(
+    watering: bool,
+) -> (
+    State,
+    simcore::registry::Registry,
+    simcore::environment::SourceResolver,
+) {
     let scenario = scenario();
     let s = AirSplit {
         chamber_air_mol: BVAD_CHAMBER_AIR_MOL,
         fan_mol_per_s: 0.2,
         vapour_crosses: true,
         gas_exchange: GasExchangeStep::Minute,
-        watering: true,
+        watering,
         transpiration: GasExchangeStep::PlantStep,
     };
     let (state, bio, _) = build_split_station(
@@ -483,4 +494,67 @@ fn watering_gives_nothing_above_the_trigger() {
         let res = flow.evaluate(&s, &r.bind(&s, plant_dt), plant_dt).unwrap();
         assert!(res.legs.is_empty(), "fill {fill}: {:?}", res.legs.len());
     }
+}
+
+/// One plant step's change to the soil's top-layer account, read from `bio`'s own (wrapped)
+/// account on `state`.
+fn top_layer_change(
+    bio: &simcore::registry::Registry,
+    r: &simcore::environment::SourceResolver,
+    state: &State,
+) -> f64 {
+    let plant_dt = sealed_station_scenario().bio_dt;
+    let account = bio
+        .aux_processes()
+        .iter()
+        .find(|a| a.id() == domains::biosphere::system::SOIL_SURFACE_ACCOUNT)
+        .expect("the soil account");
+    account
+        .evaluate(state, &r.bind(state, plant_dt), plant_dt)
+        .unwrap()[TOP_SOIL_WATER]
+}
+
+/// `post-roadmap-soil-evaporation.md` §17 — the soil's top-layer account counts the crew's
+/// watering. On a step where it fires (root zone at FTSW 0.30, below the trigger), the watered
+/// build's account rises by exactly what the watering delivers into the root zone MORE than the
+/// unwatered build's account does on the same state. The top layer is set half full so neither
+/// the empty clamp nor the saturation cap can absorb the difference.
+///
+/// ⚠ Before §17 the difference was 0: the account counted only the biosphere's own watering, so
+/// water from the crew's store reached the root zone and never the top layer.
+#[test]
+fn the_top_layer_account_counts_the_crews_watering() {
+    let (state, watered, r) = plant_build(true);
+    let (_, dry, _) = plant_build(false);
+    let plant_dt = sealed_station_scenario().bio_dt;
+    let mut s = with_soil_water(&state, 0.30 * ttsw(&state));
+    // Half the top layer's share of this (low) root zone. Set, not read: the station's
+    // assemblies do not seed the soil account's starting values (recorded in §17).
+    let share = (domains::biosphere::params::biosphere().transp.soil.top_layer_depth
+        / s.aux[domains::biosphere::stocks::ROOTED_DEPTH])
+        .min(1.0);
+    let top = 0.5 * share * s.stocks[SOIL_WATER].amount;
+    let mut aux = s.aux.clone();
+    aux.insert(TOP_SOIL_WATER.to_string(), top);
+    s = State::new(s.n, s.stocks.clone(), s.rng_seed, aux).unwrap();
+
+    let delivered: f64 = watered
+        .flows()
+        .iter()
+        .find(|f| f.id() == station::air_split::WATERING)
+        .expect("the watering flow")
+        .evaluate(&s, &r.bind(&s, plant_dt), plant_dt)
+        .unwrap()
+        .legs
+        .iter()
+        .filter(|l| l.stock == SOIL_WATER)
+        .map(|l| l.amount)
+        .sum();
+    assert!(delivered > 0.0, "the watering did not fire at FTSW 0.30");
+
+    let extra = top_layer_change(&watered, &r, &s) - top_layer_change(&dry, &r, &s);
+    assert!(
+        (extra - delivered).abs() <= 1e-12 * delivered.max(top),
+        "the top layer gained {extra} kg more with the crew's watering, which delivered          {delivered} kg"
+    );
 }

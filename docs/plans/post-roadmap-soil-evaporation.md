@@ -1354,3 +1354,101 @@ records (`post-roadmap-room-temperature.md` §13–§18) are
 **Linux CI on `a5332e8` (run 38045315936): green** — `cargo test`, the ignored sealed-station golden and band
 (the first Linux read of the moved station goldens' bands: they hold), clippy, and the Godot parity job. Logs
 of this batch: `W:\temp\claude\water-adoption\` (kept at `sources\temp-evidence\water-adoption\`).
+
+## 17. The separate-air watering feeds the top-layer account (the user, 2026-10-10)
+
+**Asked (the user, picking item 1 of the open list):** close the separate-air gap §16h made live. The lab
+option's `TriggeredWatering` (`station/src/air_split.rs`) waters the root zone from the crew's store, but the
+soil's top-layer account (`SoilSurfaceAccount`) counts only ONE inflow, the biosphere's own watering. So in
+every separate-air run with its own watering on, water delivered to the root zone never reaches the top
+layer, and the soil's Stage I evaporation restarts less often than the water delivered would warrant.
+
+**Same day, separately: the Linux CI job that ran the reference's tests was deleted** (the user: *"Remove the
+Linux job"*; commit `f9efb74`). The six slow `#[ignore]`d tests now run only by hand, and the instruction to
+run them is a line in CLAUDE.md's Commands, pinned by `the_ignored_tests_still_have_a_named_run`.
+
+### 17a. Advisor review (2026-10-10), summarized
+
+The account lives in the reference and the separate-air option is lab-only, so the one-inflow path must stay
+byte-identical: gate it with `regen_goldens` (report only) and the manifest writers, with the prediction written
+before the code. Make the account take a list of inflows summed in a fixed order (the biosphere's own first), or
+expose a builder taking extra ones, and swap the account in **before** `wrap_last`: `plants_read_chamber`
+rewraps the aux processes, so one inserted after it would miss the chamber's temperature. Do not widen scope:
+`TriggeredWatering` waters through bare `Irrigation`, with no application efficiency and no subsoil leg, unlike
+`EventRecycling`; a separate question, noted and not fixed here. Test that on a step where the watering fires
+the account rises by exactly the legs it delivers, and show it red with the fix reverted. Re-measure the
+`watering` example; the older separate-air records (`post-roadmap-room-temperature.md` §13–§18) are a larger
+re-measure that needs the user's go.
+
+### 17b. The design
+
+* `SoilSurfaceAccount.inflow: Box<dyn Flow>` becomes `inflows: Vec<Box<dyn Flow>>`. The legs into `soil_water`
+  of every inflow are summed in ONE pass, inflows in list order and legs in each flow's order. With a single
+  inflow that is exactly the old sum's order of additions.
+* `domains::biosphere::system` gains a public builder for the account with extra inflows appended after the
+  season's own, and a public constant for its id.
+* `build_split_station`, with watering on and the soil form on, replaces the season's account (same position
+  in the aux list) by one fed by `[season's own watering, a second TriggeredWatering instance]`, before
+  `wrap_last`. ONE builder makes both watering instances, as the biosphere does for its own.
+
+### 17c. Predictions (written before the code)
+
+| # | prediction |
+|---|---|
+| P1 | `regen_goldens` report: **20 of 20 identical**. No golden builds the separate-air option. |
+| P2 | Manifest writers and the claim census green; no param file changes. |
+| P3 | `watering` example, the two watering-OFF rows: identical to before, every printed number. |
+| P4 | The two watering-ON rows: the top layer is dry on **fewer** plant steps; total water out of the root zone (`transp`, crop plus soil) **rises**; the crew store gives **more** (`watered` up from 11.0 / 5.0 kg). Magnitude not predicted: how often the trigger fires per season was never read. |
+| P5 | Plant carbon in the watering-ON rows within ±1 %: watering holds the root zone at the trigger either way, so extra soil evaporation is paid by the crew's store rather than by the crop's stress. |
+| P6 | The new account test is red with the account swap reverted, green with it. |
+
+### 17c'. Built and graded (2026-10-10)
+
+**What landed.** `SoilSurfaceAccount.inflows` (a list, summed in one pass); `system::soil_surface_account_with`
+and `SOIL_SURFACE_ACCOUNT`; in `build_split_station`, one builder (`crew_watering`) for the registered flow and
+the account's instance, and the season's account replaced in place before `wrap_last`. New test
+`station/tests/air_split.rs::the_top_layer_account_counts_the_crews_watering`. The `watering` example now also
+prints the plant steps whose top layer is at or below Stage I's wet threshold. Logs:
+`W:\temp\claude\separate-air-watering\` (kept at `sources\temp-evidence\separate-air-watering\`).
+
+| | weather chamber, watering on | 22 °C chamber, watering on |
+|---|---|---|
+| top layer dry (plant steps of 4880) | 2390 → **2387** | 2360 → **2358** |
+| water out of the root zone, crop + soil (kg) | 767.681 → **767.712** | 1632.591 → **1632.635** |
+| watered from the crew's store (kg) | 5.000 → 5.000 | 11.000 → 11.000 |
+| plant carbon (mol C) | 0.152 → 0.152 | 44.485 → 44.485 |
+
+* **P1 held:** `regen_goldens` report, 20 of 20 identical.
+* **P2:** see the suite line below.
+* **P3 held:** both watering-off rows identical, every printed number.
+* **P4 half held:** direction right on the top layer and the water out, but the crew's store gave exactly the
+  same. The watering fires in fixed 0.5 kg steps (the test reads 0.5 kg), 10 times a season in the weather
+  chamber and 22 at 22 °C, and the slightly faster drying did not add a firing. The gap was real but small in
+  these runs: **at most 5 and 11 kg a season ever missed the top layer.**
+* **P5 held:** plant carbon identical to the printed digits.
+* **P6 held:** with the swap reverted the test reads "gained 0 kg more ... delivered 0.5 kg"; restored, green.
+
+**Not explained, recorded:** with the fix, the watering-on rows still have their top layer dry on MORE steps
+than the watering-off rows (2387 vs 2332; 2358 vs 2168). Not traced; a guess, unchecked: the crew's small
+top-ups keep the root zone above the trigger of the chamber's own recycling, whose events are larger.
+
+**Not done, by scope (advisor):** `TriggeredWatering` waters through bare `Irrigation`, with no application
+efficiency and no subsoil leg, unlike the reference's `EventRecycling`. And the older separate-air records
+(`post-roadmap-room-temperature.md` §13–§18) are pre-adoption; re-running them is the user's call.
+
+### 17d. Found while building the test: the station never seeds the soil account (a reference finding, not fixed)
+
+The new test first read the station state's `top_soil_water` and panicked: **the key is absent.** `build_season`
+seeds the soil account's five starting values (`soil_surface_initial`: the top layer at its uniform share of the
+root zone, both clocks at 0, the soil shaded by the seedling's leaf area, the day's two totals at 0), but the
+station's assemblies build their own starting aux and seed only `thermal_time`, `rooted_depth` (and the sowing
+clock). Read in the source: `sealed.rs` (sealed station, and the separate-air build on top of it),
+`greenhouse.rs`, `harvest.rs`, `lighting.rs` — all four. `aux_of` defaults a missing key to 0, so in every
+station run **the first season's top layer starts EMPTY** and the soil starts unshaded; the re-sow
+(`annual_reset_with`) seeds them, so seasons after the first are right.
+
+This is the shape the comment above `ROOTED_DEPTH` in each assembly already records (a station builder that
+assembles its own aux silently drops a value `build_season` seeds). It reaches the reference: `sealed_station`,
+`greenhouse`, `harvest` and `lighting` all moved with the adoption (§11d table), so their committed bytes include
+an empty first-season top layer. Fixing it moves those goldens: an unfreeze, the user's call. Not measured: by
+how much. The test here sets the top layer explicitly instead of reading it.
