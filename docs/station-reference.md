@@ -360,14 +360,17 @@ gate), so the discipline is enforced, not merely requested.
 
 - **2026-10-10 — the biosphere's water forms adopted, delegated: 4 station goldens move (`greenhouse`,
   `harvest`, `lighting`, `sealed_station`) and their 4 `golden_sha256` rows follow. No station flow,
-  param, seam or claim changed.** The biosphere entry of the same date has the forms; plan
+  param or seam changed; two station-side edits ride along: the TM 102788 scorecard's R1 (a what-if air
+  resistance reaches the water flow) now runs under the constant resistance with the soil's evaporation
+  off, whose formula it checks by hand, and the separate-air option reads FAO-56's depletion fraction
+  from the biosphere's `water_cycle.yaml`.** The biosphere entry of the same date has the forms; plan
   `docs/plans/post-roadmap-soil-evaporation.md` §16. The 7-day chambers: condensate −15.9 % / −18.4 % /
   +10.2 %, root zone +2.4 % / +0.5 % / −1.3 % (`greenhouse` / `harvest` / `lighting`); `sealed_station`:
   condensate 5.51 → 75.6 kg, root zone −43.7 %, the store below the roots +5.0 %. Water only, the air's
-  vapour unchanged everywhere. The separate-air lab option reads FAO-56's depletion
-  fraction from the biosphere's `water_cycle.yaml` instead of its own copy (the plumbing commit before
-  this one). `cabin_gas`, `eclss`, `water_recovery`, `station` and `sealed_energy_drift_summary` are
-  byte-identical.
+  vapour unchanged everywhere. `cabin_gas`, `eclss`, `water_recovery`, `station` and
+  `sealed_energy_drift_summary` are byte-identical. ⚠ The separate-air option's own watering does not feed
+  the soil's top-layer account (plan §16h): a lab gap, live since this entry; its recorded numbers are
+  pre-adoption. TM 102788's water use read 0.40 → 0.43 of the trial's after it.
 - **2026-10-09 — the biosphere's chamber condenser draws nothing below its setting, delegated: 3
   station goldens move (`greenhouse`, `harvest`, `sealed_station`) and their 3 `golden_sha256` rows
   follow. No station flow, param, seam or claim changed.** The biosphere entry of the same date has the

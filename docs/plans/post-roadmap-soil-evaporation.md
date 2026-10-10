@@ -1299,3 +1299,54 @@ release: 9 passed, 0 failed (the sealed station's golden and band, both session 
 `suiteB0.log`, `suiteB1.log`, `suiteB2.log`, `ignoredB.log`, `clippyB.log`, `mutant2.log`).
 
 **Owed:** the cross-port bands on Linux CI for the ten moved goldens (the push after this commit).
+
+### 16h. After the push: Linux CI, the user's decision, and what the adoption did to the real-world check (2026-10-10)
+
+**Linux CI on `448671c` (run 38042136840): one red, and not a band.** Every golden and band test in the
+default `cargo test` passed on Linux; the steps after it (the ignored sealed-station golden and band, and
+clippy) were skipped by the red, so they are read on the next push. The one red was
+`tier_sensitivity::the_biosphere_band_sits_above_the_measured_sensitivity`. That test nudges the PAR
+seam by ±1 ULP, measures how far the 15-year perennial run moves, and checks the reading three ways:
+non-zero, within 10× of the Python instrument's 3.520e-15, and below the 1e-11 band.
+
+| reading | Windows | Linux |
+|---|---|---|
+| before the switch (`0f025e9`) | 2.291e-15 (worst leaf `stocks[10]`) | passed (value not printed) |
+| after the switch (`448671c`) | 3.965e-15 (worst leaf `biosphere.stem_c`) | **3.569e-14** (same leaf) — 1.4 % past the 3.520e-14 edge |
+
+So the switch moved the carbon's last-digit sensitivity on both platforms. No golden's carbon moved,
+but a perturbed run's carbon now reads the water forms somewhere (a path not traced). Why Linux reads 9×
+Windows was **not** measured: no Linux toolchain is installed locally, and CI runs only on a push to
+main or a pull request.
+
+**Advisor (2026-10-10), summarized:** tell the user before going further; don't move the reference
+figure or widen the window; this check justifies the band, so how to re-anchor it is the user's call;
+measure Windows before and after, then Linux both ways, before proposing a fix.
+
+**DECIDED (the user), asked how to get the Linux numbers:** *"I don't care about Linux, drop its tests
+if needed."* Done narrowly: the test still runs on Linux (claims 1 and 3), and only claim 2, the reach
+check against the Python figure, runs on Windows alone and says so on Linux. Not compiled out
+(`#[cfg]`): a gate that vanishes is the shape `goldens.rs` warns against. ⚠ **The gap this leaves:** on
+Linux the biosphere band's basis is now "non-zero and below 1e-11", not "the same order as the
+instrument it re-measures". The Python figure describes a model before these forms, so on any platform
+the window's premise is gone; a re-anchoring is owed if this check is to mean "the same dynamics" again.
+
+**The real-world check, read after the switch** (`station/tests/scorecard_tm102788.rs`, TM 102788 at
+812 ppm): water use over TM days 25–80 **2.38 → 2.60 L m⁻² d⁻¹, 0.40 → 0.43 of the trial's ~6.0**;
+mean water use 0.61 of the trial's; peak daytime uptake unchanged at 0.979. The leaf-area resistance
+lets the dense canopy transpire a little more (rs 70 → 50 s/m at full cover); the gap is mostly still
+there. (The scorecard's row is a nutrient-solution crop held above the stress threshold, so the soil's
+evaporation and the event watering hardly touch it.)
+
+**The separate-air gap is now live** (§11d ceremony 4). The station's separate-air option waters from
+the crew's supply with its own `TriggeredWatering`, which the soil's top-layer account does not see: its
+inflow is the biosphere's own watering. While soil evaporation was lab-only this was latent; now every
+separate-air run with its own watering on has a top layer refilled only by the biosphere's event
+watering, so its Stage I restarts less often than the water delivered would warrant. Measured once:
+`cargo run --release -p station --example watering` completes (the 22 °C chamber watered 11.0 kg from
+the crew's store over a season; the weather chamber 5.0 kg). ⚠ The separate-air numbers already in the
+records (`post-roadmap-room-temperature.md` §13–§18) are
+**pre-adoption**. The fix (feed the account from whatever waters the root zone) is offered as a follow-on.
+
+**The pricing branch** `wip/three-forms-price` (three local commits, never pushed) is superseded by
+`20fe5b7` and `448671c`; deleting it is the user's call.

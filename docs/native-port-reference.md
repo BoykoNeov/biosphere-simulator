@@ -436,7 +436,12 @@ Every `**` / `math.*` site maps to its exact Rust equivalent:
 `docs/plans/post-roadmap-soil-evaporation.md` §16) put the bare soil's evaporation into the
 reference after the Python checker was retired, so there is no op-for-op mirror to match: they
 matter for the **bands**, which they enter on all 10 water-moved goldens (`rust/data/tiers.json`
-names both sites), and those are read on Linux CI, never on the Windows box.
+names both sites), and those are read on Linux CI, never on the Windows box. ⚠ **And since the same
+day the biosphere band's reach check runs on Windows only** (the user: *"I don't care about Linux, drop
+its tests if needed"*): Linux read the ±1-ULP sensitivity 9× Windows (3.569e-14 against 3.965e-15), 1.4 %
+past the order-of-magnitude window around the retired Python figure. On Linux the band now rests on
+"non-zero and below 1e-11" only; why Linux reads higher was not measured
+(`docs/plans/post-roadmap-soil-evaporation.md` §16h).
 
 Beyond libm, bit-exactness lives on **operation order, not math**: float `+`/`*` are
 commutative but not associative, so every integrator grouping and every `sorted()` reduction

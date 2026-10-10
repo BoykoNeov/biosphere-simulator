@@ -162,3 +162,10 @@ second route to the deep water; an infinite param is now refused at the build. �
 open field's `irrigation_mm_day` is only an on/off switch** — the book's deep-store tests, which need a crop
 watered below its demand, a dry store or a fixed-point re-sow cycle, now pin the five old forms, kept as lab
 switches. The cross-port bands for the ten moved goldens are read on Linux CI.
+
+**After the push (plan §16h).** Linux CI: one red, the biosphere band's reach check (Linux read the
+last-digit sensitivity 9× Windows, 1.4 % past a window around the retired Python figure; the band itself
+held). The user: *"I don't care about Linux, drop its tests if needed"* — that one check runs on Windows
+only now; why Linux reads higher was not measured. **The real-world check:** TM 102788's water use went
+0.40 → 0.43 of the trial's; carbon uptake unchanged. **Live gap:** the separate-air option's own watering
+does not feed the soil's top-layer account (fix offered).

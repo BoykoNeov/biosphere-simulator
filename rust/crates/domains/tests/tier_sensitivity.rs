@@ -76,6 +76,12 @@ fn band_of(key: &str) -> f64 {
 
 /// The three claims every measured sensitivity must satisfy, in the order they can fail.
 fn assert_justifies(key: &str, measured: f64, python: f64, leaf: &str) {
+    assert_justifies_on(key, measured, python, leaf, true);
+}
+
+/// [`assert_justifies`], with claim 2 (the order-of-magnitude reach check against the Python
+/// figure) run only when `reach_check` is true — said out loud when it is not.
+fn assert_justifies_on(key: &str, measured: f64, python: f64, leaf: &str, reach_check: bool) {
     // Captured unless `-- --nocapture`, so it costs nothing and the instrument can be read
     // back without editing it — the same reason `tiers::compare_at_tier` returns its measurement.
     eprintln!("MEASURED {key} = {measured:.6e} (python {python:.3e}) leaf={leaf}");
@@ -89,8 +95,13 @@ fn assert_justifies(key: &str, measured: f64, python: f64, leaf: &str) {
     );
     // 2. It reached the RIGHT subject. Non-zero is not enough: 1e-30 is non-zero and wrong,
     //    and only the number this re-measures can see that.
+    if !reach_check {
+        eprintln!(
+            "{key}: THE REACH CHECK AGAINST THE PYTHON FIGURE DID NOT RUN on this platform              (measured {measured:.3e}, python {python:.3e}); claims 1 and 3 still do"
+        );
+    }
     assert!(
-        measured > python / 10.0 && measured < python * 10.0,
+        !reach_check || (measured > python / 10.0 && measured < python * 10.0),
         "{key}: measured ±1-ULP sensitivity {measured:.3e} is more than an order of magnitude \
          from the Python instrument's {python:.3e} — the two ports' bands are sized against \
          the same dynamics, so this is a finding about the probe or about the port, not a \
@@ -278,6 +289,16 @@ fn the_sibling_bands_sit_above_the_measured_sensitivity() {
 
 /// The one band all seven biosphere goldens share, measured on the worse of the two 15-year
 /// sealed runs — the Python instrument's representative pair.
+///
+/// ⚠⚠ **Claim 2 (the reach check against the Python figure) runs on Windows only since
+/// 2026-10-10 — the user's call: *"I don't care about Linux, drop its tests if needed."*** The
+/// water-forms adoption (`docs/plans/post-roadmap-soil-evaporation.md` §16h) moved this
+/// sensitivity: Windows read 2.291e-15 before it and 3.965e-15 after (stem carbon now the worst
+/// leaf — the water forms reach carbon at the last digit, though no golden's carbon moved), and
+/// the Linux runner read **3.569e-14**, 1.4 % past the window's 3.520e-14 edge. Why Linux reads 9×
+/// Windows was NOT measured. The Python figure describes a model before these forms, so the
+/// window's premise ("the same dynamics") no longer holds either way. Claims 1 (non-zero) and 3
+/// (below the 1e-11 band, which Linux clears ~280×) still run everywhere.
 #[test]
 fn the_biosphere_band_sits_above_the_measured_sensitivity() {
     let (measured, leaf) = ulp_probe::biosphere_sensitivity(domains::biosphere::LONG_HORIZON_YEARS);
@@ -287,7 +308,13 @@ fn the_biosphere_band_sits_above_the_measured_sensitivity() {
             1e-11,
             "{key}: the seven biosphere goldens must share one band"
         );
-        assert_justifies(key, measured, PYTHON_BIOSPHERE_PERENNIAL_15YR, &leaf);
+        assert_justifies_on(
+            key,
+            measured,
+            PYTHON_BIOSPHERE_PERENNIAL_15YR,
+            &leaf,
+            cfg!(windows),
+        );
     }
 }
 
