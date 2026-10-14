@@ -804,26 +804,29 @@ infrared than of PAR — general knowledge, not on a page here), McCree's ratios
 the canopy at **1.83×** the PAR energy (≤ 2× at the bulb, through a glass barrier passing 74 % of the
 shortwave and 81 % of the PAR) to **2.0×** (if his ratio was measured where the plants sat). So ×2.24 is
 **more than all the shortwave**: the remaining **19–33 W m⁻²** would have to be heat radiation from or
-through the barrier — the part McCree found a glass barrier cuts by 75 %, leaving leaves near air
-temperature. On the trays basis (×3.07) the remainder is **86–100 W m⁻²**.
+through the barrier ~~— the part McCree found a glass barrier cuts by 75 %, leaving leaves near air
+temperature~~ (struck: the 75 % cut does not make the remainder small — §12e). On the trays basis (×3.07)
+the remainder is **86–100 W m⁻²**.
 
 ### 12d. Graded
 
 | criterion | what was found | reads toward |
 |---|---|---|
 | leaf − air temperature, Phase IV | **none** — TM 102788 gives no canopy temperature | — (blocked) |
-| leaf − air temperature, other | Phase II crop ±1 °C (TM 103494, §10d); McCree: with a glass barrier, leaves close to air | **leans against lamp heat alone** (+2 K predicted); does not separate air coupling from "lamp heat plus air coupling" |
+| leaf − air temperature, other | Phase II crop ±1 °C (TM 103494, §10d); McCree: with a glass barrier, leaves close to air | **leans against lamp heat alone** (+2 K predicted) — ⚠ at the model's `ra` only, not against extra radiation as such (§12e); does not separate air coupling from "lamp heat plus air coupling" |
 | lit vs dark water use | **none** — condensate logged daily | — (blocked by the record's design) |
-| total radiation / barrier IR | BPC: glass or acrylic barriers; McCree: shortwave ≤ ~2× PAR, glass removes 75 % of thermal | **strains lamp heat alone**: ×2.24 exceeds all the shortwave and needs 19–33 W m⁻² of residual heat radiation (§12c) |
+| total radiation / barrier IR | BPC: glass or acrylic barriers; McCree: shortwave ≤ ~2× PAR, glass removes 75 % of thermal | ~~**strains lamp heat alone**~~ **unsized by this source** (§12e): ×2.24 exceeds all the shortwave and needs 19–33 W m⁻² of residual heat radiation (§12c); one reading of the same abstract lets ~60 through |
 | canopy conductance | **none** — the two Bugbee/Monje papers that may hold one are blocked | — |
 | (not in the table) water use vs light vs VPD | TM-2003: no clear correlation with daily PAR; VPD *"likely"* more influential — across species and studies, the authors' inference | leans toward air coupling, weakly: a well-coupled canopy's water use follows VPD, a poorly coupled one's follows radiation (Penman–Monteith; the reading is ours) |
 
 **What this item says.**
 
-1. **Lamp heat alone is strained, not refuted.** By McCree's ratios the barrier-filtered shortwave cannot
-   supply ×2.24 on its own; it would need every shortwave watt absorbed and ~20–33 W m⁻² of heat radiation
-   besides, which a glass barrier is reported to cut to near-air leaf temperatures. McCree's chambers are
-   not the BPC, his HPS-specific numbers are not in the abstract, and the BPC's acrylic option is unread.
+1. ~~**Lamp heat alone is strained, not refuted.**~~ **Lamp heat is neither ruled in nor out by this source
+   (§12e).** By McCree's ratios the barrier-filtered shortwave cannot supply ×2.24 on its own; it would need
+   every shortwave watt absorbed and ~20–33 W m⁻² of heat radiation besides~~, which a glass barrier is
+   reported to cut to near-air leaf temperatures~~ — and the barrier may pass more than that. McCree's
+   chambers are not the BPC, his HPS-specific numbers are not in the abstract, and the BPC's acrylic option
+   is unread.
 2. **Air coupling is not refuted, and leans slightly ahead** — on the leaf temperatures and on the BPC's
    water use tracking air dryness rather than light. But **no source gives the chamber's canopy air
    resistance**; the papers that may (Bugbee/Monje 1996) are blocked.
@@ -837,3 +840,28 @@ same uncited `ra` = 50 from `transpiration.yaml`) under-transpire too. Changing 
 item and an unfreeze — **not priced here; the user's call.** The next read that could decide it is one of
 the blocked Bugbee/Monje papers (a library copy), or Bugbee & Salisbury's chamber work if it reports canopy
 temperatures (unchecked).
+
+### 12e. The correction (2026-10-14, advisor review of §12a–d, after commit `5290bf1`)
+
+⚠ `5290bf1`'s headline (*"lamp heat alone strained"*) is wrong and stays in history, as `bb79817`'s did;
+the struck text above is the record of it.
+
+1. **The 75 % cut was read as making the barrier's leftover heat radiation small. The same abstract does
+   not allow that.** For the metal-halide chamber without a barrier, PAR/shortwave ≈ 0.5 and PAR/total
+   < ~0.25, so thermal radiation was **> ~2×** the PAR energy. A glass barrier leaving 25 % of it leaves
+   **> ~0.5×** the bulb-side PAR — **> ~0.62×** the PAR at the canopy (÷ 0.81), **~65 W m⁻²** at 480 µmol, ~62
+   absorbed at a leaf's ~0.95 thermal absorptance (general knowledge). That is **above** the 19–33 W m⁻²
+   the candidate needs, not below.
+2. **Two things the abstract does not say:** whether that ratio holds for HPS (it is given for metal halide
+   only), and whether "thermal" is the excess over the room's own radiation or the absolute downward flux.
+   Read as absolute, a 75 % cut is not physical (the barrier itself radiates at least at room temperature),
+   so read either way the abstract **bounds the residual in neither direction**.
+3. **So the radiation row is unsized by this source.** What remains against lamp heat alone is the leaves
+   near air temperature (BPC Phase II ±1 °C; McCree's chambers with a barrier) — evidence against lamp heat
+   **at the model's air resistance** (+2 K), not against extra radiation as such. If McCree's barrier
+   chambers did carry ~60 W m⁻² of residual heat radiation with leaves near air temperature, their canopies
+   were well coupled to the air — which reads toward **both** candidates acting together. That is our
+   inference from an abstract, not a finding.
+4. **What stands:** the trial's record cannot separate the candidates (12b); air coupling is not refuted;
+   the BPC's water use tracked air dryness more than light (a weak lean toward coupling); the sources that
+   would decide it are blocked. **Neither is named the cause.**

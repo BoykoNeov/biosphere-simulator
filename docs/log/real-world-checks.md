@@ -124,8 +124,11 @@ NASA TM-2003-211184 (public domain) says the BPC's lamps sat behind clear glass 
 ~400 m³ min⁻¹ of circulation, and that its crops' water use tracked air dryness more than light (the authors'
 "likely"). McCree 1984 (*Crop Sci.*; abstract only, paywalled) measured HID-lit chambers: shortwave at most
 ~2× the PAR energy; a glass barrier removed 75 % of the heat radiation and left leaves near air temperature.
-So **lamp heat alone is strained, not refuted**: ×2.24 is more than all the barrier-filtered shortwave
-(1.83–2.0× even at the model's albedo), needing 19–33 W m⁻² of heat radiation besides. **Air coupling is
+So ~~**lamp heat alone is strained, not refuted**~~ **lamp heat is neither ruled in nor out by this source**
+(corrected the same day, plan §12e: the abstract's own ratios let ~60 W m⁻² of heat radiation through a
+glass barrier, above what is needed): ×2.24 is more than all the barrier-filtered shortwave (1.83–2.0×
+even at the model's albedo), needing 19–33 W m⁻² of heat radiation besides. The leaves near air
+temperature count against lamp heat only at the model's air resistance. **Air coupling is
 not refuted and leans slightly ahead**, but no source gives the chamber's canopy air resistance; the two
 papers that may (Bugbee, Monje & Tanner 1996; Monje & Bugbee 1996) are blocked, as are the BPC design papers
 (Prince et al. 1987, Sager et al. 1988, Prince & Knott 1989). Most likely some of each. **Neither is named
