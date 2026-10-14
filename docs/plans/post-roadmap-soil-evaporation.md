@@ -1492,7 +1492,7 @@ starts its aux from it: sealed, greenhouse and lighting with their own soil-wate
 harvest with its re-derived 1.3 m water and depth. The new goldens were produced with `--write`, copied to
 `W:\temp\claude\station-soil-seed\new\` and the committed ones restored at once (the tool has no output
 folder). Logs and the compare script: `W:\temp\claude\station-soil-seed\` (kept at
-`sources\temp-evidence\station-soil-seed\`, the script as `compare.py.txt` so the tree's Python file list
+`sources\temp-evidence\station-soil-seed\`, the new goldens under `new`, the script as `compare.py.txt` so the tree's Python file list
 stays the oracle's thirteen).
 
 | run | top layer at the end | soil water (root zone) | condensate | carbon |
@@ -1516,7 +1516,7 @@ stays the oracle's thirteen).
 * **Q5 held:** `cargo test --no-fail-fast` red on exactly the two golden checks over the cheap station
   goldens (byte compare and band; greenhouse is reported first) and clippy clean. ⚠ A third red is NOT this change:
   `repo_gates::context_budget::every_memory_index_line_names_a_file_and_vice_versa` reads the user's memory
-  index, which the 2026-10-08 compression put several files to a line; the test counts one link per
+  index, which a shared-line compression after 2026-09-06 (date not checked) put several files to a line; the test counts one link per
   line starting `- [`, so it reads 39 files as unindexed. Pre-existing; recorded, not fixed here.
 
 **Adopting it** is a station unfreeze moving four goldens (water only), the user's call. Still separate:
