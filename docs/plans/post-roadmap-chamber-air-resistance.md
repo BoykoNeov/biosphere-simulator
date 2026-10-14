@@ -13,7 +13,7 @@ pushed. Adopting any value would be a biosphere + station unfreeze, and a scienc
 1. **Values: a spread, 50 → 30 → 15 → 9 s m⁻¹** (over the fitted ~9 alone, and over stopping to look
    for a source). The spread shows the cost curve without choosing a number. ⚠ No value below 50 has a
    source: 9 is FITTED to TM 102788 (it would pass that row by construction), and 30 / 15 are points on
-   a curve, not citations. Adopting one would need either a source or the user setting aside the rule
+   a curve, not citations. ⚠ *(Later 2026-10-14: a peer-reviewed measurement now exists — Monje & Bugbee 2019, ~6.4–7.5 s m⁻¹ in a faster-ventilated HPS wheat chamber; `post-roadmap-real-world-checks.md` §13e–§13i. The decision to keep 50 stands.)* Adopting one would need either a source or the user setting aside the rule
    that tuned values stay lab-only (`docs/param-file-conventions.md`, WHAT-IF).
 2. **Scope: the open field keeps 50**; the chamber value applies to enclosed rooms. Priced as **two
    lines**:
@@ -170,7 +170,7 @@ the size of the change: they say *that* the water moves, not *how much*. Run mea
 the sunlit chambers +4 to +19 % at any value.
 
 **Ceremony an adoption would add** (beyond the run):
-1. **A value.** None below 50 has a source. 9 is fitted to TM 102788 **on its 20 m² basis only**: on the
+1. **A value.** None below 50 has a source. ⚠ *(Later 2026-10-14: a peer-reviewed measurement now exists — Monje & Bugbee 2019, ~6.4–7.5 s m⁻¹ in a faster-ventilated HPS wheat chamber; `post-roadmap-real-world-checks.md` §13e–§13i. The decision to keep 50 stands.)* 9 is fitted to TM 102788 **on its 20 m² basis only**: on the
    16 m² of trays the same match needs ~1.5 s m⁻¹ (§11b of the real-world-checks plan), which no chamber
    plausibly has, so a better match to the trial is not evidence for the value. Adopting 30, 15 or 9
    needs a source or the user setting aside the WHAT-IF rule.

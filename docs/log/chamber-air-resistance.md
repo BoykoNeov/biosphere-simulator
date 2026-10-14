@@ -9,7 +9,9 @@ after Step 6's water gap (`post-roadmap-real-world-checks.md` §11–§12). Plan
 
 * **The user's choices:** a spread of values, 50 → 30 → 15 → 9 s/m, over the fitted 9 alone; the open
   field keeps 50; priced on two scopes — the lamp-lit chambers (2 goldens) and every sealed chamber
-  (9 goldens; the lamp-lit ones are sealed too). No value below 50 has a source.
+  (9 goldens; the lamp-lit ones are sealed too). No value below 50 has a source. ⚠ *(Later 2026-10-14: a
+  peer-reviewed measurement now exists — Monje & Bugbee 2019, ~6.4–7.5 s m⁻¹ in a faster-ventilated HPS wheat
+  chamber; `post-roadmap-real-world-checks.md` §13e–§13i. The decision to keep 50 stands.)*
 * **Checked first:** `ra` reaches the model in one place, the crop's transpiration; the station has no
   latent heat; the station builders read params inside `build_season`, so a scope must be carried by the
   scenario — `ra` is a property of the room.
@@ -31,7 +33,8 @@ after Step 6's water gap (`post-roadmap-real-world-checks.md` §11–§12). Plan
   goldens and their bands, as predicted.
 * **The value is the open question.** 9 matches TM 102788 only on its 20 m² basis; on the 16 m² of trays
   the match needs ~1.5, which no chamber plausibly has, so matching the trial is not evidence for the
-  value. Adopting any value needs a source or the user setting aside the WHAT-IF rule; the TM scorecard
+  value. Adopting any value needs a source or the user setting aside the WHAT-IF rule; ⚠ *(a source now exists
+  — see the note above)* the TM scorecard
   (an open build) sits outside both scopes.
 
 **Lesson:** an end-state change is not the size of a change, and a cause written for it is a claim until a

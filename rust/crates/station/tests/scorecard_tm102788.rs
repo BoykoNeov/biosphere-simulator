@@ -863,3 +863,33 @@ fn the_gap_at_a_measured_chamber_coupling() {
         );
     }
 }
+
+/// Plan §13i (R1–R3): the air resistance that reaches the trial's level (4.17) and the top of its
+/// allowed band (4.5, §11), at each lamp-heat case — how much weaker than the source's 7.5 s m⁻¹
+/// the coupling may be once the source's measured lamp heat is in.
+#[test]
+fn the_air_resistance_each_lamp_heat_needs() {
+    let r = run(CA_ROW);
+    let tp = params::biosphere().transp;
+    let sla = params::biosphere().canopy.sla_per_mol_c;
+    let lai = mean(W1_DAYS.map(|d| {
+        let s = &r.states[(d - TM_DAY0) * STEPS_PER_DAY];
+        science::leaf_area_index(s.stocks[LEAF_C].amount, sla, DEFAULT_SCENARIO.ground_area)
+    }));
+    let rs = science::canopy_surface_resistance(
+        tp.rs_form,
+        tp.surface_resistance,
+        lai,
+        tp.leaf_stomatal_resistance,
+        tp.threshold_lai,
+    );
+    for (name, rn_x) in [("R1 light only", 1.0), ("R2 x1.35", 1.35), ("R3 x1.75", 1.75)] {
+        let at = |target: f64| solve(|x| w1_by_hand(x, rs, rn_x), target, 0.1, 200.0);
+        let (a, b) = (at(TM_W1_LEVEL), at(4.5));
+        eprintln!(
+            "§13i {name}: ra for {TM_W1_LEVEL} = {a:.2} s m⁻¹ (leaf {:+.3} K); for 4.5 = {b:.2} (leaf {:+.3} K)",
+            leaf_over_air(a, rs, rn_x),
+            leaf_over_air(b, rs, rn_x)
+        );
+    }
+}

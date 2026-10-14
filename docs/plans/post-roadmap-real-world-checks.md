@@ -1035,7 +1035,7 @@ not carried).
    cause.
 2. **The forcings were not the gap (K3–K5):** the TM's measured temperatures add under 1 %; a sodium lamp's
    photon energy removes ~4 %. The ratio is 0.60–0.63 whichever is used.
-3. **A measured chamber value now exists, and it leans the trial's gap toward air coupling.** In an HPS-lit
+3. ⚠ *Overstated — corrected in §13i–§13j ("reaches about the level", and "some of each"):* **A measured chamber value now exists, and it leans the trial's gap toward air coupling.** In an HPS-lit
    wheat chamber at Utah State (Monje & Bugbee 2019), the canopy's air resistance was **6.4–7.5 s m⁻¹**, and
    the lamps' extra heat put net radiation at **×1.3–1.8** the model's light-only figure. Carried into the row:
    the measured air coupling **alone closes the 20 m² level** (1.03–1.06); the measured lamp heat **alone does
@@ -1054,3 +1054,61 @@ not carried).
 
 **Blocked and left:** Bugbee & Salisbury 1988 (bot check; free, fetchable by hand), the two 1996 papers (no
 file). The trial's own record still cannot separate the candidates (§12b).
+
+### 13i. The correction (2026-10-14, advisor review of §13d–h, after commit `67fa625`)
+
+⚠ `67fa625`'s headline — the measured coupling *"closes it by air coupling alone"* — **overstates what §13g
+shows**, and stays in history as `5290bf1`'s did. Three reasons:
+
+1. **The 1.03–1.06 is inside the trial figure's own error.** §11 found the digitized points ~7 % under the
+   TM's text and allowed a level of 4.2–4.5. At 4.5, `ra` 7.5 gives 0.96 and `ra` 6.4 gives 0.98: the
+   measured coupling **reaches about the level**; it does not close it with room to spare.
+2. **The source's air was faster than the BPC's.** Its 7.5 s m⁻¹ is at the 1.7 m s⁻¹ fan setting; the BPC ran
+   0.2–1.2 m s⁻¹, at or under the source's LOW setting (0.8). Slower air raises `ra` by an amount the source
+   does not give, so 7.5 is a lower bound for the BPC, not an estimate.
+3. **S4's leaf-temperature check used the wrong band.** Against the source's LOW-fan line (0 → +4 °C over
+   0–1700 µmol, ≈ **+1.1 K** at 480) — the one nearer the BPC's air — the lamp-heat-alone cases (+0.6 / +1.3 K)
+   fit as well as the coupled ones (≈ 0 K). At BPC-like air the leaf temperatures do not lean toward coupling.
+
+**What stands:** the CONTRAST — at the source's figures, its coupling reaches about the level while its lamp
+heat alone reaches 0.73–0.85. **The check that sets the wording** (no wind-scaling law needed): solve for the
+`ra` that reaches 4.17, and 4.5, at each lamp-heat case. If a combined case closes at an `ra` well above 7.5,
+the honest line is §12d point 4's: *some of each, in any chamber slower than the source's.*
+
+**Predictions** (interpolated from §13g and §11b's 8.76; written before the run):
+
+| | `ra` reaching 4.17 | `ra` reaching 4.5 |
+|---|---|---|
+| R1 light only (×1.0) | 8.76 (§11b) | **5–6.5** |
+| R2 water-filter heat (×1.35) | **10–13** | **7–8.5** |
+| R3 glass-barrier heat (×1.75) | **13–18** | **9–11** |
+
+So the prediction is: at the glass-barrier heat, a canopy coupled about **half as well** as the source's (ra
+roughly twice 7.5) still reaches the 20 m² level. That is "some of each", not "coupling alone".
+
+### 13j. R1–R3 measured (2026-10-14) — graded, and what §13 now says
+
+`the_air_resistance_each_lamp_heat_needs` (printed, never asserted):
+
+| | `ra` reaching 4.17 (predicted) | `ra` reaching 4.5 (predicted) | grade |
+|---|---|---|---|
+| R1 light only | **8.76** (8.76) | **5.86** (5–6.5) | HELD |
+| R2 ×1.35 | **11.43** (10–13) | **7.39** (7–8.5) | HELD |
+| R3 ×1.75 | **17.54** (13–18) | **10.53** (9–11) | HELD |
+
+Leaf over air in every case: −0.30 to +0.23 K.
+
+**What §13 says, corrected (replaces §13h point 3's "closes it by air coupling alone"):**
+
+* **Firm:** at the kept `ra` 50 no leaf setting closes the gap (K1), and the forcings move it under 4 %
+  (K3–K5).
+* **The contrast:** at the source's own figures, its air coupling reaches **about** the trial's level (0.96–1.06
+  across the level's 4.17–4.5 band), and its lamp heat alone reaches **0.73–0.85**.
+* **Some of each:** with the source's glass-barrier lamp heat (×1.75 — the BPC's barriers were glass or
+  acrylic), a canopy coupled about **half as well** as the source's (`ra` ~10.5–17.5 against its 6.4–7.5)
+  still reaches the level. The BPC's slower air would couple its canopy less well than the source's by an
+  unknown amount, so §12d point 4 stands as the honest line: **most likely some of each — a canopy much
+  better coupled than the model's 50, plus some lamp heat. No cause named.**
+* **For the model:** every combination that reaches the trial needs `ra` far below 50 (at most ~17.5 even
+  with the source's full glass-barrier heat). Keeping 50 is the user's decision and stands; this is what it
+  leaves unexplained.

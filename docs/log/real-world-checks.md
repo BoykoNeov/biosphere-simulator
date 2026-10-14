@@ -140,9 +140,13 @@ the light-only energy) could close the gap — a property of the model's choice,
 trial's measured temperatures and a sodium lamp's photon energy move the ratio under 4 % (0.60–0.63). A fresh
 search found **Monje & Bugbee 2019** (*Agronomy* 9:114, open access): in an HPS-lit wheat chamber at Utah
 State the canopy's air resistance was **6.4–7.5 s m⁻¹** and the lamps' extra heat put net radiation at
-**×1.3–1.8** the model's light-only figure. Carried into the row, that air coupling alone closes the 20 m²
-level (1.03–1.06) and that lamp heat alone does not (0.73–0.85). **Leans toward air coupling** — but another
-chamber, with three times the light and faster air; **no cause named.** It is also the first source for a
+**×1.3–1.8** the model's light-only figure. Carried into the row, ~~that air coupling alone closes the 20 m²
+level (1.03–1.06)~~ that air coupling reaches **about** the level (0.96–1.06 across its 4.17–4.5 band) and that
+lamp heat alone does not (0.73–0.85). ~~**Leans toward air coupling**~~ ⚠ *Corrected the same day (plan §13i–§13j,
+advisor review):* the source's air was faster than the BPC's, so its 7.5 s m⁻¹ is a lower bound there; with
+its glass-barrier lamp heat (×1.75) a canopy coupled half as well (`ra` 10.5–17.5) still reaches the level.
+**Most likely some of each — far better coupling than the model's 50, plus some lamp heat; no cause named.**
+It is also the first source for a
 chamber air resistance, which the closed price had said did not exist; the decision to keep 50 is the
 user's. Bugbee & Salisbury 1988 is free but behind a bot check from here.
 
