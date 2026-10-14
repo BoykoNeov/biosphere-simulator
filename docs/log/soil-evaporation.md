@@ -180,3 +180,11 @@ of 4880. **Found on the way, not fixed (an unfreeze, the user's call):** the fou
 seed the soil account's starting values, so every station run's first season starts with an EMPTY top layer
 and unshaded soil; the re-sow seeds them. Same day, separately, the user deleted the Linux CI job that ran
 the reference's tests; the slow tests now run only by hand.
+
+**The station's empty first-season top layer, measured (plan §18, 2026-10-14; NOT adopted).** Seeding the soil
+account in the four station assemblies (local branch `wip/station-soil-seed`) moves exactly the four goldens
+predicted, `greenhouse`, `lighting`, `harvest` and `sealed_station`, water only; no carbon stock moves in any.
+The three one-week runs had never evaporated at the wet-soil rate (their top layer stays empty all week); seeded,
+each loses ~7 kg more soil water in the week to the condenser: −24 %, −19 % and −4 % of the root zone. The
+sealed station's end state shifts as a snapshot of cycling stores. Adopting it is a station unfreeze, the
+user's call.

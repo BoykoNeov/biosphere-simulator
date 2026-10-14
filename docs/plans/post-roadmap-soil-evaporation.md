@@ -1452,3 +1452,72 @@ assembles its own aux silently drops a value `build_season` seeds). It reaches t
 `greenhouse`, `harvest` and `lighting` all moved with the adoption (§11d table), so their committed bytes include
 an empty first-season top layer. Fixing it moves those goldens: an unfreeze, the user's call. Not measured: by
 how much. The test here sets the top layer explicitly instead of reading it.
+
+## 18. The station's first season seeds the soil account — measured, not adopted (the user, 2026-10-14)
+
+**Asked (the user, taking the recommendation):** measure how far §17d's fix moves the reference before
+deciding on it. Local branch `wip/station-soil-seed`; `regen_goldens` in report mode only; no `--write`.
+
+**Advisor (2026-10-14), summarized:** copy only the five soil keys from `build_season`'s own state into the
+sealed, greenhouse and lighting aux, not the whole map: a whole-map merge also brings `vernalization_days`
+(the separate omission `sealed.rs` names) and would give the diff two causes. Harvest must DERIVE its values
+from its rebuilt 1.3 m water and depth, through a public wrapper of `soil_surface_initial` that leaves
+`build_season` calling the same function. Harvest starts past the stage where the soil-shade value stops
+updating, so whatever it is seeded with holds all run. Write the predictions first, then stop: adopting is
+an unfreeze and the user's call.
+
+**Facts read before predicting.** The top layer (0.15 m) equals the sowing depth (0.15 m), so in sealed,
+greenhouse and lighting the top layer starts holding the WHOLE root zone's water, where today it starts at
+0. Greenhouse, lighting and harvest are 7-day runs: for them "the first season" is the whole run. Harvest
+starts at thermal time 1300 (development stage 1.27), past the shade freeze at stage 1.0: its soil has been
+unshaded for its whole run, and seeded it takes the seedling's small leaf area. `sealed_energy_drift` builds
+no biosphere. The four goldens already list `top_soil_water` (the account writes it each step), so no key
+is added.
+
+### 18a. Predictions (written before the code)
+
+| # | prediction |
+|---|---|
+| Q1 | `regen_goldens` report: **exactly four** move — `greenhouse`, `lighting`, `harvest`, `sealed_station`; the 7 biosphere goldens and every other station golden identical. |
+| Q2 | Direction: a full top layer puts the soil in its wet stage from step 0, so soil evaporation RISES in all four; root-zone water ends LOWER; the water it left ends in the air or the condensate. |
+| Q3 | Carbon: unchanged to the printed digits in the three 7-day runs (the root zone starts full and a week's extra soil evaporation does not reach the stress threshold); in `sealed_station` a small move (< 0.1 %), through the first season's water only. |
+| Q4 | Harvest's water moves the most in relative terms of the three 7-day runs: its shade change holds all run. Its top layer starts at 0.15/1.3 of the root zone, a smaller share than the others' 100 %, so this is not certain — recorded as the weakest prediction. |
+| Q5 | Manifest writers, claim census and the full suite green apart from the golden byte compares of the four. |
+
+### 18b. Measured (2026-10-14) — graded; NOT adopted
+
+**What was built, on `wip/station-soil-seed` only:** `system::soil_surface_start` (public; empty when the soil
+form is off; calls the same `soil_surface_initial` `build_season` does), and each of the four assemblies
+starts its aux from it: sealed, greenhouse and lighting with their own soil-water stock and the sowing depth,
+harvest with its re-derived 1.3 m water and depth. The new goldens were produced with `--write`, copied to
+`W:\temp\claude\station-soil-seed\new\` and the committed ones restored at once (the tool has no output
+folder). Logs and the compare script: `W:\temp\claude\station-soil-seed\` (kept at
+`sources\temp-evidence\station-soil-seed\`, the script as `compare.py.txt` so the tree's Python file list
+stays the oracle's thirteen).
+
+| run | top layer at the end | soil water (root zone) | condensate | carbon |
+|---|---|---|---|---|
+| greenhouse (7 d) | 0 → 7.04 kg | 29.18 → 22.17 kg (**−24 %**) | 3.56 → 10.56 kg | identical |
+| lighting (7 d) | 0 → 9.15 kg | 30.07 → 24.29 kg (**−19 %**) | 4.37 → 10.15 kg | identical |
+| harvest (7 d) | 0 → 7.16 kg | 163.6 → 156.7 kg (−4.3 %) | 3.45 → 10.44 kg | identical |
+| sealed station (4 seasons) | — | 91.65 → 100.41 kg (+9.6 %); below the roots 24.39 → 19.71 kg (−19 %) | 75.60 → 71.53 kg (−5.4 %) | identical |
+
+* **Q1 held:** exactly the four; 16 of 20 identical.
+* **Q2 held in the three 7-day runs:** each loses ~6–7 kg more to soil evaporation in the week, all of it
+  caught by the condenser. ⚠ **In the committed goldens the top layer never refills in those runs: it ends
+  at 0 with the dry clock at 7 days, so the soil there has NEVER evaporated at its wet-soil rate.** Today's
+  soil evaporation in those runs is ~0.25–0.39 kg on the last day; seeded, ~1.3–2.0 kg.
+  In the sealed station the end-state reading is the B6 shape (§15): a snapshot of stores that cycle with
+  the waterings, so its signs say when the run stopped, not that the soil is wetter. Not traced further.
+* **Q3 held:** no carbon stock moved in any of the four — water only.
+* **Q4 FAILED:** harvest moves the least in relative terms, because its root zone holds ~5.5× the water;
+  its absolute loss (~7 kg) matches the others. The seeded shade value is 0.031 (the seedling), against 0
+  committed: too small to matter.
+* **Q5 held:** `cargo test --no-fail-fast` red on exactly the two golden checks over the cheap station
+  goldens (byte compare and band; greenhouse is reported first) and clippy clean. ⚠ A third red is NOT this change:
+  `repo_gates::context_budget::every_memory_index_line_names_a_file_and_vice_versa` reads the user's memory
+  index, which the 2026-10-08 compression put several files to a line; the test counts one link per
+  line starting `- [`, so it reads 39 files as unindexed. Pre-existing; recorded, not fixed here.
+
+**Adopting it** is a station unfreeze moving four goldens (water only), the user's call. Still separate:
+`vernalization_days` is also unseeded by the station builders (harmless while `aux_of` defaults it to 0).
