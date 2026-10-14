@@ -1081,6 +1081,23 @@ pub fn soil_surface_account_with(
     soil_evaporates(p).then(|| Box::new(soil_surface_account(scenario, p, extra)) as Box<dyn AuxProcess>)
 }
 
+/// The soil account's starting values as [`build_season_with`] seeds them, for a station that
+/// assembles its own starting aux: empty when the soil-evaporation form is off. `soil_water`
+/// and `rooted_depth` are the station's own (harvest re-derives both for a grown root system).
+/// Without it a station run's first season starts with an empty top layer and unshaded soil
+/// (`docs/plans/post-roadmap-soil-evaporation.md` §17d, §18).
+pub fn soil_surface_start(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+    soil_water: f64,
+    rooted_depth: f64,
+) -> Vec<(String, f64)> {
+    if !soil_evaporates(p) {
+        return Vec::new();
+    }
+    soil_surface_initial(scenario, p, soil_water, rooted_depth).into()
+}
+
 /// The lab soil account's starting values: the top layer holds its uniform share of the root
 /// zone's water (the zone is uniform by declaration); the clocks at 0; the soil shaded by the
 /// seedling's own leaf area.

@@ -1521,3 +1521,58 @@ stays the oracle's thirteen).
 
 **Adopting it** is a station unfreeze moving four goldens (water only), the user's call. Still separate:
 `vernalization_days` is also unseeded by the station builders (harmless while `aux_of` defaults it to 0).
+**Both done 2026-10-14, §19.**
+
+## 19. Adopted: the station seeds its starting values (the user, 2026-10-14)
+
+**Asked (the user):** adopt §18's fix, and seed `vernalization_days` in the station builders too. Two
+commits, one cause each: (A) the soil seed, a station unfreeze moving four goldens; (B) the cold-exposure
+counter, predicted to move nothing.
+
+**Advisor (2026-10-14), summarized:** bring §18's code onto main uncommitted (its WIP message says "not
+adopted"); `cmp` the regenerated goldens against §18's measured copies, and stop on any difference; predict
+the manifest diff before writing it. Seed the counter at 0 always, as `build_season` does, harvest
+included (its value is never read: it starts past the vegetative stage), and predict no byte moves: the
+aux merge (`or_insert(0.0)`) and every reader (`unwrap_or(0.0)`) already treat a missing key as 0, and
+all four goldens already carry the key. The sealed station's golden checks are in the slow set, so
+`cargo test -- --ignored` is part of the evidence. `soil_surface_start` is code in `domains`, an accessor
+over the function `build_season` already calls: say so in the unfreeze log and confirm the seven
+biosphere goldens identical.
+
+### 19a. Predictions (written before regenerating)
+
+| # | prediction |
+|---|---|
+| R1 | (A) `regen_goldens --write` rewrites exactly `greenhouse`, `harvest`, `lighting`, `sealed_station`, and each is byte-identical to §18's copy in `sources\temp-evidence\station-soil-seed\new\`. |
+| R2 | (A) `dump_station_inventory --write-manifest` changes exactly those four `golden_sha256` rows; the biosphere and authoring manifests do not move; `git diff rust/crates/simcore/` is empty. |
+| R3 | (B) no golden byte moves; no manifest moves. |
+
+### 19b. (A) the soil seed — graded (2026-10-14)
+
+* **R1 held:** `regen_goldens --write` rewrote exactly the four, 16 of 20 identical, and `cmp` finds each
+  byte-identical to §18's measured copy. §18b's table is the adopted reference's numbers.
+* **R2 held:** the station manifest's diff is exactly the four `golden_sha256` rows; the biosphere and
+  authoring manifests did not move; `git diff rust/crates/simcore/` is empty.
+* **The sealed station's opposite-sign end state, traced** (a side review asked; §18b had asserted it, "not
+  traced further"). §15's probe (`probe_b6.rs`, from `sources\temp-evidence\dehumidifier\`) run on main
+  without the fix (a detached worktree) and with it; logs `b6_old.log` / `b6_new.log` in
+  `sources\temp-evidence\station-soil-seed\`. Control: the no-fix run reproduces §15's root-zone column to
+  the printed digits (means 78.804 / 64.303 / 49.511) and the committed golden's end values.
+
+  | over the whole run (1221 days) | without | with the seed |
+  |---|---|---|
+  | below-root store, mean | 78.80 kg | 76.55 kg (−2.9 %) |
+  | root zone, mean | 64.30 kg | 63.85 kg (−0.7 %) |
+  | condensate, mean | 49.51 kg | 52.22 kg (+5.5 %) |
+  | first watering | day 107 | day 96 |
+  | last watering | day 1196 | day 1201 |
+
+  Over the run the seed moves the water the SAME way as in the one-week runs: a little less in the soil, more
+  in the condensate tank. The end state's opposite sign is timing: the wetter first season brings the first
+  watering 11 days earlier, the watering calendar never re-aligns, and the seeded run ends 20 days after a
+  watering (root zone high, deep store at its trough: 19.71 kg, inside the 18.65–24.39 range of season lows
+  both runs show). §18b's attribution now has its experiment.
+* **Gates (2026-10-14):** `cargo test --no-fail-fast` red only on the memory-index test (pre-existing, §18b);
+  clippy clean; `cargo test -- --ignored` all nine pass, the sealed station's byte compare and band among
+  them. Logs `adopt-test.txt`, `adopt-clippy.txt`, `adopt-ignored.txt` in
+  `sources\temp-evidence\station-soil-seed\`.

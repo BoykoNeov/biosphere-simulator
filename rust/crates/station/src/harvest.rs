@@ -15,7 +15,7 @@ use domains::biosphere::stocks::{
     CARBON_POOL, LITTER_CARBON, O2_POOL, ROOTED_DEPTH, SOIL_WATER, STORAGE_C, SUBSOIL_WATER,
     THERMAL_TIME,
 };
-use domains::biosphere::system::weather_shared;
+use domains::biosphere::system::{soil_surface_start, weather_shared};
 use domains::crew::{CrewParams, FECAL_WASTE, FOOD_STORE};
 use domains::eclss::EclssParams;
 use simcore::environment::SourceResolver;
@@ -116,15 +116,24 @@ pub fn build_harvest_at(
     stocks.insert(SOIL_WATER.to_string(), sw);
     let sub = stocks[SUBSOIL_WATER].with_amount(wstorg)?;
     stocks.insert(SUBSOIL_WATER.to_string(), sub);
+    // The soil account's starting values for THIS root zone, not the greenhouse's sowing zone.
+    // ⚠ The crop starts past the stage where the soil-shade value stops following the canopy,
+    // so the value seeded here holds for the whole run (§18 of the soil-evaporation plan).
+    let soil_start = soil_surface_start(
+        bio,
+        &domains::biosphere::params::biosphere(),
+        atsw,
+        scenario.rooted_depth0,
+    );
     let state = State::new(
         gh_state.n,
         stocks,
         gh_state.rng_seed,
-        BTreeMap::from([
+        BTreeMap::from_iter(soil_start.into_iter().chain([
             (THERMAL_TIME.to_string(), scenario.thermal_time0),
             // Goes with thermal_time0: a crop started past anthesis has finished rooting.
             (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
-        ]),
+        ])),
     )?;
 
     // (2) Rebuild the cabin flows (the Rust Registry does not lend out owned flows) and

@@ -188,3 +188,7 @@ The three one-week runs had never evaporated at the wet-soil rate (their top lay
 each loses ~7 kg more soil water in the week to the condenser: −24 %, −19 % and −4 % of the root zone. The
 sealed station's end state shifts as a snapshot of cycling stores. Adopting it is a station unfreeze, the
 user's call.
+
+**Adopted (plan §19, 2026-10-14, the user's call).** The four station assemblies now seed the soil account's
+starting values; the four goldens moved exactly as §18 measured them (byte-identical to the measured copies),
+water only, with a station unfreeze-log entry.

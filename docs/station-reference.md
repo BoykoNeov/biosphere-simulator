@@ -358,6 +358,20 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-14 — the station assemblies seed the soil account's starting values: 4 station goldens move
+  (`greenhouse`, `harvest`, `lighting`, `sealed_station`) and their 4 `golden_sha256` rows follow. Water
+  only; no carbon stock moves in any. No station flow, param, seam or claim changed.** A bug: the four
+  builders assemble their own starting aux and never seeded the soil account `build_season` seeds (the
+  omission `ROOTED_DEPTH` had until 2026-08-12, a second time), so every station run's first season started
+  with an empty top layer and unshaded soil; the three one-week runs never evaporated at the wet-soil rate.
+  The one `domains` change is code, not data: `system::soil_surface_start`, a public accessor over the
+  same `soil_surface_initial` `build_season` calls; the 7 biosphere goldens are byte-identical and
+  `rust/crates/simcore/` is untouched. Harvest derives its values from its own re-derived 1.3 m root zone.
+  Measured first on a branch (plan `docs/plans/post-roadmap-soil-evaporation.md` §18), adopted §19: the
+  regenerated goldens are byte-identical to the measured ones. Root zone at day 7: −24 % / −4.3 % / −19 %
+  (`greenhouse` / `harvest` / `lighting`), each ~7 kg more to the condenser; `sealed_station`: root zone
+  +9.6 %, below the roots −19 %, condensate −5.4 %, an end-state snapshot of stores that cycle with the
+  waterings.
 - **2026-10-10 — the biosphere's water forms adopted, delegated: 4 station goldens move (`greenhouse`,
   `harvest`, `lighting`, `sealed_station`) and their 4 `golden_sha256` rows follow. No station flow,
   param or seam changed; two station-side edits ride along: the TM 102788 scorecard's R1 (a what-if air

@@ -20,12 +20,14 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
-    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, RN_VAR, ROOTED_DEPTH, STORAGE_C,
-    TEMP_VAR, THERMAL_TIME,
+    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER,
+    STORAGE_C, TEMP_VAR, THERMAL_TIME,
 };
 use domains::biosphere::params::PhenologyParams;
 use domains::biosphere::science;
-use domains::biosphere::system::{annual_reset_with, build_season, weather_forcings, weather_shared};
+use domains::biosphere::system::{
+    annual_reset_with, build_season, soil_surface_start, weather_forcings, weather_shared,
+};
 use domains::crew::{
     CrewParams, WaterBalance, FECAL_WASTE, FOOD_INTAKE_VAR, FOOD_STORE, WATER_BALANCE,
     WATER_INTAKE_VAR, WATER_STORE,
@@ -339,11 +341,19 @@ pub fn build_sealed_station_unread(
     for (id, s) in fast_stocks {
         stocks.insert(id, s);
     }
+    // The soil account's five starting values, as `build_season` seeds them — the same
+    // omission as ROOTED_DEPTH below, a second time (§17d of the soil-evaporation plan).
+    let soil_start = soil_surface_start(
+        &scenario.bio,
+        &domains::biosphere::params::biosphere(),
+        stocks[SOIL_WATER].amount,
+        scenario.bio.rooted_depth0,
+    );
     let state = State::new(
         0,
         stocks.clone(),
         0,
-        BTreeMap::from([
+        BTreeMap::from_iter(soil_start.into_iter().chain([
             (THERMAL_TIME.to_string(), 0.0),
             // ⚠ ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
             // assemblies (both ports) until 2026-08-12. `build_season` has seeded it
@@ -355,7 +365,7 @@ pub fn build_sealed_station_unread(
             // The cold program's clock (slice 4): the crop is sown now. Seeded here, not
             // defaulted at the reader — the omission `vernalization_days` still has (§10).
             (SOWN_STEP.to_string(), 0.0),
-        ]),
+        ])),
     )?;
 
     // --- fast flows (the crew breathes the biosphere's own gas pools: shared air) ---

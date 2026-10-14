@@ -13,9 +13,11 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
-    DAYLENGTH_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH, TEMP_VAR, THERMAL_TIME,
+    DAYLENGTH_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER, TEMP_VAR, THERMAL_TIME,
 };
-use domains::biosphere::system::{build_season, weather_forcings, weather_shared};
+use domains::biosphere::system::{
+    build_season, soil_surface_start, weather_forcings, weather_shared,
+};
 use domains::biosphere::{light_path, weather};
 use domains::power::{battery_stock, BATTERY, WASTE_HEAT};
 use simcore::boundary;
@@ -78,11 +80,19 @@ pub fn build_lighting(
     for s in power_stocks {
         stocks.insert(s.id.clone(), s);
     }
+    // The soil account's five starting values, as `build_season` seeds them — the same
+    // omission as ROOTED_DEPTH below, a second time (§17d of the soil-evaporation plan).
+    let soil_start = soil_surface_start(
+        &scenario.bio,
+        &domains::biosphere::params::biosphere(),
+        stocks[SOIL_WATER].amount,
+        scenario.bio.rooted_depth0,
+    );
     let state = State::new(
         0,
         stocks.clone(),
         0,
-        BTreeMap::from([
+        BTreeMap::from_iter(soil_start.into_iter().chain([
             (THERMAL_TIME.to_string(), 0.0),
             // ⚠ ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
             // assemblies (both ports) until 2026-08-12. `build_season` has seeded it
@@ -91,7 +101,7 @@ pub fn build_lighting(
             // Invisible while the depth gate was inert; fatal once stress divides by
             // `TTSW = depth * EXTR * rho * A`.
             (ROOTED_DEPTH.to_string(), scenario.bio.rooted_depth0),
-        ]),
+        ])),
     )?;
 
     let power_flows: Vec<Box<dyn Flow>> = if with_lamp {

@@ -10,8 +10,10 @@
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::{CARBON_POOL, O2_POOL, ROOTED_DEPTH, THERMAL_TIME};
-use domains::biosphere::system::{build_season, weather_resolver, weather_shared};
+use domains::biosphere::stocks::{CARBON_POOL, O2_POOL, ROOTED_DEPTH, SOIL_WATER, THERMAL_TIME};
+use domains::biosphere::system::{
+    build_season, soil_surface_start, weather_resolver, weather_shared,
+};
 use domains::crew::URINE;
 use domains::crew::{CrewParams, FECAL_WASTE, FOOD_INTAKE_VAR, WATER_INTAKE_VAR};
 use domains::eclss::{EclssParams, CO2_REMOVED, HUMIDITY_CONDENSATE, O2_SUPPLY};
@@ -120,11 +122,19 @@ pub fn build_greenhouse_at(
     for (id, s) in cabin_stocks {
         stocks.insert(id, s);
     }
+    // The soil account's five starting values, as `build_season` seeds them — the same
+    // omission as ROOTED_DEPTH below, a second time (§17d of the soil-evaporation plan).
+    let soil_start = soil_surface_start(
+        &scenario.bio,
+        &domains::biosphere::params::biosphere(),
+        stocks[SOIL_WATER].amount,
+        scenario.bio.rooted_depth0,
+    );
     let state = State::new(
         0,
         stocks.clone(),
         0,
-        BTreeMap::from([
+        BTreeMap::from_iter(soil_start.into_iter().chain([
             (THERMAL_TIME.to_string(), 0.0),
             // ⚠ ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
             // assemblies (both ports) until 2026-08-12. `build_season` has seeded it
@@ -133,7 +143,7 @@ pub fn build_greenhouse_at(
             // Invisible while the depth gate was inert; fatal once stress divides by
             // `TTSW = depth * EXTR * rho * A`.
             (ROOTED_DEPTH.to_string(), scenario.bio.rooted_depth0),
-        ]),
+        ])),
     )?;
 
     let cabin_flows = build_cabin_flows(crew, eclss, CARBON_POOL, O2_POOL, fecal_waste_target);
