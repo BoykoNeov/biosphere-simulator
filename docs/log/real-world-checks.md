@@ -133,3 +133,18 @@ not refuted and leans slightly ahead**, but no source gives the chamber's canopy
 papers that may (Bugbee, Monje & Tanner 1996; Monje & Bugbee 1996) are blocked, as are the BPC design papers
 (Prince et al. 1987, Sager et al. 1988, Prince & Knott 1989). Most likely some of each. **Neither is named
 the cause.** Changing the model's air resistance would be a science item and an unfreeze — not priced.
+
+**Re-read with the air resistance kept at 50 (2026-10-14, plan §13; the user's *"use 50. work on 2"*).**
+At 50, even leaves with no resistance reach only 0.83 of the trial, so inside the model only lamp heat (×2.4
+the light-only energy) could close the gap — a property of the model's choice, not the trial's cause. The
+trial's measured temperatures and a sodium lamp's photon energy move the ratio under 4 % (0.60–0.63). A fresh
+search found **Monje & Bugbee 2019** (*Agronomy* 9:114, open access): in an HPS-lit wheat chamber at Utah
+State the canopy's air resistance was **6.4–7.5 s m⁻¹** and the lamps' extra heat put net radiation at
+**×1.3–1.8** the model's light-only figure. Carried into the row, that air coupling alone closes the 20 m²
+level (1.03–1.06) and that lamp heat alone does not (0.73–0.85). **Leans toward air coupling** — but another
+chamber, with three times the light and faster air; **no cause named.** It is also the first source for a
+chamber air resistance, which the closed price had said did not exist; the decision to keep 50 is the
+user's. Bugbee & Salisbury 1988 is free but behind a bot check from here.
+
+**Lesson:** a model setting that is kept is not evidence — once a lever is fixed, the remaining fit points at
+whatever is left, so say which cause the fixed lever excluded before reading the residual.

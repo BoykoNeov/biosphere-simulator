@@ -865,3 +865,192 @@ the struck text above is the record of it.
 4. **What stands:** the trial's record cannot separate the candidates (12b); air coupling is not refuted;
    the BPC's water use tracked air dryness more than light (a weak lean toward coupling); the sources that
    would decide it are blocked. **Neither is named the cause.**
+
+---
+
+## 13. The water gap with the air resistance kept at 50 (2026-10-14, the user's pick: *"use 50. work on 2"*)
+
+**The user's two calls.** The chamber air-resistance price (`post-roadmap-chamber-air-resistance.md`) is
+closed: every room keeps the uncited `ra` = 50 s m⁻¹, nothing adopted. Then: work on the water gap — why the
+model's crop drinks 0.62 of TM 102788's water at full cover (§11).
+
+**What this item can and cannot deliver, stated first.** Keeping 50 is a decision about the model, not
+evidence about the trial: air coupling stays a candidate cause there (§12). This item is a **diagnosis** and
+changes nothing in the model, its goldens or its params. If air coupling is the cause, the station's chambers
+keep their share of the gap whatever this finds.
+
+### 13a. Advisor review (2026-10-14), summarized
+
+Close the price first (done, commit `f13ad3c`). Then the check that decides what this item can end in: at the
+kept `ra` 50, can any surface resistance `rs` ≥ 0 reach the trial's level? (Advisor's arithmetic: `rs` = 0
+gives ~107 W m⁻² lit against ~130 needed — to be verified, not taken.) If not, the only lever left INSIDE the
+model is extra radiation — the sodium-lamp heat §11's side note warned would fit this trial and get the LED
+station wrong — and keeping 50 must not be read as pushing the diagnosis that way. Next the forcing side,
+never checked: the TM's MEASURED temperatures (20.36 °C light, 16.8 °C dark) and humidities (81 % / 82 %)
+against the row's set points (20 / 16 °C, 81 % both), and the PAR-to-energy factor (4.57 µmol J⁻¹ is
+daylight's; a sodium lamp's is nearer 5). Predictions first. Then a FRESH source search — not the §12b blocked
+list again: Bugbee & Salisbury 1988 (*Plant Physiol.* 88:869), full texts of the Bugbee/Monje work on Utah
+State's own lab pages, any BPC wheat paper giving canopy-minus-air temperature — graded against §12a's table
+as written, same stop rule.
+
+### 13b. The forcings, checked against the TM (read before predicting)
+
+TM 102788 PDF p. 5 (text extraction): *"For the first 34 days after planting, air temperature and humdity were
+held constant at 20 °C and 80% relative. After 34 days, temperature set points were switched to 20 °C in the
+light and 16 °C in the dark. … Throughout the study, temperatures averaged 20.36 °C (± 0.4 °C difference
+between levels) for the 20-h light cycle, and 16.8 °C (± 0.5 °C) for the dark cycle. Humidities averaged 81% ±
+4% and 82% ± 6% for the light and dark cycles."* And PPF *"throughout the study averaged 534 µmol m⁻² s⁻¹"* —
+consistent with the row's 695 → 480 dimming on day 28 (time-weighted over TM days 3–86: ~545).
+
+The row uses the set points (20.0 / 16.0 °C) and 81 % in both periods. ⚠ "Throughout the study" for the dark
+mean cannot include days 3–33 at a constant 20 °C AND average 16.8 unless the later nights ran ~14.7 °C; the
+reading taken here is that the dark mean is over the cool-night period, applied from day 34 only.
+
+The lamp's light-only energy: `station::lighting::lamp_net_radiation` = `(1 − 0.23) · PAR / 4.57`, the
+`4.57 µmol J⁻¹` being McCree's daylight factor (`weather.rs` `PAR_UMOL_PER_J`). A high-pressure sodium lamp's
+400–700 nm photons carry less energy each on average (its output sits near 590 nm); its factor is ~4.9–5.0
+µmol J⁻¹ — **general knowledge, not on a page here** (to look for in the §13d search). Used as a sensitivity
+at 4.98, not a correction.
+
+### 13c. Predictions (hand arithmetic, the §11a operating point; written before any code)
+
+Lit: Δ 145 Pa K⁻¹, Rn 81 W m⁻², VPD 444 Pa, ρcp 1220.7, γ 67, `ra` 50, full-cover `rs` 50 (Szeicz–Long). Dark
+(16 °C): Δ ~112, VPD 345, Rn 0.
+
+| | prediction | confidence |
+|---|---|---|
+| K1 | **No `rs` ≥ 0 reaches 4.17 at `ra` 50.** `rs` → 0: lit λE (145·81 + 1220.7·444/50)/(145 + 67) ≈ 107 W m⁻² (×1.31 on today's 81), dark ≈ 47 (×1.38): W1 ceiling **3.3–3.5** L m⁻² d⁻¹, **0.79–0.84** of the level. On the trays basis (5.21) further still | high |
+| K2 | so at `ra` 50 the gap closes in the model only with **extra net radiation** (Q5's ×2.24 stands) or `rs` below 0 — no physical leaf setting does it | high (follows K1) |
+| K3 | the TM's measured temperatures and humidities (20.36 / 16.8 °C from day 34; 81 / 82 %) move W1 by **0 to +2 %**; the ratio stays **0.62–0.63** | medium |
+| K4 | a sodium-lamp factor of 4.98 µmol J⁻¹ (Rn × 0.918) moves W1 **−3 to −5 %** (ratio ~**0.60**) and raises Q5's multiple from ×2.24 to **×2.4–2.5** of the lamp's (corrected) light-only energy | medium |
+| K5 | together: ratio **0.59–0.62**. The forcing side does not explain the gap; checking it is the point, closing it is not expected | medium |
+
+What would refute: K1 — the by-hand ceiling at `rs` → 0 reaching 4.17 (then a leaf-side cause stays open at
+50). K3/K4 — a shift outside the stated band in either direction means the arithmetic misses a term, and the
+by-hand path is re-derived before reading anything from it.
+
+Printed, never asserted, in `rust/crates/station/tests/scorecard_tm102788.rs`. No model, golden, param or
+manifest change.
+
+### 13d. K1–K5 measured (2026-10-14) — graded
+
+`the_gap_at_the_kept_air_resistance` (printed, never asserted). The by-hand path reproduces `w1_by_hand`
+exactly at the set points (2.6067), 0.15 % from the model's 2.6027 as in §11b.
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| K1 | `rs` → 0 at `ra` 50: W1 3.3–3.5, 0.79–0.84 of 4.17 | **3.4414**, **0.825** (0.661 of 5.21) | HELD — **no leaf setting closes the gap at `ra` 50** |
+| K2 | so only extra net radiation (or `rs` < 0) closes it in the model | follows from K1 | HELD |
+| K3 | measured temperatures/RH: W1 0 to +2 %, ratio 0.62–0.63 | **+0.86 %**, **0.630**; net radiation for 4.17 ×2.21 | HELD |
+| K4 | sodium factor 4.98: W1 −3 to −5 %, ratio ~0.60, multiple ×2.4–2.5 | **−3.98 %**, **0.599**, **×2.44** | HELD |
+| K5 | together: ratio 0.59–0.62 | **0.604** (×2.41) | HELD |
+
+**What the forcing side says:** the row's set points were close enough — the measured temperatures add under
+1 %, and a sodium lamp's photon energy takes ~4 % away. The gap is not in the forcings, and with the air
+resistance kept at 50 the model can only close it with lamp heat of ×2.4 its light-only energy.
+
+### 13e. The fresh search (2026-10-14) — what was read
+
+* **Bugbee & Salisbury 1988** (*Plant Physiol.* 88:869–878, PMC1055676): free to read, but every route
+  (PMC, Europe PMC, USU Digital Commons — "not available here") answered with an automated bot check, not a
+  file. **Blocked from here; the user can fetch it by hand.** Its PMC abstract and reference list say nothing
+  on canopy temperature or water use.
+* **Utah State lab pages** for the 1996 Bugbee/Monje papers: no file found (the CV only lists them).
+* **BPC papers giving canopy-minus-air temperature:** one search found none (a 1994 contractor report gives
+  BPC *air* temperatures only).
+* **FOUND — Monje & Bugbee (2019)**, *Radiometric Method for Determining Canopy Stomatal Conductance in
+  Controlled Environments*, *Agronomy* 9(3):114, doi 10.3390/agronomy9030114 — open access, CC BY 4.0, by the
+  authors of the blocked 1996 papers, measuring the same quantity; on the git-ignored shelf as
+  `sources/monje_bugbee_2019_agronomy9_114.pdf`. ⚠ **Locus: not the BPC and not TM 102788's crop.** Two ~1 m²
+  EGC-13 chambers at Utah State (86 kPa, 1460 m), USU-Apogee wheat at 1100 plants m⁻², leaf area index > 15,
+  18–35 days old, 1600 µmol m⁻² s⁻¹ from four 1000 W **high-pressure sodium** lamps above a glass box of
+  chilled water (the "water filter"), 21 °C, RH 68–70 % lit, 20 h light. What it gives (PDF page numbers):
+  * p. 5 (2.4): fan settings 0.8 / 1.7 / 2.3 m s⁻¹ above the canopy; most measurements at 1.7. (BPC: 0.2–1.2
+    m s⁻¹, TM 103494 p. 8.)
+  * p. 6 (2.6): PAR converted to energy *"assuming 5 µmol m⁻² s⁻¹ per W m⁻² for HPS lamps"* — an assumption
+    in a peer-reviewed paper, which puts K4's 4.98 inside the range a working group uses; still not a
+    measurement.
+  * p. 7 (2.7): *"The PARabs to Rnet ratio was 83% of Rnet in a chamber with a water filter below the lamps,
+    but was only 64% of Rnet when the water filter was removed"*; draining the filter *"added ~100 W m⁻² to
+    Rnet, as the glass temperature … reached 45 °C"*. Evaporation from the covered solution: *"small (~2% of
+    Rnet)"* (bears on §10c A4).
+  * p. 19 (Discussion): *"The gA for the wheat (5.5 mol m⁻² s⁻¹ or 7.5 s m⁻¹) … were within the range of
+    typical aerodynamic conductances of field crops (… 4–13 s m⁻¹)"*. ⚠ The paper's 7.5 s m⁻¹ converts at
+    sea-level molar volume; at its own 86 kPa and 21 °C the same molar conductance is **6.4 s m⁻¹**. Both are
+    carried.
+  * Table 3 (p. 17): wheat at constant light and `gA`, CO₂ 390 → 1230 µmol mol⁻¹: canopy stomatal conductance
+    2.15 → 1.03 mol m⁻² s⁻¹ (−52 %), transpiration 11.2 → 7.0 mmol m⁻² s⁻¹ (−37 %), latent heat 460 → 288 W
+    m⁻², decoupling coefficient 0.65 → 0.39.
+  * p. 13 (3.3, Fig. 6; the text is overprinted in the PDF, read as best it allows): canopy minus air rose
+    linearly with light, **0 → +4 °C at the low fan setting and −1 → +2 °C at the high one** over 0–1700 µmol.
+
+### 13f. The source's numbers carried into the row — predictions (before the run)
+
+Transplanting is the weak step: another chamber, three times the light, a denser and shorter crop, faster
+air. So these are *what the row would do if the BPC were like the USU chamber*, never a fit.
+
+**Net radiation in the model's units.** The model's lamp net radiation is `0.77 · PAR/4.57`. The source's is
+`PARabs / ratio`, with PARabs = capture × PAR/5 and capture ~0.90–0.95 (visible reflection 0.055, p. 6). So
+the multiple on the model's figure is `1.187 · capture / ratio`: **×1.3–1.4 with the water filter** (ratio
+0.83) and **×1.7–1.8 without** (0.64). The BPC's lamps sat behind plain glass or acrylic (§12b), nearer the
+no-water case.
+
+| | prediction | confidence |
+|---|---|---|
+| S1 | air coupling at the source's value, lamp light-only: `ra` 7.5 → W1 **4.3–4.6**; `ra` 6.4 → **4.5–4.8** — above the 4.17 level, below the 5.21 trays figure | medium |
+| S2 | lamp heat at the source's ratios, `ra` 50: ×1.35 → W1 **2.9–3.1**; ×1.75 → **3.2–3.5** — short of 4.17 alone | medium |
+| S3 | both (`ra` 6.4–7.5 with ×1.35–1.75): W1 **4.5–5.1**, between the two area bases; at low `ra` extra radiation adds little (the marginal share falls to ~0.2) | medium |
+| S4 | leaf over air on lit steps at `ra` 7.5 with ×1.75: **−0.1 to +0.3 K** — inside the source's high-fan band at this light (−1 → +2 °C over 0–1700 µmol gives ~−0.2 K at 480) | low |
+
+What would refute: S1 below 4.17 means the source's chamber value would NOT close the gap by itself; S2 at or
+above 4.17 means the source's lamp heat alone would.
+
+### 13g. S1–S4 measured (2026-10-14) — graded
+
+`the_gap_at_a_measured_chamber_coupling` (printed, never asserted; the model's full-cover `rs` 50 throughout —
+the source's own canopy stomatal resistance, ~34–40 s m⁻¹ at 1230 µmol mol⁻¹ but at 1600 µmol of light, is
+not carried).
+
+| case | W1 | of 4.17 (20 m²) | of 5.21 (trays) | leaf − air |
+|---|---|---|---|---|
+| `ra` 7.5, light only | 4.303 | **1.03** | 0.83 | −0.28 K |
+| `ra` 6.4, light only | 4.432 | **1.06** | 0.85 | −0.26 K |
+| `ra` 50, ×1.35 | 3.048 | 0.73 | 0.59 | +0.61 K |
+| `ra` 50, ×1.75 | 3.552 | 0.85 | 0.68 | +1.26 K |
+| `ra` 7.5, ×1.35 / ×1.75 | 4.489 / 4.702 | 1.08 / 1.13 | 0.86 / 0.90 | −0.14 / +0.02 K |
+| `ra` 6.4, ×1.35 / ×1.75 | 4.599 / 4.789 | 1.10 / 1.15 | 0.88 / 0.92 | −0.13 / +0.01 K |
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| S1 | `ra` 7.5 → 4.3–4.6; 6.4 → 4.5–4.8; above 4.17, below 5.21 | 4.303; **4.432** | HELD on the claim (both above 4.17, below 5.21); the 6.4 value 0.07 under its band — the hand estimate ran high |
+| S2 | ×1.35 → 2.9–3.1; ×1.75 → 3.2–3.5; short of 4.17 | 3.048; **3.552** | HELD on the claim; ×1.75 0.05 over its band |
+| S3 | 4.5–5.1, between the two bases | 4.489–4.789 | HELD (the lowest case 0.01 under) |
+| S4 | `ra` 7.5 ×1.75: −0.1 to +0.3 K | +0.020 K | HELD |
+
+### 13h. What §13 says
+
+1. **With the air resistance kept at 50, no leaf setting closes the gap (K1)** — even leaves with no
+   resistance at all reach 0.83 of the trial. Inside the model only extra lamp heat (×2.4 the lamp's
+   light-only energy, sodium-corrected) would. That is a statement about the model's choice, not the trial's
+   cause.
+2. **The forcings were not the gap (K3–K5):** the TM's measured temperatures add under 1 %; a sodium lamp's
+   photon energy removes ~4 %. The ratio is 0.60–0.63 whichever is used.
+3. **A measured chamber value now exists, and it leans the trial's gap toward air coupling.** In an HPS-lit
+   wheat chamber at Utah State (Monje & Bugbee 2019), the canopy's air resistance was **6.4–7.5 s m⁻¹**, and
+   the lamps' extra heat put net radiation at **×1.3–1.8** the model's light-only figure. Carried into the row:
+   the measured air coupling **alone closes the 20 m² level** (1.03–1.06); the measured lamp heat **alone does
+   not** (0.73–0.85); both together give 1.08–1.15 of the 20 m² level and 0.86–0.92 of the trays figure. At the
+   measured coupling the leaf sits within ±0.3 K of the air — inside the source's own high-fan band.
+4. **Not named the cause.** The source is another chamber: three times the light, faster air (1.7 m s⁻¹
+   against the BPC's 0.2–1.2), a shorter and far denser crop. The BPC's slower air would raise its `ra`, by an
+   amount this source does not give. "Leans toward air coupling, with some lamp heat" is what it earns.
+5. **For the station (the user's decision stands, and is not re-opened here):** the price closed on
+   2026-10-14 noted that *"no value below 50 has a source"*. That is no longer quite true: a peer-reviewed
+   chamber measurement puts a ventilated wheat chamber's canopy air resistance near 7 s m⁻¹, inside the 4–13 s m⁻¹
+   it quotes for field crops (its ref. 46, unread here) — a range the model's 50 sits above (for the open field
+   too; FAO-56's grass reference gives ~100 s m⁻¹ at 2 m s⁻¹ wind, so field values vary with crop height and
+   wind, and nothing here bears on the open field). Whether that changes the
+   decision is the user's call; adopting any value is still a science item and an unfreeze.
+
+**Blocked and left:** Bugbee & Salisbury 1988 (bot check; free, fetchable by hand), the two 1996 papers (no
+file). The trial's own record still cannot separate the candidates (§12b).

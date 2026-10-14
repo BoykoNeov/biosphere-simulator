@@ -30,7 +30,7 @@ use domains::biosphere::stocks::{
     LITTER_SINK, TEMP_VAR, VPD_VAR,
 };
 use domains::biosphere::system::{build_season, build_season_with, weather_forcings, weather_shared};
-use domains::biosphere::weather::saturation_vapor_pressure;
+use domains::biosphere::weather::{self, saturation_vapor_pressure};
 use domains::biosphere::{SeasonScenario, BIO_DT, DEFAULT_SCENARIO, STEPS_PER_DAY};
 use simcore::environment::{constant, Schedule, SourceResolver};
 use simcore::integrator::EulerIntegrator;
@@ -692,4 +692,174 @@ fn the_gap_resized_at_the_adopted_form() {
         leaf_over_air(ra_trays, rs, 1.0),
         leaf_over_air(ra, rs, rn_trays)
     );
+}
+
+// --- the water gap at the kept air resistance (plan §13) — printed, never asserted ---------------
+
+/// The TM's MEASURED light/dark means (p. 5): 20.36 °C light; 16.8 °C dark, read as the cool-night
+/// period's mean and applied from day 34 only (plan §13b); humidity 81 % light, 82 % dark.
+const T_LIGHT_MEASURED: f64 = 20.36;
+const T_DARK_MEASURED: f64 = 16.8;
+const RH_DARK_MEASURED: f64 = 0.82;
+/// A high-pressure sodium lamp's PAR photons per joule — general knowledge, not on a page here
+/// (plan §13b): a sensitivity against the daylight 4.57 the lamp's net radiation uses.
+const HPS_UMOL_PER_J: f64 = 4.98;
+
+/// The forcings `w1_by_hand` reads, made explicit so the measured ones can be swapped in.
+#[derive(Clone, Copy)]
+struct Forcing {
+    t_light: f64,
+    t_dark: f64,
+    rh_light: f64,
+    rh_dark: f64,
+    /// Multiplies the lamp's net radiation (4.57 / the lamp's own factor).
+    rn_scale: f64,
+}
+
+const SET_POINTS: Forcing = Forcing {
+    t_light: T_LIGHT,
+    t_dark: T_DARK,
+    rh_light: RH,
+    rh_dark: RH,
+    rn_scale: 1.0,
+};
+
+/// `w1_by_hand` with the forcings as arguments; `SET_POINTS` reproduces it.
+fn w1_by_hand_with(ra: f64, rs: f64, f: Forcing) -> f64 {
+    mean(W1_DAYS.map(|d| {
+        let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
+        (first..first + STEPS_PER_DAY as u64)
+            .map(|n| {
+                let l = lit(n, BIO_DT);
+                let (t, rh) = if tm_day(n) < NIGHTS_COOL_FROM_TM_DAY {
+                    (f.t_light, f.rh_light)
+                } else {
+                    (
+                        f.t_dark + (f.t_light - f.t_dark) * l,
+                        f.rh_dark + (f.rh_light - f.rh_dark) * l,
+                    )
+                };
+                let rn = f.rn_scale * lamp_net_radiation(par_on(n)) * l;
+                let vpd = saturation_vapor_pressure(t) * (1.0 - rh);
+                science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * BIO_DT
+            })
+            .sum::<f64>()
+    }))
+}
+
+/// Plan §13 (K1–K5): with the air resistance kept at 50, can any leaf setting close the gap; and
+/// does the forcing side — the TM's measured temperatures and humidities, a sodium lamp's photon
+/// energy — move the ratio.
+#[test]
+fn the_gap_at_the_kept_air_resistance() {
+    let r = run(CA_ROW);
+    let model = mean(W1_DAYS.map(|d| daily_water(&r, d)));
+    let tp = params::biosphere().transp;
+    let sla = params::biosphere().canopy.sla_per_mol_c;
+    let lai = mean(W1_DAYS.map(|d| {
+        let s = &r.states[(d - TM_DAY0) * STEPS_PER_DAY];
+        science::leaf_area_index(s.stocks[LEAF_C].amount, sla, DEFAULT_SCENARIO.ground_area)
+    }));
+    let rs = science::canopy_surface_resistance(
+        tp.rs_form,
+        tp.surface_resistance,
+        lai,
+        tp.leaf_stomatal_resistance,
+        tp.threshold_lai,
+    );
+    let ra = tp.aerodynamic_resistance;
+    let base = w1_by_hand_with(ra, rs, SET_POINTS);
+    eprintln!(
+        "§13 (ra {ra}, rs {rs:.2}): W1 model {model:.4}; by hand {base:.4} (w1_by_hand {:.4})",
+        w1_by_hand(ra, rs, 1.0)
+    );
+    let ceiling = w1_by_hand_with(ra, 0.0, SET_POINTS);
+    eprintln!(
+        "  K1 rs -> 0 at ra {ra}: W1 {ceiling:.4} = {:.4} of {TM_W1_LEVEL}, {:.4} of {TM_W1_TRAYS}",
+        ceiling / TM_W1_LEVEL,
+        ceiling / TM_W1_TRAYS
+    );
+    let measured = Forcing {
+        t_light: T_LIGHT_MEASURED,
+        t_dark: T_DARK_MEASURED,
+        rh_dark: RH_DARK_MEASURED,
+        ..SET_POINTS
+    };
+    let hps = Forcing {
+        rn_scale: weather::PAR_UMOL_PER_J / HPS_UMOL_PER_J,
+        ..SET_POINTS
+    };
+    let both = Forcing {
+        rn_scale: hps.rn_scale,
+        ..measured
+    };
+    for (name, f) in [
+        ("K3 measured temps/RH", measured),
+        ("K4 HPS 4.98 µmol/J", hps),
+        ("K5 both", both),
+    ] {
+        let w = w1_by_hand_with(ra, rs, f);
+        let rn_needed = solve(
+            |x| {
+                w1_by_hand_with(
+                    ra,
+                    rs,
+                    Forcing {
+                        rn_scale: f.rn_scale * x,
+                        ..f
+                    },
+                )
+            },
+            TM_W1_LEVEL,
+            1.0,
+            10.0,
+        );
+        eprintln!(
+            "  {name}: W1 {w:.4} ({:+.2} %); model W1 x that / {TM_W1_LEVEL} = {:.4}; net radiation for {TM_W1_LEVEL}: x{rn_needed:.3} of this case's light-only energy",
+            100.0 * (w / base - 1.0),
+            model * w / base / TM_W1_LEVEL
+        );
+    }
+}
+
+/// Plan §13f (S1–S4): Monje & Bugbee 2019 (*Agronomy* 9:114, an HPS-lit wheat chamber at Utah
+/// State — NOT the BPC) carried into the row. Its canopy air resistance: 7.5 s m⁻¹ as the paper
+/// states it (p. 19), 6.4 at its own 86 kPa. Its net radiation over absorbed PAR (p. 7: PARabs is
+/// 83 % of Rnet under a water filter, 64 % without), in the model's units `1.187 · capture /
+/// ratio`: ×1.35 and ×1.75.
+#[test]
+fn the_gap_at_a_measured_chamber_coupling() {
+    let r = run(CA_ROW);
+    let tp = params::biosphere().transp;
+    let sla = params::biosphere().canopy.sla_per_mol_c;
+    let lai = mean(W1_DAYS.map(|d| {
+        let s = &r.states[(d - TM_DAY0) * STEPS_PER_DAY];
+        science::leaf_area_index(s.stocks[LEAF_C].amount, sla, DEFAULT_SCENARIO.ground_area)
+    }));
+    let rs = science::canopy_surface_resistance(
+        tp.rs_form,
+        tp.surface_resistance,
+        lai,
+        tp.leaf_stomatal_resistance,
+        tp.threshold_lai,
+    );
+    let ra = tp.aerodynamic_resistance;
+    for (name, ra_x, rn_x) in [
+        ("S1 ra 7.5, light only", 7.5, 1.0),
+        ("S1 ra 6.4, light only", 6.4, 1.0),
+        ("S2 ra 50, x1.35", ra, 1.35),
+        ("S2 ra 50, x1.75", ra, 1.75),
+        ("S3 ra 7.5, x1.35", 7.5, 1.35),
+        ("S3 ra 7.5, x1.75", 7.5, 1.75),
+        ("S3 ra 6.4, x1.35", 6.4, 1.35),
+        ("S3 ra 6.4, x1.75", 6.4, 1.75),
+    ] {
+        let w = w1_by_hand(ra_x, rs, rn_x);
+        eprintln!(
+            "§13 {name}: W1 {w:.4} = {:.4} of {TM_W1_LEVEL}, {:.4} of {TM_W1_TRAYS}; leaf over air {:+.3} K",
+            w / TM_W1_LEVEL,
+            w / TM_W1_TRAYS,
+            leaf_over_air(ra_x, rs, rn_x)
+        );
+    }
 }
