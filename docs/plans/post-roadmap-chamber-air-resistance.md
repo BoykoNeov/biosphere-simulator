@@ -246,3 +246,17 @@ operating point is not TM's. Not decomposed further.
 sunlit sealed chambers and +20 to +77 % through the lamp-lit station, with the station's condensate store
 running down by up to 39 % on average. Carbon and every other quantity: unchanged (§7a P4), within what the
 model can see (§7d point 7).
+
+---
+
+## 9. The user's decision (2026-10-14): keep 50 — CLOSED, nothing adopted
+
+**The user's call:** *"1. use 50"*. Every room keeps the uncited `ra` = 50 s m⁻¹; no chamber value is
+adopted, no param, golden or manifest moves. The price above stands as the record of what a lower value
+would have cost. The local branch `wip/chamber-ra-price` was never pushed and is left as it is until the
+user says whether to delete it.
+
+⚠ **What keeping 50 does and does not say.** It is a decision about the model, not evidence about TM
+102788: the trial's water gap (`post-roadmap-real-world-checks.md` §11–§12) stays open, and air coupling
+stays a candidate cause there. It does mean the station's lamp-lit chambers keep whatever share of that gap
+air coupling would have explained. The water gap's next round is §13 of that plan.

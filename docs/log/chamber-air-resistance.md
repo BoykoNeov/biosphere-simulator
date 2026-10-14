@@ -36,3 +36,7 @@ after Step 6's water gap (`post-roadmap-real-world-checks.md` §11–§12). Plan
 
 **Lesson:** an end-state change is not the size of a change, and a cause written for it is a claim until a
 run tests it — the "watering cycle" explanation held for two builds and failed for two.
+
+**CLOSED 2026-10-14 on the user's call (*"use 50"*): nothing adopted.** Every room keeps the uncited 50; the
+price stands as the record. Keeping 50 decides the model, not the trial's water gap, which stays open
+(`post-roadmap-real-world-checks.md` §13).
