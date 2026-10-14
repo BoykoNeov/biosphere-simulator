@@ -200,6 +200,23 @@ pub fn memory_link(row: &str) -> Option<String> {
     Some(name.to_string())
 }
 
+/// EVERY memory file a line names, in order — where [`memory_link`] reads only the first.
+///
+/// The index's gates count one memory per `- [` line, so a line naming two files hides the
+/// second from all of them; this is how the caller sees that it happened.
+pub fn memory_links(row: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut rest = row;
+    while let Some(at) = rest.find("](") {
+        rest = &rest[at..];
+        if let Some(name) = memory_link(rest) {
+            found.push(name);
+        }
+        rest = &rest[2..];
+    }
+    found
+}
+
 /// The user's memory index, which lives in the profile rather than the repo.
 ///
 /// `None` when the home directory is not discoverable; the caller decides what an absent

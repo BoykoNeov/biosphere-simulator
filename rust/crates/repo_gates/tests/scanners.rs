@@ -9,7 +9,7 @@
 //! the scanners are pinned here, on inputs chosen for the two exclusions that are easy to
 //! drop: the `memory/` lookbehind and the word boundary.
 
-use repo_gates::{doc_bounds, memory_link, plan_docs, record_link, usize_consts};
+use repo_gates::{doc_bounds, memory_link, memory_links, plan_docs, record_link, usize_consts};
 
 fn set(items: &[&str]) -> std::collections::BTreeSet<String> {
     items.iter().map(|s| s.to_string()).collect()
@@ -139,6 +139,22 @@ fn memory_link_reads_the_index_line_and_rejects_everything_else() {
     assert!(memory_link("## Direction & posture").is_none());
     assert!(memory_link("- [Title](notes.txt) — hook").is_none());
     assert!(memory_link("- plain text with no link").is_none());
+}
+
+/// The reader behind the one-link-per-line gate. A line sharing several memories (the
+/// 2026-10-08 compression) must yield every one of them, a `.txt` target none, and an
+/// ordinary index line exactly its own — the case the gate passes.
+#[test]
+fn memory_links_reads_every_link_on_a_shared_line() {
+    assert_eq!(
+        memory_links("- Phases: [3](phase3-a.md) — x (y) · [notes](n.txt) · [5](phase5-b.md) — z"),
+        vec!["phase3-a.md".to_string(), "phase5-b.md".to_string()]
+    );
+    assert_eq!(
+        memory_links("- [Soil layers: BUILT](soil-layers-built.md) — the expensive design"),
+        vec!["soil-layers-built.md".to_string()]
+    );
+    assert!(memory_links("## Direction & posture").is_empty());
 }
 
 /// The scanners' shared number reader, exercised through both of them because the two sides

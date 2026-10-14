@@ -28,8 +28,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use repo_gates::{
-    data_rows, doc_bounds, log_sections, memory_files, memory_index, memory_link, normalised_bytes,
-    plan_docs, read_normalised, record_files, record_link, repo_root, usize_consts,
+    data_rows, doc_bounds, log_sections, memory_files, memory_index, memory_link, memory_links,
+    normalised_bytes, plan_docs, read_normalised, record_files, record_link, repo_root,
+    usize_consts,
 };
 
 /// Measured 2026-08-12, immediately after the retirement rule was applied. The headroom is
@@ -534,6 +535,47 @@ fn every_memory_index_line_names_a_file_and_vice_versa() {
         dangling.is_empty(),
         "{} index line(s) in MEMORY.md name a file that does not exist: {dangling:?}. That          is a dead recall target — it costs bytes in every session and points at nothing.          Either restore the file or remove its line.",
         dangling.len()
+    );
+}
+
+/// ⚠ THE SIXTH BOUND, added 2026-10-14: every bound above counts one memory per `- [` line,
+/// so it is only as good as that premise — and the premise was broken for six weeks.
+///
+/// On 2026-10-08 the index was compressed so that finished series SHARED a line
+/// (`- Flip C-items: [C1](…) · [C2](…) · …`). Each such line named up to ten files, and none
+/// of the bounds could see it: the parity test read only the first link of lines starting
+/// `- [`, so it reported 39 indexed files as UNREACHABLE (loud, and misread as a pre-existing
+/// red for six days); the mean counted the shared lines' bytes over a denominator that left
+/// them out; and the max-line bound never saw an 809 B line. Fixing the parity reader alone
+/// would have turned it green with the two byte bounds still blind — so the premise is now a
+/// bound of its own. Remedy, as before: MERGE the series into one file with one line (done
+/// 2026-10-14, 176 → 148 lines), never share a line.
+#[test]
+fn every_memory_index_line_names_exactly_one_file() {
+    // ⚠ Does not run when the memory index is absent — every CI run, same terms as
+    // `memory_index_ceiling`. Said out loud rather than discovered later.
+    let Some(path) = memory_index().filter(|p| p.is_file()) else {
+        eprintln!(
+            "every_memory_index_line_names_exactly_one_file: the memory index is not present \
+             (expected on CI). THIS ASSERTION DID NOT RUN."
+        );
+        return;
+    };
+    let text = read_normalised(&path);
+    let offenders: Vec<(usize, usize)> = text
+        .lines()
+        .enumerate()
+        .map(|(i, l)| (i + 1, l, memory_links(l).len()))
+        .filter(|(_, l, n)| *n > 1 || (*n == 1 && !l.starts_with("- [")))
+        .map(|(i, _, n)| (i, n))
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "MEMORY.md has {} line(s) that are not one `- [Title](file.md) — hook` row, as \
+         (line, links): {offenders:?}. Every other bound here counts ONE memory per `- [` line, \
+         so a shared line hides its other files from all of them. The remedy is to MERGE the \
+         series into one memory file with one line, not to share a line.",
+        offenders.len()
     );
 }
 

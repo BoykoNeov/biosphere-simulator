@@ -1594,3 +1594,12 @@ account, this), so it is gated rather than remembered.
 * **R3 held:** `regen_goldens` report: 20 of 20 identical; no manifest moved. `cargo test --no-fail-fast` red
   only on the memory-index test; clippy clean; `--ignored` all nine pass. Logs `b-regen.txt`, `b-test.txt`,
   `b-clippy.txt`, `b-ignored.txt` in `sources\temp-evidence\station-soil-seed\`.
+
+### 19d. The memory-index red, CLOSED (2026-10-14)
+
+The red that §16a–§19c carried as "unrelated, pre-existing" was the memory-index gate reading one link
+per `- [` line while the user's memory index had been compressed on **2026-10-08** (the date §18b left
+unchecked) so that finished series shared a line. Nothing was unindexed: 156 links, 156 files. On the user's
+call the lines were split and the finished series merged into one file each (176 → 148 index lines), and a
+sixth bound now fails on any shared line. Record: `docs/context-budget.md`, "2026-10-14 — a shared line hid
+39 memories". No golden, manifest or simulation code moved.

@@ -504,6 +504,33 @@ would have been followed, found impossible, and improvised around, and this docu
 only thing that catches that. `CLAUDE.md` was pointing at the same deleted file and was
 corrected in the same commit.
 
+#### 2026-10-14 — a shared line hid 39 memories, and the premise became a sixth bound
+
+On 2026-10-08 the index was compressed so that finished series **shared a line**
+(`- Flip C-items: [C1](…) · [C2](…) · …`, seven such lines naming 46 files). That is the
+condensing this section refuses, in a shape no bound could see, because **every bound counts
+one memory per `- [` line**:
+
+- the parity test read only the first link of lines starting `- [`, so it reported **39
+  indexed files as unreachable**. It was loud, but recorded for six days as an unrelated
+  pre-existing red;
+- the mean counted the shared lines' bytes over a line count that left them out;
+- the max-line bound never saw the longest of them, **809 B** against 240.
+
+Fixing only the parity reader would have turned it green with both byte bounds still blind.
+So the remedy the ceiling's message prescribes was done instead: the user chose to split the
+lines, and then to **merge finished series into one file each** (29 files into 7, each
+merged file at or under the largest existing memory, ~46 KB, each absorbed file kept
+verbatim under its old name). The index went 176 → **148 lines, 16,384 B**. The user chose to stop
+there rather than reach the harness's 140-line advisory by merging active notes or making a
+~200 KB phases file.
+
+**The premise is now a bound of its own:** `every_memory_index_line_names_exactly_one_file`
+fails on any line naming more than one memory file, or a link on a line that is not a `- [`
+row. Control (predicted, then run): one shared line appended → that test alone red, on that
+line, with two links; index restored to the same sha-256. It also caught the merge script's
+own seven new lines, written without their leading `- `, before any commit.
+
 ### What the gate deliberately does NOT check
 
 It cannot tell whether a row *should* have been retired, or whether a memory file
