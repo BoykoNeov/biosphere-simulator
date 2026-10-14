@@ -56,7 +56,7 @@ classified, a price table and no recommendation.
   0.45) with a capacity of 8 mm/day; sealed chambers water from their condensate (`Recycling`).
   Development speeds up below FTSW 0.40 (`wssd`), growth and transpiration slow below 0.30 (`wssg`).
 
-## 4. The arithmetic (the model's constants; `W:\temp\claude\air-res-price\pm.py`)
+## 4. The arithmetic (the model's constants; `W:\temp\claude\air-res-price\pm.py`, kept at `sources\temp-evidence\air-res-price\`)
 
 Penman–Monteith at full cover, `rs` 50 (Szeicz–Long at LAI ≥ 2), demand per day:
 
@@ -70,6 +70,14 @@ Penman–Monteith at full cover, `rs` 50 (Szeicz–Long at LAI ≥ 2), demand pe
 The highest daily demand in the table, 6.5 mm/day at `ra` 9 on a warm bright day, is under the
 watering's 8 mm/day capacity. A sealed chamber's air holding near its 75 % humidity target limits the
 deficit further (more transpiration → humid air → condensed by the dehumidifier, not a drier leaf).
+
+⚠ *Corrected 2026-10-14, after the run (advisor review):* the sunlit columns assume FULL cover, which
+those chambers never reach — the canopy-resistance record measured their LAI never passing 1.02. At
+LAI 1.0 (Szeicz–Long `rs` 100, crop share `1 − e^−0.5` of Rn) the same days give **×1.15–1.19 at 30,
+×1.35–1.42 at 15, ×1.47–1.55 at 9**, and the highest demand falls to **3.55 mm/day**; at LAI 0.5, ×1.11–1.13 /
+×1.22–1.25 / ×1.28–1.31. The ratios barely move and the watering headroom only grows, so P4's reasoning
+stands, but its stated basis was wrong. The lamp column is unaffected (§11 of the real-world-checks plan
+checked it against the model to 0.15 %). §8 measures the actual throughput.
 
 ## 5. Predictions (written before the branch exists)
 
@@ -91,7 +99,8 @@ deficit further (more transpiration → humid air → condensed by the dehumidif
 scenario builders) and a pricing hook in `transpiration_flow` that reads two environment variables —
 `PRICE_RA_SCOPE` (`lamp` | `sealed`) and `PRICE_RA_VALUE` — so one build prices all six cells. An
 environment read is NOT an adoption shape (parameters are data); it exists only so the price runs
-without six recompiles. Logs: `W:\temp\claude\air-res-price\`.
+without six recompiles. Logs: `W:\temp\claude\air-res-price\` (scripts, comparison and logs kept at
+`sources\temp-evidence\air-res-price\`; the per-cell golden copies were deleted — the branch regenerates them).
 
 ---
 
@@ -112,7 +121,7 @@ in the same folder. Suites at `ra` 9: the full debug suite `--no-fail-fast` for 
 | P2 | Line L: exactly `lighting` and `sealed_station` | **2 rewritten**, those two, at 30, 15 and 9 | HELD |
 | P3 | Line S: those two plus the seven sunlit sealed builds; the other eleven identical | **9 rewritten**, the predicted nine, at every value | HELD |
 | P4 | water only, everywhere | **held bit for bit**: in all 6 cells the only leaves that differ are water stocks (soil, subsoil, condensate) and the soil account's water aux (`top_soil_water`, `soil_evap_today`, `soil_dry_days`). No carbon, nitrogen, oxygen, energy, `thermal_time`, `rooted_depth`, `vernalization_days` or `soil_shade_lai` leaf moves. Even at 9 no build's watering falls behind | HELD |
-| P5 | the size grows with `1/ra`, same sign | held for the three short runs (`lighting` −0.08 / −0.14 / −0.17 % soil; `greenhouse`, `harvest` likewise). **Refuted for every multi-year sealed run**: the end state is a snapshot inside a watering cycle, so it swings with sign changes — the sealed station's soil +36 % at 30, +18 % at 15, −17 % at 9; the perennial long horizon's condensate −25 %, +5 %, −75 % | REFUTED (for snapshots of long runs) |
+| P5 | the size grows with `1/ra`, same sign | held for the three short runs (`lighting` −0.08 / −0.14 / −0.17 % soil; `greenhouse`, `harvest` likewise). **Refuted for every multi-year sealed run**: the end states swing with sign changes — the sealed station's soil +36 % at 30, +18 % at 15, −17 % at 9; the perennial long horizon's condensate −25 %, +5 %, −75 % | REFUTED (for snapshots of long runs). ~~The end state is a snapshot inside a watering cycle~~ — first written as the cause, untested; §8 measured it: true for the re-sown chambers' soil, **false** for the sealed station's subsoil and condensate (a steady shift) and the never-re-sown chamber |
 | P6 | reds by design: the goldens' regression and band checks; manifest byte gates green | domains + station `golden_regression`, both `tier_contract` checks (cheap and the `--ignored` expensive) red; **manifest byte gates green** | HELD |
 | P7 | possibly red: water-pinning sealed / lamp tests | **none of them** (chamber dryness, vapour, dehumidifier, watering, minute-step, separate air, lamp shed all green). Red instead: the re-sow cycle test (7b) and the canopy-resistance instrument (7c) | none fired as listed |
 | P8 | green: the TM scorecard, carbon / energy / gas, `drought_window`, the laws | green | HELD |
@@ -141,8 +150,8 @@ to round-off" becomes "two cycles". Not run at 30 or 15.
 
 ### 7d. The price table
 
-**What moves** (end state against the unset run, %). ⚠ For the multi-year runs these are snapshots inside
-a watering cycle (7a P5), not the size of the change: they say *that* the water moves, not *how much*.
+**What moves** (end state against the unset run, %). ⚠ For the multi-year runs these end states are not
+the size of the change: they say *that* the water moves, not *how much*. Run means and throughput: §8.
 
 | golden | line | 30 | 15 | 9 |
 |---|---|---|---|---|
@@ -157,8 +166,8 @@ a watering cycle (7a P5), not the size of the change: they say *that* the water 
 | `consumer_long_horizon` (15 yr) | S | soil +50, condensate −44 | +37 / −33 | +29 / −25 |
 | the other 11 (incl. the open field) | — | identical | identical | identical |
 
-**How much more water flows** — not in any golden; from the arithmetic (§4): ×1.16 / ×1.41 / ×1.60 at
-the lamp's full-cover point, ×1.1–1.7 for the sunlit chambers. Not measured on the branch.
+**How much more water flows** — not in any golden; **measured in §8**: the sealed station +20 / +54 / +77 %,
+the sunlit chambers +4 to +19 % at any value.
 
 **Ceremony an adoption would add** (beyond the run):
 1. **A value.** None below 50 has a source. 9 is fitted to TM 102788 **on its 20 m² basis only**: on the
@@ -175,5 +184,65 @@ the lamp's full-cover point, ×1.1–1.7 for the sunlit chambers. Not measured o
 5. **The TM scorecard sits outside both lines** (an open build). Adopting would leave it reading 50 unless
    it opts in, and if it opts in at 9 its water row passes by construction.
 6. **Potato** inherits the wheat transpiration file — no golden holds it.
+7. **What "water only" cannot see.** The model gives evaporation no heat: no station node and not
+   `thermal.rs` carries latent heat (§3), and the dehumidifier draws no power for what it condenses. In a
+   real chamber up to ×1.8 the transpiration would cool the leaves and the room and load the dehumidifier.
+   So the energy side of this price is **unmeasured, not zero** — "nothing but water moves" means nothing
+   the model can see moves.
 
 Nothing adopted; main keeps `ra` 50 everywhere. The branch is kept, local.
+
+---
+
+## 8. Run means and throughput (2026-10-14, advisor review of §7)
+
+**The advisor's two objections** (summarized): the sealed station's subsoil (+36 / +36 / +33 %) does not
+fit "a snapshot inside a watering cycle" — same sign, same size at every value is a shift — and that
+cause was asserted, never tested; and §4's sunlit arithmetic assumed a canopy those chambers never
+reach (corrected in §4). Measure run means and the root zone's outflow on the branch before calling it.
+
+**The probe** (`zz_ra_probe.rs`, committed to the branch only; copy in `sources\temp-evidence\air-res-price\`):
+the crop's `Transpiration` flow wrapped in a recorder that sums its root-zone leg — the crop's
+transpiration **plus the soil's evaporation**, which leave the root zone together — and a per-step
+observer for the means (daily states for the sealed station). Line S. Every run wrapped exactly one flow,
+rationed 0. Log: `probe.txt`.
+
+**Outflow from the root zone, kg over the run** (change against unset):
+
+| build | unset | 30 | 15 | 9 |
+|---|---|---|---|---|
+| `sealed_station` (lamp, 4 yr) | 1860.6 | 2236.7 (**+20 %**) | 2858.8 (**+54 %**) | 3287.1 (**+77 %**) |
+| `sealed_chamber` (3 yr, never re-sown) | 563.5 | 649.2 (+15 %) | 648.3 (+15 %) | 668.2 (+19 %) |
+| `perennial_chamber` (5 yr) | 2095.0 | 2224.6 (+6 %) | 2383.7 (+14 %) | 2410.0 (+15 %) |
+| `consumer_chamber` (5 yr) | 1907.8 | 1990.9 (+4 %) | 2016.8 (+6 %) | 2097.9 (+10 %) |
+
+The sunlit chambers move far less than the arithmetic's ×1.3–1.55: their crop is small or dead much of
+the run, and the soil's evaporation — which does not read `ra` — is part of the outflow. The lamp-lit
+station, a closed canopy under a lamp, moves more than the §4 lamp column (×1.77 against ×1.60): its
+operating point is not TM's. Not decomposed further.
+
+**Run means** (change against unset):
+
+| build | soil 30 / 15 / 9 | subsoil 30 / 15 / 9 | condensate 30 / 15 / 9 |
+|---|---|---|---|
+| `sealed_station` | +0.2 / +0.7 / +2.4 % | **+5.7 / +10.6 / +24.7 %** | **−8.5 / −16.3 / −39.2 %** |
+| `perennial_chamber` | +3.7 / +2.3 / +3.4 % | −3.8 / −4.0 / −3.2 % | −3.2 / −0.8 / −3.1 % |
+| `consumer_chamber` | +1.2 / +1.7 / +2.3 % | −2.5 / +6.8 / +1.1 % | −0.2 / −6.6 / −3.9 % |
+| `sealed_chamber` | −16.4 / −2.1 / −16.7 % | +0.1 / +0.1 / +0.1 % | +36 / +4.6 / +37 % |
+
+**Graded, the cause first written in §7:**
+* **The re-sown chambers: the snapshot explanation holds.** Their run-mean soil moves 1–4 % where the end
+  states swung up to 72 %.
+* **The sealed station: it does not.** Water moves steadily out of the condensate and into the deep store,
+  growing with `1/ra` — the shift the advisor read from the subsoil. Its soil's end-state swing (+36 /
+  +18 / −17 %) is a snapshot (means +0.2 to +2.4 %). Why the condensate drains into the deep store is
+  **not established** (a lead, untested: more watering events, each overfilling the root zone into the
+  subsoil).
+* **The never-re-sown sealed chamber: neither.** Its means swing too (soil −16 / −2 / −17 %), so its split
+  between soil and condensate is sensitive to the value in a way a snapshot does not explain. Not
+  attributed.
+
+**What the price now says about size:** a chamber value would send +4 to +19 % more water through the
+sunlit sealed chambers and +20 to +77 % through the lamp-lit station, with the station's condensate store
+running down by up to 39 % on average. Carbon and every other quantity: unchanged (§7a P4), within what the
+model can see (§7d point 7).

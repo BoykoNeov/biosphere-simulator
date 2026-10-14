@@ -17,9 +17,15 @@ after Step 6's water gap (`post-roadmap-real-world-checks.md` §11–§12). Plan
   a pricing device and not an adoption shape): every cell moves exactly the predicted goldens, and
   **only water** — not one carbon, nitrogen, oxygen, energy or phenology leaf, even at 9. The watering
   keeps the soil above every stress threshold.
-* **Refuted:** "the end-state change grows with the value". The multi-year sealed runs end at different
-  points of a watering cycle, so their end states swing in sign (the sealed station's soil +36 %, +18 %,
-  −17 %). They show *that* water moves, not *how much*; the size is the arithmetic's ×1.16–1.73.
+* **Refuted:** "the end-state change grows with the value" — the multi-year end states swing in sign
+  (the sealed station's soil +36 %, +18 %, −17 %). Their first-written cause, "a snapshot inside a watering
+  cycle", was untested; measured on run means it holds for the re-sown chambers only. The lamp-lit station's
+  water moves steadily out of the condensate (−9 / −16 / −39 % on average) into the deep store (+6 / +11 /
+  +25 %), cause not established; the never-re-sown chamber's means swing too.
+* **The size, measured** (root-zone outflow over each run): +20 / +54 / +77 % through the lamp-lit station,
+  +4 to +19 % through the sunlit sealed chambers, whose crop is small or dead much of the time.
+* **What "water only" cannot see:** the model gives evaporation no heat and the dehumidifier no power
+  for what it condenses, so the energy side of this price is unmeasured, not zero.
 * **One behaviour red** at 9: the perennial chamber's below-root store settles in two re-sow cycles
   instead of one (still a cycle, not a ratchet). Two reds belong to the branch device; the rest are the
   goldens and their bands, as predicted.
@@ -28,5 +34,5 @@ after Step 6's water gap (`post-roadmap-real-world-checks.md` §11–§12). Plan
   value. Adopting any value needs a source or the user setting aside the WHAT-IF rule; the TM scorecard
   (an open build) sits outside both scopes.
 
-**Lesson:** an end state of a run with a watering cycle is a phase reading — size a water change by
-its throughput, not by a snapshot.
+**Lesson:** an end-state change is not the size of a change, and a cause written for it is a claim until a
+run tests it — the "watering cycle" explanation held for two builds and failed for two.
