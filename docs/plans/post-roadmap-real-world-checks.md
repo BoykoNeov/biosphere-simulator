@@ -733,3 +733,107 @@ model's air resistance for chambers would be a science item and an unfreeze.
 the 2026-10-10 entry) — correcting a contract's prose is the user's call. Every other line carrying the
 old figure is marked in place, the log index's status cell for this item included (⚠ the first
 version of this paragraph said that cell was gated to the log heading; only the row's FIRST cell is).
+
+---
+
+## 12. The water gap's two candidates, searched (2026-10-14, the user's pick: *"1"*, read-only)
+
+**The question.** §11 left two candidates, each closing the 20 m² gap alone: the canopy's air coupling
+(`ra` ≈ 8.8 s m⁻¹ instead of the uncited 50) or extra lamp heat (net radiation ×2.24 the lamp's PAR alone).
+They point different ways for the station: air coupling would carry over; the sodium lamps' heat would not.
+This item searches for a source that separates them. Nothing in the model, its tests, goldens or params moves.
+
+### 12a. What would count — stated before any source was read (advisor, 2026-10-14)
+
+| a source reporting… | air coupling (`ra` ≈ 8.8) | lamp heat (×2.24) |
+|---|---|---|
+| leaf (canopy) minus air temperature, best on the Phase IV crop itself | ≈ −0.3 K | ≈ +2 K |
+| lit vs dark water use | both rise; the dark share rises | only lit rises; the dark share falls (0.058 of W1 now) |
+| total radiation at the canopy, or the barrier's infrared transmission | — | needs ≈ 2.2× the PAR energy |
+| a canopy aerodynamic / boundary-layer conductance | needs ≈ 9 s m⁻¹ | — |
+
+**Air speed alone does not count** (§10d withdrew the 0.2–1.2 m s⁻¹ reading). The most a candidate can earn
+here is "not refuted" or "leans"; naming a cause needs a measurement on the Phase IV crop. Stop rule as §10c:
+the shelf, then NTRS for Prince et al. 1987, Sager et al. 1988, Prince & Knott 1989, then one search on the
+lamp barrier. Paywalled or blocked → recorded as blocked.
+
+### 12b. What was read
+
+Page numbers below are PDF pages.
+
+* **The shelf, read in full this time** (both TMs by text extraction, not page samples). Nothing new for
+  the Phase IV crop: TM 102788 records condensate **once a day** (*"Condensate tank volumes for both the
+  upper and lower air handling systems were recorded each day and then emptied"*, PDF p. 9), so **no
+  lit/dark split exists** in the trial's record; and it gives no canopy temperature. TM 103494 adds only
+  what §10d had (the ±1 °C, Phase II).
+* **NASA TM-2003-211184** — Wheeler et al. (2003), *Crop Production for Advanced Life Support Systems —
+  Observations From the Kennedy Space Center Breadboard Project* (NTRS 20030032422; US-Government work,
+  public domain; on the git-ignored shelf as `sources/wheeler_et_al_2003_TM2003-211184.pdf`):
+  * p. 14: *"Lamps were separated from the plants by clear glass or acrylic barriers."* — the barrier
+    material, which §10d had not found.
+  * p. 14: *"air circulation of about 400 m³ min⁻¹ provided by two 30-kilowatt (kW) fans"*; 96 × 400 W HPS
+    lamps on dimming ballasts, *"about 2 kW of input electrical power per m² of growing area"*.
+  * p. 30, p. 33 (Table 9): water use over a crop averaged 2–5 L m⁻² d⁻¹ (wheat 4.7), peaks 5–9 *"depending
+    on the species and the water vapor pressure deficit"*; p. 35: plotted against daily PAR, *"no clear
+    correlations existed; this was likely due to the more influential effects of different water vapor
+    pressure deficits (VPDs) among the different studies."*
+* **McCree (1984)**, *Crop Science* 24:816–819, doi 10.2135/cropsci1984.0011183x002400040043x — **the
+  abstract only** (via Crossref; the paper is paywalled; facts cited, not copied; the abstract text kept at
+  `sources/mccree_1984_abstract.txt`). Chambers with metal halide, high-pressure sodium and low-pressure
+  sodium lamps, some with glass or plastic barriers:
+  * PAR-to-shortwave (280–2800 nm) ratios *"generally at or above those found in natural sunlight (about
+    0.5)"* — the shortwave is at most ~2× the PAR energy;
+  * without a barrier (metal halide), PAR-to-total under half that, from the bulbs' and fixtures' thermal
+    radiation; *"Leaf temperatures were as much as 16 °C above air temperature."*;
+  * *"A plate glass barrier removed 75% of the thermal radiation, while transmitting 81% of the
+    photosynthetic radiation and 74% of the shortwave radiation. With the barrier, leaf temperatures were
+    close to air temperature."*; barriers *"essential"* with metal halide or HPS lamps.
+* NTRS 20190027336 (2019, a history of the chamber): restates the glass-or-acrylic barriers; nothing else.
+
+**Blocked:** Prince et al. 1987 (SAE 871437 — NTRS record 19880033873, no download); Sager et al. 1988 (ASAE
+88-4018 — not on NTRS); Prince & Knott 1989 (NTRS record 19910030115, no download); Bugbee, Monje & Tanner
+1996 (*Adv. Space Res.* 18:149 — sensors for canopy temperature and air velocity) and Monje & Bugbee 1996
+(*Acta Hort.* 440:123) — USU Digital Commons records with no file; McCree 1984's full text (paywalled).
+McCormack et al. 1994 (AIAA 94-4573, *"A method for modeling transpiration in CELSS"*) — not found on NTRS.
+
+### 12c. The lamp candidate, sized against McCree (the model's own constants)
+
+The model's lamp net radiation is `(1 − 0.23) · PAR / 4.57`: **80.9 W m⁻²** at 480 µmol. If every watt of
+the lamp's shortwave were absorbed at the same 0.23 albedo (generous: canopies reflect more of the near
+infrared than of PAR — general knowledge, not on a page here), McCree's ratios cap the shortwave reaching
+the canopy at **1.83×** the PAR energy (≤ 2× at the bulb, through a glass barrier passing 74 % of the
+shortwave and 81 % of the PAR) to **2.0×** (if his ratio was measured where the plants sat). So ×2.24 is
+**more than all the shortwave**: the remaining **19–33 W m⁻²** would have to be heat radiation from or
+through the barrier — the part McCree found a glass barrier cuts by 75 %, leaving leaves near air
+temperature. On the trays basis (×3.07) the remainder is **86–100 W m⁻²**.
+
+### 12d. Graded
+
+| criterion | what was found | reads toward |
+|---|---|---|
+| leaf − air temperature, Phase IV | **none** — TM 102788 gives no canopy temperature | — (blocked) |
+| leaf − air temperature, other | Phase II crop ±1 °C (TM 103494, §10d); McCree: with a glass barrier, leaves close to air | **leans against lamp heat alone** (+2 K predicted); does not separate air coupling from "lamp heat plus air coupling" |
+| lit vs dark water use | **none** — condensate logged daily | — (blocked by the record's design) |
+| total radiation / barrier IR | BPC: glass or acrylic barriers; McCree: shortwave ≤ ~2× PAR, glass removes 75 % of thermal | **strains lamp heat alone**: ×2.24 exceeds all the shortwave and needs 19–33 W m⁻² of residual heat radiation (§12c) |
+| canopy conductance | **none** — the two Bugbee/Monje papers that may hold one are blocked | — |
+| (not in the table) water use vs light vs VPD | TM-2003: no clear correlation with daily PAR; VPD *"likely"* more influential — across species and studies, the authors' inference | leans toward air coupling, weakly: a well-coupled canopy's water use follows VPD, a poorly coupled one's follows radiation (Penman–Monteith; the reading is ours) |
+
+**What this item says.**
+
+1. **Lamp heat alone is strained, not refuted.** By McCree's ratios the barrier-filtered shortwave cannot
+   supply ×2.24 on its own; it would need every shortwave watt absorbed and ~20–33 W m⁻² of heat radiation
+   besides, which a glass barrier is reported to cut to near-air leaf temperatures. McCree's chambers are
+   not the BPC, his HPS-specific numbers are not in the abstract, and the BPC's acrylic option is unread.
+2. **Air coupling is not refuted, and leans slightly ahead** — on the leaf temperatures and on the BPC's
+   water use tracking air dryness rather than light. But **no source gives the chamber's canopy air
+   resistance**; the papers that may (Bugbee/Monje 1996) are blocked.
+3. **The trial's own record cannot separate them**: it has neither a canopy temperature nor a lit/dark
+   water split. A cause can only be named from another source or another trial.
+4. **Most likely some of each** — some extra radiation through the barrier, a lower air resistance — which
+   the model can only represent by both. **Neither is named the cause.**
+
+**For the station:** if air coupling carries most of it, the station's lamp-lit chambers (which read the
+same uncited `ra` = 50 from `transpiration.yaml`) under-transpire too. Changing that value is a science
+item and an unfreeze — **not priced here; the user's call.** The next read that could decide it is one of
+the blocked Bugbee/Monje papers (a library copy), or Bugbee & Salisbury's chamber work if it reports canopy
+temperatures (unchecked).

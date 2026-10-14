@@ -116,3 +116,17 @@ it. The one leaf-temperature reading on the shelf (±1 °C, an earlier crop) lea
 which, unlike the sodium lamps' heat, would carry over to the station. Neither is named the cause. On the
 trays basis neither is plausible alone. The air resistance (uncited, one value for every build) is what the
 station reads too. Nothing in the model moved.
+
+**The two candidates, searched (plan §12, 2026-10-14, the user's pick, read-only).** What would count was
+written down before any source was read; air speed alone was ruled out as evidence. The trial's own record
+cannot separate the two: it logs condensate once a day (no lit/dark split) and gives no canopy temperature.
+NASA TM-2003-211184 (public domain) says the BPC's lamps sat behind clear glass or acrylic barriers, with
+~400 m³ min⁻¹ of circulation, and that its crops' water use tracked air dryness more than light (the authors'
+"likely"). McCree 1984 (*Crop Sci.*; abstract only, paywalled) measured HID-lit chambers: shortwave at most
+~2× the PAR energy; a glass barrier removed 75 % of the heat radiation and left leaves near air temperature.
+So **lamp heat alone is strained, not refuted**: ×2.24 is more than all the barrier-filtered shortwave
+(1.83–2.0× even at the model's albedo), needing 19–33 W m⁻² of heat radiation besides. **Air coupling is
+not refuted and leans slightly ahead**, but no source gives the chamber's canopy air resistance; the two
+papers that may (Bugbee, Monje & Tanner 1996; Monje & Bugbee 1996) are blocked, as are the BPC design papers
+(Prince et al. 1987, Sager et al. 1988, Prince & Knott 1989). Most likely some of each. **Neither is named
+the cause.** Changing the model's air resistance would be a science item and an unfreeze — not priced.
