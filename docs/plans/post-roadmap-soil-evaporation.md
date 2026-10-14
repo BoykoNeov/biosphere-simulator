@@ -1332,7 +1332,7 @@ instrument it re-measures". The Python figure describes a model before these for
 the window's premise is gone; a re-anchoring is owed if this check is to mean "the same dynamics" again.
 
 **The real-world check, read after the switch** (`station/tests/scorecard_tm102788.rs`, TM 102788 at
-812 ppm): water use over TM days 25–80 **2.38 → 2.60 L m⁻² d⁻¹, 0.40 → 0.43 of the trial's ~6.0**;
+812 ppm): water use over TM days 25–80 **2.38 → 2.60 L m⁻² d⁻¹, 0.40 → 0.43 of the trial's ~6.0** (⚠ 2026-10-14: ~6.0 was the trial's PEAK; its level is 4.17, so 0.62 — `post-roadmap-real-world-checks.md` §11);
 mean water use 0.61 of the trial's; peak daytime uptake unchanged at 0.979. The leaf-area resistance
 lets the dense canopy transpire a little more (rs 70 → 50 s/m at full cover); the gap is mostly still
 there. (The scorecard's row is a nutrient-solution crop held above the stress threshold, so the soil's

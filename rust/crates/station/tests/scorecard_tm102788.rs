@@ -58,6 +58,14 @@ const RH: f64 = 0.81;
 /// CO₂ in the light: mean 1160 ppm (the row); the 1000 ppm setpoint (the sensitivity) (p. 5).
 const CA_ROW: f64 = 1160.0;
 const CA_SETPOINT: f64 = 1000.0;
+/// Transpiration over TM days 25–80, L m⁻² d⁻¹: the mean of Fig. 10's 19 "condensate produced"
+/// points on those days (p. 27; condensate "directly related to water transpired" after day 12,
+/// p. 12), 83.3 L day⁻¹ over the TM's own 20 m² stand. Read off the page image at 200 dpi, ±~3 L
+/// day⁻¹ a point (plan §11). ⚠ Until 2026-10-14 this row divided by 6.0 — the text's PEAK, "120 L
+/// day⁻¹ near 25 days" (p. 12) — while averaging the model over the whole window.
+const TM_W1_LEVEL: f64 = 4.17;
+/// The same 83.3 L day⁻¹ on the 16 m² of trays (p. 2) — the other area basis, printed, not chosen.
+const TM_W1_TRAYS: f64 = 5.21;
 /// µmol m⁻² s⁻¹ from mol per step over the model's ground area.
 const STEP_SECONDS: f64 = BIO_DT * 86_400.0;
 
@@ -335,17 +343,18 @@ fn scorecard() {
         ("N1 night respiration, TM day 20", night_20, 13.0, "rate"),
         ("N1 night respiration, season mean", night_mean, 7.2, "rate"),
         ("N2 night resp. 20 °C / 16 °C (day 33 / 34)", n2, 1.65, "rate"),
-        ("W1 transpiration, days 25–80 (L m⁻² d⁻¹)", w1, 6.0, "rate"),
+        ("W1 transpiration, days 25–80 (L m⁻² d⁻¹)", w1, TM_W1_LEVEL, "rate"),
         ("U2 mean daytime net uptake, days 10–84", u2, 15.0, "total"),
         ("C1 net C fixed, days 10–84 (mol C m⁻²)", c1, 73.1, "total"),
         ("B1 plant C at day 86, roots in (mol C m⁻²)", b1, 66.7, "total"),
         ("B1 plant C at day 86, roots out", b1_shoot, 66.7, "total"),
-        ("W2 mean transpiration (L m⁻² d⁻¹)", w2, 4.5, "TOTAL (leaf-blind)"),
+        ("W2 mean transpiration (L m⁻² d⁻¹)", w2, 4.5, "total"),
     ];
     eprintln!("\nTM 102788 scorecard (ci = {:.0} ppm):", scenario(CA_ROW).ci);
     for (name, model, tm, kind) in rows {
         eprintln!("  {name:<48} model {model:>9.4}  TM {tm:>6.2}  ratio {:>7.4}  [{kind}]", model / tm);
     }
+    eprintln!("  W1 on the 16 m² of trays: TM {TM_W1_TRAYS:.2}, ratio {:.4}", w1 / TM_W1_TRAYS);
     eprintln!("  U1 peak on TM day {peak_day}");
     eprintln!(
         "  S1 C1 at ci {:.0} / ci {:.0}: {:.4}",
@@ -413,15 +422,22 @@ fn transpiration_params() -> (f64, f64) {
     (p.transp.aerodynamic_resistance, p.transp.surface_resistance)
 }
 
-/// A1 — airflow alone cannot close the gap: with the air resistance near 0, full-cover water use
-/// tops out below the trial's ~6 L m⁻² d⁻¹ at the frozen surface resistance.
+/// A1 — at the CONSTANT surface resistance (the file's 70 s m⁻¹, a lab switch since the water-forms
+/// adoption of 2026-10-10) airflow alone cannot close the gap: with the air resistance near 0,
+/// full-cover water use tops out below the trial's level.
+///
+/// ⚠ Scoped to the constant form. Under the ADOPTED leaf-area form the ceiling is above the trial
+/// (plan §11; printed by `the_gap_resized_at_the_adopted_form`). The target was the 6.0 peak until
+/// 2026-10-14; at the corrected level the claim still holds, with less room (3.95 against 4.17).
 #[test]
-fn airflow_alone_cannot_reach_the_trials_water_use() {
+fn airflow_alone_cannot_reach_the_trials_water_use_at_the_constant_resistance() {
     let (ra, rs) = transpiration_params();
     let frozen = w1_by_hand(ra, rs, 1.0);
     let limit = w1_by_hand(1e-6, rs, 1.0);
-    eprintln!("A1: W1 at the frozen ra {ra} = {frozen:.4}; as ra -> 0: {limit:.4} L m⁻² d⁻¹ (TM ~6.0)");
-    assert!(limit < 6.0, "infinite airflow would close the gap: {limit}");
+    eprintln!(
+        "A1 (constant rs {rs}): W1 at ra {ra} = {frozen:.4}; as ra -> 0: {limit:.4} L m⁻² d⁻¹ (TM {TM_W1_LEVEL})"
+    );
+    assert!(limit < TM_W1_LEVEL, "infinite airflow would close the gap: {limit}");
 }
 
 /// R1 — a WHAT-IF air resistance reaches `Transpiration`: the run's W1 equals Penman–Monteith on
@@ -504,7 +520,8 @@ fn the_surface_resistance_a_full_canopy_would_have() {
     );
     eprintln!(
         "§10e: mean LAI over TM days 25–80 {lai:.3}; FAO-form rs {rs_fao:.2} s m⁻¹ (frozen {rs}); \
-         W1 at ra {ra}: {:.4} (frozen rs: {:.4}); at that rs as ra -> 0: {:.4} (TM ~6.0)",
+         W1 at ra {ra}: {:.4} (frozen rs: {:.4}); at that rs as ra -> 0: {:.4} (TM {TM_W1_LEVEL}; \
+         6.0 until 2026-10-14, the peak)",
         w1_by_hand(ra, rs_fao, 1.0),
         w1_by_hand(ra, rs, 1.0),
         w1_by_hand(1e-6, rs_fao, 1.0)
@@ -557,4 +574,98 @@ fn the_rows_water_curve_under_the_canopy_resistance_forms() {
         println!("   LAI on those days: {}", lai.join(" "));
     }
     println!("TM Fig. 10 water added / ~85 (its days 25–80 level): 5:0.21 8:0.47 11:0.71 14:1.18 26:1.29 40–80: 0.82–1.06 83:0.67");
+}
+
+// --- the water gap, re-sized (plan §11) — printed, never asserted ------------------------------
+
+/// `ρ·cp` of the model's Penman–Monteith (`science.rs`: 1.205 kg m⁻³ × 1013 J kg⁻¹ K⁻¹), for the
+/// leaf-over-air temperature `ΔT = H·ra/(ρ·cp)` the energy balance leaves.
+const RHO_CP: f64 = 1.205 * 1013.0;
+/// The model's latent heat, J kg⁻¹ (`science.rs`).
+const LAMBDA: f64 = 2.45e6;
+
+/// The `x` in `[lo, hi]` where `f(x) = target`, for `f` monotone on the interval.
+fn solve(f: impl Fn(f64) -> f64, target: f64, mut lo: f64, mut hi: f64) -> f64 {
+    let rising = f(hi) > f(lo);
+    for _ in 0..200 {
+        let mid = 0.5 * (lo + hi);
+        if (f(mid) < target) == rising {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
+/// Mean leaf-over-air temperature on the fully lit steps of TM days 25–80, K: the net radiation
+/// Penman–Monteith does not put into evaporation is sensible heat, `H = Rn − λE`.
+fn leaf_over_air(ra: f64, rs: f64, rn_scale: f64) -> f64 {
+    mean(W1_DAYS.flat_map(|d| {
+        let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
+        (first..first + STEPS_PER_DAY as u64).filter(|&n| lit(n, BIO_DT) == 1.0)
+    })
+    .map(|n| {
+        let t = temp(n, BIO_DT);
+        let rn = rn_scale * lamp_net_radiation(par_on(n));
+        let vpd = saturation_vapor_pressure(t) * (1.0 - RH);
+        let le = science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * LAMBDA / 86_400.0;
+        (rn - le) * ra / RHO_CP
+    }))
+}
+
+/// Plan §11 (Q1–Q6): every §10 argument re-sized at the trial's corrected level AND the adopted
+/// surface-resistance form. The by-hand path gives the whole net radiation to the canopy; Q2 checks
+/// it against the model's own W1 before anything else is read from it.
+#[test]
+fn the_gap_resized_at_the_adopted_form() {
+    let r = run(CA_ROW);
+    let model = mean(W1_DAYS.map(|d| daily_water(&r, d)));
+    let tp = params::biosphere().transp;
+    let sla = params::biosphere().canopy.sla_per_mol_c;
+    let lai = mean(W1_DAYS.map(|d| {
+        let s = &r.states[(d - TM_DAY0) * STEPS_PER_DAY];
+        science::leaf_area_index(s.stocks[LEAF_C].amount, sla, DEFAULT_SCENARIO.ground_area)
+    }));
+    let rs = science::canopy_surface_resistance(
+        tp.rs_form,
+        tp.surface_resistance,
+        lai,
+        tp.leaf_stomatal_resistance,
+        tp.threshold_lai,
+    );
+    let ra = tp.aerodynamic_resistance;
+    let hand = w1_by_hand(ra, rs, 1.0);
+    let ceiling = w1_by_hand(1e-6, rs, 1.0);
+    let ra_needed = solve(|x| w1_by_hand(x, rs, 1.0), TM_W1_LEVEL, 0.1, ra);
+    let rn_needed = solve(|x| w1_by_hand(ra, rs, x), TM_W1_LEVEL, 1.0, 10.0);
+    eprintln!("§11 ({:?}, mean LAI {lai:.3}: rs {rs:.2} s m⁻¹; ra {ra})", tp.rs_form);
+    eprintln!(
+        "  Q1 W1 model {model:.4}: / {TM_W1_LEVEL} = {:.4}; / {TM_W1_TRAYS} = {:.4}",
+        model / TM_W1_LEVEL,
+        model / TM_W1_TRAYS
+    );
+    eprintln!("  Q2 W1 by hand {hand:.4} (model / hand {:.4})", model / hand);
+    eprintln!("  Q3 airflow ceiling (ra -> 0): {ceiling:.4}");
+    eprintln!(
+        "  Q4 ra for {TM_W1_LEVEL} (lamp PAR-only): {ra_needed:.3} s m⁻¹ (W1 {:.4})",
+        w1_by_hand(ra_needed, rs, 1.0)
+    );
+    eprintln!(
+        "  Q5 net radiation for {TM_W1_LEVEL} at ra {ra}: x{rn_needed:.3} (W1 {:.4})",
+        w1_by_hand(ra, rs, rn_needed)
+    );
+    eprintln!(
+        "  Q6 leaf over air, lit steps: as is {:+.3} K; Q4 case {:+.3} K; Q5 case {:+.3} K",
+        leaf_over_air(ra, rs, 1.0),
+        leaf_over_air(ra_needed, rs, 1.0),
+        leaf_over_air(ra, rs, rn_needed)
+    );
+    let ra_trays = solve(|x| w1_by_hand(x, rs, 1.0), TM_W1_TRAYS, 0.1, ra);
+    let rn_trays = solve(|x| w1_by_hand(ra, rs, x), TM_W1_TRAYS, 1.0, 10.0);
+    eprintln!(
+        "  on the trays basis ({TM_W1_TRAYS}): ra {ra_trays:.3} ({:+.3} K); net radiation x{rn_trays:.3} ({:+.3} K)",
+        leaf_over_air(ra_trays, rs, 1.0),
+        leaf_over_air(ra, rs, rn_trays)
+    );
 }

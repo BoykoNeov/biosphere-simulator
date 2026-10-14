@@ -167,8 +167,9 @@ switches. The cross-port bands for the ten moved goldens are read on Linux CI.
 last-digit sensitivity 9× Windows, 1.4 % past a window around the retired Python figure; the band itself
 held). The user: *"I don't care about Linux, drop its tests if needed"* — that one check runs on Windows
 only now; why Linux reads higher was not measured. **The real-world check:** TM 102788's water use went
-0.40 → 0.43 of the trial's; carbon uptake unchanged. **Live gap:** the separate-air option's own watering
-does not feed the soil's top-layer account (fix offered).
+0.40 → 0.43 of the trial's (⚠ 2026-10-14: 0.62 against the trial's level, not its peak —
+`post-roadmap-real-world-checks.md` §11); carbon uptake unchanged. **Live gap:** the separate-air option's own
+watering does not feed the soil's top-layer account (fix offered).
 Linux CI green on `a5332e8`, the moved goldens' bands included.
 
 **The separate-air gap closed (plan §17, 2026-10-10).** The soil's top-layer account now counts every flow

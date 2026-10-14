@@ -71,6 +71,9 @@ trial's chamber. A diagnostic: it asserts its instrument and prints the scorecar
   in the plant and **30.4 was shed** to litter. Standing plant carbon at day 86: **0.93× with roots,
   0.68× without** — the TM does not say whether its 40 kg includes roots.
 * Water at full cover **0.40**, below as predicted against the advisor's guess. **Cause untested.**
+  ⚠ *2026-10-14 (plan §11 of `post-roadmap-real-world-checks.md`):* the trial figure behind this was its PEAK
+  (120 L day⁻¹ ÷ 20 m² = 6.0); Fig. 10's level over TM days 25–80 is **4.17** (5.21 on the trays alone), so the
+  row reads **0.62** (0.50), the old 0.40 / 0.43 → 0.62.
   Two candidates: the model's lamp heats the crop with its PAR only (the BPC's sodium lamps
   radiate far more), and the frozen air/surface resistances are outdoor-grass values (the BPC blew
   air hard). Sized: 6 L m⁻² d⁻¹ would need ~4× the lamp's net radiation at these resistances.
@@ -84,7 +87,8 @@ the model's water use feeds nothing back while the soil is wet, so arithmetic si
 candidates, sources judge them, and one WHAT-IF run checks only the instrument and the coupling.
 
 * At the frozen surface resistance (70 s/m, uncited) airflow alone cannot close it: infinite
-  airflow tops out at 3.95 L m⁻² d⁻¹ against ~6.0.
+  airflow tops out at 3.95 L m⁻² d⁻¹ against ~6.0. (⚠ 2026-10-14: against the corrected 4.17 it still
+  holds at 70 s/m; under the adopted leaf-area resistance the ceiling is 5.53, ABOVE it — plan §11.)
 * 4.2× the lamp's net radiation reproduces 6.05 L; carbon bit-identical; the soil stays wet.
 * ⚠ **Corrected the same day (plan §10e; commit `bb79817` recorded a wrong reading).** At ×4.2 the
   model's leaf would sit ~5.8 K above the air; TM 103494's earlier crop had shoots within ±1 °C of
@@ -100,3 +104,14 @@ candidates, sources judge them, and one WHAT-IF run checks only the instrument a
   infrared share given).
 * ⚠ *Later 2026-10-07:* FAO-56 was then read first-hand (`log/canopy-resistance.md`): Eq. 5 is
   scoped to dense full cover, so its use here at the model's full-cover LAI 6.2 is within scope.
+
+**The water gap, re-sized (plan §11, 2026-10-14, the user's pick, read-only).** The row had divided the
+model's full-cover average by the trial's PEAK day (120 L day⁻¹, 6.0 L m⁻² d⁻¹). Fig. 10, digitized
+(19 condensate points, TM days 25–80), puts the level at **4.17 L m⁻² d⁻¹** on the trial's 20 m² (5.21 on
+its trays): the model is at **0.62** of the trial (0.50), matching the season-mean row's 0.61. Re-sized
+under the adopted leaf-area resistance (50 s m⁻¹ at full cover), every prediction held: airflow alone
+can now close the gap (ceiling 5.53), at an air resistance of ~9 s m⁻¹ instead of the field value 50,
+with the leaves 0.3 K below the air; or lamp heat ×2.24 the lamp's light alone, with the leaves 2 K
+above it. The one leaf-temperature reading on the shelf (±1 °C, an earlier crop) leans toward the air
+coupling, which, unlike the sodium lamps' heat, would carry over to the station. Neither is named the
+cause. Nothing in the model moved.

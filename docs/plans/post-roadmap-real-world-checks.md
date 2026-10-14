@@ -392,7 +392,7 @@ condition or parameter was changed. The draft's printed numbers are not scores a
 | N1 night respiration, TM day 20 | 1.93 | ~13 | 0.149 | rate |
 | N1 night respiration, season mean | 3.44 | 7.2 | 0.478 | rate |
 | N2 night respiration 20 °C / 16 °C (day 33 / 34) | 1.294 | 1.65 (Fig. 5, 5 weeks) | 0.784 | rate |
-| W1 transpiration, TM days 25–80 (L m⁻² d⁻¹) | 2.376 | ~6.0 (peak; then roughly constant) | 0.396 | rate |
+| W1 transpiration, TM days 25–80 (L m⁻² d⁻¹) | 2.376 | ~6.0 (peak; then roughly constant) — ⚠ the PEAK; the level is 4.17 (§11) | 0.396 (0.570 at the level) | rate |
 | U2 mean daytime net uptake, days 10–84 | 17.33 | 15 | 1.156 | total |
 | C1 net carbon fixed, days 10–84 (mol C m⁻²) | 90.26 | 73.1 | 1.235 | total |
 | B1 plant carbon, TM day 86, roots in (mol C m⁻²) | 62.01 | 66.7 (CH₂O basis; 75 at 45 % C) | 0.930 (0.83) | total |
@@ -493,7 +493,9 @@ a surviving candidate earns.
 ### 10b. The arithmetic (the model's own constants)
 
 `ρcp` = 1.205 × 1013 = 1220.7 J m⁻³ K⁻¹; `γ` = 67 Pa K⁻¹; frozen `ra` = 50, `rs` = 70 s m⁻¹; VPD =
-es(T) × 0.19 = 444 Pa at 20 °C, 345 Pa at 16 °C. The trial's full-cover 6.0 L m⁻² d⁻¹ is a daily
+es(T) × 0.19 = 444 Pa at 20 °C, 345 Pa at 16 °C. (⚠ 2026-10-14: every size in this section is for 6.0, the
+trial's PEAK, and the constant `rs` 70; §11 re-sizes them at the level, 4.17, and the adopted form.)
+The trial's full-cover 6.0 L m⁻² d⁻¹ is a daily
 mean latent flux of ~170 W m⁻²; with the dark hours at their own rate it needs **~198 W m⁻² while
 lit**.
 
@@ -620,3 +622,107 @@ the "general knowledge, not read on a page" caveat in point 3 is discharged.
 **Not done, the user's call:** pricing a leaf-area-dependent canopy resistance as a science item (lab
 first; adopting it would be an unfreeze). Whether the station's own lamp has the same gap is not
 measured here — this row is an HPS chamber.
+
+---
+
+## 11. The water gap, re-sized (2026-10-14, the user's pick: *"1"*, the water gap, read-only)
+
+**Found before any new run: the row's trial figure was the PEAK, not the level.** W1 averages the
+model over TM days 25–80 and divided by **6.0 L m⁻² d⁻¹** — the text's *peak*, 120 L day⁻¹ "near 25
+days" ÷ 20 m² (p. 12). The level over those days is on Fig. 10 (p. 27). The canopy-resistance plan
+(§7a there) had already normalised that figure's shape by "~85" while labelling the level "~6.0".
+
+**Fig. 10 digitized** (the page rendered at 200 dpi; filled "condensate produced" markers found as the
+blobs that survive a 5-px disc erosion; axes calibrated on the plot frame, 0–100 days by 0–150 L day⁻¹;
+the legend's own marker and a 1-px speck dropped; reading error ~±3 L day⁻¹ per point). Condensate,
+not "water added": the TM says condensate "directly related to water transpired" after day 12 (p. 12).
+Script and image: `W:\temp\claude\water-gap\fig\` (to be kept at `sources\temp-evidence\water-gap\`).
+
+| TM day | 25.9 | 29.1 | 31.8 | 35.0 | 38.3 | 41.0 | 44.3 | 47.0 | 50.2 | 53.3 | 56.0 | 59.1 | 61.9 | 65.0 | 68.2 | 71.0 | 74.2 | 76.9 | 80.0 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| L day⁻¹ | 95.2 | 97.0 | 81.6 | 86.1 | 91.3 | 91.3 | 79.8 | 74.1 | 73.0 | 76.0 | 81.3 | 86.7 | 87.6 | 81.0 | 88.1 | 86.6 | 75.9 | 74.1 | 76.6 |
+
+Mean of the 19: **83.3 L day⁻¹ = 4.17 L m⁻² d⁻¹** on the TM's own 20 m² (the stand with the gaps
+between trays, p. 2 and p. 13), **5.21** on the 16 m² of trays. Neither basis is chosen; 20 m² is the
+row's, as it is the TM's for its own 4.5 average. Cross-check: the digitized points from day 11 on
+average 83.7 L day⁻¹ where the text says "about 90" — the points read ~7 % under the text (a sampled
+curve against a daily mean, or reading error); the corrected level could be ~4.2–4.5.
+
+**Advisor (2026-10-14), summarized:** report this first; digitize condensate with an error; use the
+model's season-mean row (W2, model 2.735 against the TM's own 4.5 = 0.61, already like-for-like) as the
+control; give both area bases; re-size every §10 argument at the corrected target AND the adopted
+surface-resistance form (Szeicz–Long, `rs` = 100 / min(LAI, 2) = 50 s m⁻¹ at full cover, adopted
+2026-10-10) with predictions first — the airflow ceiling may now exceed the target, which would flip
+§10's "airflow alone cannot close it"; strike the stale 0.40/0.43 figures in place.
+
+**Side note offered to the user mid-work (2026-10-14), recorded:** the trial's high-pressure sodium
+lamps radiate far more heat than light; if the gap is closed with lamp heat, the model may match that
+one chamber and get the station's own lamp wrong. Ask which part of the gap is the trial's lamp type
+and which is the model. This item changes nothing in the model.
+
+### 11a. Predictions (hand arithmetic with the model's own constants, written before the code)
+
+Operating point at full cover, 480 µmol, 20 °C lit: lamp net radiation 81 W m⁻², VPD 444 Pa, Δ ≈ 145
+Pa K⁻¹, `ra` 50, `rs` 50. Lit λE ≈ (145·81 + 1220.7·444/50)/(145 + 67·2) ≈ 81 W m⁻²; dark ≈ 39. Daily ≈
+2.61 L m⁻² d⁻¹ — the model's 2.603 (so at full cover the leaf already sits at air temperature).
+
+| | prediction | confidence |
+|---|---|---|
+| Q1 | W1 = 2.603 / 4.17 = **0.62** (20 m²), **0.50** (16 m²); close to the control W2 = 0.61 | high (arithmetic) |
+| Q2 | by hand at the adopted full-cover `rs` (mean LAI 6.2 → 50) and `ra` 50, Penman–Monteith on the forcings gives W1 within 2 % of the model's 2.603 (the residual is the soil's share of the energy and its evaporation) | high |
+| Q3 | **the airflow ceiling flips:** as `ra → 0` the flux tends to `ρcp·VPD/(γ·rs)`, independent of radiation: ~162 W m⁻² at 20 °C, ~126 at 16 °C → W1 ceiling **5.3–5.7**, ABOVE 4.17 (and above 5.21) | high |
+| Q4 | air coupling alone, lamp PAR-only: the `ra` that gives W1 = 4.17 is **6–12 s m⁻¹** (hand: ~8–9) | medium |
+| Q5 | lamp heat alone at `ra` 50: net radiation **×2.2–2.4** of the PAR-only figure gives 4.17 (§10's ×4.2 was for 6.0 at `rs` 70) | medium |
+| Q6 | leaf over air, lit steps, mean over days 25–80: Q5's case **+1.7 to +2.4 K**; Q4's case **−0.2 to −0.6 K** (the leaf cooler than the air); the row as is ~0 K | medium |
+| Q7 | so on the one leaf-temperature reading on the shelf (TM 103494, Phase II crop: shoots within ±1 °C of the air) the air-coupling case fits and the lamp-heat case sits outside it — still a different crop and area basis, so neither is named the cause | — |
+
+What would refute: Q2 off by more than 2 % means the instrument's by-hand path does not describe the
+adopted flow and Q3–Q6 must be re-derived from the model, not the formula.
+
+### 11b. Measured (2026-10-14) — graded
+
+`scorecard_tm102788.rs`: the W1 row now divides by `TM_W1_LEVEL` = 4.17 (and prints the trays basis);
+A1 is renamed to say it is about the constant resistance and checks against the level; a new printed
+test, `the_gap_resized_at_the_adopted_form`, carries Q1–Q6. Nothing in the model changed; no golden,
+manifest or param moved. Log `W:\temp\claude\water-gap\resize.txt` (kept at
+`sources\temp-evidence\water-gap\`).
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| Q1 | 0.62 (20 m²), 0.50 (16 m²); near W2's 0.61 | **0.6241**, **0.4996**; W2 0.6078 | HELD |
+| Q2 | by hand within 2 % of the model | 2.6067 against 2.6027 (0.15 %) | HELD |
+| Q3 | airflow ceiling 5.3–5.7, above 4.17 | **5.528** | HELD — §10's "airflow alone cannot close it" holds only at the constant 70 s m⁻¹ |
+| Q4 | `ra` 6–12 s m⁻¹ | **8.76** | HELD |
+| Q5 | net radiation ×2.2–2.4 | **×2.24** | HELD |
+| Q6 | lamp heat +1.7 to +2.4 K; air coupling −0.2 to −0.6 K; as is ~0 | **+2.06 K**; **−0.30 K**; +0.04 K | HELD |
+
+On the trays basis (5.21) the same two candidates need `ra` 1.45 s m⁻¹ (leaf −0.08 K) or net radiation
+×3.07 (leaf +3.4 K).
+
+**What the row now says.**
+
+1. **The model's crop drinks about 0.6 of the trial's water at full cover, not 0.4.** The gap was over-
+   stated by reading the trial's best day as its typical day. The full-cover rate (0.62) and the season
+   mean (0.61) now agree.
+2. **Two candidates each close what is left, alone**, and they point different ways for the station:
+   * **Air coupling** (a model property): the model's air resistance is 50 s m⁻¹, a value for wind over a
+     field. The trial's level needs ~9. A chamber fan pushing air through a dense canopy could plausibly
+     give a much lower value, but no source on the shelf gives one. If this is the cause, the station's
+     chambers carry the same gap, whatever their lamp.
+   * **Lamp heat** (the trial's lamp type): ×2.24 the heat of the lamp's light alone. High-pressure sodium
+     lamps radiate a lot outside the visible band; how much reached this canopy through the lamp
+     barriers is not on the shelf. If this is the cause, it belongs to the trial's lamps, and an LED-lit
+     station would not share it — matching it in the model would be the error the side note warns of.
+3. **The one temperature reading leans toward air coupling.** Under lamp heat alone the leaves would
+   run ~2 K above the air; under air coupling ~0.3 K below. TM 103494's earlier crop in the same
+   chamber had shoots within ±1 °C of the air. That crop had other conditions and another area basis,
+   so this leans, it does not decide. **Neither is named the cause.**
+
+**What would separate them (the user's call):** a source for the chamber's canopy air resistance or its
+leaf-to-air coupling (the BPC design papers named in §10c: Prince et al. 1987, Sager et al. 1988), or
+one for the radiant heat that crossed the lamp barriers. Either is a read, not a build. Changing the
+model's air resistance for chambers would be a science item and an unfreeze.
+
+**Left unedited on purpose:** the 0.40 / 0.43 in the frozen contract's prose (`docs/station-reference.md`,
+the 2026-10-10 entry) and in the log index's row for this item (a gate makes it equal the log file's
+heading). The log file's body and every plan line carrying the old figure are marked in place.
