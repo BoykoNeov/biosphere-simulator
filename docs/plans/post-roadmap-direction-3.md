@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `chamber-dehumidifier.md`
+**Re-read against the record's last row:** `chamber-air-resistance.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -536,6 +536,13 @@ saturation item's history above ("the condenser alone could not" bound the air),
 touch: the excess over the setting is still removed whole. The plan never carried the below-setting
 draw as an item (it was recorded only in `water_cycle.yaml`), so this discharges nothing and adds
 nothing to §2 or §3.
+⚠ *Re-read 2026-10-14* (`log/chamber-air-resistance.md`, PRICED on a local branch, nothing adopted):
+grepped this plan for aerodynamic, Penman, transpiration, resistance, condensate and re-sow. The plan
+carries no air-resistance item, so this discharges nothing and is not a re-proposal of a §3 row. It
+bears on the vapour item's "would not notice" below only as more evidence in the same direction: at up
+to ×1.6 the chambers' transpiration, watering still keeps every crop above its stress thresholds and no
+carbon moves. Nothing added to §2 or §3; the value it would need has no source (the record's own open
+question, not this plan's).
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

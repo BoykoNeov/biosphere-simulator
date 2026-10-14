@@ -92,3 +92,88 @@ scenario builders) and a pricing hook in `transpiration_flow` that reads two env
 `PRICE_RA_SCOPE` (`lamp` | `sealed`) and `PRICE_RA_VALUE` — so one build prices all six cells. An
 environment read is NOT an adoption shape (parameters are data); it exists only so the price runs
 without six recompiles. Logs: `W:\temp\claude\air-res-price\`.
+
+---
+
+## 7. The price, measured on the local branch (2026-10-14) — graded
+
+Branch `wip/chamber-ra-price` (local, never pushed; commit `101aa1a` on top of `d82cf12`). Each cell:
+`regen_goldens -- --write` with the two variables set, the 20 files copied to
+`W:\temp\claude\air-res-price\<cell>\`, then `rust/data/golden` restored from git (the tree was clean
+after the seventh cell). Per-leaf comparison against the branch's own unset run: `diff.py` → `diff.txt`
+in the same folder. Suites at `ra` 9: the full debug suite `--no-fail-fast` for each line, and `--ignored
+--release` for Line S.
+
+### 7a. The predictions, graded
+
+| | predicted | measured | grade |
+|---|---|---|---|
+| P1 | unset: 20 of 20 identical | **0 rewritten** | HELD |
+| P2 | Line L: exactly `lighting` and `sealed_station` | **2 rewritten**, those two, at 30, 15 and 9 | HELD |
+| P3 | Line S: those two plus the seven sunlit sealed builds; the other eleven identical | **9 rewritten**, the predicted nine, at every value | HELD |
+| P4 | water only, everywhere | **held bit for bit**: in all 6 cells the only leaves that differ are water stocks (soil, subsoil, condensate) and the soil account's water aux (`top_soil_water`, `soil_evap_today`, `soil_dry_days`). No carbon, nitrogen, oxygen, energy, `thermal_time`, `rooted_depth`, `vernalization_days` or `soil_shade_lai` leaf moves. Even at 9 no build's watering falls behind | HELD |
+| P5 | the size grows with `1/ra`, same sign | held for the three short runs (`lighting` −0.08 / −0.14 / −0.17 % soil; `greenhouse`, `harvest` likewise). **Refuted for every multi-year sealed run**: the end state is a snapshot inside a watering cycle, so it swings with sign changes — the sealed station's soil +36 % at 30, +18 % at 15, −17 % at 9; the perennial long horizon's condensate −25 %, +5 %, −75 % | REFUTED (for snapshots of long runs) |
+| P6 | reds by design: the goldens' regression and band checks; manifest byte gates green | domains + station `golden_regression`, both `tier_contract` checks (cheap and the `--ignored` expensive) red; **manifest byte gates green** | HELD |
+| P7 | possibly red: water-pinning sealed / lamp tests | **none of them** (chamber dryness, vapour, dehumidifier, watering, minute-step, separate air, lamp shed all green). Red instead: the re-sow cycle test (7b) and the canopy-resistance instrument (7c) | none fired as listed |
+| P8 | green: the TM scorecard, carbon / energy / gas, `drought_window`, the laws | green | HELD |
+| P9 | Line L's reds ⊆ Line S's | L: station golden + band, plus the two branch artifacts (7c) — all in S's list | HELD |
+
+Suite at 9, Line S: 8 red (83 binaries green). Line L: 4 red. `--ignored`, Line S: the sealed station's
+golden and band red, every other slow test green.
+
+### 7b. The one behaviour red: the re-sow cycle settles in two cycles, not one
+
+`the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years` (Line S, 9): the perennial chamber's
+below-root store at each cycle's start reads **167.904, 167.582, 167.582 (−4.7e-10), 167.582 (−1.2e-12)**.
+The test asks every cycle after the first to sit within 1e-12 of the second; the third is 4.7e-10 away.
+So it still converges — by ~400× a cycle — and the frozen claim "one transient cycle, then a fixed point
+to round-off" becomes "two cycles". Not run at 30 or 15.
+
+### 7c. Two reds belong to the branch, not to the price
+
+* `scenario_flag_types::the_toggle_roster_is_every_bool_field_of_the_scenario` — the branch's new
+  `lamp_lit` bool is not on the roster. An adoption carrying the scope as a scenario bool owes that line;
+  one carrying a scenario VALUE (`ra` per room) would not hit this gate.
+* `canopy_resistance::each_lab_form_reaches_the_water_flow_exactly` — its by-hand side reads the param
+  file's 50 while the sealed flow reads the override. An adoption would make it read the scenario's value.
+* (On main, not the branch: `repo_gates::every_plan_doc_is_indexed` was red from `d82cf12` until this
+  plan's log row landed — the plan was committed before its index line.)
+
+### 7d. The price table
+
+**What moves** (end state against the unset run, %). ⚠ For the multi-year runs these are snapshots inside
+a watering cycle (7a P5), not the size of the change: they say *that* the water moves, not *how much*.
+
+| golden | line | 30 | 15 | 9 |
+|---|---|---|---|---|
+| `lighting` (7 days) | L, S | soil −0.08, condensate +0.19 | −0.14 / +0.33 | −0.17 / +0.40 |
+| `sealed_station` (4 yr) | L, S | soil +36, condensate −61, subsoil +36 | +18 / −36 / +36 | −17 / +15 / +33 |
+| `greenhouse` (7 days) | S | soil −0.07, condensate +0.14 | −0.12 / +0.25 | −0.14 / +0.29 |
+| `harvest` | S | soil −0.006, condensate +0.09 | −0.010 / +0.16 | −0.012 / +0.19 |
+| `sealed_chamber` (3 yr) | S | soil −2.1, condensate +3.7 | −3.4 / +5.8 | −27 / +47 |
+| `perennial_chamber` (5 yr) | S | soil +72, condensate −68 | +36 / −33 | +11 / −10 |
+| `perennial_long_horizon` (15 yr) | S | soil +19, condensate −25 | −4.1 / +5.3 | +55 / −75 |
+| `consumer_chamber` (5 yr) | S | soil −9.1, condensate +17 | −22 / +40 | +8.0 / −15 |
+| `consumer_long_horizon` (15 yr) | S | soil +50, condensate −44 | +37 / −33 | +29 / −25 |
+| the other 11 (incl. the open field) | — | identical | identical | identical |
+
+**How much more water flows** — not in any golden; from the arithmetic (§4): ×1.16 / ×1.41 / ×1.60 at
+the lamp's full-cover point, ×1.1–1.7 for the sunlit chambers. Not measured on the branch.
+
+**Ceremony an adoption would add** (beyond the run):
+1. **A value.** None below 50 has a source. 9 is fitted to TM 102788 **on its 20 m² basis only**: on the
+   16 m² of trays the same match needs ~1.5 s m⁻¹ (§11b of the real-world-checks plan), which no chamber
+   plausibly has, so a better match to the trial is not evidence for the value. Adopting 30, 15 or 9
+   needs a source or the user setting aside the WHAT-IF rule.
+2. **A shape.** `ra` becomes a property of the room (scenario data, like `ground_area`) or a second param
+   (`chamber_aerodynamic_resistance`) with a scope rule — either changes a schema and the biosphere
+   manifest's `transpiration.yaml` / scenario rows.
+3. **Manifest rows:** 2 (Line L) or 9 (Line S) `golden_sha256` rows across the biosphere and station
+   manifests; the contracts' dated entries.
+4. **Tests restated:** the re-sow cycle test (two cycles, at 9); the canopy instrument reads the scenario's
+   value; a bool shape adds a roster line.
+5. **The TM scorecard sits outside both lines** (an open build). Adopting would leave it reading 50 unless
+   it opts in, and if it opts in at 9 its water row passes by construction.
+6. **Potato** inherits the wheat transpiration file — no golden holds it.
+
+Nothing adopted; main keeps `ra` 50 everywhere. The branch is kept, local.
