@@ -106,12 +106,13 @@ candidates, sources judge them, and one WHAT-IF run checks only the instrument a
   scoped to dense full cover, so its use here at the model's full-cover LAI 6.2 is within scope.
 
 **The water gap, re-sized (plan §11, 2026-10-14, the user's pick, read-only).** The row had divided the
-model's full-cover average by the trial's PEAK day (120 L day⁻¹, 6.0 L m⁻² d⁻¹). Fig. 10, digitized
-(19 condensate points, TM days 25–80), puts the level at **4.17 L m⁻² d⁻¹** on the trial's 20 m² (5.21 on
-its trays): the model is at **0.62** of the trial (0.50), matching the season-mean row's 0.61. Re-sized
-under the adopted leaf-area resistance (50 s m⁻¹ at full cover), every prediction held: airflow alone
-can now close the gap (ceiling 5.53), at an air resistance of ~9 s m⁻¹ instead of the field value 50,
-with the leaves 0.3 K below the air; or lamp heat ×2.24 the lamp's light alone, with the leaves 2 K
-above it. The one leaf-temperature reading on the shelf (±1 °C, an earlier crop) leans toward the air
-coupling, which, unlike the sodium lamps' heat, would carry over to the station. Neither is named the
-cause. Nothing in the model moved.
+model's full-cover average by the trial's PEAK day (120 L day⁻¹, 6.0 L m⁻² d⁻¹). Fig. 10, digitized (19
+condensate points, TM days 25–80), puts the level at **4.17 L m⁻² d⁻¹** on the trial's 20 m² (5.21 on its
+trays): the model is at **0.62** of the trial (0.50), matching the season-mean row's 0.61. Re-sized under
+the adopted leaf-area resistance (50 s m⁻¹ at full cover), every prediction held: on the 20 m² basis airflow
+alone can now close the gap (ceiling 5.53), at an air resistance of ~9 s m⁻¹ instead of the field value 50,
+with the leaves 0.3 K below the air; or lamp heat ×2.24 the lamp's light alone, with the leaves 2 K above
+it. The one leaf-temperature reading on the shelf (±1 °C, an earlier crop) leans toward the air coupling,
+which, unlike the sodium lamps' heat, would carry over to the station. Neither is named the cause. On the
+trays basis neither is plausible alone. The air resistance (uncited, one value for every build) is what the
+station reads too. Nothing in the model moved.

@@ -661,6 +661,30 @@ fn the_gap_resized_at_the_adopted_form() {
         leaf_over_air(ra_needed, rs, 1.0),
         leaf_over_air(ra, rs, rn_needed)
     );
+    // The leaf-area resistance has no light term, so the pores stay open in the dark: the share of
+    // W1 on fully dark steps, as is and in the Q4 case (a crop closing its pores at night would
+    // need a lower `ra` still).
+    let dark_share = |ra: f64| {
+        let all = w1_by_hand(ra, rs, 1.0);
+        let lit_only = mean(W1_DAYS.map(|d| {
+            let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
+            (first..first + STEPS_PER_DAY as u64)
+                .filter(|&n| lit(n, BIO_DT) > 0.0)
+                .map(|n| {
+                    let t = temp(n, BIO_DT);
+                    let rn = lamp_net_radiation(par_on(n)) * lit(n, BIO_DT);
+                    let vpd = saturation_vapor_pressure(t) * (1.0 - RH);
+                    science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * BIO_DT
+                })
+                .sum::<f64>()
+        }));
+        1.0 - lit_only / all
+    };
+    eprintln!(
+        "  fully dark steps' share of W1: as is {:.4}; Q4 case {:.4}",
+        dark_share(ra),
+        dark_share(ra_needed)
+    );
     let ra_trays = solve(|x| w1_by_hand(x, rs, 1.0), TM_W1_TRAYS, 0.1, ra);
     let rn_trays = solve(|x| w1_by_hand(ra, rs, x), TM_W1_TRAYS, 1.0, 10.0);
     eprintln!(

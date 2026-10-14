@@ -698,15 +698,21 @@ manifest or param moved. Log `W:\temp\claude\water-gap\resize.txt` (kept at
 
 On the trays basis (5.21) the same two candidates need `ra` 1.45 s m⁻¹ (leaf −0.08 K) or net radiation
 ×3.07 (leaf +3.4 K).
+Fully dark steps carry **0.058** of W1 as is and **0.093** in the Q4 case: the leaf-area resistance has no
+light term (`transpiration.yaml`: "the leaf-area forms do not close stomata in the dark"), so a crop
+closing its pores at night would need a lower `ra` than 8.76.
 
 **What the row now says.**
 
 1. **The model's crop drinks about 0.6 of the trial's water at full cover, not 0.4.** The gap was over-
    stated by reading the trial's best day as its typical day. The full-cover rate (0.62) and the season
    mean (0.61) now agree.
-2. **Two candidates each close what is left, alone**, and they point different ways for the station:
-   * **Air coupling** (a model property): the model's air resistance is 50 s m⁻¹, a value for wind over a
-     field. The trial's level needs ~9. A chamber fan pushing air through a dense canopy could plausibly
+2. **On the 20 m² basis, two candidates each close what is left, alone** (on the 16 m² of trays neither
+   is plausible alone: almost no air resistance at all, or leaves 3.4 K over the air — so the area basis
+   bears on the answer), and they point different ways for the station:
+   * **Air coupling** (a model property): the model's air resistance is 50 s m⁻¹, uncited (`TODO(cite)`,
+     "wind/height-dependent") and one value for every build — the station's chambers read the same
+     `transpiration.yaml` (checked 2026-10-14: no station-side override). The trial's level needs ~9. A chamber fan pushing air through a dense canopy could plausibly
      give a much lower value, but no source on the shelf gives one. If this is the cause, the station's
      chambers carry the same gap, whatever their lamp.
    * **Lamp heat** (the trial's lamp type): ×2.24 the heat of the lamp's light alone. High-pressure sodium
@@ -724,5 +730,6 @@ one for the radiant heat that crossed the lamp barriers. Either is a read, not a
 model's air resistance for chambers would be a science item and an unfreeze.
 
 **Left unedited on purpose:** the 0.40 / 0.43 in the frozen contract's prose (`docs/station-reference.md`,
-the 2026-10-10 entry) and in the log index's row for this item (a gate makes it equal the log file's
-heading). The log file's body and every plan line carrying the old figure are marked in place.
+the 2026-10-10 entry) — correcting a contract's prose is the user's call. Every other line carrying the
+old figure is marked in place, the log index's status cell for this item included (⚠ the first
+version of this paragraph said that cell was gated to the log heading; only the row's FIRST cell is).
