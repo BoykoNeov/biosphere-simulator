@@ -507,19 +507,21 @@ corrected in the same commit.
 #### 2026-10-14 — a shared line hid 39 memories, and the premise became a sixth bound
 
 On 2026-10-08 the index was compressed so that finished series **shared a line**
-(`- Flip C-items: [C1](…) · [C2](…) · …`, seven such lines naming 46 files). That is the
+(`- Flip C-items: [C1](…) · [C2](…) · …`: seven lines not starting `- [`, naming 38 files, and
+one `- [` line carrying a second link). That is the
 condensing this section refuses, in a shape no bound could see, because **every bound counts
 one memory per `- [` line**:
 
 - the parity test read only the first link of lines starting `- [`, so it reported **39
-  indexed files as unreachable**. It was loud, but recorded for six days as an unrelated
-  pre-existing red;
+  indexed files as unreachable** (38 + 1). It was loud, but red from 2026-10-08 and, once
+  first written down on 2026-10-10 (§16a of the soil-evaporation plan), carried as an
+  unrelated pre-existing red until 2026-10-14;
 - the mean counted the shared lines' bytes over a line count that left them out;
 - the max-line bound never saw the longest of them, **809 B** against 240.
 
 Fixing only the parity reader would have turned it green with both byte bounds still blind.
 So the remedy the ceiling's message prescribes was done instead: the user chose to split the
-lines, and then to **merge finished series into one file each** (29 files into 7, each
+lines, and then to **merge finished series into one file each** (35 files into 7: 34 deleted, 6 new, one kept its name; each
 merged file at or under the largest existing memory, ~46 KB, each absorbed file kept
 verbatim under its old name). The index went 176 → **148 lines, 16,384 B**. The user chose to stop
 there rather than reach the harness's 140-line advisory by merging active notes or making a

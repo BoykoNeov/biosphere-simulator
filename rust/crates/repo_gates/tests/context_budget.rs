@@ -544,8 +544,8 @@ fn every_memory_index_line_names_a_file_and_vice_versa() {
 /// On 2026-10-08 the index was compressed so that finished series SHARED a line
 /// (`- Flip C-items: [C1](…) · [C2](…) · …`). Each such line named up to ten files, and none
 /// of the bounds could see it: the parity test read only the first link of lines starting
-/// `- [`, so it reported 39 indexed files as UNREACHABLE (loud, and misread as a pre-existing
-/// red for six days); the mean counted the shared lines' bytes over a denominator that left
+/// `- [`, so it reported 39 indexed files as UNREACHABLE (loud, and carried as a pre-existing
+/// red from 2026-10-10 to 2026-10-14); the mean counted the shared lines' bytes over a denominator that left
 /// them out; and the max-line bound never saw an 809 B line. Fixing the parity reader alone
 /// would have turned it green with the two byte bounds still blind — so the premise is now a
 /// bound of its own. Remedy, as before: MERGE the series into one file with one line (done
