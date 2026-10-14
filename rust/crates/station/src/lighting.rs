@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
     DAYLENGTH_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER, TEMP_VAR, THERMAL_TIME,
+    VERNALIZATION_DAYS,
 };
 use domains::biosphere::system::{
     build_season, soil_surface_start, weather_forcings, weather_shared,
@@ -94,6 +95,9 @@ pub fn build_lighting(
         0,
         BTreeMap::from_iter(soil_start.into_iter().chain([
             (THERMAL_TIME.to_string(), 0.0),
+            // Seeded at 0 as `build_season` seeds it; a missing key read as 0 everywhere, so
+            // this moved no byte (soil-evaporation plan §19). `tests/starting_aux.rs` gates it.
+            (VERNALIZATION_DAYS.to_string(), 0.0),
             // ⚠ ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
             // assemblies (both ports) until 2026-08-12. `build_season` has seeded it
             // with the cited sowing depth since the root-depth build; the station

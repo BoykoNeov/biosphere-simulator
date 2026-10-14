@@ -192,3 +192,6 @@ user's call.
 **Adopted (plan §19, 2026-10-14, the user's call).** The four station assemblies now seed the soil account's
 starting values; the four goldens moved exactly as §18 measured them (byte-identical to the measured copies),
 water only, with a station unfreeze-log entry.
+Separately and byte-neutral (20 of 20 goldens identical), the builders now also seed `vernalization_days`
+at 0 as `build_season` does, and `station/tests/starting_aux.rs` fails if a station build drops any key
+`build_season` seeds — the third such omission, so now gated.

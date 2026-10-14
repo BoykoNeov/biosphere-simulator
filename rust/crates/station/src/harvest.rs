@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use domains::biosphere::science;
 use domains::biosphere::stocks::{
     CARBON_POOL, LITTER_CARBON, O2_POOL, ROOTED_DEPTH, SOIL_WATER, STORAGE_C, SUBSOIL_WATER,
-    THERMAL_TIME,
+    THERMAL_TIME, VERNALIZATION_DAYS,
 };
 use domains::biosphere::system::{soil_surface_start, weather_shared};
 use domains::crew::{CrewParams, FECAL_WASTE, FOOD_STORE};
@@ -131,6 +131,10 @@ pub fn build_harvest_at(
         gh_state.rng_seed,
         BTreeMap::from_iter(soil_start.into_iter().chain([
             (THERMAL_TIME.to_string(), scenario.thermal_time0),
+            // ⚠ 0, not the saturated count a grown crop would carry: the crop starts past the
+            // vegetative stage, where nothing reads it, and 0 is what the key read as before
+            // it was seeded, so no byte moved (soil-evaporation plan §19).
+            (VERNALIZATION_DAYS.to_string(), 0.0),
             // Goes with thermal_time0: a crop started past anthesis has finished rooting.
             (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
         ])),

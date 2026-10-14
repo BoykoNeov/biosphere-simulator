@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
     CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER,
-    STORAGE_C, TEMP_VAR, THERMAL_TIME,
+    STORAGE_C, TEMP_VAR, THERMAL_TIME, VERNALIZATION_DAYS,
 };
 use domains::biosphere::params::PhenologyParams;
 use domains::biosphere::science;
@@ -355,6 +355,9 @@ pub fn build_sealed_station_unread(
         0,
         BTreeMap::from_iter(soil_start.into_iter().chain([
             (THERMAL_TIME.to_string(), 0.0),
+            // Seeded at 0 as `build_season` seeds it; a missing key read as 0 everywhere, so
+            // this moved no byte (soil-evaporation plan §19). `tests/starting_aux.rs` gates it.
+            (VERNALIZATION_DAYS.to_string(), 0.0),
             // ⚠ ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
             // assemblies (both ports) until 2026-08-12. `build_season` has seeded it
             // with the cited sowing depth since the root-depth build; the station
@@ -363,7 +366,7 @@ pub fn build_sealed_station_unread(
             // `TTSW = depth * EXTR * rho * A`.
             (ROOTED_DEPTH.to_string(), scenario.bio.rooted_depth0),
             // The cold program's clock (slice 4): the crop is sown now. Seeded here, not
-            // defaulted at the reader — the omission `vernalization_days` still has (§10).
+            // defaulted at the reader — the omission `vernalization_days` had until §19.
             (SOWN_STEP.to_string(), 0.0),
         ])),
     )?;
