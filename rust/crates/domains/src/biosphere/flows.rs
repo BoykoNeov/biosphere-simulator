@@ -786,8 +786,8 @@ pub struct CanopyRead {
     /// FAO-56's `rl` and Teh's `Lcr` (`transpiration.yaml`).
     pub leaf_resistance: f64,
     pub threshold_lai: f64,
-    /// Whether the stomata close in the dark — `Open` on every frozen build; `Closing` is lab-only
-    /// (`docs/plans/post-roadmap-night-stomata.md`).
+    /// Whether the stomata close in the dark — `Closing` at the booting ratio on every frozen build
+    /// since 2026-10-15; `Open` is lab-only (`docs/plans/post-roadmap-night-stomata.md`).
     pub night: science::NightStomata,
 }
 

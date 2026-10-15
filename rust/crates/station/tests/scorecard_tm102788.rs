@@ -31,7 +31,7 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::light_path::top_hat_window_mean;
 use domains::biosphere::params::{self, BiosphereParams};
-use domains::biosphere::science;
+use domains::biosphere::science::{self, NightStomata};
 use domains::biosphere::stocks::{
     CI_VAR, CO2_ATMOS, CO2_RESP, DAYLENGTH_VAR, FERTILIZATION_VAR, IRRIGATION_VAR, LEAF_C, PAR_VAR,
     PLANT_N, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C,
@@ -449,7 +449,16 @@ const W1_DAYS: std::ops::RangeInclusive<usize> = 25..=80;
 /// W1 from the forcings alone: Penman–Monteith on every step's lamp net radiation, VPD and
 /// temperature, at the given resistances, with no soil-water factor (the conditions test holds
 /// FTSW above `wssg`, where that factor is exactly 1).
+///
+/// `rs` is the DAY resistance; dark steps read it through the loader's night rule, as the model
+/// does since 2026-10-15 (`docs/plans/post-roadmap-night-stomata.md` §7a).
 fn w1_by_hand(ra: f64, rs: f64, rn_scale: f64) -> f64 {
+    w1_by_hand_at(ra, rs, rn_scale, params::biosphere().transp.night_stomata)
+}
+
+/// `w1_by_hand` under a named night rule. The constant-resistance checks (A1, R1) name `Open`: the
+/// constant form's flow has no canopy, so the model never applies the night rule there.
+fn w1_by_hand_at(ra: f64, rs: f64, rn_scale: f64, night: NightStomata) -> f64 {
     mean(W1_DAYS.map(|d| {
         let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
         (first..first + STEPS_PER_DAY as u64)
@@ -457,6 +466,7 @@ fn w1_by_hand(ra: f64, rs: f64, rn_scale: f64) -> f64 {
                 let t = temp(n, BIO_DT);
                 let rn = rn_scale * lamp_net_radiation(par_on(n)) * lit(n, BIO_DT);
                 let vpd = saturation_vapor_pressure(t) * (1.0 - RH);
+                let rs = science::night_surface_resistance(rs, rn, night);
                 science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * BIO_DT
             })
             .sum::<f64>()
@@ -478,8 +488,8 @@ fn transpiration_params() -> (f64, f64) {
 #[test]
 fn airflow_alone_cannot_reach_the_trials_water_use_at_the_constant_resistance() {
     let (ra, rs) = transpiration_params();
-    let frozen = w1_by_hand(ra, rs, 1.0);
-    let limit = w1_by_hand(1e-6, rs, 1.0);
+    let frozen = w1_by_hand_at(ra, rs, 1.0, NightStomata::Open);
+    let limit = w1_by_hand_at(1e-6, rs, 1.0, NightStomata::Open);
     eprintln!(
         "A1 (constant rs {rs}): W1 at ra {ra} = {frozen:.4}; as ra -> 0: {limit:.4} L m⁻² d⁻¹ (TM {TM_W1_LEVEL})"
     );
@@ -506,7 +516,7 @@ fn a_what_if_air_resistance_reaches_the_water_flow() {
     p.transp.soil_evap = science::SoilEvaporationForm::Off;
     let r = run_what_if(&p, 1.0);
     let model = mean(W1_DAYS.map(|d| daily_water(&r, d)));
-    let hand = w1_by_hand(10.0, rs, 1.0);
+    let hand = w1_by_hand_at(10.0, rs, 1.0, NightStomata::Open);
     eprintln!("R1 (WHAT-IF ra = 10): W1 model {model:.6}, by hand {hand:.6}");
     assert!((model - hand).abs() <= 1e-9 * hand, "{model} vs {hand}");
 }
@@ -569,7 +579,8 @@ fn the_surface_resistance_a_full_canopy_would_have() {
          W1 at ra {ra}: {:.4} (frozen rs: {:.4}); at that rs as ra -> 0: {:.4} (TM {TM_W1_LEVEL}; \
          6.0 until 2026-10-14, the peak)",
         w1_by_hand(ra, rs_fao, 1.0),
-        w1_by_hand(ra, rs, 1.0),
+        // The constant form's flow has no canopy, so the model never closes it at night.
+        w1_by_hand_at(ra, rs, 1.0, NightStomata::Open),
         w1_by_hand(1e-6, rs_fao, 1.0)
     );
 }
@@ -707,9 +718,9 @@ fn the_gap_resized_at_the_adopted_form() {
         leaf_over_air(ra_needed, rs, 1.0),
         leaf_over_air(ra, rs, rn_needed)
     );
-    // The leaf-area resistance has no light term, so the pores stay open in the dark: the share of
-    // W1 on fully dark steps, as is and in the Q4 case (a crop closing its pores at night would
-    // need a lower `ra` still).
+    // The share of W1 on fully dark steps, as is and in the Q4 case. Until 2026-10-15 the pores
+    // stayed open in the dark here (the leaf-area resistance has no light term); they close since,
+    // by the loader's night rule, so the lit-only sum below needs no rule (it skips dark steps).
     let dark_share = |ra: f64| {
         let all = w1_by_hand(ra, rs, 1.0);
         let lit_only = mean(W1_DAYS.map(|d| {
@@ -770,8 +781,10 @@ const SET_POINTS: Forcing = Forcing {
     rn_scale: 1.0,
 };
 
-/// `w1_by_hand` with the forcings as arguments; `SET_POINTS` reproduces it.
+/// `w1_by_hand` with the forcings as arguments; `SET_POINTS` reproduces it, the loader's night rule
+/// included.
 fn w1_by_hand_with(ra: f64, rs: f64, f: Forcing) -> f64 {
+    let night = params::biosphere().transp.night_stomata;
     mean(W1_DAYS.map(|d| {
         let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
         (first..first + STEPS_PER_DAY as u64)
@@ -787,6 +800,7 @@ fn w1_by_hand_with(ra: f64, rs: f64, f: Forcing) -> f64 {
                 };
                 let rn = f.rn_scale * lamp_net_radiation(par_on(n)) * l;
                 let vpd = saturation_vapor_pressure(t) * (1.0 - rh);
+                let rs = science::night_surface_resistance(rs, rn, night);
                 science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * BIO_DT
             })
             .sum::<f64>()

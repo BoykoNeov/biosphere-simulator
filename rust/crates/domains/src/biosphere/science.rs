@@ -1009,9 +1009,11 @@ pub const FAO_ACTIVE_LAI_FRACTION: f64 = 0.5;
 
 /// Whether the canopy's stomata close in the dark (`docs/plans/post-roadmap-night-stomata.md`).
 ///
-/// Never loaded from a param file — it selects a form. [`NightStomata::Open`] (the leaf-area forms'
-/// constant leaf value, day and night alike) is the loader's; [`NightStomata::Closing`] is a lab
-/// switch, its ratio a cited const below, not a YAML key (a key would join the frozen census).
+/// Never loaded from a param file — it selects a form. The loader's is [`NightStomata::Closing`]
+/// at [`NIGHT_CONDUCTANCE_RATIO_BOOTING`] since 2026-10-15 (the plan's §7); [`NightStomata::Open`]
+/// (the leaf-area forms' constant leaf value, day and night alike) and the heading ratio are lab
+/// switches.
+/// The ratio is a cited const below, not a YAML key (a key would join the frozen census).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum NightStomata {
     /// The surface resistance ignores light: the stomata never close.
@@ -1028,7 +1030,10 @@ pub enum NightStomata {
 /// Night-to-day stomatal conductance of irrigated field wheat at BOOTING — McAusland et al. (2023),
 /// *New Phytologist* 239:1622–1636, doi 10.1111/nph.19075 (CC BY 4.0), Table 3, control plots:
 /// *"12.30 ± 4.54"* % (LI-6400, three seasons, n = 6; leaf VPD held at the day's 1.2 kPa at night,
-/// 16 °C leaf, measured 30 min after sunset). Lab-only (`NightStomata::Closing`).
+/// 16 °C leaf, measured 30 min after sunset). The loader's since 2026-10-15: the only one of the
+/// two ratios that agrees with the paper's own absolute night conductance on the model's day leaf,
+/// and inside wheat's measured lifetime range (the plan's §7). One value all season; the source
+/// measured two stages.
 pub const NIGHT_CONDUCTANCE_RATIO_BOOTING: f64 = 0.123;
 
 /// The same at HEADING — McAusland et al. (2023) Table 3, control: *"19.40 ± 9.01"* %. Lab-only.

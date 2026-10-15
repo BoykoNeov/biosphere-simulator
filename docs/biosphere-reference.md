@@ -927,6 +927,22 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-15 — STOMATA CLOSE IN THE DARK: the loader sets `night_stomata:
+  NightStomata::Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING)` — on a step whose net radiation is ≤ 0 the
+  canopy's surface resistance is the day value / 0.123, McAusland et al. (2023)'s night-over-day
+  conductance for wheat at booting. No biosphere golden moves and `biosphere-reference.manifest.json` is
+  byte-identical; 2 station goldens move (the station entry of this date). Water only.** The user's call
+  (*"do what is closer to reality"*, on keep-open / 0.123 / 0.194); the ratio chosen on physics, not on the
+  TM fit (plan `docs/plans/post-roadmap-night-stomata.md` §7, predictions A1–A7 graded there). No YAML key,
+  flow, aux or param set changed — the rule and both consts were built lab-only earlier the same day — so
+  **no automatic gate can see this unfreeze** (the 2026-08-12 `WSFD` case): the restated
+  `the_loader_closes_the_stomata_at_the_booting_ratio` (`domains/tests/night_stomata.rs`) is its one pin,
+  and this entry is the ceremony's record. **Science gates:** none moves — the frozen biosphere scenarios read
+  the weather's daily-mean net radiation, never ≤ 0 (all 7 biosphere goldens byte-identical;
+  `the_open_field_never_sees_a_dark_step` holds the open season bit-identical under both ratios), and no
+  band or liveness floor reads a lamp-lit build. **Scope:** only lamp-lit builds have dark steps, so only they see it. **Caveats:** the source
+  measured two growth stages; one ratio is applied all season. Partly lit steps count as day, so their
+  dark minutes keep open stomata — a stated bias of the rule, not corrected for.
 - **2026-10-15 — A CITED AIR RESISTANCE FOR EVERY SEALED CHAMBER: the transpiration flow reads
   `aerodynamic_resistance_for(scenario.sealed)` — Monje & Bugbee (2019)'s measured 7.5 s/m in every sealed
   build, the open field's 50 elsewhere. 5 goldens here (`sealed_chamber`, `perennial_chamber`,

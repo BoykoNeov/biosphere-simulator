@@ -358,6 +358,20 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-15 — the biosphere's night stomata closing adopted, delegated: 2 station goldens move
+  (`lighting`, `sealed_station`) and their 2 `golden_sha256` rows follow. Water only. No station flow,
+  param or seam changed; one station-side edit rides along: the TM 102788 scorecard's by-hand water path
+  applies the same night rule.** On a lamp-lit build's dark step the crop's surface resistance is the day
+  value / 0.123 (the biosphere entry of the same date; plan `docs/plans/post-roadmap-night-stomata.md` §7).
+  `lighting` (day 7): condensate −2.17 %, root zone +0.91 %. `sealed_station` (end state, one day of a
+  watering cycle): condensate −29.3 %, root zone +32.5 %, below the roots −0.19 %; over the 1220-day run the
+  chamber's water throughput falls 18.5 % (§6). `sealed_energy_drift_summary` holds no water value and is
+  byte-identical; the other 11 station goldens likewise. **The scorecard** (`tests/scorecard_tm102788.rs`, a
+  diagnostic, not a gate): the scored row's water ratio goes 1.04 → 0.958, its carbon rows unchanged.
+  `w1_by_hand` and `w1_by_hand_with` now apply `science::night_surface_resistance` on each step's own lamp
+  net radiation at the loader's form, because their model side (`run`) closes at night too — §11 Q2's
+  model / hand reads 0.997. A1 and R1 run the constant surface resistance, whose flow never reads the
+  rule, and name `Open`.
 - **2026-10-15 — the biosphere's chamber air resistance adopted, delegated: 4 station goldens move
   (`greenhouse`, `harvest`, `lighting`, `sealed_station`) and their 4 `golden_sha256` rows follow. Water
   only. No station flow, param or seam changed; one station-side edit rides along: the TM 102788

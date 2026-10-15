@@ -39,6 +39,7 @@
 use super::science::{
     Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, NightStomata, O2Form,
     SoilEvaporationForm, SoilSupply, SurfaceResistanceForm, VpdRead, WateringForm,
+    NIGHT_CONDUCTANCE_RATIO_BOOTING,
 };
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
@@ -274,8 +275,9 @@ pub struct TranspirationParams {
     /// (`docs/plans/post-roadmap-soil-evaporation.md` §16).
     pub soil_evap: SoilEvaporationForm,
     /// Whether the stomata close in the dark ([`NightStomata`]), read only under a leaf-area
-    /// `rs_form`. Never loaded from the file: the loader sets [`NightStomata::Open`]; closing is
-    /// lab-only (`docs/plans/post-roadmap-night-stomata.md`).
+    /// `rs_form`. Never loaded from the file: the loader sets `Closing` at the booting ratio since
+    /// 2026-10-15; `Open` and the heading ratio are lab-only
+    /// (`docs/plans/post-roadmap-night-stomata.md`).
     pub night_stomata: NightStomata,
     /// `rl`, a well-watered leaf's stomatal resistance (s/m), read by the two leaf-area forms of
     /// [`SurfaceResistanceForm`] (FAO-56 Box 5's 100 s/m).
@@ -808,9 +810,10 @@ pub fn transpiration_from_bounded(
             floor: false,
             supply: SoilSupply::RootZone,
         },
-        // Stomata that never close; closing in the dark is lab-only
-        // (docs/plans/post-roadmap-night-stomata.md).
-        night_stomata: NightStomata::Open,
+        // Stomata that close in the dark to McAusland et al. (2023)'s booting ratio, adopted
+        // 2026-10-15 on the user's call; moved 2 station goldens, water only
+        // (docs/plans/post-roadmap-night-stomata.md §7). `Open` and the heading ratio are lab-only.
+        night_stomata: NightStomata::Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING),
     }
 }
 

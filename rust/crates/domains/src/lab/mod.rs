@@ -231,7 +231,8 @@ pub fn biosphere_with_rs_form(
 ///
 /// # ⚠ A switch, not an endorsement of the form switched to
 ///
-/// [`NightStomata::Open`] is the loader's; `Closing` at either cited ratio is the lab's.
+/// `Closing` at the booting ratio is the loader's since 2026-10-15; [`NightStomata::Open`] and the
+/// heading ratio are the lab's.
 pub fn with_night_stomata(mut p: BiosphereParams, form: NightStomata) -> BiosphereParams {
     p.transp.night_stomata = form;
     p

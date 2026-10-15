@@ -161,6 +161,9 @@ Three possible follow-ons, each its own decision, none started:
   ⚠ *Corrected 2026-10-15* (`post-roadmap-night-stomata.md` §2a, §6): only the lamp-lit station builds
   ever see a dark step — the biosphere jars read the outdoor daily mean — so two goldens move, not every
   sealed one; the TM ratio did move (1.04 → 0.96–0.97).
+  **ADOPTED 2026-10-15** at the booting ratio (0.123; `post-roadmap-night-stomata.md` §7): the
+  dark-hours heat with nothing to pay for it, once the lamp is off at night, is now **~0.31 GJ, not
+  1.80** (§6 there; the partly lit windows' dark minutes still count as day, ~0.5 GJ more, estimated).
 * **The room's lamp heat switched with the light** (on/off rather than a daily average) — a station
   unfreeze; it moves the chamber's temperature and heater books, not water.
 * **Latent heat in the room's books** (evaporation draws from the chamber store, condensation into the

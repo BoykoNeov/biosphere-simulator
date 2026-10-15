@@ -3,7 +3,8 @@
 **Opened 2026-10-15** on the user's choice *"Night stomata closing"*, the first of the three follow-ons
 the latent-heat estimate left open (`post-roadmap-chamber-latent-heat.md` §5b). **This doc builds a
 lab-only form and measures it. It is not the adoption** — adopting it is a biosphere unfreeze and a
-separate call for the user, on the numbers in §6.
+separate call for the user, on the numbers in §6. **⚠ ADOPTED the same day** at the booting ratio, on the
+user's call: §7 (the adoption, its predictions, and their grading in §7c).
 
 ## 0. Why
 
@@ -255,10 +256,17 @@ growth stages; the model applies one ratio all season.
   its booting case would compare with itself and pass inertly — the same instrument fault §6 found in
   the reach test. Its baseline is named `NightStomata::Open` first, in its own commit, before the flip.
 * **The TM scorecard's water-gap instruments** (`w1_by_hand`, `w1_by_hand_with`; §6) integrate nights
-  at the day resistance. They are kept as recorded and RELABELLED as open-stomata arithmetic — the
-  precedent the air-resistance adoption set the same day (*"the water-gap instruments keep the open
-  field's 50, as their numbers were recorded"*); they already compare a model at 7.5 with a hand path
-  at 50. The `dark_share` comment, which states the stomata stay open in the dark, is corrected.
+  at the day resistance. ⚠ *First written: "kept as recorded and relabelled, the air-resistance
+  adoption's precedent; they already compare a model at 7.5 with a hand path at 50." **False**, caught
+  by the advisor's check before commit:* their model side is `run`, the open build at 50 — not
+  `run_row` at 7.5 — so §11's Q2 ("by hand within 2 % of the model", 0.15 % when recorded) was
+  like-for-like, and under adoption its model closes at night while the hand path would not. The
+  precedent covered an air-resistance change the instruments never saw; this one they do. So the
+  night rule is applied in the by-hand path (`science::night_surface_resistance` on each step's own
+  lamp net radiation, at the loader's form). A1 and R1 run the CONSTANT surface resistance, whose
+  flow never reads the night rule, so they take the hand path with `Open` named.
+* **A7** (added with the correction, before the corrected instrument ran): Q2's model / hand stays
+  within 2 % (it was 0.15 %); with the open hand path it would be off by roughly the dark share.
 
 ### 7b. Predictions (written before the loader line changed)
 
@@ -276,3 +284,26 @@ growth stages; the model applies one ratio all season.
   loader test's old form (gone once restated), the two goldens' own byte checks, and the station
   `manifest_writer`. After: full suite green, `-- --ignored` green, clippy clean.
 * **A6** Science gates: no biosphere band or liveness floor reads a lamp-lit build, so none moves.
+
+### 7c. Graded (2026-10-15)
+
+* **A1 held.** `regen_goldens`: exactly `lighting_state` and `sealed_station_state` CHANGED; 18 identical,
+  `sealed_energy_drift_summary` and the 7 biosphere goldens among them.
+* **A2 held.** Every changed key listed by script against `HEAD`: `lighting_state` — condensate −2.17 %,
+  soil water +0.91 %, `top_soil_water`; `sealed_station_state` — condensate −29.3 %, soil water +32.5 %,
+  subsoil water −0.19 %, `soil_dry_days` 5.875 → 3.375, `soil_evap_today`. No other stock or aux, and no
+  field but `amount`.
+* **A3 held.** W1 **3.9958, 0.9582** of 4.17; U1 26.43, C1 90.26, B1 62.01 / 45.43, N1, N2, U2, S1 equal to
+  their recorded values (`post-roadmap-real-world-checks.md` §15).
+* **A4 held.** The three writers: biosphere and authoring `unchanged`; station REWRITTEN in exactly the two
+  `golden_sha256` rows. `git diff rust/crates/simcore/` empty.
+* **A5 MISSED, in part.** Before regeneration the reds were two, not the three named: `golden_regression`
+  (`lighting_state`'s byte check) and `tier_contract` (`lighting_state` 2.4e-2 off the committed golden at
+  `$.aux.top_soil_water` — the reference moving, not a band to widen). I named the station
+  `manifest_writer`, which stayed green: it hashes the COMMITTED goldens, so it can only go red once they
+  are rewritten — and I did not name `tier_contract`, which compares the run with the committed golden too.
+  `sealed_station_state` is read only by the slow tests. After regeneration: full suite 1377 passed / 0
+  failed (`--release --no-fail-fast`), `-- --ignored` 9 / 0, clippy clean, the repo gates green.
+* **A6 held.** No science gate went red; no band or floor reads a lamp-lit build.
+* **A7 held.** §11 Q2 model / hand **0.9967** (recorded 1.0015 before, both closing at night now). A1 at the
+  constant form 2.3762 → as `ra → 0` 3.9486 (unchanged; it names `Open`); R1 model = hand to 1e-9 (3.249631).

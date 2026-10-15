@@ -1,9 +1,10 @@
 //! **Stomata that close in the dark** — the lab form's own checks.
 //!
-//! Plan: `docs/plans/post-roadmap-night-stomata.md`. [`NightStomata::Open`] is the loader's;
-//! `Closing` at McAusland et al. (2023)'s two ratios is lab-only. This file asserts the rule, that the
-//! loader keeps it off, that the open field cannot see it (its net radiation is a daily mean, never
-//! dark — §2a), and that it reaches `Transpiration` on a dark step by exactly the rule.
+//! Plan: `docs/plans/post-roadmap-night-stomata.md`. `Closing` at McAusland et al. (2023)'s booting
+//! ratio is the loader's since 2026-10-15 (§7); [`NightStomata::Open`] and the heading ratio are
+//! lab-only. This file asserts the rule, the loader's choice, that the open field cannot see it
+//! (its net radiation is a daily mean, never dark — §2a), and that it reaches `Transpiration` on a
+//! dark step by exactly the rule.
 
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::science::{
@@ -59,10 +60,15 @@ fn the_rule_divides_by_the_ratio_only_in_the_dark() {
     }
 }
 
-/// The loader keeps the stomata open: closing is lab-only until the user adopts it.
+/// The loader closes the stomata in the dark at the booting ratio — adopted 2026-10-15 on the
+/// user's call (plan §7). Until then this test pinned `Open` (`the_loader_keeps_the_stomata_open`).
+/// The adoption moved no param file, flow or aux set, so no manifest can see it: this is its pin.
 #[test]
-fn the_loader_keeps_the_stomata_open() {
-    assert_eq!(params::biosphere().transp.night_stomata, NightStomata::Open);
+fn the_loader_closes_the_stomata_at_the_booting_ratio() {
+    assert_eq!(
+        params::biosphere().transp.night_stomata,
+        NightStomata::Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING)
+    );
 }
 
 /// P2's open-field half: the open season never has a dark step (its net radiation is the weather's

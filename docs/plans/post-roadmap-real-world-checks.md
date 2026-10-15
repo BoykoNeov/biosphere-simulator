@@ -1122,3 +1122,20 @@ instruments keep the open field's 50, so their recorded numbers stand. Measured:
 (0.833 of 5.21); W2 4.2549, 0.946; every CO₂ step and the end crop bit-identical to the row at 50 (asserted:
 `the_chamber_air_moves_the_rows_water_and_nothing_else`); lowest FTSW 0.4461. §13i's caveat stands: the
 source's air was faster than the BPC's, so 1.04 is an upper reading.
+
+## 15. Stomata close in the dark (2026-10-15)
+
+The user adopted night stomatal closure at McAusland et al. (2023)'s booting ratio, 0.123
+(`post-roadmap-night-stomata.md` §7): on a step with net radiation ≤ 0 the canopy resistance is the day
+value / 0.123. The trial's 4 dark hours a day now transpire far less (about a sixth of the open rate in the station's chamber, §6 there). Measured: W1 **3.9958, 0.958** of 4.17
+(0.767 of 5.21); W2 3.9376, 0.875; every carbon row unchanged to its printed digits (U1 26.43, C1 90.26, B1
+62.01). The row went from 4 % over the trial to 4 % under; the trial's record cannot say how much of its
+water was night water (§12d).
+
+**The instruments changed with it.** §10–§13's by-hand path (`w1_by_hand`, `w1_by_hand_with`) summed dark
+steps at the day resistance. Their model side (`run`, the open build at 50) now closes at night, so the hand
+path applies the same rule (`science::night_surface_resistance` on each step's lamp net radiation); §11 Q2
+reads model / hand **0.9967** (it was 1.0015). A1, R1 and §10e's constant-resistance print run the constant
+form, whose flow never reads the rule, and keep the pores open by name. The numbers recorded in §10–§13
+are as of their dates; a rerun now prints the closed-night values (e.g. §11 Q4: the air resistance for 4.17
+is 5.52 s m⁻¹; dark steps carry 2.1 % of the by-hand W1).

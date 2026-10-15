@@ -41,4 +41,31 @@ anything the switch moves — ask the second question too.
 the warm phase's 8 dark hours with open stomata — at the open dark rate ~0.60 GJ over the run, of which a
 lit-fraction rule would remove ~0.44–0.50 GJ more. Not built: the flow has no lit-fraction signal.
 
-**Open, the user's:** adopt or not, and at which ratio (an unfreeze: two station goldens, water only).
+**Open, the user's (until the same day):** adopt or not, and at which ratio (an unfreeze: two station
+goldens, water only).
+
+**ADOPTED 2026-10-15** on the user's *"do what is closer to reality"* (plan §7, predictions A1–A7 written
+before the loader line changed, graded there). The loader sets `Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING)`;
+the heading ratio and `Open` are lab-only. **Why booting:** chosen on physics, not on the TM fit — carried
+onto the model's day leaf it gives a night resistance (813 s/m) close to the paper's own absolute porometer
+value (~870), where heading leaves the leaf ~25 % more open than the paper; 12.3 % sits inside wheat's
+measured lifetime range (5.7–18.9 %), 19.4 % at its top; warm nights lowered the ratio (the chamber's night
+is a held 22 °C). Caveat: one ratio all season, from two measured stages.
+
+* **What moved, as predicted:** `lighting_state` and `sealed_station_state`, water only (condensate, soil
+  and subsoil water, `top_soil_water`, `soil_dry_days`, `soil_evap_today`); their two `golden_sha256` rows
+  in the station manifest. The biosphere and authoring manifests are byte-identical, `simcore` untouched.
+* **No automatic gate sees the biosphere side** (no file, set or biosphere golden moves — the `WSFD`
+  case): the restated `the_loader_closes_the_stomata_at_the_booting_ratio` is its one pin; the unfreeze
+  logs of both reference docs carry the record.
+* **TM 102788:** water 0.958 (was 1.04), carbon rows unchanged. **An instrument correction on the way:**
+  the plan first said the scorecard's by-hand water path would be kept as recorded and relabelled, "as it
+  already compares a model at 7.5 with a hand path at 50". False, caught by the advisor before commit: its
+  model side is the open build at 50, which now closes at night too, so the check was like-for-like. The
+  rule went into the hand path (constant-resistance checks name `Open`, since that flow never reads it);
+  model / hand reads 0.997 (A7: within 2 %).
+* **Prediction missed (A5):** before regeneration I named the station manifest writer as the third red.
+  It stayed green — it hashes the committed goldens, so it can only go red once they are rewritten — and
+  the reds were the golden byte check and the tier-band check (`top_soil_water` 2.4 % off the committed
+  golden). Both cleared on regeneration; no band was widened.
+
