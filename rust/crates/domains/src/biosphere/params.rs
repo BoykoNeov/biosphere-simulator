@@ -256,7 +256,12 @@ pub struct RespirationParams {
 /// Penman–Monteith transpiration params.
 #[derive(Debug, Clone, Copy)]
 pub struct TranspirationParams {
+    /// The OPEN FIELD's `r_a` (s/m). A sealed build reads [`Self::chamber_aerodynamic_resistance`];
+    /// take either through [`Self::aerodynamic_resistance_for`].
     pub aerodynamic_resistance: f64,
+    /// A sealed chamber's `r_a` (s/m): Monje & Bugbee (2019)'s measured 7.5, adopted 2026-10-15
+    /// (`docs/plans/post-roadmap-chamber-air-resistance-adopted.md`).
+    pub chamber_aerodynamic_resistance: f64,
     pub surface_resistance: f64,
     /// How the canopy surface resistance is obtained ([`SurfaceResistanceForm`]). Never loaded
     /// from the file: the loader sets [`SurfaceResistanceForm::SzeiczLong`] since the water-forms
@@ -275,6 +280,20 @@ pub struct TranspirationParams {
     pub threshold_lai: f64,
     /// The soil's evaporation coefficients, read by [`SoilEvaporationForm::TwoStage`].
     pub soil: SoilEvaporationParams,
+}
+
+impl TranspirationParams {
+    /// The canopy's `r_a` for a room: the chamber's measured value when the build is sealed, the
+    /// open field's otherwise. `r_a` is a property of the room's air movement, and every sealed
+    /// build is a ventilated chamber. The one selector, so a by-hand instrument cannot read the
+    /// open field's 50 for a sealed flow.
+    pub fn aerodynamic_resistance_for(&self, sealed: bool) -> f64 {
+        if sealed {
+            self.chamber_aerodynamic_resistance
+        } else {
+            self.aerodynamic_resistance
+        }
+    }
 }
 
 /// The bare soil's evaporation coefficients (`transpiration.yaml`) — Soltani & Sinclair (2012)
@@ -720,6 +739,7 @@ pub fn transpiration_from_bounded(
         &f,
         &[
             ("aerodynamic_resistance", "s/m"),
+            ("chamber_aerodynamic_resistance", "s/m"),
             ("surface_resistance", "s/m"),
             ("leaf_stomatal_resistance", "s/m"),
             ("threshold_lai", "m2/m2"),
@@ -735,6 +755,7 @@ pub fn transpiration_from_bounded(
     );
     for field in [
         "aerodynamic_resistance",
+        "chamber_aerodynamic_resistance",
         "surface_resistance",
         "leaf_stomatal_resistance",
         "threshold_lai",
@@ -762,6 +783,7 @@ pub fn transpiration_from_bounded(
     ));
     TranspirationParams {
         aerodynamic_resistance: v["aerodynamic_resistance"],
+        chamber_aerodynamic_resistance: v["chamber_aerodynamic_resistance"],
         surface_resistance: v["surface_resistance"],
         leaf_stomatal_resistance: v["leaf_stomatal_resistance"],
         threshold_lai: v["threshold_lai"],
@@ -2441,7 +2463,11 @@ parameters:
     /// Mirrors `test_transp_loader_rejects_non_positive`.
     #[test]
     fn a_non_positive_transpiration_resistance_is_rejected() {
-        for field in ["aerodynamic_resistance", "surface_resistance"] {
+        for field in [
+            "aerodynamic_resistance",
+            "chamber_aerodynamic_resistance",
+            "surface_resistance",
+        ] {
             for bad in ["0.0", "-1.0"] {
                 let broken = value_of(TRANSPIRATION_YAML, field, bad);
                 rejects(
@@ -2457,6 +2483,24 @@ parameters:
             transpiration_from(TRANSPIRATION_YAML, "transpiration.yaml").surface_resistance,
             70.0
         );
+    }
+
+    /// The sealed chamber's air resistance (2026-10-15,
+    /// `docs/plans/post-roadmap-chamber-air-resistance-adopted.md`): Monje & Bugbee (2019)'s measured
+    /// 7.5 s/m, CITED where the open field's 50 is not, and the selector hands each room its own.
+    #[test]
+    fn a_sealed_chamber_reads_the_measured_air_resistance() {
+        let p = transpiration();
+        assert_eq!(p.chamber_aerodynamic_resistance, 7.5);
+        assert_eq!(p.aerodynamic_resistance_for(true), 7.5);
+        assert_eq!(p.aerodynamic_resistance_for(false), 50.0);
+        let line = TRANSPIRATION_YAML
+            .lines()
+            .skip_while(|l| !l.starts_with("  chamber_aerodynamic_resistance:"))
+            .find(|l| l.trim_start().starts_with("source:"))
+            .expect("the chamber value carries a source");
+        assert!(!line.contains("TODO(cite)"), "the chamber value is cited: {line}");
+        assert!(line.contains("[F] p. 19"), "{line}");
     }
 
     /// The twelve coefficients moved from code into the two water files on 2026-10-10

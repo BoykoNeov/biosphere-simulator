@@ -927,6 +927,14 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-15 — plumbing ahead of the chamber air resistance: `chamber_aerodynamic_resistance` (7.5 s/m,
+  Monje & Bugbee 2019) added to `transpiration.yaml`, read by nothing yet. No golden moved;
+  `transpiration.yaml`'s digest is the only manifest change.** The first of two commits of the adoption the
+  user called with *"1"* (value 7.5, every sealed chamber; the open field keeps 50). Plan and predictions,
+  committed before code: `docs/plans/post-roadmap-chamber-air-resistance-adopted.md`. The new key is loaded,
+  unit-guarded, positivity-guarded and pinned, and `TranspirationParams::aerodynamic_resistance_for(sealed)`
+  is the one selector a flow or instrument takes it through. The open field's `aerodynamic_resistance`
+  source line now says it is the open field's only. `regen_goldens`: 20 of 20 identical.
 - **2026-10-10 — THE WATER FORMS ADOPTED: Szeicz–Long's leaf-area canopy resistance, the bare soil's
   two-stage evaporation drawing on the whole root zone, watering in events (FAO-56's trigger), new roots
   credited with the deep store's actual wetness, and the deep store's excess recycled. 6 goldens here

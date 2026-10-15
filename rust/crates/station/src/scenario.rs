@@ -935,6 +935,7 @@ mod water_geometry_tests {
         // so the two halves of the same claim are visible in one place.
         let transp = domains::biosphere::params::transpiration();
         assert!(transp.aerodynamic_resistance > 0.0 && transp.surface_resistance > 0.0);
+        assert!(transp.chamber_aerodynamic_resistance > 0.0);
     }
 
     /// A CONSISTENCY REQUIREMENT ACROSS TWO FILES, enforced here because nothing else can.

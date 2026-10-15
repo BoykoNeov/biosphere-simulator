@@ -49,6 +49,9 @@
 #   [E] Soltani, A. & Sinclair, T.R. (2012), "Modeling Physiology of Crop Development,
 #       Growth and Yield", CABI, Wallingford. Ch. 13 Table 13.1 (soil hydraulic values) and
 #       Ch. 14 (soil evaporation after Amir & Sinclair 1991; Box 14.1, the program).
+#   [F] Monje, O. & Bugbee, B. (2019), "Radiometric Method for Determining Canopy Stomatal
+#       Conductance in Controlled Environments", Agronomy 9(3):114,
+#       doi 10.3390/agronomy9030114 (open access, CC BY 4.0).
 
 name: winter_wheat
 process: transpiration
@@ -57,7 +60,11 @@ parameters:
   aerodynamic_resistance:
     value: 50.0
     unit: "s/m"
-    source: "TODO(cite) — provisional, literature-typical canopy aerodynamic resistance r_a (~30–100 s/m, wind/height-dependent) [A][C]; primary citation pending Step 11"
+    source: "TODO(cite) — provisional, literature-typical canopy aerodynamic resistance r_a (~30–100 s/m, wind/height-dependent) [A][C]; primary citation pending Step 11. The OPEN FIELD's value only since 2026-10-15: every sealed build reads chamber_aerodynamic_resistance"
+  chamber_aerodynamic_resistance:
+    value: 7.5
+    unit: "s/m"
+    source: "[F] p. 19 (Discussion), verbatim: 'The gA for the wheat (5.5 mol m-2 s-1 or 7.5 s m-1)'; 5.5 mol m-2 s-1 is 7.56 s/m at this model's air (1.205 kg/m3, sea level, 20 C). Read by every SEALED build (the scenario's sealed flag); the open field keeps aerodynamic_resistance. LOCUS: an HPS-lit ~1 m2 wheat chamber, fan 1.7 m/s over the canopy (p. 5); NASA's BPC ran 0.2-1.2 m/s, so in a slower-aired room 7.5 is a lower bound, not an estimate. docs/plans/post-roadmap-chamber-air-resistance-adopted.md"
   surface_resistance:
     value: 70.0
     unit: "s/m"
