@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `chamber-air-resistance.md`
+**Re-read against the record's last row:** `chamber-air-resistance-adopted.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -543,6 +543,10 @@ bears on the vapour item's "would not notice" below only as more evidence in the
 to ×1.6 the chambers' transpiration, watering still keeps every crop above its stress thresholds and no
 carbon moves. Nothing added to §2 or §3; the value it would need has no source (the record's own open
 question, not this plan's).
+⚠ *Re-read 2026-10-15* (`log/chamber-air-resistance-adopted.md`, OPENED, the cited 7.5 s/m for every
+sealed chamber): grepped this plan again for aerodynamic, Penman, transpiration, resistance, condensate and
+re-sow. Still no air-resistance item, so this discharges nothing and adds nothing to §2 or §3; the source
+the 2026-10-14 note said was missing now exists (Monje & Bugbee 2019), and the record carries it.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
