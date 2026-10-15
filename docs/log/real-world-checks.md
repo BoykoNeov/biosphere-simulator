@@ -150,5 +150,13 @@ It is also the first source for a
 chamber air resistance, which the closed price had said did not exist; the decision to keep 50 is the
 user's. Bugbee & Salisbury 1988 is free but behind a bot check from here.
 
+**The scored row reads the chamber value (2026-10-15).** The user adopted Monje & Bugbee's 7.5 s m⁻¹ for
+every sealed chamber and chose that the TM row read it too
+(`docs/plans/post-roadmap-chamber-air-resistance-adopted.md` §10; `log/chamber-air-resistance-adopted.md`).
+The row's water now reads **1.04** of the 20 m² level (0.83 on the trays; whole-run mean 0.95), up from
+0.62; every carbon row and the end crop are bit-identical. The water-gap instruments above keep 50, as
+recorded. The source's coupling is a best case for the BPC, so this is an upper reading, not a match — and
+still no cause named.
+
 **Lesson:** a model setting that is kept is not evidence — once a lever is fixed, the remaining fit points at
 whatever is left, so say which cause the fixed lever excluded before reading the residual.

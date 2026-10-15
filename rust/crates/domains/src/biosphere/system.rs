@@ -925,7 +925,9 @@ fn transpiration_flow(
         rn_var: RN_VAR.to_string(),
         vpd_var: VPD_VAR.to_string(),
         temp_var: TEMP_VAR.to_string(),
-        aerodynamic_resistance: p.transp.aerodynamic_resistance,
+        // A sealed room's air resistance is the chamber's measured 7.5 s/m, the open field's the
+        // uncited 50 (docs/plans/post-roadmap-chamber-air-resistance-adopted.md).
+        aerodynamic_resistance: p.transp.aerodynamic_resistance_for(scenario.sealed),
         surface_resistance: p.transp.surface_resistance,
         ground_area: scenario.ground_area,
         rooted_depth_aux: ROOTED_DEPTH.to_string(),
@@ -3506,9 +3508,10 @@ mod tests {
     /// ⚠ The claim is sharper than "not a ratchet" and the tolerance says so. The rule
     /// this replaced returned the abandoned column *at the drained upper limit*, which made
     /// every cycle start identical from year 2; the FRACTION rule instead CONVERGES — one
-    /// transient cycle, then a fixed point held to round-off. So the assertion is a
-    /// convergence at 1e-12, four orders below the transient it has to distinguish itself
-    /// from, plus the transient's own existence and direction.
+    /// transient cycle (two since 2026-10-15, the second ~2e-9 of the first), then a fixed
+    /// point held to round-off. So the assertion is a convergence at 1e-12, orders below the
+    /// transient it has to distinguish itself from, plus the transient's own existence, its
+    /// collapse in the second cycle, and its direction.
     /// ⚠ HONEST SCOPE, measured rather than assumed. This catches a return that STOPS (the
     /// true ratchet: the store steps down every cycle), not a return that is merely the
     /// wrong SIZE. A multiplicative drift on the fraction — `× 1.000001` — converges to a
@@ -3528,14 +3531,31 @@ mod tests {
     fn the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years() {
         let book = pre_adoption_params();
         let scenario = perennial_chamber_scenario();
-        let years = PERENNIAL_CHAMBER_YEARS;
+        // ⚠ SIX years since 2026-10-15 (the name is kept: the census and the plans cite it). The
+        // transient grew to two cycles, so a five-year run would leave the fixed-point check two
+        // values to compare; one more year keeps it at three, as before.
+        let years = PERENNIAL_CHAMBER_YEARS + 1;
         let (state, integrator, resolver) =
             super::super::season_setup_with(&scenario, years, &book).unwrap();
         let mut below: Vec<f64> = Vec::new();
         let mut both: Vec<f64> = Vec::new();
+        let mut water: Vec<f64> = Vec::new();
         let mut observe = |s: &State| {
             below.push(s.stocks[SUBSOIL_WATER].amount);
             both.push(s.stocks[SUBSOIL_WATER].amount + s.stocks[SOIL_WATER].amount);
+            // Every stock that carries water, by its composition — the chamber's full total.
+            water.push(
+                s.stocks
+                    .values()
+                    .map(|k| {
+                        k.amount
+                            * k.composition
+                                .get(&simcore::quantities::Quantity::Water)
+                                .copied()
+                                .unwrap_or(0.0)
+                    })
+                    .sum(),
+            );
         };
         let year = super::super::season_steps();
         let (_, rationed, _) = run_perennial_with(
@@ -3556,31 +3576,70 @@ mod tests {
         // after the reset", not "one day after".
         let at_cycle_start: Vec<f64> = (1..years).map(|i| below[i * year + 1]).collect();
         assert_eq!(at_cycle_start.len(), years - 1);
-        let settled = &at_cycle_start[1..];
+        // ⚠ The transient is TWO cycles wide since 2026-10-15 (was one). At the chamber's
+        // measured air resistance (7.5 s/m, `docs/plans/post-roadmap-chamber-air-resistance-
+        // adopted.md` §9) the store reads 167.9026, 167.57357515255570, 167.57357515193095,
+        // 167.5735751519298 kg: the second step is 3.7e-12 relative, above this 1e-12, and the
+        // third is 7e-15. Restated rather than widened: the fixed point is held to 1e-12 from
+        // the third cycle, and the second step must be a vanishing fraction of the first.
+        // ⚠ The fixed-point check compares cycles 3, 4 and 5 — three values, as cycles 2, 3 and
+        // 4 were before; the run is a year longer to keep that (above). And
+        // the "fixed point" itself slides at the rounding lean below (-6.8e-15 a cycle at 7.5,
+        // -4.4e-15 at 50, measured over 12 cycles), which this 1e-12 cannot see for ~150 cycles.
+        let settled = &at_cycle_start[2..];
         for v in settled {
             assert!(
                 (v - settled[0]).abs() <= 1e-12 * settled[0].abs(),
                 "the below-root store drifts rather than settling: {at_cycle_start:?}"
             );
         }
-        // The transient is ONE cycle wide, small, and in one direction — not the first two
-        // steps of a slow ratchet that happen to look flat at this tolerance.
+        // A CONVERGENCE and not the first steps of a slow ratchet: a ratchet steps by about
+        // the same amount every cycle; this one's second step is 1.9e-9 of its first at 7.5
+        // (9e-11 at 50), measured, held here to 1e-8 — ~5x, near this test's ~3x rule.
+        let first_step = (at_cycle_start[0] - settled[0]).abs();
+        let second_step = (at_cycle_start[1] - settled[0]).abs();
+        assert!(
+            second_step < 1e-8 * first_step,
+            "the second cycle still steps: {at_cycle_start:?}"
+        );
+        // The first step is small and in one direction.
         assert_ne!(at_cycle_start[0], settled[0]);
         // ⚠ 4e-3 since 2026-10-01 (was 1e-3), the USER's call at the Step 3b freeze
         // (`docs/plans/post-roadmap-chamber-dryness.md` §4.4, §4.6). Reading the chamber's own
         // air raised potential transpiration +20.55 %, which leaves year 1's root zone further
         // from the settled cycle: the transient went 3.39e-4 -> 1.203e-3 while the convergence
         // above still holds to 1e-12. The bound is ~3x the measured transient, the same rule
-        // that set 1e-3; it was never tied to a physical limit.
+        // that set 1e-3; it was never tied to a physical limit. At 7.5 s/m (2026-10-15) the
+        // transient measures 1.96e-3, inside it; the bound is unchanged.
         assert!((at_cycle_start[0] - settled[0]).abs() / settled[0] < 4e-3);
         assert!(at_cycle_start[0] > settled[0]);
-        // The two soil stores TOGETHER are conserved across every cycle boundary, which is
-        // what says the convergence is a REDISTRIBUTION and not a leak.
-        let totals: Vec<f64> = (1..years).map(|i| both[i * year + 1]).collect();
-        for t in &totals {
+        // NO LEAK, and the cycle REPEATS — two claims, each held to a stated ROUNDING BUDGET
+        // per cycle (since 2026-10-15, the USER's call; `docs/plans/post-roadmap-chamber-air-
+        // resistance-adopted.md` §9b). Until then this read "the two soil stores together are
+        // conserved" at a flat 1e-14 — but the soil pair is not a closed set (vapour and
+        // condensate hold water too), and the chamber's FULL water total is not exact either:
+        // measured over 12 cycles it falls in a straight line, -5.8e-15 of 195 kg a cycle at
+        // 7.5 s/m and -3.8e-15 at 50 — a rounding LEAN in the water path, the same sign every
+        // cycle, present before the change and only faster with it. At 50 the flat 1e-14 was
+        // reached in cycle 5, one past this test's horizon; at 7.5 in cycle 4. Not hunted: an
+        // open item. The budget is 2e-14 a cycle, ~3x the faster measured lean.
+        const ROUNDING_PER_CYCLE: f64 = 2e-14;
+        // NO LEAK: the chamber's full water total — the claim that the convergence above is a
+        // REDISTRIBUTION — drifts by no more than rounding.
+        let full: Vec<f64> = (1..years).map(|i| water[i * year + 1]).collect();
+        for (k, t) in full.iter().enumerate() {
             assert!(
-                (t - totals[0]).abs() <= 1e-14 * totals[0].abs(),
-                "the two stores together are not conserved across cycles: {totals:?}"
+                (t - full[0]).abs() <= k as f64 * ROUNDING_PER_CYCLE * full[0].abs(),
+                "the chamber's water drifts past rounding across cycles: {full:?}"
+            );
+        }
+        // The cycle REPEATS: the two soil stores together land in the same place at every
+        // re-sow, to the same budget (measured -6.1e-15 a cycle at 7.5).
+        let totals: Vec<f64> = (1..years).map(|i| both[i * year + 1]).collect();
+        for (k, t) in totals.iter().enumerate() {
+            assert!(
+                (t - totals[0]).abs() <= k as f64 * ROUNDING_PER_CYCLE * totals[0].abs(),
+                "the two soil stores do not return to the same total: {totals:?}"
             );
         }
         // NON-VACUITY: the store really is drawn down within a year, so "no ratchet" is not

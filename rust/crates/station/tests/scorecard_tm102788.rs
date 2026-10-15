@@ -9,6 +9,14 @@
 //! chamber's counterpart) with vernalization off, every weather-derived forcing replaced by the
 //! trial's conditions. Model day 0 is TM day 3, when the lamps came on (p. 5).
 //!
+//! ⚠ **The scored row reads the CHAMBER's air resistance** since 2026-10-15 (the user's call,
+//! `docs/plans/post-roadmap-chamber-air-resistance-adopted.md` §10): the trial was a chamber, but
+//! the open build would read the open field's 50 s m⁻¹, so [`run_row`] sets it to
+//! `aerodynamic_resistance_for(true)` — the adopted 7.5, not a what-if. The row, its conditions,
+//! its books and its rerun read it; the water-gap instruments below (plan §10–§13 of
+//! `post-roadmap-real-world-checks.md`) keep [`run`] at the open field's value, as their recorded
+//! numbers were taken.
+//!
 //! ⚠ **This is a diagnostic, not a gate.** It asserts only its own instrument — the books, the
 //! replaced weather, the trial's non-limiting water and nitrogen, the unit arithmetic — and prints
 //! the scorecard. No ratio is pinned: a pinned ratio would make every science change re-pin it.
@@ -147,9 +155,25 @@ struct Run {
     water: Vec<f64>,
 }
 
+/// The open build as frozen: the open field's air resistance (50 s m⁻¹). The water-gap
+/// instruments' baseline.
 fn run(ca: f64) -> Run {
     let s = scenario(ca);
     run_built(&s, build_season(&s).expect("build"), 1.0)
+}
+
+/// The frozen params with the air resistance a sealed build reads (7.5 s m⁻¹, Monje & Bugbee
+/// 2019) — the open build's only route to it, since the trial cannot ride the `sealed` flag.
+fn chamber_params() -> BiosphereParams {
+    let mut p = params::biosphere();
+    p.transp.aerodynamic_resistance = p.transp.aerodynamic_resistance_for(true);
+    p
+}
+
+/// The scored row: the open build at the chamber's air resistance.
+fn run_row(ca: f64) -> Run {
+    let s = scenario(ca);
+    run_built(&s, build_season_with(&s, &chamber_params()).expect("build"), 1.0)
 }
 
 /// The water-gap WHAT-IF (plan §10): other params and/or a scaled lamp net radiation.
@@ -275,7 +299,7 @@ fn every_weather_forcing_is_the_chambers() {
 
 #[test]
 fn the_crop_is_never_short_of_water_or_nitrogen_as_in_nutrient_solution() {
-    let r = run(CA_ROW);
+    let r = run_row(CA_ROW);
     let nitro = params::biosphere().nitro;
     let (mut min_ftsw, mut min_fn) = (f64::MAX, f64::MAX);
     for s in &r.states {
@@ -303,7 +327,7 @@ fn the_crop_is_never_short_of_water_or_nitrogen_as_in_nutrient_solution() {
 /// seedling's first day, and an efflux on every fully dark step. The first draft read 0 at night.
 #[test]
 fn the_books_see_the_night_and_the_day() {
-    let r = run(CA_ROW);
+    let r = run_row(CA_ROW);
     for d in TM_DAY0..TM_LAST_DAY {
         assert!(steps_of(d, 0.0).count() > 0 && steps_of(d, 1.0).count() > 0);
         assert!(night_resp(&r, d) > 0.0, "no night respiration on TM day {d}");
@@ -313,15 +337,33 @@ fn the_books_see_the_night_and_the_day() {
 
 #[test]
 fn the_row_is_bit_identical_on_a_rerun() {
-    let (a, b) = (run(CA_ROW), run(CA_ROW));
+    let (a, b) = (run_row(CA_ROW), run_row(CA_ROW));
     assert!(a.co2.iter().zip(&b.co2).all(|(x, y)| x.to_bits() == y.to_bits()));
     assert!(a.water.iter().zip(&b.water).all(|(x, y)| x.to_bits() == y.to_bits()));
+}
+
+/// The chamber's air resistance moves the row's WATER and nothing else: every CO₂ step and the end
+/// crop bit-identical to the row at the open field's 50, the water not (plan T2,
+/// `docs/plans/post-roadmap-chamber-air-resistance-adopted.md` §10). It holds because the crop is
+/// never water-limited here (the conditions test), so no carbon path reads the water.
+#[test]
+fn the_chamber_air_moves_the_rows_water_and_nothing_else() {
+    let (open, row) = (run(CA_ROW), run_row(CA_ROW));
+    assert!(open.co2.iter().zip(&row.co2).all(|(a, b)| a.to_bits() == b.to_bits()));
+    let (a, b) = (open.states.last().unwrap(), row.states.last().unwrap());
+    for k in [LEAF_C, STEM_C, ROOT_C, STORAGE_C, STEM_RESERVE_C, PLANT_N] {
+        assert_eq!(a.stocks[k].amount.to_bits(), b.stocks[k].amount.to_bits(), "{k} moved");
+    }
+    // NON-VACUITY: the row really does read the chamber value.
+    let w1 = |r: &Run| mean(W1_DAYS.map(|d| daily_water(r, d)));
+    eprintln!("T2: W1 at the open field's 50 {:.4}, at the chamber's 7.5 {:.4}", w1(&open), w1(&row));
+    assert!(w1(&row) > w1(&open), "the chamber value did not reach the water");
 }
 
 /// The scorecard itself: printed, never asserted (`--nocapture` to read it).
 #[test]
 fn scorecard() {
-    let r = run(CA_ROW);
+    let r = run_row(CA_ROW);
     let (peak, peak_day) = (TM_DAY0..TM_LAST_DAY)
         .map(|d| (day_uptake_peak(&r, d), d))
         .fold((f64::MIN, 0), |a, b| if b.0 > a.0 { b } else { a });
@@ -336,7 +378,7 @@ fn scorecard() {
     let b1 = plant_c(end) / DEFAULT_SCENARIO.ground_area;
     // TM p. 10 says only "about 40 kg of total biomass" — whether roots are in it is not stated.
     let b1_shoot = (plant_c(end) - end.stocks[ROOT_C].amount) / DEFAULT_SCENARIO.ground_area;
-    let c1_setpoint = net_fixed(&run(CA_SETPOINT), 10, 84);
+    let c1_setpoint = net_fixed(&run_row(CA_SETPOINT), 10, 84);
 
     let rows: [(&str, f64, f64, &str); 10] = [
         ("U1 peak daytime net uptake (µmol m⁻² s⁻¹)", peak, 27.0, "rate"),
@@ -350,7 +392,11 @@ fn scorecard() {
         ("B1 plant C at day 86, roots out", b1_shoot, 66.7, "total"),
         ("W2 mean transpiration (L m⁻² d⁻¹)", w2, 4.5, "total"),
     ];
-    eprintln!("\nTM 102788 scorecard (ci = {:.0} ppm):", scenario(CA_ROW).ci);
+    eprintln!(
+        "\nTM 102788 scorecard (ci = {:.0} ppm, air resistance {} s m⁻¹):",
+        scenario(CA_ROW).ci,
+        chamber_params().transp.aerodynamic_resistance
+    );
     for (name, model, tm, kind) in rows {
         eprintln!("  {name:<48} model {model:>9.4}  TM {tm:>6.2}  ratio {:>7.4}  [{kind}]", model / tm);
     }

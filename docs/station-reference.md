@@ -358,6 +358,19 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-15 — the biosphere's chamber air resistance adopted, delegated: 4 station goldens move
+  (`greenhouse`, `harvest`, `lighting`, `sealed_station`) and their 4 `golden_sha256` rows follow. Water
+  only. No station flow, param or seam changed; one station-side edit rides along: the TM 102788
+  scorecard's scored row reads the chamber value.** Every sealed build now reads Monje & Bugbee (2019)'s
+  7.5 s/m (the biosphere entry of the same date; plan `docs/plans/post-roadmap-chamber-air-resistance-adopted.md`).
+  Day 7: `lighting` root zone −0.171 %, condensate +0.411 %; `greenhouse` −0.144 / +0.303 %; `harvest`
+  −0.013 / +0.192 %. `sealed_station` (4 yr, lamp-lit): root-zone outflow +86.7 % over the run; end state
+  root zone −21.7 %, below the roots +32.7 %, condensate +21.5 %. **The scorecard** (`tests/scorecard_tm102788.rs`,
+  a diagnostic, not a gate): the trial ran on an open build, so the row takes the chamber value through
+  `run_row` (the frozen params with `aerodynamic_resistance_for(true)`); its water ratio goes 0.62 → 1.04,
+  and a new assertion holds every CO₂ step and the end crop bit-identical to the row at 50. The water-gap
+  instruments keep the open field's 50, as their numbers were recorded. `station/src/scenario.rs` asserts
+  the chamber value is positive.
 - **2026-10-14 — the station assemblies seed the soil account's starting values: 4 station goldens move
   (`greenhouse`, `harvest`, `lighting`, `sealed_station`) and their 4 `golden_sha256` rows follow. Water
   only; no carbon stock moves in any. No station flow, param, seam or claim changed.** A bug: the four

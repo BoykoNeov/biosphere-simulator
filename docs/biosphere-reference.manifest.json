@@ -181,13 +181,13 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "848b5a42ae52aed6534c2429223c00a12b5f38b99399127d982c8d62200d9634",
+      "golden_sha256": "d68306c4cc2bba4ace2b6ff530eec429576c56a033b8d60e4a2b61e155769d67",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "17b81325653a9823f9a1b628b70ae6ebbf08568465d5d11eb8e26be7a5d5781a",
+      "golden_sha256": "93e605467a226cbe46296bc9af90275d492a269853b949f6ae399151c603d33f",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
@@ -205,19 +205,19 @@
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "04a6e9ff8034bca17926053e4c518cbd6604f971b62fb02aa3b0ffddf0597875",
+      "golden_sha256": "1bc9db9b155cc04136cfeff8aedfeee469a8c7df9e7bb0acb9a7fa2ad13b8b51",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "9c2e91f61147c474ebefedf074313ffb59ce3e72254082d81f59b35abfca154d",
+      "golden_sha256": "eec66da990907a728c0a9e2ab39e49c048a5324e2d96a08fc758eb7d29618576",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "6a13a6bb7c6f952821808a61b31a3d3fb399d8f9f6e53fdf9906baef77c20f9b",
+      "golden_sha256": "0285d37ccf78b2ac94c36bd2e461f33234f2d6dc64d07a0f3e79f111fa319911",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

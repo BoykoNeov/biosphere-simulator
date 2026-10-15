@@ -1112,3 +1112,13 @@ Leaf over air in every case: −0.30 to +0.23 K.
 * **For the model:** every combination that reaches the trial needs `ra` far below 50 (at most ~17.5 even
   with the source's full glass-barrier heat). Keeping 50 is the user's decision and stands; this is what it
   leaves unexplained.
+
+## 14. The scored row reads the chamber value (2026-10-15)
+
+The user adopted the 7.5 s m⁻¹ of §13e for every sealed chamber and chose that this row read it too
+(`post-roadmap-chamber-air-resistance-adopted.md` §10). `scorecard`, the conditions test, the books test
+and the rerun now run through `run_row` (the frozen params with `aerodynamic_resistance_for(true)`); §10–§13's
+instruments keep the open field's 50, so their recorded numbers stand. Measured: W1 **4.3409, 1.041** of 4.17
+(0.833 of 5.21); W2 4.2549, 0.946; every CO₂ step and the end crop bit-identical to the row at 50 (asserted:
+`the_chamber_air_moves_the_rows_water_and_nothing_else`); lowest FTSW 0.4461. §13i's caveat stands: the
+source's air was faster than the BPC's, so 1.04 is an upper reading.

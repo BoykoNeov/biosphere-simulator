@@ -204,7 +204,7 @@ fn each_lab_form_reaches_the_water_flow_exactly() {
                     env.get(RN_VAR).unwrap(),
                     vpd,
                     temp,
-                    p.transp.aerodynamic_resistance,
+                    p.transp.aerodynamic_resistance_for(s.sealed),
                     rs,
                 ) * f_water
                     * s.ground_area

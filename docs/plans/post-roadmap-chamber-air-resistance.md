@@ -138,6 +138,12 @@ The test asks every cycle after the first to sit within 1e-12 of the second; the
 So it still converges — by ~400× a cycle — and the frozen claim "one transient cycle, then a fixed point
 to round-off" becomes "two cycles". Not run at 30 or 15.
 
+⚠ **Correction (2026-10-15, the adoption's §9b).** Not the one behaviour red: the same test's next check —
+the two soil stores' total at each re-sow, held to a flat 1e-14 — would have gone red at 9 too (−1.83e-14
+by cycle 4; at 15, −1.74e-14), unseen because the test stopped at its first failing check. It is a rounding
+lean in the water path, present at 50 and faster at a lower `r_a`
+(`docs/plans/post-roadmap-chamber-air-resistance-adopted.md` §9b).
+
 ### 7c. Two reds belong to the branch, not to the price
 
 * `scenario_flag_types::the_toggle_roster_is_every_bool_field_of_the_scenario` — the branch's new

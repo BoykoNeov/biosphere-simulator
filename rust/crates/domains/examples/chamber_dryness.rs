@@ -62,7 +62,7 @@ fn run(scn: &SeasonScenario, years: usize, perennial: bool, read: VpdRead) -> Ta
                 rn,
                 vpd,
                 temp,
-                p.transp.aerodynamic_resistance,
+                p.transp.aerodynamic_resistance_for(scn.sealed),
                 p.transp.surface_resistance,
             )
         };

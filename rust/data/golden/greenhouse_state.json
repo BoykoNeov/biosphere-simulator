@@ -8,7 +8,7 @@
     "station.plant_window.par": "0x0.0p+0",
     "station.plant_window.temp": "0x1.a147ae147ae14p+3",
     "thermal_time": "0x0.0p+0",
-    "top_soil_water": "0x1.c24535e2c39efp+2",
+    "top_soil_water": "0x1.c0387bb1a67e4p+2",
     "vernalization_days": "0x0.0p+0"
   },
   "n": 112,
@@ -42,7 +42,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.51fd5430e9b8fp+3",
+      "amount": "0x1.5303b14978496p+3",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -198,7 +198,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.62c7889e20e39p+4",
+      "amount": "0x1.62445a11d99b2p+4",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },

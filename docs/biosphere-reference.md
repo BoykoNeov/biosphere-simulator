@@ -927,6 +927,23 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-15 — A CITED AIR RESISTANCE FOR EVERY SEALED CHAMBER: the transpiration flow reads
+  `aerodynamic_resistance_for(scenario.sealed)` — Monje & Bugbee (2019)'s measured 7.5 s/m in every sealed
+  build, the open field's 50 elsewhere. 5 goldens here (`sealed_chamber`, `perennial_chamber`,
+  `perennial_long_horizon`, `consumer_chamber`, `consumer_long_horizon`; 4 more on the station), their
+  `golden_sha256` rows. Water only, bit for bit.** The second commit of the adoption the user called with
+  *"1"* (value 7.5 over the price's 6.4–9 — 7.56 at the model's own air density; scope: every sealed room).
+  Plan, predictions and grading: `docs/plans/post-roadmap-chamber-air-resistance-adopted.md` §6–§11. No
+  flow, aux or param key added or removed; `season_euler` and the two drift summaries byte-identical.
+  **What moved:** only soil, below-root and condensate water and the soil account's water aux; the
+  multi-year end states swing either way (snapshots inside a watering cycle). **Behaviour.** The re-sow
+  cycle settles in two cycles instead of one; its test was restated, not widened, and runs six years. Its
+  soil-total check exposed a rounding lean in the water path — the chamber's full water total falls
+  −5.8e-15 a cycle at 7.5 (−3.8e-15 at 50, present before) — now held to a stated budget of 2e-14 a cycle,
+  the user's call; the lean is an open item. **Source caveat:** the 7.5 is the source's best-case
+  coupling (its fan ran faster than NASA's chamber), cited with that locus. The energy side — evaporation's
+  heat, the dehumidifier's load — is unmeasured, not zero. The TM 102788 scorecard's scored row now reads
+  the chamber value (the station entry of this date).
 - **2026-10-15 — plumbing ahead of the chamber air resistance: `chamber_aerodynamic_resistance` (7.5 s/m,
   Monje & Bugbee 2019) added to `transpiration.yaml`, read by nothing yet. No golden moved;
   `transpiration.yaml`'s digest is the only manifest change.** The first of two commits of the adoption the
