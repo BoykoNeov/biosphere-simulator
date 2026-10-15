@@ -96,4 +96,6 @@ sensitivity) are untouched and stand as recorded. **HOUSEKEEPING, DECLARED NOT L
 worktree and the branch `leaf-expansion-rebase` are **kept deliberately** so a decision need
 not redo the rebase; `step.py` is restored to the shipped `BIO_DT = 0.25` there and the tree
 is clean; `leaf-expansion-blocked` is **unchanged** at `cb668f6` — the rebase is a second
-branch, not a rewrite of the parked one.
+branch, not a rewrite of the parked one. ⚠ *2026-10-15, on the user's call:* both are now
+**annotated tags of the same name** (on origin) and the branches are deleted, so every command
+in the record that names them still resolves to the same commit.
