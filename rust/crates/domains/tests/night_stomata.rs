@@ -139,7 +139,8 @@ fn closing_reaches_the_flow_on_a_dark_step_by_exactly_the_rule() {
             .sum::<f64>()
     };
 
-    let frozen = params::biosphere();
+    // The baseline is named OPEN, not taken from the loader, so the check survives an adoption.
+    let frozen = params_with(NightStomata::Open);
     let tp = frozen.transp;
     let env = resolver.bind(&state, BIO_DT);
     let (vpd, temp) = (env.get(VPD_VAR).unwrap(), env.get(TEMP_VAR).unwrap());

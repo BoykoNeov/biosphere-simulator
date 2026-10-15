@@ -194,7 +194,30 @@ over the 716 warm days; closing them as the dark windows close would remove anot
 (booting) or ~0.44 GJ (heading) — about as much again as the dark windows have left. A lit-fraction
 rule is the form that would; it needs a lit-fraction signal the flow does not have.
 
+**The four other readers of `science::canopy_surface_resistance`, re-read (as §2 promised).**
+
+* `station/tests/scorecard_tm102788.rs` — **integrates nights at the day value.** `w1_by_hand` and
+  `w1_by_hand_with` sum every step of a TM day, dark ones included, at one daytime `rs`; the §11 Q2
+  "model / hand" line and the §13 rows would drift on adoption. All print, none asserts — except R1
+  (`a_what_if_air_resistance_reaches_the_water_flow`), which runs the CONSTANT form, where the rule is
+  not read, so it stays exact. On adoption: apply the rule in the by-hand path, or say the rows are
+  daytime-resistance arithmetic.
+* `domains/tests/canopy_resistance.rs` (flow = by hand to 1e-12) — biosphere scenarios on the weather's
+  daily mean: never a dark step, unaffected.
+* `domains/tests/soil_evaporation.rs` S3 (crop + soil radiation term ≤ net radiation) — a closed stoma
+  only lowers the crop term; unaffected.
+* `domains/examples/chamber_dryness.rs` — reads the file's constant 70 s/m on a biosphere jar (daily-mean
+  light); unaffected.
+
+**The suite with closing adopted** (the worktree at `Closing(0.194)`, its two goldens rewritten,
+`--release --no-fail-fast`): three reds, **no behaviour pin among them** —
+`the_loader_keeps_the_stomata_open` (by design), `station` `manifest_writer`'s
+`the_committed_manifest_is_what_the_reference_writes` (the two golden hashes, the ceremony's
+regeneration), and `closing_reaches_the_flow_on_a_dark_step_by_exactly_the_rule`, an instrument fault:
+it took the loader's params as its open baseline, so under adoption the heading case compared with
+itself. Fixed on main the same day (the baseline is now `NightStomata::Open` by name).
+
 **What adoption would cost.** A biosphere unfreeze (the loader line and the two consts' citation
-standing in a frozen form), two station goldens, water only. The TM water match goes from 1.04 to
+standing in a frozen form), two station goldens, water only, and the station manifest regenerated. The TM water match goes from 1.04 to
 0.96–0.97 (3–4 % under, where it was 4 % over), and the trial's own record cannot say how much of
 its water was night water (`post-roadmap-real-world-checks.md` §12d).

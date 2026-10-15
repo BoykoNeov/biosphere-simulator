@@ -158,6 +158,9 @@ Three possible follow-ons, each its own decision, none started:
 
 * **Night-time stomatal closure** — a larger dark-hours `rs`, from a source to be found (the ASCE lead).
   A biosphere unfreeze; it would move water in every sealed golden and likely the TM ratio.
+  ⚠ *Corrected 2026-10-15* (`post-roadmap-night-stomata.md` §2a, §6): only the lamp-lit station builds
+  ever see a dark step — the biosphere jars read the outdoor daily mean — so two goldens move, not every
+  sealed one; the TM ratio did move (1.04 → 0.96–0.97).
 * **The room's lamp heat switched with the light** (on/off rather than a daily average) — a station
   unfreeze; it moves the chamber's temperature and heater books, not water.
 * **Latent heat in the room's books** (evaporation draws from the chamber store, condensation into the
