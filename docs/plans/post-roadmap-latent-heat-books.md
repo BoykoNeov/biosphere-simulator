@@ -252,3 +252,39 @@ The switch wired into `build_sealed_station_in` (after `wrap_last`), a worktree 
 **Wiring for adoption (advisor):** inside the reference build, not through the lab wrapper — its `n = 0`
 guard and seeded key would make any state saved before the change error at its first minute. A
 pre-adoption save needs an explicit answer (seed the key at load, or refuse with a clear message).
+
+## 8. Adoption (2026-10-15)
+
+**The user's answers** (all four as recommended): **adopt**; the structure walls' slow test **restated to
+the new truth** (the battery runs out, on a measured day); the **separate-air build gets the heat** (its
+water stays on the plant step) and the **minute-water lab option opts out** with a note; the coil's shared
+200 W **documented, not built** (§1b; the shared-coil count stays in the probe).
+
+### 8a. What changes
+
+* **Inside the reference build** (`build_sealed_station_unread`, so every sealed build and the
+  separate-air build inherit it), not through a lab wrapper: the transpiration flow shared with the
+  recorder, the recorder appended to the plant aux, `EVAPORATION_RATE_AUX` seeded at 0; and
+  `ChamberLatentHeat` in `sealed_fast_flows` (the one canonical fast list, which the separate-air build
+  re-uses with its own cabin air).
+* **The lab off switch** `station::latent_heat::without_latent_heat`: removes the recorder, the fast flow
+  and the seeded key (the shared flow stays: it delegates, so it computes what the plain flow computes).
+  The lab `with_latent_heat` goes.
+* **Minute water** (`air_split::build_split_station` with `transpiration: Minute`) applies the off switch
+  before moving the water, and says so; `water_on_fast_step` keeps refusing a build that carries the
+  recorder, so nothing reaches the minute step silently.
+* **A save from before the change** carries no rate key. Loading keeps the session's registries; the
+  first plant step after a group boundary records the key (the additive channel starts it from 0), so a
+  save at a group boundary resumes; one taken between a plant step and its minutes errors at the first
+  minute with the flow's own message.
+* The station manifest's `flow_set` gains `ChamberLatentHeat`; `sealed_station_state` regenerated.
+
+### 8b. Predictions (written before the build changes)
+
+| | prediction |
+|---|---|
+| A1 | `regen_goldens`: `sealed_station_state` only, and its bytes **identical to the §7b worktree's** (the wiring moves the recorder inside the plants' wrappers rather than sharing the wrapped flow; both see the same environment) |
+| A2 | the off switch on the adopted tree reproduces the **pre-adoption** golden byte-exact |
+| A3 | the reds of §7b, with two changes: `latent_heat.rs` rewritten for the default; the separate-air pair (`air_split.rs`) **turn green** without a restatement once the split build has the heat on both sides of its comparison — unless its minute variant moves the water, in which case it stays red and is restated as minute water without the heat |
+| A4 | the structure walls' battery runs out between days **900 and 1220** (§7: it ends at 1.8e4 J; the heater needs ~6.3 GJ more against a 1.48 GJ margin) |
+| A5 | anything else that builds through `build_sealed_station_unread` (the TM 102788 scorecard, the sowing-clock and gas-exchange tests, the shedding example) moves only as §7 did: water ≤ 0.3 %, and season-dated pins by one day |
