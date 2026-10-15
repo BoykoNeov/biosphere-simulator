@@ -342,6 +342,25 @@ impl TwoRate<'_> {
                     .into(),
             ));
         }
+        // ⚠ The same trap for the chamber's latent-heat books (2026-10-15,
+        // `docs/plans/post-roadmap-latent-heat-books.md`): every minute would draw the day's LAST
+        // window's evaporation rate, and the heat drawn would part from the ledger silently.
+        // Refused: switch the books off (`latent_heat::without_latent_heat`) for a slow-first record.
+        if order == DayOrder::SlowFirst
+            && self
+                .fast
+                .registry()
+                .flows()
+                .iter()
+                .any(|f| f.id() == crate::latent_heat::CHAMBER_LATENT_HEAT)
+        {
+            return Err(SimError::Validation(
+                "the slow-first day cannot run the chamber's latent-heat books: every minute would \
+                 draw the day's last window's evaporation. Switch them off \
+                 (latent_heat::without_latent_heat) to reproduce a slow-first record"
+                    .into(),
+            ));
+        }
         if order == DayOrder::SlowFirst {
             return Ok(DayGroups {
                 count: 1,

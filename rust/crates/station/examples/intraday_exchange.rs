@@ -409,6 +409,11 @@ fn sealed_measure(sc: &SealedStationScenario, with_harvest: bool, order: DayOrde
         GasExchangeStep::PlantStep,
     )
     .expect("build sealed");
+    // The record predates the chamber's latent-heat books (2026-10-15), and the slow-first day
+    // cannot carry them (every minute would draw the day's last window): switched off, on both
+    // orders and in the control, so the comparison stays like for like.
+    let (s0, bio, fast) =
+        station::latent_heat::without_latent_heat(s0, bio, fast).expect("books off");
     let bio_res = sealed_bio_resolver(&lamp, sc).expect("bio resolver");
     let fast_res = sealed_fast_resolver(&charge, sc).expect("fast resolver");
     let reset = sealed_reset_hook(sc);
@@ -452,6 +457,11 @@ fn control_full_sealed(interleaved: &State) {
         GasExchangeStep::PlantStep,
     )
     .expect("build sealed");
+    // The record predates the chamber's latent-heat books (2026-10-15), and the slow-first day
+    // cannot carry them (every minute would draw the day's last window): switched off, on both
+    // orders and in the control, so the comparison stays like for like.
+    let (s0, bio, fast) =
+        station::latent_heat::without_latent_heat(s0, bio, fast).expect("books off");
     let (states, _, _) = run_sealed(
         &EulerIntegrator::new(bio),
         &EulerIntegrator::new(fast),

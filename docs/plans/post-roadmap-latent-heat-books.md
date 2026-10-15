@@ -334,3 +334,21 @@ over four days equal λ × the total to 1e-12.
 **A standing caution (a side note, 2026-10-15):** the reference crop now matures ~6 % into its last day,
 closer to the line than before (11 %). A later change warming the room by ~0.03 K could take the day back
 and move grain ~−3.4 % with no mechanism behind it. Read a ~3 % grain move against the re-sow days first.
+
+### 8d. Closing checks (2026-10-16, after the advisor's review)
+
+* **A reader the §2 table missed: the retired slow-first day** (`DayOrder::SlowFirst`, lab-only). It runs
+  every plant step before every minute, so every minute would draw the day's LAST window's rate, and the
+  heat drawn would part from the ledger with no error — the trap the minute gas exchange is already
+  refused for. `TwoRate` now refuses a slow-first day whose fast registry carries `ChamberLatentHeat`
+  (tested: `the_slow_first_day_refuses_the_books`). Its one user, `examples/intraday_exchange.rs`,
+  switches the books off in its sealed builds (both orders and its control), as it already needed the
+  averaged lamp to reproduce its record. `day_order.rs` runs the lighting build (no chamber): unaffected.
+  No golden.
+* **The probe's default is now the adopted books**: the "without" runs of §5–§7 reproduce only with
+  `chamber_latent_heat -- --no-latent`; with no flag the probe runs the new form.
+* **The cited logs** (§6, §7, §7a, §7b) are kept at
+  `W:\Claude_projects\space-station\sources\temp-evidence\latent-heat-build\` (git-ignored, local; the
+  `W:\temp\claude\X` → `sources\temp-evidence\X` mapping of that folder's README).
+* **Status lines closed**: the estimate's §5b third bullet, its index row and record, and two memory notes
+  said the third follow-on was open.

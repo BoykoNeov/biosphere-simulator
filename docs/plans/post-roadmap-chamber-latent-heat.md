@@ -173,3 +173,6 @@ Three possible follow-ons, each its own decision, none started:
 * **Latent heat in the room's books** (evaporation draws from the chamber store, condensation into the
   cooler's path) — the §0 build. Only worth taking after the two above, since today it would book a deficit
   that is night transpiration under an averaged lamp.
+  **ADOPTED 2026-10-15** (`post-roadmap-latent-heat-books.md` §8): drawn minute by minute across the window
+  that moved the water, handed to the node; the heater 0.31 → 1.34 GJ (by day too: the reheat cost), each
+  crop a day longer.

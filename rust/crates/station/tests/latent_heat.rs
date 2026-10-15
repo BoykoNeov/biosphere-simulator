@@ -206,3 +206,55 @@ fn a_save_without_the_rate_key_resumes_at_a_group_boundary() {
     assert!(end.aux.contains_key(EVAPORATION_RATE_AUX));
     assert!(end.aux[EVAPORATED_TOTAL_AUX] > 0.0);
 }
+
+/// The retired slow-first day refuses the books: every minute would draw the day's last window's
+/// rate, and the heat drawn would part from the ledger without an error. With them switched off it
+/// runs (a plant-step gas exchange, so the gas refusal does not answer first).
+#[test]
+fn the_slow_first_day_refuses_the_books() {
+    let scenario = sealed_station_scenario();
+    let lamp = station::params::lamp();
+    let build_plant_step = || {
+        station::sealed::build_sealed_station_at(
+            &domains::params::charge(),
+            &domains::params::thermal(),
+            &domains::params::crew(),
+            &domains::params::eclss(),
+            &station::params::water_recovery(),
+            &lamp,
+            &station::params::harvest(),
+            &scenario,
+            false,
+            false,
+            station::gas_exchange::GasExchangeStep::PlantStep,
+        )
+        .expect("build")
+    };
+    let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
+    let fast_r = sealed_fast_resolver(&domains::params::charge(), &scenario).expect("fast");
+    for books in [true, false] {
+        let (state, bio, fast) = build_plant_step();
+        let (_, bio, fast) = if books {
+            (state, bio, fast)
+        } else {
+            without_latent_heat(state, bio, fast).expect("off")
+        };
+        let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
+        let two = TwoRate {
+            slow: &bio,
+            fast: &fast,
+            slow_resolver: &bio_r,
+            fast_resolver: &fast_r,
+            steps_per_day: scenario.steps_per_day,
+            slow_steps_per_day: scenario.bio_steps_per_day,
+            slow_dt: scenario.bio_dt,
+            fast_dt: scenario.cabin_dt,
+            slow_reset: None,
+        };
+        assert_eq!(
+            two.validate(DayOrder::SlowFirst).is_err(),
+            books,
+            "books {books}"
+        );
+    }
+}
