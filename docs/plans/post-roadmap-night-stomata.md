@@ -54,7 +54,7 @@ carried no light term and the stomata never close. `transpiration.yaml` says so 
   achieved rates of 5.7–18.9% of g_s"*, declining with age for most genotypes.
 * **[N3] ASCE-EWRI (2005) standardized reference ET, hourly form** — read through Snyder, R.L.,
   "Equations for Estimating ETos and ETrs with Hourly Weather Data" (UC Davis, 2002, after ASCE-EWRI
-  2004), not the standard itself: short grass `rs = 50 s/m` *"during daylight (when Rn > 0)"*,
+  2004; saved as `sources/snyder_2002_asce_hourly_ETos_ETrs.pdf`), not the standard itself: short grass `rs = 50 s/m` *"during daylight (when Rn > 0)"*,
   `200 s/m` *"during the night (when Rn ≤ 0)"* (night conductance 25 % of day); tall alfalfa 30 / 200
   (15 %). **LOCUS: reference surfaces, not wheat** — used here for the day/night RULE, not the value.
 
