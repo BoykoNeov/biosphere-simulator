@@ -80,8 +80,10 @@ FAO's class value; the heading gap is stated as the cost.
   value divided by `f`, the night-to-day conductance ratio. Otherwise unchanged. **The rule is
   ASCE's** ([N3], `Rn > 0` is day), applied to the model's own day resistance.
 * **Partly lit steps count as day** — ASCE's rule taken literally. At the 1/16 step a 16-h photoperiod
-  centred on midday (lights 04:00–20:00) leaves 1.5 of its 8 dark hours inside partly lit windows, so
-  about a fifth of the dark time keeps open stomata; the 20-h TM row, 1 h of its 4. Stated as a bias
+  centred on midday (lights 04:00–20:00) leaves 2 of its 8 dark hours inside partly lit windows
+  (03:00–04:30 and 19:30–21:00, 1 h dark each), so a quarter of the dark time keeps open stomata; the
+  20-h TM row, 1 h of its 4. ⚠ *First written "1.5 of 8", corrected from the windows' edges before
+  the results were read.* Stated as a bias
   toward MORE night water. A lit-fraction weighting is the alternative; it needs a lit-fraction signal
   the flow does not have, and is not built.
 * **Where:** inside `flows.rs` `CanopyRead`, which both transpiration paths call. The shared
@@ -147,6 +149,52 @@ heading control). [N2]'s 5.7 % and [N1] Table 2's 32.7 % bound it.
    latent, the shortfall.
 4. Sealed station runs: total transpiration, condensate, carbon readouts against `Open`.
 
-## 6. Results
+## 6. Results (2026-10-15)
 
-*(to be filled from the runs)*
+**How it ran.** The lab form committed on main (`829b7f1`, loader `Open`); the probe's vapour readout
+added (`039a51a`). Baseline on main; then a scratch worktree of `039a51a` with the loader line flipped
+to `Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING)`, then `…_HEADING`. Per value: `chamber_latent_heat`
+(the sealed station, 1220 days), the TM scorecard, `regen_goldens` (report). Every control held in
+every run: no rationing (slow 0, fast 0), legs re-applied with 0 mismatches, water books closing to
+≤ 6e-12 kg; the baseline probe's golden byte-exact.
+
+| | Open (today) | Closing 0.123 (booting) | Closing 0.194 (heading) |
+|---|---|---|---|
+| warm dark windows, crop latent | 116.19 W | **19.75 W** | **30.20 W** |
+| crop dark/lit rate, warm | 0.925 | 0.157 | 0.240 |
+| dark-window heat with nothing to pay for it (lamp off at night) | 1.80 GJ | **0.31 GJ** | **0.47 GJ** |
+| water through the station's chamber, 1220 days | 3473 kg | 2832 kg (−18.5 %) | 2918 kg (−16.0 %) |
+| chamber vapour, warm dark windows (mean) | 3.3332 kg | 3.3379 kg | 3.3316 kg |
+| TM 102788 W1 (water, days 25–80) | 1.041 | **0.958** | **0.967** |
+| TM carbon rows (C1, B1, U1, N1) | — | identical | identical |
+| goldens moved | — | 2 | 2 |
+
+**Graded.**
+
+* **P1 held**: on main under `Open`, the full suite green, goldens unchanged.
+* **P2 MISSED, one of three.** Predicted three goldens; two moved (`lighting_state`,
+  `sealed_station_state`). `sealed_energy_drift_summary` is identical: it holds only
+  `horizon_years`, `is_stationary` and `node_peak_temp_k`, and the model gives evaporation no heat,
+  so a water-only change cannot reach it. The prediction asked *"can the switch fire in this build"*,
+  not *"does this golden record anything the switch moves"*. The other 17 identical, as predicted.
+* **P3 held**: 116 W → 19.75 / 30.20 W against the predicted ~20 / ~31. The night air held its
+  vapour (3.333 → 3.338 / 3.332 kg), so the drop is not offset by a drier night.
+* **P4 held**: 1.80 GJ → 0.31 / 0.47 GJ against the predicted ~0.3–0.5.
+* **P5 held**: TM W1 1.041 → 0.958 / 0.967 against 0.95–1.00. Carbon untouched (the trial row is
+  never water-limited).
+* **P6 held, more strongly than stated**: in both moved goldens only water moved — condensate, soil
+  water, subsoil water and the soil-surface counters (`top_soil_water`, `soil_dry_days`,
+  `soil_evap_today`). No carbon, nitrogen, oxygen or energy value. The sealed station's end snapshot
+  shifts ~51 kg from condensate to soil water; it is one day's state in a watering cycle, not a
+  run total (the run total is the row above).
+
+**The rule's bias, estimated (not run).** The partly lit windows count as day, so their 2 dark hours
+per warm day keep open stomata. At the measured open dark rate (116.19 W) those hours carry ~0.60 GJ
+over the 716 warm days; closing them as the dark windows close would remove another ~0.50 GJ
+(booting) or ~0.44 GJ (heading) — about as much again as the dark windows have left. A lit-fraction
+rule is the form that would; it needs a lit-fraction signal the flow does not have.
+
+**What adoption would cost.** A biosphere unfreeze (the loader line and the two consts' citation
+standing in a frozen form), two station goldens, water only. The TM water match goes from 1.04 to
+0.96–0.97 (3–4 % under, where it was 4 % over), and the trial's own record cannot say how much of
+its water was night water (`post-roadmap-real-world-checks.md` §12d).
