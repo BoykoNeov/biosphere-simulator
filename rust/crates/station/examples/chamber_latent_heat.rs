@@ -12,10 +12,11 @@
 //!
 //! Run from `rust/`: `cargo run --release -q -p station --example chamber_latent_heat`.
 //!
-//! `-- --switched`: the room's lamp heat switched with the light (LAB-ONLY,
-//! `docs/plans/post-roadmap-room-lamp-heat.md`, `station::sealed::with_switched_lamp_heat`) in place of
-//! the daily average. The golden control then reports DIFFERS by design; the room's temperature and its
-//! cooler and heater are printed for both.
+//! `-- --averaged`: the room's lamp heat at its daily average on every minute (LAB-ONLY since the
+//! switched lamp was adopted, 2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md`,
+//! `station::sealed::with_averaged_lamp_heat`) — how the records before that date were made. The
+//! golden control then reports DIFFERS by design; the room's temperature and its cooler and heater are
+//! printed for both.
 
 use std::collections::BTreeMap;
 
@@ -36,7 +37,7 @@ use station::flows::LAMP;
 use station::scenario::{sealed_station_scenario, Phase};
 use station::sealed::{
     build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
-    with_switched_lamp_heat,
+    with_averaged_lamp_heat,
 };
 use station::sowing::{sown_step, twin};
 
@@ -216,11 +217,11 @@ fn main() {
     .expect("build_sealed_station");
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
-    let switched = std::env::args().any(|a| a == "--switched");
+    let averaged = std::env::args().any(|a| a == "--averaged");
     let chamber = station::params::chamber();
     let fast_r = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
-    let fast_r = if switched {
-        with_switched_lamp_heat(fast_r, &scenario).expect("switched")
+    let fast_r = if averaged {
+        with_averaged_lamp_heat(fast_r, &scenario).expect("averaged")
     } else {
         fast_r
     };
@@ -360,7 +361,7 @@ fn main() {
     let t = domains::biosphere::params::biosphere().transp;
     println!(
         "lamp heat: {}",
-        if switched { "SWITCHED with the light (lab)" } else { "daily average (the reference)" }
+        if averaged { "daily average (lab; the reference until 2026-10-15)" } else { "switched with the light (the reference)" }
     );
     println!(
         "sealed station, {} days; transpiration.yaml: open-field ra {} s/m, chamber ra {} s/m",

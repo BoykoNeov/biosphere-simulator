@@ -34,9 +34,12 @@ const PER_DAY: u64 = domains::biosphere::STEPS_PER_DAY as u64;
 const HEATER_HEALTH: &str = "test.chamber_heater_health";
 /// The coldest five days of the weather file (§23i, L1): days 113–117, mean 0.04 °C.
 const COLD: (u64, u64) = (113, 118);
-/// L1's heater-less run loses its heater from this day on: after the day-56 warm-up (slice 3a),
-/// so both runs share it and differ only in the lamp-failure window.
-const HEATER_CUT_FROM: u64 = 100;
+/// L1's heater-less run loses its heater from this day on: the lamp-failure window's first, so
+/// both runs share everything before it and differ only from the window on. ⚠ Day 100 until
+/// 2026-10-15, when the heater was idle between the warm-up and the window; since the room's lamp
+/// heat follows the light the heater fires on warm nights, and a cut at day 100 moved the runs
+/// apart 13 days early (`docs/plans/post-roadmap-room-lamp-heat.md` §8c).
+const HEATER_CUT_FROM: u64 = COLD.0;
 
 struct Run {
     states: Vec<State>,
@@ -87,7 +90,9 @@ fn run(
         HEATER_HEALTH,
         window_override(
             constant(1.0).unwrap(),
-            HEATER_CUT_FROM * PER_DAY,
+            // `+ 1`: the fast group after plant step `k` runs at `n = k + 1`, so the cut starts
+            // with day HEATER_CUT_FROM's first group and the day-end states bracket it.
+            HEATER_CUT_FROM * PER_DAY + 1,
             u64::MAX,
             heater,
         ),
@@ -213,43 +218,60 @@ fn the_walls_read_the_plants_day_on_the_fast_step() {
 fn a_dead_lamp_on_cold_days_fires_the_heater() {
     let days = COLD.1 as usize;
     let nominal = run(days, ChamberSurroundings::Outdoor, None, 1.0);
+    // The nominal run with its heater cut from the window: what the nominal heater spends there.
+    let nominal_unheated = run(days, ChamberSurroundings::Outdoor, None, 0.0);
     let heated = run(days, ChamberSurroundings::Outdoor, Some(COLD), 1.0);
     let cold = run(days, ChamberSurroundings::Outdoor, Some(COLD), 0.0);
     let end = days;
     let (n, h, c) = (&nominal.states[end], &heated.states[end], &cold.states[end]);
 
-    // Before the window the heater never fired: the battery matches the run without a heater.
     // ⚠ The fast operator runs after its group's plant step has advanced `n`, so a lamp window
     // keyed `[113·16, 118·16)` goes dark in the LAST group of day 112 — 90 minutes before
-    // `states[113]` (measured: the two runs first differ there, §23j). The last state wholly
-    // before the window is `states[112]`; the day-112 end state already carries 90 heated
-    // minutes, and the window ends 90 minutes before day 118's.
+    // `states[113]` (measured, §23j) — and ends 90 minutes before day 118's. Since the room's
+    // lamp heat follows the light (2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md` §8c)
+    // both of those groups are dark, so the lamp gives nothing in them either way: the failed
+    // run is still the nominal run, bit for bit, at the end of day 112.
     let before = COLD.0 as usize;
     assert_eq!(
-        amount(&heated.states[before - 1], BATTERY).to_bits(),
-        amount(&cold.states[before - 1], BATTERY).to_bits()
+        heated.states[before], nominal.states[before],
+        "the lamp window's first group (day 112's last) is no longer dark"
     );
-    assert_ne!(
+    // The heater runs are cut from day 113's first group, so they share everything to its start.
+    assert_eq!(
         amount(&heated.states[before], BATTERY).to_bits(),
-        amount(&cold.states[before], BATTERY).to_bits(),
-        "the window no longer begins inside day 112: the lag this test documents moved"
+        amount(&cold.states[before], BATTERY).to_bits()
     );
-    // What it drew over the window: the two failed runs differ by the heater alone.
+    // What it drew from the window on: the two failed runs differ by the heater alone. With the
+    // lamp off the heater pays the walls' loss and whatever the room's store changed by — the
+    // books of the heated run, from the last state before the window to the end. (A pin of
+    // 1.4574e7 J stood here until 2026-10-15; the span now also carries the dark 90 minutes
+    // after the window, which the averaged lamp used to heat.)
     let drawn = amount(c, BATTERY) - amount(h, BATTERY);
+    let h0 = &heated.states[before];
+    let walls = amount(h, CHAMBER_SURROUNDINGS) - amount(h0, CHAMBER_SURROUNDINGS);
+    let stored = amount(h, CHAMBER) - amount(h0, CHAMBER);
     assert!(
-        (drawn / 1.4574e7 - 1.0).abs() < 1e-3,
-        "the heater drew {drawn} J, predicted 1.4574e7"
+        (drawn - (walls + stored)).abs() <= 1e-6 * drawn,
+        "the heater drew {drawn} J; the walls took {walls} J and the room stored {stored} J"
     );
-    // Against the nominal run: the lamp's energy not drawn, less the heater.
+    // Against the nominal run: the lamp's energy not drawn, less the heater the failure added
+    // over the nominal run's own — which fires on these nights too, the lamp being off at night.
+    let nominal_heater = amount(&nominal_unheated.states[end], BATTERY) - amount(n, BATTERY);
+    assert!(
+        nominal_heater > 0.0,
+        "the nominal heater never fired on the coldest nights"
+    );
     let scenario = sealed_station_scenario();
     let lamp_saved = full_lamp_heat_input_w(&scenario) * 5.0 * 86_400.0;
     let gained = amount(h, BATTERY) - amount(n, BATTERY);
     assert!(
-        (gained - (lamp_saved - drawn)).abs() <= 1e-6 * lamp_saved,
-        "battery {gained} vs lamp {lamp_saved} − heater {drawn}"
+        (gained - (lamp_saved - (drawn - nominal_heater))).abs() <= 1e-6 * lamp_saved,
+        "battery {gained} vs lamp {lamp_saved} − (heater {drawn} − nominal heater {nominal_heater})"
     );
-    assert!((gained / 4.3026e7 - 1.0).abs() < 1e-3, "{gained}");
-    eprintln!("L1: heater drew {drawn} J; battery vs nominal {gained} J");
+    eprintln!(
+        "L1: heater drew {drawn} J (walls {walls}, stored {stored}); nominal heater \
+         {nominal_heater} J; battery vs nominal {gained} J"
+    );
 
     // The chamber held: never more than one step's wall loss below the setpoint (≤ 0.0146 K).
     // Days 113–117 are in the warm phase, so the setpoint is the warm one.
@@ -270,8 +292,8 @@ fn a_dead_lamp_on_cold_days_fires_the_heater() {
         chamber_t(c)
     );
     // The plants read the chamber (slice 3a). Identical until the window opens — both runs
-    // share the warm-up; the heater-less run's heater is idle from day 100 to the window anyway.
-    for (a, b) in heated.states[..before].iter().zip(&cold.states[..before]) {
+    // share the warm-up and every night's heater before day 113.
+    for (a, b) in heated.states[..=before].iter().zip(&cold.states[..=before]) {
         crop_identical(a, b);
     }
     // Inverted, with directions (§24h): without the heater the plants read a colder chamber,
@@ -327,28 +349,50 @@ fn a_cabin_hotter_or_colder_than_the_chamber() {
     }
 }
 
-/// L4 — the station structure (120 days): the walls lose more than the lamp gives, so the
-/// heater runs all the time; the node settles near 179.15 K and the heater near 44.8 W.
+/// L4 — the station structure (120 days): the walls lose more than the lamp gives over a day,
+/// so the heater runs all the time; the node settles near 179.15 K and the heater near 44.8 W.
+///
+/// ⚠ **Re-pinned 2026-10-15** (`docs/plans/post-roadmap-room-lamp-heat.md` §8c; the room's lamp
+/// heat follows the light), measured by this tree: the node **180.3016 K**, the heater
+/// **51.785 W**. Direction from the change: the lit lamp (200 W) now outruns the walls by day,
+/// the cooler hands that excess to the node, and the heater makes it up by night — more heater
+/// energy, all of it ending in the node. Its size was not predicted.
 #[test]
 fn walls_onto_the_station_structure_run_the_heater_continuously() {
     let days = 120;
     let r = run(days, ChamberSurroundings::Structure, None, 1.0);
     let reference = run(days, ChamberSurroundings::Outdoor, None, 1.0);
     let t = node_t(&r.states[days]);
-    assert!((t - 179.151).abs() < 0.01, "node {t} K, predicted 179.151");
     // Over the last 30 days the battery falls faster than the reference's by the heater alone.
     let span = 30;
     let fall =
         |run: &Run| amount(&run.states[days - span], BATTERY) - amount(&run.states[days], BATTERY);
     let heater_w = (fall(&r) - fall(&reference)) / (span as f64 * 86_400.0);
-    assert!(
-        (heater_w - 44.84).abs() < 0.05,
-        "heater {heater_w} W, predicted 44.84"
-    );
     eprintln!("L4: node {t} K, heater {heater_w} W");
-    let set = station::params::chamber().warm_setpoint;
+    assert!((t - 180.3016).abs() < 0.01, "node {t} K, measured 180.3016");
+    assert!(
+        (heater_w - 51.785).abs() < 0.05,
+        "heater {heater_w} W, measured 51.785"
+    );
+    // A day end is dark, so the heater holds the room against the walls' whole loss to the node
+    // and the deadbeat controller leaves it one step's loss below the setpoint — derived since
+    // 2026-10-15 (0.0706 K here). Until then a fixed 0.05 K stood: the averaged lamp's 133 W
+    // covered most of the loss in the dark, so the step's deficit was 0.018 K.
+    let ch = station::params::chamber();
+    let set = ch.warm_setpoint;
     let tc = chamber_t(&r.states[days]);
-    assert!(tc < set && tc > set - 0.05, "chamber {tc}");
+    let step_loss =
+        ch.wall_conductance * ch.wall_area * (set - t) * sealed_station_scenario().cabin_dt
+            / ch.heat_capacity;
+    assert!(
+        (step_loss - 0.0706).abs() < 1e-3,
+        "the hand step loss (1.536 W/K × 114.85 K × 60 s / 1.5e5 J/K): {step_loss}"
+    );
+    assert!(
+        tc < set && set - tc <= step_loss * (1.0 + 1e-3),
+        "chamber {tc}, {} K below the setpoint; one step's loss is {step_loss} K",
+        set - tc
+    );
 }
 
 /// L4, the full horizon — slow (~1 min release). With the heater on the structure the battery
@@ -365,6 +409,10 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
 /// this tree — NOT by an independent re-simulation, as every earlier figure here was. Its
 /// direction was predicted (§25f Q5: 504 dim cold days instead of 224, so less lamp drawn); its
 /// size was not, and it is a pin against regression, not a check of the physics.
+///
+/// ⚠ **Re-pinned 2026-10-15** (`docs/plans/post-roadmap-room-lamp-heat.md` §8c; the room's lamp
+/// heat follows the light), measured by this tree: **1.4834e9 J** — the heater now also runs
+/// every night the lamp is off (L4 above: +6.9 W on the structure). Direction predicted, size not.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
@@ -373,7 +421,7 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
     let b = amount(r.states.last().unwrap(), BATTERY);
     eprintln!("L4 full horizon: battery ends at {b} J");
     assert!(
-        b > 0.0 && (b / 2.2602e9 - 1.0).abs() < 0.02,
+        b > 0.0 && (b / 1.4834e9 - 1.0).abs() < 0.02,
         "battery ends at {b} J"
     );
 }
@@ -392,6 +440,15 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
 /// of it, so the walls face different weather — not predicted); at most two transition day-ends
 /// per crop (measured 9 over 9 crops); the run ends WARM, its last crop 108 days old, at
 /// **295.1999296 K**.
+///
+/// ⚠ **Re-pinned 2026-10-15** (`docs/plans/post-roadmap-room-lamp-heat.md` §8c; the room's lamp
+/// heat follows the light), measured by this tree: the node **162.3792 / 174.4180 / 169.4745 K**
+/// (warmer on the mean: the cooler hands the lit lamp's excess to the node by day, and the heater
+/// replaces it by night). The chamber's bands are now DERIVED, not measured: a day end is dark,
+/// so the room is held at its setpoint by the heater (below, by at most one step's wall loss,
+/// 0.0146 K — L1's bound) or by the cooler (above, the walls bringing heat in): measured
+/// −0.0036 / +0.0112 K at the cold setpoint and −0.0146 / +0.0001 K at the warm, so ±0.015 K of
+/// either setpoint. Nine day ends fall outside (the warm-ups); the run ends at **295.1466290 K**.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -407,19 +464,26 @@ fn the_reference_node_and_chamber_follow_the_weather() {
     let (clo, chi) = ch
         .iter()
         .fold((f64::MAX, f64::MIN), |(l, h), &x| (l.min(x), h.max(x)));
-    let in_band = |t: f64| (277.1517..=277.1673).contains(&t) || (295.188..=295.2035).contains(&t);
+    let (cold_set, warm_set) = (
+        sealed_station_scenario().cold.setpoint,
+        station::params::chamber().warm_setpoint,
+    );
+    let in_band = |t: f64| (t - cold_set).abs() <= 0.015 || (t - warm_set).abs() <= 0.015;
     let outside = ch.iter().filter(|&&t| !in_band(t)).count();
     let end = chamber_t(r.states.last().unwrap());
     eprintln!(
         "chamber daily min {clo} max {chi}; {outside} day-end states between the bands; ends {end} K"
     );
     assert!(
-        (lo - 162.2719).abs() < 0.01 && (hi - 174.2496).abs() < 0.01,
+        (lo - 162.3792).abs() < 0.01 && (hi - 174.4180).abs() < 0.01,
         "{lo} {hi}"
     );
-    assert!((mean - 169.1984).abs() < 0.01, "{mean}");
-    assert!(clo >= 277.1517 && chi <= 295.2035, "{clo} {chi}");
+    assert!((mean - 169.4745).abs() < 0.01, "{mean}");
+    assert!(
+        clo >= cold_set - 0.015 && chi <= warm_set + 0.015,
+        "{clo} {chi}"
+    );
     // One mid-warm-up and one mid-cool-down day-end state per crop at most: 9 crops (§25g).
     assert!(outside <= 2 * 9, "{outside}");
-    assert!((end - 295.1999296).abs() < 1e-6, "chamber ends {end} K");
+    assert!((end - 295.1466290).abs() < 1e-6, "chamber ends {end} K");
 }

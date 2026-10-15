@@ -274,7 +274,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.508fbcc76c1e1p+25",
+      "amount": "0x1.508fbcc76c1d4p+25",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },
@@ -313,7 +313,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.16ac433893e2dp+25",
+      "amount": "0x1.16ac433893e2ap+25",
       "composition": {
         "energy": "0x1.0000000000000p+0"
       },

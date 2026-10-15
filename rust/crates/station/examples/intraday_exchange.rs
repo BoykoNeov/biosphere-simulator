@@ -56,7 +56,7 @@ use station::greenhouse::{
     build_greenhouse_at, greenhouse_bio_resolver, greenhouse_cabin_resolver,
 };
 use station::harvest::{build_harvest_at, harvest_bio_resolver, harvest_cabin_resolver};
-use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver};
+use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver_averaged};
 use station::params as station_params;
 use station::scenario::{
     greenhouse_scenario, harvest_scenario, lighting_scenario, sealed_station_scenario,
@@ -576,7 +576,9 @@ fn main() {
             let lamp = station_params::lamp();
             let sc = lighting_scenario();
             let bio_res = lighting_bio_resolver(&lamp, &sc, true).expect("bio");
-            let power_res = lighting_power_resolver(&sc).expect("power");
+            // The averaged lamp (the reference until 2026-10-15): the record this reproduces had a
+            // lamp flat within the day, and the retired order draws a switched lamp in the dark.
+            let power_res = lighting_power_resolver_averaged(&sc).expect("power");
             let build = || {
                 let (s, b, p) = build_lighting(&lamp, &sc, true).expect("b");
                 (s, EulerIntegrator::new(b), EulerIntegrator::new(p))

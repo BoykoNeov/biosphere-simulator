@@ -40,6 +40,12 @@ they replaced PAR and day length but left transpiration on the weather file's ou
 The formula's science stays the biosphere's (`weather::net_shortwave`); which light it is fed is
 this contract's. See the unfreeze log.
 
+⚠ **Since 2026-10-15 the lamp's DRAW switches with its light** in both seams: the fast side's
+`lamp_power` is the on-power on the plant step's own top-hat (`station::lighting::switched_lamp_draw`,
+read for the windows of the interleaved day's group behind `n`), not the daily average on every minute
+— so the plant chamber's heat input is 0 in the dark. The daily average is the lab switch
+`station::sealed::with_averaged_lamp_heat`. See the unfreeze log.
+
 ⚠ **Since 2026-10-05 (slice 3a) the sealed station also owns the crop's TEMPERATURE.** Every
 plant-step flow and aux process of `sealed_station` is wrapped to read `temp` from the plant
 chamber (`thermal.chamber`, `Q / C − 273.15`; `station::chamber::plants_read_chamber`), and the
@@ -358,6 +364,26 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-15 — THE LAMP'S DRAW SWITCHED WITH ITS LIGHT: the fast side's `lamp_power` is the lamp's
+  on-power on the plant step's own top-hat (`station::lighting::switched_lamp_draw`), not the daily
+  average on every minute. 2 goldens: `sealed_station_state` (carbon, water, energy) and `lighting_state`
+  (its two lamp sinks at ~1e-15), and their 2 `golden_sha256` rows. No flow, param or seam set changed.**
+  The user's *"then to the others in order"*, the latent-heat estimate's second follow-on; built lab-only,
+  measured, adopted the same day (plan `docs/plans/post-roadmap-room-lamp-heat.md` §7–§8). **The window:**
+  the interleaved day runs a group's plant steps (moving `n` past them) and then its fast steps, which lie
+  in those windows, so the draw reads the windows behind `n` — `n − 1` on the sealed station, the mean of
+  two on the lighting seam (3 power hours over 2 plant windows); keyed on `n` the room would heat 90
+  minutes before the light. A day's energy is the average's to 1e-12 (tested,
+  `tests/room_lamp_heat.rs`). **Readers:** the chamber's start reads the first window's draw (0); the lab
+  lamp shed's nominal is the unperturbed switched program; `sealed_node_heat` keeps the daily mean (the
+  node's time constant is days). **Measured over the sealed station's 1220 days:** heater-on minutes 421 →
+  257 040 (287 MJ off the battery, end battery −2.6 %); the cooler (200 W, the lamp's nameplate) saturates
+  30 hours and the room peaks +0.13 K; the warm-up after each cold period dips 11.2 K below its setpoint
+  (was 6.5); crop carbon ≤ 0.11 %; no rationing. `sealed_energy_drift_summary` is built from the
+  heat-closure station, which has no lamp: byte-identical, as are the other 10 station goldens. The
+  biosphere and authoring manifests are byte-identical. ⚠ The reason the average stood — *"`substep`
+  freezes `n`, so a within-day shape is not expressible"* (the 2026-08-14 entry below) — was true only
+  while the plant step was a day; it is withdrawn in `lighting.rs`.
 - **2026-10-15 — the biosphere's night stomata closing adopted, delegated: 2 station goldens move
   (`lighting`, `sealed_station`) and their 2 `golden_sha256` rows follow. Water only. No station flow,
   param or seam changed; one station-side edit rides along: the TM 102788 scorecard's by-hand water path

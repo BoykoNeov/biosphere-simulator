@@ -20,7 +20,7 @@ use simcore::flow::Flow;
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
-use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_HEATER};
+use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_HEATER, CHAMBER_SURROUNDINGS};
 use station::driver::run_master_day;
 use station::gas_exchange::window_key;
 use station::lamp_shed::{
@@ -161,14 +161,16 @@ fn lab(
 
 const HEATER_HEALTH: &str = "test.chamber_heater_health";
 
-/// [`lab`] with the chamber heater scaled by `heater` (0 = a heater that gives nothing). The
-/// wrapper keeps the heater's id, so the rewire still finds and sheds it.
+/// [`lab`] with the chamber heater scaled by `heater` (0 = a heater that gives nothing) over the
+/// steps `[cut.0, cut.1)`, whole outside them. The wrapper keeps the heater's id, so the rewire
+/// still finds and sheds it.
 fn lab_with_heater(
     scn: &SealedStationScenario,
     fast: SourceResolver,
     bio: &SourceResolver,
     reserve_j: f64,
     heater: f64,
+    cut: (u64, u64),
 ) -> Run {
     let (state, bio_reg, fast_reg) = build(scn);
     let (flows, aux) = fast_reg.into_parts();
@@ -186,7 +188,7 @@ fn lab_with_heater(
     let fast = with_forcing(
         fast,
         HEATER_HEALTH,
-        window_override(constant(1.0).unwrap(), 0, u64::MAX, heater),
+        window_override(constant(1.0).unwrap(), cut.0, cut.1, heater),
     )
     .unwrap();
     let (state, bio_reg, fast_reg) =
@@ -357,6 +359,12 @@ fn the_plain_crop_does_not_see_a_blackout() {
     // small battery on day 6, the backstop then rations the lamp's draw (5 140 times, measured on
     // the first run of 3a), less lamp heat reaches the chamber, and the crop reads a colder room
     // from day 7. That is the plants reading the chamber, not the light defect this pins.
+    //
+    // ⚠ Since the room's lamp heat follows the light (2026-10-15, `docs/plans/post-roadmap-room-
+    // lamp-heat.md` §8c) a day-end state is dark, and the room is back at its setpoint in both
+    // runs there (the last day end bit-identical, measured), so the colder room is read where it acts: in the lit
+    // hours, where this full lamp and the walls outrun the cooler and warm the room by up to
+    // ~4 K (measured), and the crop that grows less in the rationed room.
     let scn = full_lamp_scenario(SMALL_BATTERY);
     let (bio, calm) = resolvers(&scn, false);
     let (_, dark) = resolvers(&scn, true);
@@ -367,10 +375,10 @@ fn the_plain_crop_does_not_see_a_blackout() {
     assert_same_recorded_light(&calm, &dark);
     assert!(dark.rationed > 0 && calm.rationed == 0);
     assert!(
-        chamber_t(d) < chamber_t(c),
-        "the rationed lamp left the chamber no colder: {} vs {}",
-        chamber_t(d),
-        chamber_t(c)
+        crop(d) < crop(c),
+        "the crop in the rationed lamp's room grew no less: {} vs {}",
+        crop(d),
+        crop(c)
     );
 }
 
@@ -420,11 +428,19 @@ fn cutting_only_the_lamps_power_darkens_the_lab_crop() {
     assert!(crop(off.states.last().unwrap()) < crop(lit.states.last().unwrap()));
     // The plain build cannot see it: its crop is lit by the nameplate. (Since slice 3a it does
     // feel the cut lamp's missing HEAT, through the chamber — so the pin is on the light it
-    // records, and the room is shown colder inside the cut, on day 4.)
+    // records, and the room was shown colder inside the cut, on day 4. Since 2026-10-15 the
+    // lamp heats the room only while lit, and a day-end state is dark: both rooms sit at the
+    // setpoint there, bit for bit, measured. The colder room is in the cut's lit hours, where
+    // this full lamp and the walls outrun the cooler; the crop that reads it grows less.)
     let plain_cut = plain(&scn, &cut, &bio);
     let plain_lit = plain(&scn, &fast, &bio);
     assert_same_recorded_light(&plain_cut, &plain_lit);
-    assert!(chamber_t(&plain_cut.states[4]) < chamber_t(&plain_lit.states[4]));
+    assert_eq!(
+        chamber_t(&plain_cut.states[4]).to_bits(),
+        chamber_t(&plain_lit.states[4]).to_bits(),
+        "a dark day end no longer finds both rooms at the setpoint"
+    );
+    assert!(crop(plain_cut.states.last().unwrap()) < crop(plain_lit.states.last().unwrap()));
 }
 
 #[test]
@@ -455,15 +471,25 @@ fn a_blackout_also_cuts_the_crops_water_loss() {
 fn a_shed_heater_is_the_heaterless_run_bit_for_bit() {
     // H1: lit, the lamp holds the chamber above its setpoint, so the heater gives nothing; shed,
     // the heater goes with the lamp on the same reading; and this station never restores. So
-    // the blackout run is the run with no heater at all, in every stock on every day.
+    // the blackout run is the run whose heater is gone from the shed's group on, in every stock
+    // on every day. ⚠ Until 2026-10-15 it was the run with no heater at all: the lamp's heat was
+    // its daily average, so the warm chamber never needed the heater. Since the lamp heats the
+    // room only while lit, the heater fires on every warm night before the shed
+    // (`docs/plans/post-roadmap-room-lamp-heat.md` §8c). The shed falls inside a lit group,
+    // where the heater gives nothing either way, so the cut can start at that group's step.
     let scn = warm_scenario(SMALL_BATTERY);
     let (bio, fast) = resolvers(&scn, true);
     let dark = &lab(&scn, &fast, &bio, reserve(&scn));
-    let heaterless = lab_with_heater(&scn, fast, &bio, reserve(&scn), 0.0);
-    assert!(
-        dark.log.delivery.iter().any(|&x| x < 1.0),
-        "nothing was shed"
-    );
+    let first_off = dark
+        .log
+        .delivery
+        .iter()
+        .position(|&x| x < 1.0)
+        .expect("nothing was shed");
+    // Group `g` follows plant step `g` (one plant step a group here), so it runs at `n = g + 1`.
+    assert_eq!(dark.log.delivery.len(), DAYS * STEPS as usize);
+    let shed_n = first_off as u64 + 1;
+    let heaterless = lab_with_heater(&scn, fast, &bio, reserve(&scn), 0.0, (shed_n, u64::MAX));
     assert_eq!(dark.log, heaterless.log);
     assert_eq!(dark.rationed, heaterless.rationed);
     assert_eq!(dark.states.len(), heaterless.states.len());
@@ -498,8 +524,16 @@ fn a_lamp_failure_with_a_healthy_battery_keeps_its_heater() {
         )
         .unwrap()
     };
-    let heated = lab_with_heater(&scn, cut(), &bio, reserve(&scn), 1.0);
-    let cold = lab_with_heater(&scn, cut(), &bio, reserve(&scn), 0.0);
+    // The cold run's heater is cut over days 2–4 exactly — one group later than the lamp's
+    // window, which (keyed on `n`, run after its plant step) starts in day 1's last group and
+    // ends a group before day 5's end. Both groups are dark, so the lamp gives nothing in them
+    // either way. ⚠ Until 2026-10-15 the cold run had no heater at all; since the lamp heats the
+    // room only while lit, the heater fires on every warm night, so a run-long cut would count
+    // the nights too (`docs/plans/post-roadmap-room-lamp-heat.md` §8c).
+    let days = (2_usize, 5_usize);
+    let heater_cut = (BLACKOUT.0 + 1, BLACKOUT.1 + 1);
+    let heated = lab_with_heater(&scn, cut(), &bio, reserve(&scn), 1.0, heater_cut);
+    let cold = lab_with_heater(&scn, cut(), &bio, reserve(&scn), 0.0, heater_cut);
     assert!(
         heated.log.delivery.contains(&0.0),
         "the lamp never went dark"
@@ -508,9 +542,23 @@ fn a_lamp_failure_with_a_healthy_battery_keeps_its_heater() {
         .states
         .iter()
         .all(|s| s.stocks[BATTERY].amount > reserve(&scn)));
-    let battery = |r: &Run| r.states.last().unwrap().stocks[BATTERY].amount;
-    let drawn = battery(&cold) - battery(&heated);
-    eprintln!("H4: the heater drew {drawn} J with the lamp's power cut");
+    let at = |r: &Run, day: usize, id: &str| r.states[day].stocks[id].amount;
+    assert_eq!(
+        at(&heated, days.0, BATTERY).to_bits(),
+        at(&cold, days.0, BATTERY).to_bits()
+    );
+    let drawn = at(&cold, days.1, BATTERY) - at(&heated, days.1, BATTERY);
+    // With the lamp off the heater pays the walls' loss and the room's change of store.
+    let walls =
+        at(&heated, days.1, CHAMBER_SURROUNDINGS) - at(&heated, days.0, CHAMBER_SURROUNDINGS);
+    let stored = at(&heated, days.1, CHAMBER) - at(&heated, days.0, CHAMBER);
+    eprintln!(
+        "H4: the heater drew {drawn} J with the lamp's power cut (walls {walls}, stored {stored})"
+    );
+    assert!(
+        (drawn - (walls + stored)).abs() <= 1e-6 * drawn,
+        "the heater drew {drawn} J; the walls took {walls} J and the room stored {stored} J"
+    );
     assert!(
         (drawn / 3.5e6 - 1.0).abs() < 0.2,
         "the heater drew {drawn} J, predicted 3.5e6 ±20 %"

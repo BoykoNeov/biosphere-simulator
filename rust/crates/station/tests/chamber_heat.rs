@@ -31,7 +31,7 @@ use simcore::state::State;
 use station::chamber::{chamber_temperature, CHAMBER, CHAMBER_COOLING, CHAMBER_WALL};
 use station::driver::run_master_day;
 use station::perturbations::ScaledFlow;
-use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScenario};
+use station::scenario::{sealed_station_scenario, ColdProgram, Phase, SealedStationScenario};
 use station::sealed::{
     build_sealed_station, full_lamp_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
     sealed_node_heat, sealed_reset_hook,
@@ -155,7 +155,8 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
         );
     }
 
-    // Failed: it warms at w / C_ch, exactly linear (the lamp's draw is the daily average).
+    // Failed: it warms at w / C_ch a day, linear from day end to day end (a day of the switched
+    // draw is the average's energy; within the day it climbs only while the lamp is lit).
     let w = full_lamp_heat_input_w(&scenario);
     let per_day = w * 86_400.0 / ch.heat_capacity;
     assert!(
@@ -207,9 +208,48 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
         "after {DAYS} days the node is {} K above {t_eq_failed}; the bound is {bound} K",
         last - t_eq_failed
     );
-    // Nominal node holds.
-    let nominal_end = node_t(nominal.last().unwrap(), &th);
-    assert!((nominal_end - t_eq_nominal).abs() < 1e-6, "{nominal_end}");
+    // Nominal node holds — to the lamp's within-day swing, since the room's lamp heat follows
+    // the light (2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md` §8c; it held to 1e-6
+    // while the lamp drew its daily average). With the walls off the cooler passes the lamp's
+    // heat to the node as it comes, so the node's energy strays from its daily-mean path by at
+    // most the lit hours' excess, (P_on − P_avg)·T_lit, and the radiator only damps that. The
+    // start (the mean equilibrium) is off that daily cycle by no more than the same, and the
+    // offset decays at least as fast as `exp(−t/τ)`, τ at the nominal node — so the last two
+    // day ends agree to within the bound left after DAYS − 1 days.
+    let p_on = scenario.lamp_power(Phase::Warm, lamp.photon_efficacy);
+    let lit_s = scenario.photoperiod_hours(Phase::Warm) as f64 * 3600.0;
+    let swing = (p_on - w) * lit_s / th.heat_capacity;
+    assert!(
+        (swing - 0.384).abs() < 1e-3,
+        "the hand swing (66.7 W × 16 h / 1e7 J/K): {swing}"
+    );
+    for s in &nominal {
+        let t = node_t(s, &th);
+        assert!(
+            (t - t_eq_nominal).abs() <= swing,
+            "day {}: node {t}, {} K off its equilibrium; the swing is {swing} K",
+            s.n / scenario.bio_steps_per_day,
+            t - t_eq_nominal
+        );
+    }
+    let tau_nominal = th.heat_capacity
+        / (4.0
+            * th.emissivity
+            * domains::thermal::STEFAN_BOLTZMANN
+            * th.radiator_area
+            * t_eq_nominal.powf(3.0));
+    let settled = swing * (-((DAYS - 1) as f64) * 86_400.0 / tau_nominal).exp();
+    let (last2, last1) = (node_t(&nominal[DAYS - 1], &th), node_t(&nominal[DAYS], &th));
+    eprintln!(
+        "nominal node: ends {last1} K ({} off equilibrium), last day moved {} K, bound {settled}",
+        last1 - t_eq_nominal,
+        last1 - last2
+    );
+    assert!(
+        (last1 - last2).abs() <= settled,
+        "the nominal node's last day moved {} K; the decayed bound is {settled} K",
+        last1 - last2
+    );
 
     // The crop reads the chamber (slice 3a): identical at the start, and over day 1 — the
     // chamber 76.8 K above nominal by its end — the overheated crop burns more than it fixes,

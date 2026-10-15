@@ -1,9 +1,10 @@
-//! **The room's lamp heat switched with the light** — the lab switch's own checks.
+//! **The room's lamp heat switched with the light** — its own checks.
 //!
-//! Plan: `docs/plans/post-roadmap-room-lamp-heat.md` (§4 L5). LAB-ONLY: the reference's fast-side
-//! `lamp_power` is the daily average; `station::sealed::with_switched_lamp_heat` swaps in the lamp's
-//! draw on the plant step's own top-hat. These tests hold the swap to the plants' light: the same
-//! window, the same daily energy.
+//! Plan: `docs/plans/post-roadmap-room-lamp-heat.md` (§4 L5, §8). The fast-side `lamp_power` is the
+//! lamp's draw on the plant step's own top-hat since 2026-10-15 (built lab-only first, adopted the
+//! same day); the daily average it replaced is the lab switch
+//! `station::sealed::with_averaged_lamp_heat`. These tests hold the draw to the plants' light: the
+//! same window, the same daily energy.
 
 use domains::biosphere::stocks::PAR_VAR;
 use simcore::environment::{Environment, SourceResolver};
@@ -11,7 +12,7 @@ use simcore::state::State;
 use station::flows::LAMP_POWER_VAR;
 use station::scenario::{sealed_station_scenario, Phase, SealedStationScenario};
 use station::sealed::{
-    build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, with_switched_lamp_heat,
+    build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, with_averaged_lamp_heat,
 };
 use station::sowing::twin;
 
@@ -33,11 +34,7 @@ fn setup() -> (SealedStationScenario, State, SourceResolver, SourceResolver) {
     )
     .expect("build");
     let bio = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
-    let fast = with_switched_lamp_heat(
-        sealed_fast_resolver(&charge, &scenario).expect("fast resolver"),
-        &scenario,
-    )
-    .expect("switched");
+    let fast = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
     (scenario, state, bio, fast)
 }
 
@@ -107,13 +104,25 @@ fn a_day_of_the_switched_draw_is_the_averages_energy() {
     }
 }
 
-/// The swap refuses a resolver that does not carry the twins (a plain or already-wrapped one),
-/// rather than adding a second lamp schedule beside it.
+/// The lab switch restores the daily average on every window, lit or dark, and refuses a resolver
+/// that does not carry the twins rather than adding a second lamp schedule beside it.
 #[test]
-fn the_switch_refuses_a_resolver_without_the_twins() {
-    let scenario = sealed_station_scenario();
+fn the_lab_switch_restores_the_average() {
+    let (scenario, state, _, fast) = setup();
+    let efficacy = station::params::lamp().photon_efficacy;
+    let averaged = with_averaged_lamp_heat(fast, &scenario).expect("averaged");
+    for phase in Phase::BOTH {
+        let want = scenario.lamp_average_power(phase, efficacy);
+        for n in 1..=scenario.bio_steps_per_day {
+            let got = averaged
+                .bind(&at(&state, n), scenario.cabin_dt)
+                .get(&twin(LAMP_POWER_VAR, phase))
+                .unwrap();
+            assert_eq!(got.to_bits(), want.to_bits(), "{phase:?} at n = {n}");
+        }
+    }
     let empty = SourceResolver::new(Default::default(), Default::default()).expect("empty");
-    assert!(with_switched_lamp_heat(empty, &scenario).is_err());
+    assert!(with_averaged_lamp_heat(empty, &scenario).is_err());
 }
 
 /// The lighting seam's power hours come in groups of 3 over 2 plant windows; `n` cannot tell the
@@ -123,13 +132,13 @@ fn the_switch_refuses_a_resolver_without_the_twins() {
 fn the_lighting_seams_groups_draw_the_light_of_their_windows() {
     use station::lighting::{
         build_lighting, lamp_average_power, lamp_par, lighting_bio_resolver,
-        lighting_power_resolver_switched,
+        lighting_power_resolver,
     };
     let scenario = station::scenario::lighting_scenario();
     let lamp = station::params::lamp();
     let (state, _, _) = build_lighting(&lamp, &scenario, true).expect("build");
     let bio = lighting_bio_resolver(&lamp, &scenario, true).expect("bio");
-    let power = lighting_power_resolver_switched(&scenario).expect("power");
+    let power = lighting_power_resolver(&scenario).expect("power");
     let groups =
         station::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day).unwrap();
     assert_eq!(

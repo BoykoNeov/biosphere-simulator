@@ -201,8 +201,13 @@ fn the_built_registries_read_the_states_sowing() {
             .evaluate(&s, &fast_r.bind(&s, scenario.cabin_dt), scenario.cabin_dt)
             .unwrap();
         let drawn = -legs.legs.iter().find(|l| l.stock == BATTERY).unwrap().amount;
-        let want = scenario.lamp_average_power(phase, station::params::lamp().photon_efficacy)
-            * scenario.cabin_dt;
+        // The phase's switched program on this step (the room's lamp heat follows the light since
+        // 2026-10-15; `n − 1` is a lit window in both phases, so the two draws still differ).
+        let want = station::sealed::switched_lamp_draw_for(&scenario, phase).unwrap()(
+            s.n,
+            scenario.cabin_dt,
+        ) * scenario.cabin_dt;
+        assert!(want > 0.0, "{phase:?}: window {} is dark", s.n - 1);
         assert_eq!(drawn.to_bits(), want.to_bits(), "the lamp drew the wrong phase");
         seen.insert(format!("{phase:?}"), (par, drawn));
     }

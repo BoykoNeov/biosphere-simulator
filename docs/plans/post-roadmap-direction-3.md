@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `night-stomata.md`
+**Re-read against the record's last row:** `room-lamp-heat.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -563,6 +563,14 @@ which named night stomatal closure as one of three follow-ons, not added to §2.
 discharged. One correction reaches the note above's scaling: only the lamp-lit station builds can see a dark
 step (the biosphere jars read the outdoor daily mean), so the battery reading stands as written. Nothing in
 §3 is re-proposed.
+⚠ *Re-read 2026-10-15* (`log/room-lamp-heat.md`, ADOPTED the same day, a station unfreeze): grepped this
+plan for lamp heat, heater, cooler, battery, average, night and dark. It discharges the second of the three
+follow-ons the latent-heat note above names (not on §2, so nothing struck). It bears on the 2026-10-01
+battery note: the heater now fires on warm nights and draws 0.31 GJ over 1220 days (it drew 15 MJ), and the
+sealed station's battery ends 2.6 % lower (1.0865e10 J). Scaling that note's drain by the heater's share
+(~2.2 % of the lamp's 1.41e10 J) moves "dark near day 1736" to roughly day 1700 — still past the horizon (a
+scaling, not a run). The third follow-on (latent heat in the room's books) stays the record's open question,
+next in the user's order, not added to §2. Nothing in §3 is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

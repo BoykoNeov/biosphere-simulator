@@ -18,6 +18,7 @@
 
 use domains::crew::FECAL_WASTE;
 use domains::params;
+use simcore::environment::SourceResolver;
 use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
@@ -31,7 +32,10 @@ use station::greenhouse::{
     build_greenhouse, build_greenhouse_at, greenhouse_bio_resolver, greenhouse_cabin_resolver,
 };
 use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver};
-use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver};
+use station::lighting::{
+    build_lighting, lighting_bio_resolver, lighting_power_resolver,
+    lighting_power_resolver_averaged, LIGHT_USED,
+};
 use station::params as station_params;
 use station::scenario::{
     greenhouse_scenario, harvest_scenario, lighting_scenario, sealed_station_scenario,
@@ -260,19 +264,25 @@ fn the_order_moves_a_scenario_whose_sides_share_a_stock() {
 #[test]
 fn interleaving_cannot_move_a_scenario_whose_sides_share_no_stock() {
     // The lighting seam: lamp (Power) and crop share no stock, only the lamp schedule, a
-    // forcing. Each stock is written by one side only, so the order cannot reach the bits.
+    // forcing. Each stock is written by one side only, so the order cannot reach the bits —
+    // as long as the forcing is flat within the day. ⚠ Since 2026-10-15 the reference lamp's
+    // draw switches with its light (`docs/plans/post-roadmap-room-lamp-heat.md` §8c), and the
+    // retired order runs every power hour at the day's last `n`, a dark group: it draws no lamp
+    // at all. So the order claim is held on the averaged lamp, and the switched lamp is shown
+    // to be what the retired order cannot carry.
     let lamp = station_params::lamp();
     let scenario = lighting_scenario();
     let bio_res = lighting_bio_resolver(&lamp, &scenario, true).unwrap();
-    let power_res = lighting_power_resolver(&scenario).unwrap();
-    let run = |order: DayOrder| {
+    let averaged = lighting_power_resolver_averaged(&scenario).unwrap();
+    let switched = lighting_power_resolver(&scenario).unwrap();
+    let run = |order: DayOrder, power_res: &SourceResolver| {
         let (s0, bio, power) = build_lighting(&lamp, &scenario, true).unwrap();
         let (slow, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(power));
         let two = TwoRate {
             slow: &slow,
             fast: &fast,
             slow_resolver: &bio_res,
-            fast_resolver: &power_res,
+            fast_resolver: power_res,
             steps_per_day: scenario.steps_per_day,
             slow_steps_per_day: scenario.bio_steps_per_day,
             slow_dt: scenario.bio_dt,
@@ -280,9 +290,19 @@ fn interleaving_cannot_move_a_scenario_whose_sides_share_no_stock() {
             slow_reset: None,
         };
         let (states, _) = two.run(order, s0, scenario.days, &mut ignore).unwrap();
-        snap(states.last().unwrap())
+        states.last().unwrap().clone()
     };
-    assert_eq!(run(DayOrder::Interleaved), run(DayOrder::SlowFirst));
+    assert_eq!(
+        snap(&run(DayOrder::Interleaved, &averaged)),
+        snap(&run(DayOrder::SlowFirst, &averaged))
+    );
+    let light = |s: &State| s.stocks[LIGHT_USED].amount;
+    assert!(light(&run(DayOrder::Interleaved, &switched)) > 0.0);
+    assert_eq!(
+        light(&run(DayOrder::SlowFirst, &switched)),
+        0.0,
+        "the retired order's power hours no longer all read a dark group"
+    );
 }
 
 #[test]

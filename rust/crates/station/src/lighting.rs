@@ -126,9 +126,10 @@ pub fn build_lighting(
 /// The lamp's PAR forcing: a within-day top-hat centred on midday.
 ///
 /// Mirrors `station.lighting._lamp_light_path`. Shared by this module and `sealed`, the
-/// two seams whose crop is lit by a lamp rather than by the sun. ⚠ The lamp's ENERGY half
-/// keeps drawing the daily average: Power is the *fast* operator and `substep` freezes
-/// `n`, so a within-day shape is not expressible there. The two halves differ on purpose.
+/// two seams whose crop is lit by a lamp rather than by the sun. The lamp's ENERGY half follows
+/// it window for window since 2026-10-15 ([`switched_lamp_draw`]). ⚠ Until then it drew the daily
+/// average, on the reasoning that `substep` freezes `n`, so no within-day shape is expressible on
+/// the fast side — true only while a plant step was a day; at 1/16 day `n` names the window.
 pub(crate) fn lamp_light_path(on_par: f64, photoperiod_s: f64) -> Schedule {
     Box::new(move |n, dt| {
         let t = n as f64 * dt;
@@ -154,9 +155,9 @@ pub(crate) fn lamp_net_radiation_path(on_par: f64, photoperiod_s: f64) -> Schedu
     lamp_light_path(lamp_net_radiation(on_par), photoperiod_s)
 }
 
-/// The lamp's DRAW switched with its light — LAB-ONLY until adopted
-/// (`docs/plans/post-roadmap-room-lamp-heat.md`): `on_w` on the plant step's top-hat, read on the
-/// FAST side, where today's lamp draws the daily average on every minute.
+/// The lamp's DRAW switched with its light (`docs/plans/post-roadmap-room-lamp-heat.md`; the
+/// reference since 2026-10-15, §8): `on_w` on the plant step's top-hat, read on the FAST side,
+/// where until then the lamp drew the daily average on every minute.
 ///
 /// ⚠ **The windows are the group's, behind `n`.** The interleaved day runs a group's
 /// `slow_per_group` plant steps (moving `n` past them) and then its fast steps, which lie in those
@@ -225,21 +226,11 @@ pub fn lighting_bio_resolver(
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }
 
-/// The Power forcing: the constant daily-average `lamp_power` draw.
+/// The Power forcing: the lamp's `lamp_power` draw switched with its light
+/// ([`switched_lamp_draw`], the group's mean over its plant windows) — since 2026-10-15
+/// (`docs/plans/post-roadmap-room-lamp-heat.md` §8); the constant daily average
+/// ([`lamp_average_power`]) until then. A day's energy is the same either way.
 pub fn lighting_power_resolver(scenario: &LightingScenario) -> Result<SourceResolver, SimError> {
-    let mut forcings = std::collections::HashMap::new();
-    forcings.insert(
-        LAMP_POWER_VAR.to_string(),
-        constant(lamp_average_power(scenario))?,
-    );
-    SourceResolver::new(forcings, std::collections::HashMap::new())
-}
-
-/// LAB-ONLY (`docs/plans/post-roadmap-room-lamp-heat.md`): [`lighting_power_resolver`] with the
-/// lamp's draw switched with its light ([`switched_lamp_draw`]) in place of the daily average.
-pub fn lighting_power_resolver_switched(
-    scenario: &LightingScenario,
-) -> Result<SourceResolver, SimError> {
     let groups = crate::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day)?;
     let mut forcings = std::collections::HashMap::new();
     forcings.insert(
@@ -251,6 +242,21 @@ pub fn lighting_power_resolver_switched(
             scenario.bio_steps_per_day,
             groups.slow,
         ),
+    );
+    SourceResolver::new(forcings, std::collections::HashMap::new())
+}
+
+/// LAB-ONLY: [`lighting_power_resolver`] with the lamp's constant DAILY AVERAGE
+/// ([`lamp_average_power`]) — the reference until 2026-10-15, for instruments whose subject
+/// needs a forcing that is flat within the day (the retired day order sees one `n` per day, so
+/// under the switched draw all its power hours read the day's last, dark, group).
+pub fn lighting_power_resolver_averaged(
+    scenario: &LightingScenario,
+) -> Result<SourceResolver, SimError> {
+    let mut forcings = std::collections::HashMap::new();
+    forcings.insert(
+        LAMP_POWER_VAR.to_string(),
+        constant(lamp_average_power(scenario))?,
     );
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }

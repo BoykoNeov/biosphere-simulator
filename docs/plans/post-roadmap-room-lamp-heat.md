@@ -168,3 +168,70 @@ dark windows are short, 0.10 GJ over the run.
   failed-cooler linear warming and nominal day-end checks, `chamber_walls`' lamp-energy saving,
   `sowing_clock`'s average-draw check, and the lab `lamp_shed` tests that read a delivery or a nominal.
   Others are findings.
+
+### 8c. Graded (2026-10-15)
+
+* **A1 held**, with L1 graded beside it: `sealed_station_state` moved; `lighting_state` moved only
+  `boundary.light_used` (−2.2e-15) and `boundary.waste_heat` (−6.1e-16) — L1 allowed the battery too, and it
+  did not move; the other 18 byte-identical.
+* **A2 held**: `sealed_station_state`'s moved keys cover carbon, water, energy and the chamber, and its end
+  state is §7's switched run to every printed digit.
+* **A3 held**: the station manifest's two `golden_sha256` rows only; biosphere and authoring unchanged;
+  `git diff rust/crates/simcore/` empty.
+* **A4 held in part.** 13 reds (11 in the suite, 2 of the slow ones). In the predicted files, 8:
+  `sowing_clock` (the average-draw check); `chamber_walls`' dead-lamp test; five lab `lamp_shed` tests;
+  and `chamber_heat` — but on its **node** line ("the nominal node holds to 1e-6"), not on the two lines
+  named (the failed cooler's linear warming and the nominal chamber's day ends both still hold: a day
+  end is dark and a day's draw is the average's). Not predicted, 5: the direction plan's re-read gate
+  (process); `day_order`'s "interleaving cannot move a scenario whose sides share no stock"; and three
+  `chamber_walls` pins (the structure's 120-day node and heater, and the two slow full-horizon tests).
+
+**How each was restated** (none deleted, none loosened past what the physics now allows):
+
+* `sowing_clock`: the lamp draws the phase's **switched program** on the sampled step (a lit window in
+  both phases, asserted).
+* `chamber_heat`, the node: it holds to the lamp's within-day swing, **derived** — (P_on − P_avg)·T_lit / C
+  = 0.384 K — at every day end, and its last day moves less than that swing decayed over 59 days at the
+  node's own time constant (measured: 0.0016 K off its equilibrium, 7e-7 K in the last day, bound 2.0e-3).
+* `chamber_walls`, the dead lamp: the heater-less run was cut from day 100 on the premise that the
+  heater was idle until the window; it now fires on warm nights, so the cut starts with the window's
+  first day. The two pins (1.4574e7, 4.3026e7 J) became **identities**: the heater pays the walls' loss
+  plus the room's change of store (1.4551e7 J, to rounding; the averaged lamp's was 1.4574e7), and
+  the battery gains the lamp's 5 days less the heater the failure added over the nominal run's own
+  (3.63 MJ on those nights). The lamp window's first group (day 112's last) is dark, so the failed run is
+  now the nominal one, bit for bit, at the end of day 112 — asserted where the old lag check stood.
+* `chamber_walls`, the structure (120 days): re-pinned as measured — the node 180.3016 K (was 179.151), the
+  heater 51.785 W (was 44.84); the full-horizon battery 1.4834e9 J (was 2.2602e9). Direction: the lit lamp
+  outruns the walls by day, the cooler hands the excess to the node, the heater makes it up by night.
+  Its chamber check sat behind the node's and showed only once that passed: the room ends day 120
+  0.0705 K below its setpoint, past the fixed 0.05 K that stood there. **Derived** now: a day end is dark,
+  so the heater meets the walls' whole loss to the node (1.536 W/K × 114.85 K = 176 W), and the deadbeat
+  controller leaves one step's deficit, 0.0706 K (the averaged lamp's 133 W covered most of it: 0.018 K).
+  ⚠ **A stale figure, not corrected here:** `chamber.yaml`'s `heater_capacity` source says the heater
+  "must exceed the largest steady loss of any surroundings option: 44.8 W against the station structure".
+  That was the loss net of the averaged lamp; in the dark the structure option now asks 176 W of the
+  200 W heater. The claim still holds, with a narrower margin; the reference's own walls (outdoors,
+  36.6 W on the coldest day with the lamp off) are unchanged. A provenance edit is its own unfreeze.
+* `chamber_walls`, the reference trajectory (slow): the node re-pinned as measured, 162.3792 / 174.4180 /
+  169.4745 K; the chamber's day-end bands **derived** instead of measured — a day end is dark, so the room
+  is held within one step's wall loss of its setpoint (measured −0.0036 / +0.0112 K cold, −0.0146 /
+  +0.0001 K warm), ±0.015 K; 9 of 1220 day ends outside (the warm-ups); it ends at 295.1466290 K.
+* `day_order`: the order claim needs a forcing flat within the day. The retired order runs every power
+  hour at the day's last `n` — a dark group — so under the switched lamp it draws no lamp at all. The
+  claim is held on the averaged lamp (`lighting_power_resolver_averaged`, lab-only), and the dark day is
+  asserted. The lab example `intraday_exchange` reproduces its lighting record on the averaged lamp too.
+* `lamp_shed` (lab):
+  * **A bug of this item's own, caught by an unchanged test.** A dark group owes nothing and was written
+    as "fully delivered" (1.0); but the share a group writes lights the NEXT plant window, so a shed lamp
+    came back at every dawn (`a_shed_lamp_on_the_sealed_station_never_comes_back`). A dark group now
+    repeats the last share; the test passes unchanged.
+  * H1 (the shed heater is the heater-less run): the heater-less run loses its heater from the shed's
+    group, not from the start — the heater fires on warm nights before the shed.
+  * H4 (a lamp failure keeps its heater): the heater is cut over days 2–4 exactly in the cold run (one
+    group after the lamp's window, both edge groups dark), and the draw is checked as the walls' loss
+    plus the room's change of store (3.557e6 J), inside the old 3.5e6 ± 20 % prediction, kept.
+  * The two plain-crop tests read the room colder on day 4 / at the end. A day end is now dark and both
+    rooms sit at the setpoint there, bit for bit. **Not predicted, measured with a probe:** in this lab's
+    full-lamp cold period, the lit lamp and the walls outrun the 200 W cooler and warm the room up to
+    ~4 K by day, so the cut lamp's room is colder only in the lit hours; restated on the crop, which
+    reads them (−4.5 % at day 8 with the light pinned identical), and the day-end rooms asserted equal.

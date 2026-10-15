@@ -103,6 +103,10 @@ pub(crate) fn full_lamp_average_power(scenario: &SealedStationScenario) -> f64 {
 /// chamber; until then the radiant `η_lamp` leg left the station as PAR and only the waste heat
 /// `(1−η_lamp)·lamp_avg` was counted here). `_lamp` is kept so callers need not change; the
 /// whole draw does not depend on the lamp's efficacy.
+///
+/// ⚠ It keeps the lamp's DAILY AVERAGE after the room's lamp heat switched with the light
+/// (2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md` §2): the node's time constant is days,
+/// so its start is a daily-mean equilibrium, and the switch keeps the daily mean.
 pub fn sealed_node_heat(
     charge: &ChargeParams,
     thermal_params: &ThermalParams,
@@ -304,12 +308,17 @@ pub fn build_sealed_station_unread(
     )?);
     fast_seq.push(node_stock(node0)?);
     // Day 0's setpoint and lamp: the program's on the sowing day (the cold phase's in the
-    // reference; §24c, "start values"). The crop is sown at step 0 (`SOWN_STEP` below).
+    // reference; §24c, "start values"). The crop is sown at step 0 (`SOWN_STEP` below). The lamp
+    // is its draw over the first fast group (window 0, dark: 0 W) since the lamp's heat switched
+    // with its light (2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md` §8); the daily
+    // average until then.
     let sowing_phase = scenario.phase_since_sowing(0);
+    let first_group_n =
+        crate::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day)?.slow;
     fast_seq.push(chamber_stock(chamber_heat0(
         &chamber,
         scenario.chamber_setpoint(sowing_phase, chamber.warm_setpoint),
-        scenario.lamp_average_power(sowing_phase, lamp.photon_efficacy),
+        switched_lamp_draw_for(scenario, sowing_phase)?(first_group_n, scenario.cabin_dt),
     ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
     if matches!(
@@ -600,8 +609,9 @@ pub fn sealed_bio_resolver(
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }
 
-/// The fast-domain forcing: crew intakes + the lamp's daily-average draw on the cold program
-/// (since slice 3b; [`SealedStationScenario::lamp_average_power`]) + constant solar/load, the
+/// The fast-domain forcing: crew intakes + the lamp's draw on the cold program (since slice 3b),
+/// switched with its light since 2026-10-15 ([`switched_lamp_draw_for`]; the daily average
+/// before, [`with_averaged_lamp_heat`]) + constant solar/load, the
 /// outdoor temperature the chamber's walls face, and the chamber's setpoint program
 /// ([`chamber_setpoint_twins`]). The lamp's draw and the setpoint are carried as their phase
 /// twins (slice 4, [`crate::sowing`]); the fast registry's sowing clock selects between them.
@@ -618,15 +628,15 @@ pub fn sealed_fast_resolver(
         WATER_INTAKE_VAR.to_string(),
         constant(scenario.cabin.water_intake_rate)?,
     );
-    // The lamp's draw follows the cold program (slice 3b). ⚠ The efficacy is `lamp.yaml`'s, as
-    // the plant side's PAR is built from the `LampParams` its caller passes: a caller passing a
-    // modified efficacy there would see cold PAR and cold draw disagree (none does).
-    let efficacy = crate::params::lamp().photon_efficacy;
+    // The lamp's draw follows the cold program (slice 3b), switched with its light since
+    // 2026-10-15 ([`switched_lamp_draw_for`]). ⚠ The efficacy is `lamp.yaml`'s, as the plant
+    // side's PAR is built from the `LampParams` its caller passes: a caller passing a modified
+    // efficacy there would see cold PAR and cold draw disagree (none does).
     insert_twins(
         &mut forcings,
         LAMP_POWER_VAR,
-        constant(scenario.lamp_average_power(Phase::Cold, efficacy))?,
-        constant(scenario.lamp_average_power(Phase::Warm, efficacy))?,
+        switched_lamp_draw_for(scenario, Phase::Cold)?,
+        switched_lamp_draw_for(scenario, Phase::Warm)?,
     );
     forcings.insert(
         SOLAR_POWER_VAR.to_string(),
@@ -641,33 +651,46 @@ pub fn sealed_fast_resolver(
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }
 
+/// The lamp's draw in `phase` on the fast step, switched with its light
+/// ([`crate::lighting::switched_lamp_draw`] at the phase's on-power and photoperiod, over the
+/// interleaved day's group of plant windows) — the reference since 2026-10-15
+/// (`docs/plans/post-roadmap-room-lamp-heat.md` §8). Until then the room drew the lamp's daily
+/// average on every minute, lit or dark ([`with_averaged_lamp_heat`], now a lab switch).
+pub fn switched_lamp_draw_for(
+    scenario: &SealedStationScenario,
+    phase: Phase,
+) -> Result<simcore::environment::Schedule, SimError> {
+    let efficacy = crate::params::lamp().photon_efficacy;
+    let groups = crate::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day)?;
+    Ok(crate::lighting::switched_lamp_draw(
+        scenario.lamp_power(phase, efficacy),
+        scenario.photoperiod_hours(phase) as f64 * 3600.0,
+        scenario.bio_dt,
+        scenario.bio_steps_per_day,
+        groups.slow,
+    ))
+}
+
 /// LAB-ONLY (`docs/plans/post-roadmap-room-lamp-heat.md`): `fast_resolver` with both `lamp_power`
-/// twins replaced by the lamp's draw switched with its light ([`crate::lighting::switched_lamp_draw`],
-/// at the phase's on-power and photoperiod) in place of the daily average. ⚠ It REPLACES the twins,
-/// so apply it before any perturbation of the lamp's draw.
-pub fn with_switched_lamp_heat(
+/// twins replaced by the lamp's DAILY AVERAGE ([`SealedStationScenario::lamp_average_power`]) —
+/// the reference until 2026-10-15, for instruments that reproduce records made with it. ⚠ It
+/// REPLACES the twins, so apply it before any perturbation of the lamp's draw.
+pub fn with_averaged_lamp_heat(
     fast_resolver: SourceResolver,
     scenario: &SealedStationScenario,
 ) -> Result<SourceResolver, SimError> {
     let (mut forcings, shared) = fast_resolver.into_parts();
     let efficacy = crate::params::lamp().photon_efficacy;
-    let groups = crate::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day)?;
     for phase in Phase::BOTH {
         let name = crate::sowing::twin(LAMP_POWER_VAR, phase);
         if forcings.remove(&name).is_none() {
             return Err(SimError::Reference(format!(
-                "the fast resolver carries no {name:?} to switch"
+                "the fast resolver carries no {name:?} to replace"
             )));
         }
         forcings.insert(
             name,
-            crate::lighting::switched_lamp_draw(
-                scenario.lamp_power(phase, efficacy),
-                scenario.photoperiod_hours(phase) as f64 * 3600.0,
-                scenario.bio_dt,
-                scenario.bio_steps_per_day,
-                groups.slow,
-            ),
+            constant(scenario.lamp_average_power(phase, efficacy))?,
         );
     }
     SourceResolver::new(forcings, shared)

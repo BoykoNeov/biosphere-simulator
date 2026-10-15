@@ -166,6 +166,10 @@ Three possible follow-ons, each its own decision, none started:
   1.80** (§6 there; the partly lit windows' dark minutes still count as day, ~0.5 GJ more, estimated).
 * **The room's lamp heat switched with the light** (on/off rather than a daily average) — a station
   unfreeze; it moves the chamber's temperature and heater books, not water.
+  **ADOPTED 2026-10-15** (`post-roadmap-room-lamp-heat.md` §7–§8). ⚠ *"Not water"* was wrong in a small
+  way: the plants read the chamber, so carbon (≤ 0.11 %) and water (+0.32 %) move too. The heater now fires
+  on the warm nights (257 040 minutes, was 421), and with the heat books switched 1787 warm dark windows'
+  water heat is not covered by what comes in — 0.10 GJ over the run, the input to the third follow-on.
 * **Latent heat in the room's books** (evaporation draws from the chamber store, condensation into the
   cooler's path) — the §0 build. Only worth taking after the two above, since today it would book a deficit
   that is night transpiration under an averaged lamp.

@@ -77,7 +77,7 @@ use simcore::state::State;
 use crate::chamber::CHAMBER_HEATER;
 use crate::driver::{day_groups, DAYS_PER_MASTER_DAY, SECONDS_PER_DAY};
 use crate::flows::{LAMP, LAMP_POWER_VAR};
-use crate::scenario::SealedStationScenario;
+use crate::scenario::{Phase, SealedStationScenario};
 use crate::sowing::program_value;
 
 /// The loads switched off below the reserve: the lamp and the plant chamber's heater.
@@ -328,7 +328,8 @@ pub fn rewire_for_shedding(
 /// in order (`days × groups` entries).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ShedLog {
-    /// The delivered share after each group (1.0 = the lamp drew its full nominal power).
+    /// The delivered share after each group (1.0 = the lamp drew its full nominal power; a dark
+    /// group, owing nothing, repeats the share before it).
     pub delivery: Vec<f64>,
 }
 
@@ -370,7 +371,19 @@ pub fn run_shedding(
     // The nominal is the lamp PROGRAM's draw on the same step `drawn` reads (§24i): the cold
     // phase's dimmed lamp is not a 90 % failure of the full one. Both read the program's phase
     // from the state's sowing (slice 4), as the wrapped `Lamp` flow does.
-    let efficacy = crate::params::lamp().photon_efficacy;
+    //
+    // ⚠ Since the lamp's heat switched with its light (2026-10-15,
+    // `docs/plans/post-roadmap-room-lamp-heat.md` §8) the program draws 0 in the dark, so the
+    // nominal is that switched draw, not the daily average it read until then (or every group
+    // would compare a switched delivery with an averaged nominal). It is the UNPERTURBED
+    // program's, built here rather than read off `fast_resolver`, so a lamp failure cut into the
+    // resolver still reads as undelivered. A dark group owes nothing, so it measures nothing and
+    // the share keeps its last measurement: the share a group writes lights the NEXT plant
+    // window, so a dark group writing 1.0 would light the first window of every dawn after the
+    // lamp was shed (built that way first, caught by `a_shed_lamp_on_the_sealed_station_never_
+    // comes_back`, §8c).
+    let cold_program = crate::sealed::switched_lamp_draw_for(scenario, Phase::Cold)?;
+    let warm_program = crate::sealed::switched_lamp_draw_for(scenario, Phase::Warm)?;
 
     let mut state = initial;
     let mut states = vec![state.clone()];
@@ -407,13 +420,20 @@ pub fn run_shedding(
                         fast_dt,
                     )?;
                 }
-                nominal += scenario.lamp_average_power(scenario.phase(&before)?, efficacy);
+                nominal += match scenario.phase(&before)? {
+                    Phase::Cold => cold_program(before.n, fast_dt),
+                    Phase::Warm => warm_program(before.n, fast_dt),
+                };
                 rationed += report.rationed;
                 events.extend(report.events);
             }
             // Written the moment it is known, so a day-end state carries its own last
             // group's share and a run resumed from it continues bit for bit (tested).
-            let delivered = drawn / nominal;
+            let delivered = if nominal == 0.0 {
+                delivery(&state)?
+            } else {
+                drawn / nominal
+            };
             state.aux.insert(LAMP_DELIVERY_AUX.to_string(), delivered);
             log.delivery.push(delivered);
         }

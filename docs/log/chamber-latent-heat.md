@@ -28,4 +28,6 @@ byte-exact).
   2005 hourly night resistance, is not on the shelf); lamp heat switched with the light; latent heat in the
   room's books (worth taking only after the other two). Recommended first: night-time closure, the dominant term.
   **Night-time closure ADOPTED 2026-10-15** (`log/night-stomata.md`): the dark-hours shortfall is ~0.31 GJ
-  now, not 1.80. The other two are still open.
+  now, not 1.80. **The room's lamp heat switched with the light ADOPTED 2026-10-15** (`log/room-lamp-heat.md`):
+  the heater now fires on the warm nights; 0.10 GJ of dark-window water heat is not covered. The third
+  (latent heat in the room's books) is still open.
