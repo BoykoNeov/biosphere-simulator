@@ -53,6 +53,9 @@ struct Window {
     wall_in_j: f64,
     heater_j: f64,
     seconds: f64,
+    /// The chamber air's water vapour at the plant step's start (kg) — whether the night air holds
+    /// its humidity setting (`docs/plans/post-roadmap-night-stomata.md`).
+    vapour_kg: f64,
 }
 
 /// Run-wide sums for one class of window.
@@ -67,6 +70,7 @@ struct Class {
     latent_j: f64,
     unfunded: u64,
     unfunded_j: f64,
+    vapour_kg: f64,
 }
 
 impl Class {
@@ -80,6 +84,7 @@ impl Class {
         self.lamp_j += w.lamp_j;
         self.heat_in_j += heat_in;
         self.latent_j += latent;
+        self.vapour_kg += w.vapour_kg;
         if latent > heat_in {
             self.unfunded += 1;
             self.unfunded_j += latent - heat_in;
@@ -239,6 +244,7 @@ fn main() {
                 evap_kg: evap,
                 soil_kg: soil,
                 latent_w: LAMBDA * evap / (two.slow_dt * SECONDS_PER_DAY),
+                vapour_kg: before.stocks[WATER_VAPOR].amount,
                 ..Window::default()
             };
         }
@@ -363,6 +369,10 @@ fn main() {
         crop_rate("warm dark") / crop_rate("warm lit"),
         crop_rate("cold dark") / crop_rate("cold lit")
     );
+    println!("chamber air's water vapour, mean at the plant step's start (kg):");
+    for (k, c) in &p.classes {
+        println!("  {k:<11} {:.6}", c.vapour_kg / c.windows as f64);
+    }
     println!("heater-on minutes and the latent power held over them:");
     for (k, (n, latent_j, heater_j)) in &p.heater_minutes {
         let s = *n as f64 * two.fast_dt;
