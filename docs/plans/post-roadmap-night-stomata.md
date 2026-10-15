@@ -216,6 +216,7 @@ rule is the form that would; it needs a lit-fraction signal the flow does not ha
 regeneration), and `closing_reaches_the_flow_on_a_dark_step_by_exactly_the_rule`, an instrument fault:
 it took the loader's params as its open baseline, so under adoption the heading case compared with
 itself. Fixed on main the same day (the baseline is now `NightStomata::Open` by name).
+The slow tests (`-- --ignored`, 9) pass under closing too.
 
 **What adoption would cost.** A biosphere unfreeze (the loader line and the two consts' citation
 standing in a frozen form), two station goldens, water only, and the station manifest regenerated. The TM water match goes from 1.04 to
