@@ -71,7 +71,8 @@ fn the_loader_keeps_the_stomata_open() {
 #[test]
 fn the_open_field_never_sees_a_dark_step() {
     let s = DEFAULT_SCENARIO;
-    let (state0, integrator, resolver) = setup(&s, &params::biosphere());
+    // The baseline is named OPEN, not taken from the loader, so the check survives an adoption.
+    let (state0, integrator, resolver) = setup(&s, &params_with(NightStomata::Open));
     let mut frozen = vec![state0.clone()];
     let mut state = state0;
     for _ in 0..steps_for_years(1) {

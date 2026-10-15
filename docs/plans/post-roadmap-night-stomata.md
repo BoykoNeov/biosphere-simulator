@@ -222,3 +222,57 @@ The slow tests (`-- --ignored`, 9) pass under closing too.
 standing in a frozen form), two station goldens, water only, and the station manifest regenerated. The TM water match goes from 1.04 to
 0.96–0.97 (3–4 % under, where it was 4 % over), and the trial's own record cannot say how much of
 its water was night water (`post-roadmap-real-world-checks.md` §12d).
+
+## 7. Adoption — `Closing(0.123)`, the booting ratio (opened 2026-10-15)
+
+**The user's call** (2026-10-15): *"1. do what is closer to reality"*, on the three choices (keep open,
+close to 0.123, close to 0.194). Closing is the real behaviour: every source in §1 measures wheat's
+night conductance far below its day value, where the model keeps 92 %. **The ratio is chosen on
+physics, not on the TM fit** (0.958 against 0.967 is a 1 % difference the trial cannot resolve, and
+choosing by fit is the co-adaptation this project refuses). Three facts, each from §1, all favour
+booting (advisor, 2026-10-15):
+
+1. **Two routes agree only at booting.** The ratio carried onto the model's 100 s/m day leaf gives
+   813 s/m at night against [N1]'s own absolute porometer night value of ~870 s/m; at heading 515
+   against ~660 — ~25 % more open than the paper.
+2. **Wheat's measured range.** [N2]: lifetime night conductance 5.7–18.9 % of day; [N1]'s
+   introduction: 5–18 % of daytime water loss. 12.3 % sits inside both; 19.4 % at or above the top.
+3. **Warm nights point low** (tiebreak only, not corrected for): night warming LOWERED the ratio at
+   both stages in [N1], and the chamber's night is a held 22 °C, warmer than that field ever was.
+
+**Not used as a reason:** the partly-lit-window bias (§6) — picking the higher ratio to offset it would
+be stacking one error on another; it stays a stated, separate bias. **Caveat:** the source measured two
+growth stages; the model applies one ratio all season.
+
+### 7a. What changes
+
+* **The loader line** (`params.rs`): `night_stomata: NightStomata::Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING)`.
+  No YAML key, no flow, aux or param set change. The heading const stays, lab-only.
+* **Wording**: the "lab-only" doc comments on the enum, the consts, `TranspirationParams`, `CanopyRead`
+  and `lab::with_night_stomata` say what the loader now sets.
+* **Tests**: `the_loader_keeps_the_stomata_open` is restated (not deleted) to pin `Closing(0.123)`.
+  `the_open_field_never_sees_a_dark_step` takes the LOADER's params as its baseline, so under adoption
+  its booting case would compare with itself and pass inertly — the same instrument fault §6 found in
+  the reach test. Its baseline is named `NightStomata::Open` first, in its own commit, before the flip.
+* **The TM scorecard's water-gap instruments** (`w1_by_hand`, `w1_by_hand_with`; §6) integrate nights
+  at the day resistance. They are kept as recorded and RELABELLED as open-stomata arithmetic — the
+  precedent the air-resistance adoption set the same day (*"the water-gap instruments keep the open
+  field's 50, as their numbers were recorded"*); they already compare a model at 7.5 with a hand path
+  at 50. The `dark_share` comment, which states the stomata stay open in the dark, is corrected.
+
+### 7b. Predictions (written before the loader line changed)
+
+* **A1** `regen_goldens` (report): exactly `lighting_state` and `sealed_station_state` differ;
+  the other 18 identical, `sealed_energy_drift_summary` and all 7 biosphere goldens among them.
+* **A2** In both moved goldens only water keys move (condensate, soil and subsoil water,
+  `top_soil_water`, `soil_dry_days`, `soil_evap_today`); no carbon, nitrogen, oxygen or energy value.
+* **A3** The TM 102788 scorecard's W1 reads **0.958** (the §6 booting value); its carbon rows identical.
+* **A4** Manifests: `station-reference.manifest.json` changes in exactly the two goldens'
+  `golden_sha256` rows. `biosphere-reference.manifest.json` and `authoring-reference.manifest.json`
+  are **byte-identical** — no file, set or biosphere golden moves. ⚠ This makes the biosphere side
+  of the unfreeze invisible to its automatic gates (the 2026-08-12 `WSFD` case): the ceremony is
+  followed by hand, and the restated loader test is the only pin.
+* **A5** Before the goldens and manifest are regenerated, the suite's reds are exactly: the restated
+  loader test's old form (gone once restated), the two goldens' own byte checks, and the station
+  `manifest_writer`. After: full suite green, `-- --ignored` green, clippy clean.
+* **A6** Science gates: no biosphere band or liveness floor reads a lamp-lit build, so none moves.
