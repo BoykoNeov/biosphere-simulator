@@ -41,8 +41,8 @@
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
 use crate::biosphere::science::{
-    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
-    SurfaceResistanceForm, VpdRead, WateringForm,
+    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, NightStomata, O2Form,
+    SoilEvaporationForm, SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{with_override, ConfigError, ParamFile};
 
@@ -223,6 +223,18 @@ pub fn biosphere_with_rs_form(
     let mut p = biosphere_with(subs)?;
     p.transp.rs_form = form;
     Ok(p)
+}
+
+/// `p` with stomata that close in the dark, or not ([`NightStomata`],
+/// `docs/plans/post-roadmap-night-stomata.md`). Takes built params so it composes with the other
+/// forms. Read only under a leaf-area `rs_form` (the loader's Szeicz–Long is one).
+///
+/// # ⚠ A switch, not an endorsement of the form switched to
+///
+/// [`NightStomata::Open`] is the loader's; `Closing` at either cited ratio is the lab's.
+pub fn with_night_stomata(mut p: BiosphereParams, form: NightStomata) -> BiosphereParams {
+    p.transp.night_stomata = form;
+    p
 }
 
 /// The frozen params under a chosen **soil evaporation**, canopy-resistance form and watering

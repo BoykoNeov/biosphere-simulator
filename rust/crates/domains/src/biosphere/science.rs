@@ -1007,6 +1007,42 @@ pub enum SurfaceResistanceForm {
 /// resistance `rl` and Teh's `Lcr` are params (`transpiration.yaml`, since 2026-10-10).
 pub const FAO_ACTIVE_LAI_FRACTION: f64 = 0.5;
 
+/// Whether the canopy's stomata close in the dark (`docs/plans/post-roadmap-night-stomata.md`).
+///
+/// Never loaded from a param file — it selects a form. [`NightStomata::Open`] (the leaf-area forms'
+/// constant leaf value, day and night alike) is the loader's; [`NightStomata::Closing`] is a lab
+/// switch, its ratio a cited const below, not a YAML key (a key would join the frozen census).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum NightStomata {
+    /// The surface resistance ignores light: the stomata never close.
+    #[default]
+    Open,
+    /// On a step with net radiation `≤ 0` the canopy conducts `f` of its daytime value, so the
+    /// surface resistance is the day value `/ f`. The day/night rule is ASCE-EWRI (2005)'s hourly
+    /// one (*"during daylight (when Rn > 0)"*, via Snyder 2002), applied to the model's own day
+    /// resistance; partly lit steps count as day, as that rule has it. Under Szeicz–Long
+    /// (`rc = rst / L`) a canopy ratio equals the leaf ratio, so `f` is the leaf's.
+    Closing(f64),
+}
+
+/// Night-to-day stomatal conductance of irrigated field wheat at BOOTING — McAusland et al. (2023),
+/// *New Phytologist* 239:1622–1636, doi 10.1111/nph.19075 (CC BY 4.0), Table 3, control plots:
+/// *"12.30 ± 4.54"* % (LI-6400, three seasons, n = 6; leaf VPD held at the day's 1.2 kPa at night,
+/// 16 °C leaf, measured 30 min after sunset). Lab-only (`NightStomata::Closing`).
+pub const NIGHT_CONDUCTANCE_RATIO_BOOTING: f64 = 0.123;
+
+/// The same at HEADING — McAusland et al. (2023) Table 3, control: *"19.40 ± 9.01"* %. Lab-only.
+pub const NIGHT_CONDUCTANCE_RATIO_HEADING: f64 = 0.194;
+
+/// The canopy surface resistance on a step with net radiation `net_radiation` (W m⁻²), given its
+/// daytime value `day` — [`NightStomata::Closing`] divides by the ratio when `net_radiation ≤ 0`.
+pub fn night_surface_resistance(day: f64, net_radiation: f64, form: NightStomata) -> f64 {
+    match form {
+        NightStomata::Closing(f) if net_radiation <= 0.0 => day / f,
+        _ => day,
+    }
+}
+
 /// Whether the soil evaporates (`docs/plans/post-roadmap-soil-evaporation.md`).
 ///
 /// [`SoilEvaporationForm::TwoStage`] — Soltani & Sinclair (2012) Ch. 14 after Amir & Sinclair

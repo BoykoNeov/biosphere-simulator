@@ -37,8 +37,8 @@
 //! `docs/biosphere-reference.md`.
 
 use super::science::{
-    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, O2Form, SoilEvaporationForm,
-    SoilSupply, SurfaceResistanceForm, VpdRead, WateringForm,
+    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, NightStomata, O2Form,
+    SoilEvaporationForm, SoilSupply, SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
@@ -273,6 +273,10 @@ pub struct TranspirationParams {
     /// adoption (2026-10-10); `Off`, the floor and the top-layer cap are lab-only
     /// (`docs/plans/post-roadmap-soil-evaporation.md` §16).
     pub soil_evap: SoilEvaporationForm,
+    /// Whether the stomata close in the dark ([`NightStomata`]), read only under a leaf-area
+    /// `rs_form`. Never loaded from the file: the loader sets [`NightStomata::Open`]; closing is
+    /// lab-only (`docs/plans/post-roadmap-night-stomata.md`).
+    pub night_stomata: NightStomata,
     /// `rl`, a well-watered leaf's stomatal resistance (s/m), read by the two leaf-area forms of
     /// [`SurfaceResistanceForm`] (FAO-56 Box 5's 100 s/m).
     pub leaf_stomatal_resistance: f64,
@@ -804,6 +808,9 @@ pub fn transpiration_from_bounded(
             floor: false,
             supply: SoilSupply::RootZone,
         },
+        // Stomata that never close; closing in the dark is lab-only
+        // (docs/plans/post-roadmap-night-stomata.md).
+        night_stomata: NightStomata::Open,
     }
 }
 

@@ -786,18 +786,31 @@ pub struct CanopyRead {
     /// FAO-56's `rl` and Teh's `Lcr` (`transpiration.yaml`).
     pub leaf_resistance: f64,
     pub threshold_lai: f64,
+    /// Whether the stomata close in the dark — `Open` on every frozen build; `Closing` is lab-only
+    /// (`docs/plans/post-roadmap-night-stomata.md`).
+    pub night: science::NightStomata,
 }
 
 impl CanopyRead {
-    /// The surface resistance this form gives on `snapshot`; `constant` is the file's own value.
-    fn surface_resistance(&self, snapshot: &State, ground_area: f64, constant: f64) -> f64 {
-        science::canopy_surface_resistance(
+    /// The surface resistance this form gives on `snapshot` under `net_radiation` (W m⁻²);
+    /// `constant` is the file's own value. The leaf-area form gives the day value, and
+    /// [`science::night_surface_resistance`] applies the night rule to it. The shared
+    /// `science::canopy_surface_resistance` stays the DAY value for its other readers.
+    fn surface_resistance(
+        &self,
+        snapshot: &State,
+        ground_area: f64,
+        constant: f64,
+        net_radiation: f64,
+    ) -> f64 {
+        let day = science::canopy_surface_resistance(
             self.form,
             constant,
             self.lai(snapshot, ground_area),
             self.leaf_resistance,
             self.threshold_lai,
-        )
+        );
+        science::night_surface_resistance(day, net_radiation, self.night)
     }
 
     fn lai(&self, snapshot: &State, ground_area: f64) -> f64 {
@@ -937,7 +950,12 @@ impl Transpiration {
         let lai_green = s.lai_green(snapshot, self.ground_area);
         let surface_resistance = match &self.canopy {
             None => self.surface_resistance,
-            Some(c) => c.surface_resistance(snapshot, self.ground_area, self.surface_resistance),
+            Some(c) => c.surface_resistance(
+                snapshot,
+                self.ground_area,
+                self.surface_resistance,
+                net_radiation,
+            ),
         };
         let crop_potential = science::penman_monteith_transpiration(
             net_radiation * science::crop_radiation_share(lai_green, s.coef.shade_extinction),
@@ -1088,7 +1106,12 @@ impl Flow for Transpiration {
         let soil_water = amt(snapshot, &self.soil_water);
         let surface_resistance = match &self.canopy {
             None => self.surface_resistance,
-            Some(c) => c.surface_resistance(snapshot, self.ground_area, self.surface_resistance),
+            Some(c) => c.surface_resistance(
+                snapshot,
+                self.ground_area,
+                self.surface_resistance,
+                net_radiation,
+            ),
         };
         let potential = science::penman_monteith_transpiration(
             net_radiation,

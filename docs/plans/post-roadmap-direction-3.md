@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `chamber-latent-heat.md`
+**Re-read against the record's last row:** `night-stomata.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -556,6 +556,13 @@ Scaling that note's drain by 1.13 moves "dark near day 1736" to roughly day 1540
 1220-day horizon (a scaling, not a run). The item names three follow-ons (night stomatal closure, lamp heat switched with the light, latent
 heat in the room's books); they are the record's open questions, recorded there and in its plan, not added
 to §2 here, since none has a source or a user decision yet. Nothing in §3 is re-proposed.
+⚠ *Re-read 2026-10-15* (`log/night-stomata.md`, OPENED, built lab-only, measurement pending): grepped this
+plan for night, stomata, Jarvis, surface resistance, transpiration and dark. The only hit is the note above,
+which named night stomatal closure as one of three follow-ons, not added to §2. The item now has a source
+(McAusland et al. 2023) and a user decision to open it, and its record carries it; nothing here is
+discharged. One correction reaches the note above's scaling: only the lamp-lit station builds can see a dark
+step (the biosphere jars read the outdoor daily mean), so the battery reading stands as written. Nothing in
+§3 is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
