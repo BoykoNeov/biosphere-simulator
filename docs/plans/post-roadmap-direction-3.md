@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `chamber-air-resistance-adopted.md`
+**Re-read against the record's last row:** `chamber-latent-heat.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -547,6 +547,14 @@ question, not this plan's).
 sealed chamber): grepped this plan again for aerodynamic, Penman, transpiration, resistance, condensate and
 re-sow. Still no air-resistance item, so this discharges nothing and adds nothing to §2 or §3; the source
 the 2026-10-14 note said was missing now exists (Monje & Bugbee 2019), and the record carries it.
+⚠ *Re-read 2026-10-15* (`log/chamber-latent-heat.md`, ESTIMATED lab-only, nothing built): grepped this
+plan for latent, night, stomata, dark, heater, lamp heat, energy and evaporation. The only energy item is
+the 2026-10-01 note above (the sealed station's battery pays for the lamp from its starting charge). This
+bears on it at a distance: a room whose books took the water's heat would ask the heater, on that battery,
+for ~0.29 GJ over 1220 days — about 2 % of the lamp's 1.41e10 J, so it does not move that note's "dark near
+day 1736". The item names three follow-ons (night stomatal closure, lamp heat switched with the light, latent
+heat in the room's books); they are the record's open questions, recorded there and in its plan, not added
+to §2 here, since none has a source or a user decision yet. Nothing in §3 is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

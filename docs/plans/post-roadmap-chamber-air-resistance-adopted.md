@@ -96,7 +96,7 @@ capacity (and the sunlit chambers never pass LAI ~1, where it is lower still —
 The model gives evaporation no heat — no station node and not `thermal.rs` carries latent heat — and the
 dehumidifier draws no power for what it condenses. A real chamber transpiring ×1.5–1.8 more would cool its
 leaves and its room and load its dehumidifier. So the energy side of this change is **unmeasured, not
-zero**.
+zero**. **Measured 2026-10-15** (`post-roadmap-chamber-latent-heat.md` §5): at 7.5 the crop's water carries about the whole lamp's heat (warm phase 1.01; 0.53 at 50), and night transpiration alone (1.8 GJ) is six times the 0.29 GJ the room has no source for.
 
 ---
 
