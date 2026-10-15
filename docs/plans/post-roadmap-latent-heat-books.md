@@ -112,9 +112,13 @@ capacity 1800 min warm / 1776 cold; walls net 0.636 GJ out; the room's warm mini
 warm-up after each cold period). Vapour at plant-step starts: 1.02–1.03 kg cold, 3.33–3.34 kg warm.
 Battery ends 1.0865e10 J.
 
-⚠ Within a window the lamp's draw and the latent draw are both uniform (the lamp's top-hat mean; the
+~~⚠ Within a window the lamp's draw and the latent draw are both uniform (the lamp's top-hat mean; the
 window's rate), so a window's per-minute deficit is its mean deficit: the run-0 "unfunded" sums are the
-heater's new work exactly, not a lower bound — before the walls and the plants answer the changed room.
+heater's new work exactly, not a lower bound — before the walls and the plants answer the changed room.~~
+⚠ *Struck after the run (advisor, 2026-10-15):* the probe's "heat in" counts the walls only when they
+bring heat **in**; a lit window whose walls lose heat counts no loss, so its "unfunded" sum leaves the
+walls' losses out. The sums were a **lower bound** after all — most of Q2's miss (§7), and the same fact as
+the heater running by day.
 
 | | prediction | confidence |
 |---|---|---|
@@ -199,3 +203,52 @@ against a battery that ended 1.48 GJ above zero. Not a fault of the form: that l
 own transpiration. Its slow test (`chamber_walls.rs`,
 `the_structures_heater_does_not_empty_the_battery_within_the_horizon`) asserts the opposite and would go
 red at adoption.
+
+### 7a. The season's extra day, measured (advisor, 2026-10-15)
+
+The eight seasons are one event repeated (each re-sow resets the crop), so the cause was measured rather
+than argued. The probe now prints, at each re-sow, the thermal time past maturity and the last day's gain,
+and the room's mean temperature against its setpoint by window class (`base4_outdoor.txt`,
+`latent4_outdoor.txt`).
+
+| | run 0 | latent heat booked |
+|---|---|---|
+| room, warm lit windows | +0.064 K | **+0.008 K** |
+| room, warm dark windows | −0.032 K | −0.040 K |
+| room, cold windows | +0.045 / +0.018 K | +0.045 / +0.015 K |
+| overshoot past maturity at the re-sow | **2.2–2.8 °C·d** of a 22.05 °C·d day (0.10–0.13 of it) | 20.6–21.1 °C·d (0.94–0.96 of the day) |
+
+**Run 0's crop matured with 0.10–0.13 of its last day to spare.** The cooler lit room (−0.056 K over two
+thirds of the warm windows) costs the season ~3 °C·d, more than that margin: the crop misses day 139 by
+~1 °C·d and matures in the first ~6 % of day 140, so it gets one more whole day of grain fill (+0.49 mol
+C, +3.4 %). The +3.4 % is a **step of the once-a-day maturity check**, not a smooth response: a crop sitting
+more than ~0.15 day from the boundary would have moved by 0 days, and the smooth effect of ~0.15 day of
+slower development is a fraction of one day's fill.
+
+### 7b. The price of adoption, measured in a scratch worktree (§6 step 4)
+
+The switch wired into `build_sealed_station_in` (after `wrap_last`), a worktree at `cd37dd6`; logs
+`W:\temp\claude\latent-heat-build\wt_{regen,suite,ignored}.txt`.
+
+**Q13 held:** `regen_goldens` changes `sealed_station_state` only; the other 19 identical.
+
+**The reds** (17; none yet restated):
+
+| test | why | kind |
+|---|---|---|
+| `latent_heat.rs` × 3 | written for a reference without the heat (a second recorder; the refusal now fires on the reference build) | rewrite: the switch becomes the lab-off one |
+| `manifest_writer` | a new flow type, `ChamberLatentHeat` | regenerate (the ceremony) |
+| `golden_regression` (ignored), `tier_contract` (ignored, aux key count 11 vs 12) | the golden | regenerate |
+| `session_save_load` resume across a season (ignored) | pins the re-sow at day 139; it is now 140 (§7a) | restate the pin; the resume itself held |
+| `chamber_heat` dead cooler | the nominal chamber sits 5e-4 K off its old fixed bound | derive the band |
+| `chamber_walls` cabin, dead lamp, structure node, reference node (ignored) | energy identities lack the latent term; pins | restate: add the term, re-pin |
+| `chamber_walls` structure battery (ignored) | **the battery empties; 763 338 rationed steps** | **a decision** (§8) |
+| `lamp_shed` × 2 | an energy identity lacks the latent term; a dark day end is no longer exactly at the setpoint | restate |
+| `air_split` × 2 | the separate-air builds assemble their own registries and **silently lack the heat**, so they are compared with a reference that has it | **a decision** (§8) |
+
+`minute_transpiration.rs` and `scorecard_tm102788.rs` stayed green (they do not build through
+`build_sealed_station_in`).
+
+**Wiring for adoption (advisor):** inside the reference build, not through the lab wrapper — its `n = 0`
+guard and seeded key would make any state saved before the change error at its first minute. A
+pre-adoption save needs an explicit answer (seed the key at load, or refuse with a clear message).

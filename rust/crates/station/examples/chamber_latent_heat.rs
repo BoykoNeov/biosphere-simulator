@@ -84,6 +84,8 @@ struct Window {
     vapour_kg: f64,
     /// Heat the latent flow drew from the chamber over the window's minutes (J, ≥ 0; `--latent`).
     booked_j: f64,
+    /// Σ (room temperature − setpoint) over the window's minutes (K·min).
+    dev_sum: f64,
 }
 
 /// Run-wide sums for one class of window.
@@ -99,6 +101,7 @@ struct Class {
     unfunded: u64,
     unfunded_j: f64,
     vapour_kg: f64,
+    dev_sum: f64,
 }
 
 impl Class {
@@ -113,6 +116,7 @@ impl Class {
         self.heat_in_j += heat_in;
         self.latent_j += latent;
         self.vapour_kg += w.vapour_kg;
+        self.dev_sum += w.dev_sum;
         if latent > heat_in {
             self.unfunded += 1;
             self.unfunded_j += latent - heat_in;
@@ -138,6 +142,10 @@ struct Probe {
     resets: Vec<u64>,
     /// The crop at each re-sow, before the reset: grain, leaf, stem, root (mol C).
     harvests: Vec<[f64; 4]>,
+    /// Thermal time at the start of the current day, and at each re-sow (overshoot past maturity,
+    /// the last day's gain), °C·d.
+    tt_day_start: f64,
+    maturity_margins: Vec<(f64, f64)>,
     latent: LatentBooks,
 }
 
@@ -338,10 +346,19 @@ fn main() {
         Side::Reset => {
             use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C, STORAGE_C};
             p.resets.push(after.n);
+            let pheno = scenario.pheno;
+            let tt = before.aux[domains::biosphere::stocks::THERMAL_TIME];
+            p.maturity_margins.push((
+                tt - (pheno.tsum_anthesis + pheno.tsum_maturity),
+                tt - p.tt_day_start,
+            ));
             p.harvests.push([STORAGE_C, LEAF_C, STEM_C, ROOT_C].map(|k| before.stocks[k].amount));
         }
         Side::Slow => {
             p.close();
+            if before.n % scenario.bio_steps_per_day == 0 {
+                p.tt_day_start = before.aux[domains::biosphere::stocks::THERMAL_TIME];
+            }
             let results = p.evaluate(two.slow.registry(), two.slow_resolver, two.slow_dt, before, after);
             let mut evap = 0.0;
             for (f, r) in two.slow.registry().flows().iter().zip(&results) {
@@ -428,6 +445,7 @@ fn main() {
                 p.room.outdoor_above_minutes += 1;
             }
             let dev = chamber_temperature(after.stocks[CHAMBER].amount, &chamber) - set;
+            p.w.dev_sum += dev;
             let cooled = -results
                 .iter()
                 .zip(two.fast.registry().flows())
@@ -600,6 +618,14 @@ the room against its setpoint (minutes; T − setpoint min / max K; minutes > 0.
         "re-sown at day {:?}",
         p.resets.iter().map(|n| *n as f64 / scenario.bio_steps_per_day as f64).collect::<Vec<_>>()
     );
+    println!("maturity at each re-sow: thermal time past the threshold (°C·d), the last day's gain (°C·d), the overshoot as a fraction of that day");
+    for (over, gain) in &p.maturity_margins {
+        println!("  {over:>9.4} {gain:>9.4} {:>7.4}", over / gain);
+    }
+    println!("the room's mean temperature against its setpoint by window class (K):");
+    for (k, c) in &p.classes {
+        println!("  {k:<11} {:+.5}", c.dev_sum * two.fast_dt / c.seconds);
+    }
     println!("the crop at each maturity (mol C): grain, leaf, stem, root");
     for h in &p.harvests {
         println!("  {:.6e} {:.6e} {:.6e} {:.6e}", h[0], h[1], h[2], h[3]);
