@@ -1,5 +1,7 @@
-//! The heat evaporation takes from the plant chamber, in the chamber's books — LAB-ONLY
-//! (`docs/plans/post-roadmap-latent-heat-books.md`).
+//! The heat evaporation takes from the plant chamber, in the chamber's books
+//! (`docs/plans/post-roadmap-latent-heat-books.md`) — built lab-only and ADOPTED 2026-10-15: every
+//! sealed build carries it ([`book_latent_heat`], [`latent_heat_flow`]); [`without_latent_heat`] is
+//! the lab switch back to a room whose water cost it nothing.
 //!
 //! The plants' water moves on the plant step (90 minutes); the chamber's heat store moves on the
 //! minute. A window's evaporation (~0.7 MJ in the warm phase) drawn at once would drop the room
@@ -42,6 +44,10 @@ pub const TRANSPIRATION: &str = "biosphere.transpiration";
 pub const EVAPORATION_RECORDER: &str = "station.window_evaporation";
 /// The aux key holding the plant window's evaporation rate (kg/s).
 pub const EVAPORATION_RATE_AUX: &str = "station.window_evaporation.rate";
+/// The aux key holding the water evaporated so far (kg, the recorder's running total). At a day
+/// end every recorded window's heat has been drawn, so the heat booked to date is λ × this — a
+/// ledger any state can be read against (`docs/plans/post-roadmap-latent-heat-books.md` §8a).
+pub const EVAPORATED_TOTAL_AUX: &str = "station.window_evaporation.total_kg";
 /// Flow id: the evaporation's heat, chamber → thermal node.
 pub const CHAMBER_LATENT_HEAT: &str = "station.chamber_latent_heat";
 
@@ -72,7 +78,8 @@ impl Flow for SharedFlow {
 }
 
 /// The plant-step aux process recording the window's evaporation rate (kg/s) into
-/// [`EVAPORATION_RATE_AUX`]. The aux channel is additive, so it writes the increment.
+/// [`EVAPORATION_RATE_AUX`] and adding the window's water to [`EVAPORATED_TOTAL_AUX`]. The aux
+/// channel is additive, so the rate is written as its increment.
 pub struct WindowEvaporationRecorder {
     flow: Arc<dyn Flow>,
 }
@@ -115,7 +122,10 @@ impl AuxProcess for WindowEvaporationRecorder {
             .get(EVAPORATION_RATE_AUX)
             .copied()
             .unwrap_or(0.0);
-        Ok(BTreeMap::from([(EVAPORATION_RATE_AUX.to_string(), rate - old)]))
+        Ok(BTreeMap::from([
+            (EVAPORATION_RATE_AUX.to_string(), rate - old),
+            (EVAPORATED_TOTAL_AUX.to_string(), kg),
+        ]))
     }
 }
 
@@ -166,37 +176,24 @@ impl Flow for ChamberLatentHeat {
     }
 }
 
-/// LAB-ONLY: book evaporation's heat in the chamber ([module docs](self)) on a fresh sealed build —
-/// the transpiration flow shared with a new plant-step recorder, [`ChamberLatentHeat`] added to the
-/// fast registry, [`EVAPORATION_RATE_AUX`] seeded at 0.
+/// The fast flow, chamber → thermal node, as the sealed station's canonical fast list carries it
+/// (`sealed::sealed_fast_flows`).
+pub fn latent_heat_flow() -> Box<dyn Flow> {
+    Box::new(ChamberLatentHeat::new(
+        CHAMBER_LATENT_HEAT.to_string(),
+        CHAMBER.to_string(),
+        NODE.to_string(),
+    ))
+}
+
+/// The plant side of the books, on a sealed build's plant registry: the transpiration flow shared
+/// with a new [`WindowEvaporationRecorder`] (appended to the aux list), and [`EVAPORATION_RATE_AUX`]
+/// and [`EVAPORATED_TOTAL_AUX`] seeded at 0 in `state`. An error unless the transpiration flow is in `bio_reg`.
 ///
-/// An error unless the transpiration flow is on the plant step and nowhere else (a build that moved
-/// it onto the minute would leave the recorder reading nothing), the fast registry carries the
-/// chamber, and the state is fresh (`n = 0`). ⚠ Apply it **before** the lab's lamp shedding
-/// (`lamp_shed::rewire_for_shedding`), which wraps every plant-step flow and aux process alike.
-pub fn with_latent_heat(
-    state: State,
-    bio_reg: Registry,
-    fast_reg: Registry,
-) -> Result<(State, Registry, Registry), SimError> {
-    if state.n != 0 {
-        return Err(SimError::Reference(format!(
-            "the latent heat is wired on a fresh build (n = 0), not n = {}",
-            state.n
-        )));
-    }
-    if fast_reg.flows().iter().any(|f| f.id() == TRANSPIRATION) {
-        return Err(SimError::Validation(
-            "the chamber's latent heat records transpiration on the plant step, but it is on the \
-             fast step: the recorder would read nothing"
-                .into(),
-        ));
-    }
-    if !state.stocks.contains_key(CHAMBER) {
-        return Err(SimError::Validation(
-            "the chamber's latent heat needs the chamber's heat store".into(),
-        ));
-    }
+/// ⚠ Apply it **before** the plants are wrapped to read the chamber (`sealed::wrap_last`) and before
+/// the lab's lamp shedding: both wrap every plant-step flow and aux process alike, so the recorder
+/// and the flow it shares then read one environment.
+pub fn book_latent_heat(state: State, bio_reg: Registry) -> Result<(State, Registry), SimError> {
     let (flows, mut bio_aux) = bio_reg.into_parts();
     let mut shared: Option<Arc<dyn Flow>> = None;
     let flows: Vec<Box<dyn Flow>> = flows
@@ -217,15 +214,45 @@ pub fn with_latent_heat(
         )));
     };
     bio_aux.push(Box::new(WindowEvaporationRecorder { flow }));
-    let (mut fast_flows, fast_aux) = fast_reg.into_parts();
-    fast_flows.push(Box::new(ChamberLatentHeat::new(
-        CHAMBER_LATENT_HEAT.to_string(),
-        CHAMBER.to_string(),
-        NODE.to_string(),
-    )));
     let mut state = state;
     state.aux.insert(EVAPORATION_RATE_AUX.to_string(), 0.0);
+    state.aux.insert(EVAPORATED_TOTAL_AUX.to_string(), 0.0);
     let bio = Registry::new(flows, &state.stocks, bio_aux)?;
+    Ok((state, bio))
+}
+
+/// LAB-ONLY, the books as they were before 2026-10-15 (`docs/plans/post-roadmap-latent-heat-books.md`
+/// §8): `(state, bio_reg, fast_reg)` of a sealed build with the recorder, the fast flow and the two
+/// seeded keys removed, so evaporation costs the room nothing. The shared transpiration flow stays — it
+/// delegates, so it computes what the plain flow computes. An error unless all three are present, so
+/// a build that never had the books cannot be "switched off" by mistake.
+pub fn without_latent_heat(
+    state: State,
+    bio_reg: Registry,
+    fast_reg: Registry,
+) -> Result<(State, Registry, Registry), SimError> {
+    let (flows, aux) = bio_reg.into_parts();
+    let before = aux.len();
+    let aux: Vec<Box<dyn AuxProcess>> = aux
+        .into_iter()
+        .filter(|a| a.id() != EVAPORATION_RECORDER)
+        .collect();
+    let (fast_flows, fast_aux) = fast_reg.into_parts();
+    let fast_before = fast_flows.len();
+    let fast_flows: Vec<Box<dyn Flow>> = fast_flows
+        .into_iter()
+        .filter(|f| f.id() != CHAMBER_LATENT_HEAT)
+        .collect();
+    let mut state = state;
+    let seeded = state.aux.remove(EVAPORATION_RATE_AUX).is_some()
+        & state.aux.remove(EVAPORATED_TOTAL_AUX).is_some();
+    if aux.len() + 1 != before || fast_flows.len() + 1 != fast_before || !seeded {
+        return Err(SimError::Validation(
+            "without_latent_heat: the build does not carry the chamber's latent-heat books              (recorder, fast flow and both keys)"
+                .into(),
+        ));
+    }
+    let bio = Registry::new(flows, &state.stocks, aux)?;
     let fast = Registry::new(fast_flows, &state.stocks, fast_aux)?;
     Ok((state, bio, fast))
 }

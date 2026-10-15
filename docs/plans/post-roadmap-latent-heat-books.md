@@ -288,3 +288,49 @@ water stays on the plant step) and the **minute-water lab option opts out** with
 | A3 | the reds of §7b, with two changes: `latent_heat.rs` rewritten for the default; the separate-air pair (`air_split.rs`) **turn green** without a restatement once the split build has the heat on both sides of its comparison — unless its minute variant moves the water, in which case it stays red and is restated as minute water without the heat |
 | A4 | the structure walls' battery runs out between days **900 and 1220** (§7: it ends at 1.8e4 J; the heater needs ~6.3 GJ more against a 1.48 GJ margin) |
 | A5 | anything else that builds through `build_sealed_station_unread` (the TM 102788 scorecard, the sowing-clock and gas-exchange tests, the shedding example) moves only as §7 did: water ≤ 0.3 %, and season-dated pins by one day |
+
+### 8c. Graded (2026-10-15)
+
+| | measured | grade |
+|---|---|---|
+| A1 | the adopted `sealed_station_state` **byte-identical** to the §7b worktree's (`cmp`), before the ledger below | **held** |
+| A2 | `chamber_latent_heat -- --no-latent` on the adopted tree, against the still-committed pre-adoption golden: **byte-exact** | **held** |
+| A3 | the separate-air pair turned green unrestated (its minute variant moves the gas exchange, not the water); the other reds as §7b, plus two `minute_transpiration.rs` tests §7b could not see (their builds go through `build_sealed_station_unread`, which the trial did not wire) | held, with two unforeseen reds |
+| A4 | the structure walls' battery runs out **by day 1025** (rationing 763 338; 410 saturated nights before it) | **held** (900–1220) |
+| A5 | the TM 102788 scorecard, sowing-clock and gas-exchange tests green; season-dated pins moved one day (`session_save_load`'s first re-sow 139 → 140) | held |
+
+**One change after the predictions:** a running total of the evaporated water
+(`station::latent_heat::EVAPORATED_TOTAL_AUX`), written by the recorder beside the rate. At a day end
+every recorded window's heat has been drawn, so the heat booked to date is λ × the total — a ledger any
+state can be read against. It was added because three energy identities (`chamber_walls` L1,
+`lamp_shed` H4, `chamber_heat`'s dead cooler) needed the span's evaporation from states alone; it adds a
+second aux key to the golden (A1's identity was checked before it). Its own test: the minute legs summed
+over four days equal λ × the total to 1e-12.
+
+**The reds, restated** (none deleted, none widened without a derivation):
+
+* `latent_heat.rs` — rewritten for the default: the build carries the books, the lab switch takes
+  exactly them out, minute water needs them off, a keyless save resumes; the window identity and the
+  ledger.
+* `chamber_walls.rs` — the run helper is the reference day observed (`TwoRate`, interleaved) so it sums
+  the latent legs; L1's heater identity gains the evaporation (walls 14.5 MJ + evaporation 12.0 MJ +
+  store = the battery gap) and its held band one evaporation step; L2's closed form takes the lamp less
+  the run's mean evaporation (4.6 W); L4 (120 days) re-pinned (node 189.2987 K, heater 136.919 W) and
+  the room **not held** at its day 120 end (0.9526 K below: the heater saturated earlier that night);
+  the reference node re-pinned (162.4912 / 176.3676 / 170.4416 K, ends 295.1354351 K), its band one
+  evaporation step wider per state (9 day ends outside, as before); the structure horizon restated to
+  the battery running out (the user's answer).
+* `chamber_heat.rs` — the nominal room sits one evaporation step below its start at each dark day end
+  (derived); the dead cooler's day-2 rise is the lamp less the evaporation (day 1 carries ~20 kJ of the
+  healthy heater from the dark hours); its node bound starts where the dead crop stops evaporating (day
+  11); the nominal node's lamp-only derivation is held on the books-off run, and the books-on node sits
+  1.79 K above it, inside the 14.6 K the evaporation could pay for.
+* `lamp_shed.rs` — H4's identity gains the evaporation from the ledger; the two rooms' dark day ends
+  differ by exactly their evaporation steps.
+* `minute_transpiration.rs` — the minute form carries no books (fast side +2 −1); the half-pair refusal
+  switches the books off first.
+* `session_save_load.rs` — the first re-sow is day 140 (§7a).
+
+**A standing caution (a side note, 2026-10-15):** the reference crop now matures ~6 % into its last day,
+closer to the line than before (11 %). A later change warming the room by ~0.03 K could take the day back
+and move grain ~−3.4 % with no mechanism behind it. Read a ~3 % grain move against the re-sow days first.

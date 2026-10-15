@@ -1,9 +1,9 @@
-//! **The heat evaporation takes from the room** — the lab switch's own checks.
+//! **The heat evaporation takes from the room** — its own checks.
 //!
-//! Plan: `docs/plans/post-roadmap-latent-heat-books.md` (§1, §4 Q1). `station::latent_heat::with_latent_heat`
-//! records each plant window's evaporation and draws λ × it from the chamber over the window's minutes.
-//! These tests hold the drawn heat to the moved water, window by window, and hold the switch's
-//! refusals.
+//! Plan: `docs/plans/post-roadmap-latent-heat-books.md` (§1, §4 Q1, §8). Every sealed build records each
+//! plant window's evaporation and draws λ × it from the chamber over the window's minutes (built lab-only,
+//! adopted 2026-10-15); `station::latent_heat::without_latent_heat` is the lab switch back. These tests
+//! hold the drawn heat to the moved water, window by window, and hold the switch and the refusals.
 
 use domains::biosphere::science::LATENT_HEAT_VAPORIZATION as LAMBDA;
 use domains::biosphere::stocks::SOIL_WATER;
@@ -16,8 +16,8 @@ use station::air_split::water_on_fast_step;
 use station::chamber::CHAMBER;
 use station::driver::{DayOrder, Side, TwoRate};
 use station::latent_heat::{
-    with_latent_heat, CHAMBER_LATENT_HEAT, EVAPORATION_RATE_AUX, EVAPORATION_RECORDER,
-    TRANSPIRATION,
+    without_latent_heat, CHAMBER_LATENT_HEAT, EVAPORATED_TOTAL_AUX, EVAPORATION_RATE_AUX,
+    EVAPORATION_RECORDER, TRANSPIRATION,
 };
 use station::scenario::sealed_station_scenario;
 use station::sealed::{
@@ -57,7 +57,6 @@ fn the_heat_drawn_over_a_window_is_lambda_times_its_water() {
     let scenario = sealed_station_scenario();
     let lamp = station::params::lamp();
     let (state, bio, fast) = build();
-    let (state, bio, fast) = with_latent_heat(state, bio, fast).expect("latent");
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
     let fast_r = sealed_fast_resolver(&domains::params::charge(), &scenario).expect("fast");
@@ -100,7 +99,7 @@ fn the_heat_drawn_over_a_window_is_lambda_times_its_water() {
             windows.last_mut().expect("a plant step opens the window").1 -= leg_on(&r, CHAMBER);
         }
     };
-    let (_, totals) = two
+    let (states, totals) = two
         .run(DayOrder::Interleaved, state, 4, &mut observe)
         .expect("run");
     assert_eq!((totals.slow_rationed, totals.fast_rationed), (0, 0));
@@ -117,49 +116,93 @@ fn the_heat_drawn_over_a_window_is_lambda_times_its_water() {
         }
     }
     assert!(wet > 0, "no window evaporated: the identity was never tested");
+    // The ledger: at a day end every recorded window's heat has been drawn, so the heat booked to
+    // date is λ × the running total.
+    let drawn: f64 = windows.iter().map(|(_, h)| h).sum();
+    let ledger = LAMBDA * states.last().unwrap().aux[EVAPORATED_TOTAL_AUX];
+    assert!(
+        (drawn - ledger).abs() <= 1e-12 * ledger,
+        "drew {drawn} J; the ledger says {ledger} J"
+    );
 }
 
-/// The switch adds one recorder and one fast flow, seeds the rate, and leaves transpiration on the
-/// plant step once, under its own type name; the build without it carries none of them.
+/// The reference build carries the books — one recorder, one fast flow, the rate seeded, transpiration
+/// on the plant step once under its own type name — and the lab switch takes exactly those out, and
+/// refuses a build that does not carry them.
 #[test]
-fn the_switch_adds_exactly_its_own_pieces() {
+fn the_build_carries_the_books_and_the_switch_takes_exactly_them_out() {
     let (state, bio, fast) = build();
     let count = |reg: &Registry, id: &str| reg.flows().iter().filter(|f| f.id() == id).count();
-    assert_eq!(count(&fast, CHAMBER_LATENT_HEAT), 0);
-    assert!(!state.aux.contains_key(EVAPORATION_RATE_AUX));
-    assert!(!bio.aux_processes().iter().any(|a| a.id() == EVAPORATION_RECORDER));
-    let (n_bio, n_fast, n_aux) = (bio.flows().len(), fast.flows().len(), bio.aux_processes().len());
-
-    let (state, bio, fast) = with_latent_heat(state, bio, fast).expect("latent");
-    assert_eq!(bio.flows().len(), n_bio);
-    assert_eq!(fast.flows().len(), n_fast + 1);
-    assert_eq!(bio.aux_processes().len(), n_aux + 1);
+    let recorders = |reg: &Registry| {
+        reg.aux_processes()
+            .iter()
+            .filter(|a| a.id() == EVAPORATION_RECORDER)
+            .count()
+    };
+    assert_eq!(count(&fast, CHAMBER_LATENT_HEAT), 1);
+    assert_eq!(recorders(&bio), 1);
+    assert_eq!(state.aux[EVAPORATION_RATE_AUX], 0.0);
+    assert_eq!(state.aux[EVAPORATED_TOTAL_AUX], 0.0);
     assert_eq!(count(&bio, TRANSPIRATION), 1);
     assert_eq!(count(&fast, TRANSPIRATION), 0);
     let t = bio.flows().iter().find(|f| f.id() == TRANSPIRATION).unwrap();
     assert_eq!(t.type_name(), "Transpiration");
-    assert_eq!(state.aux[EVAPORATION_RATE_AUX], 0.0);
+    let (n_bio, n_fast, n_aux) = (bio.flows().len(), fast.flows().len(), bio.aux_processes().len());
+
+    let (state, bio, fast) = without_latent_heat(state, bio, fast).expect("off");
+    assert_eq!(bio.flows().len(), n_bio);
+    assert_eq!(fast.flows().len(), n_fast - 1);
+    assert_eq!(bio.aux_processes().len(), n_aux - 1);
+    assert_eq!(count(&fast, CHAMBER_LATENT_HEAT), 0);
+    assert_eq!(recorders(&bio), 0);
+    assert!(!state.aux.contains_key(EVAPORATION_RATE_AUX));
+    assert!(!state.aux.contains_key(EVAPORATED_TOTAL_AUX));
+    assert!(without_latent_heat(state, bio, fast).is_err(), "switched off twice");
 }
 
-/// The water moved onto the minute (the lab's `water_on_fast_step`) and the latent heat refuse
-/// each other in either order: the recorder would read a plant step the water had left.
+/// The water moved onto the minute (the lab's `water_on_fast_step`) refuses a build carrying the books —
+/// the recorder would read a plant step the water had left — and moves once they are switched off (the
+/// minute-water option opts out, §8).
 #[test]
-fn water_on_the_minute_and_the_latent_heat_refuse_each_other() {
+fn water_on_the_minute_needs_the_books_switched_off() {
     let shared = weather_shared(&sealed_station_scenario().bio);
 
     let (state, bio, fast) = build();
-    let (bio, fast) = water_on_fast_step(&state.stocks, bio, fast, &shared).expect("move");
-    assert!(with_latent_heat(state, bio, fast).is_err());
+    assert!(water_on_fast_step(&state.stocks, bio, fast, &shared).is_err());
 
     let (state, bio, fast) = build();
-    let (state, bio, fast) = with_latent_heat(state, bio, fast).expect("latent");
-    assert!(water_on_fast_step(&state.stocks, bio, fast, &shared).is_err());
+    let (state, bio, fast) = without_latent_heat(state, bio, fast).expect("off");
+    assert!(water_on_fast_step(&state.stocks, bio, fast, &shared).is_ok());
 }
 
-/// The switch wires a fresh build only.
+/// A save from before the books (no rate key) resumes at a group boundary: the plant step that opens
+/// the window records the rate before any minute reads it (§8a).
 #[test]
-fn the_switch_refuses_a_running_state() {
-    let (state, bio, fast) = build();
-    let moved = State::new(5, state.stocks.clone(), state.rng_seed, state.aux.clone()).unwrap();
-    assert!(with_latent_heat(moved, bio, fast).is_err());
+fn a_save_without_the_rate_key_resumes_at_a_group_boundary() {
+    let scenario = sealed_station_scenario();
+    let lamp = station::params::lamp();
+    let (mut state, bio, fast) = build();
+    state.aux.remove(EVAPORATION_RATE_AUX);
+    state.aux.remove(EVAPORATED_TOTAL_AUX);
+    let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
+    let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
+    let fast_r = sealed_fast_resolver(&domains::params::charge(), &scenario).expect("fast");
+    let reset = sealed_reset_hook(&scenario);
+    let two = TwoRate {
+        slow: &bio,
+        fast: &fast,
+        slow_resolver: &bio_r,
+        fast_resolver: &fast_r,
+        steps_per_day: scenario.steps_per_day,
+        slow_steps_per_day: scenario.bio_steps_per_day,
+        slow_dt: scenario.bio_dt,
+        fast_dt: scenario.cabin_dt,
+        slow_reset: Some(&*reset),
+    };
+    let (states, _) = two
+        .run(DayOrder::Interleaved, state, 1, &mut |_, _, _| {})
+        .expect("a keyless save resumes");
+    let end = states.last().unwrap();
+    assert!(end.aux.contains_key(EVAPORATION_RATE_AUX));
+    assert!(end.aux[EVAPORATED_TOTAL_AUX] > 0.0);
 }

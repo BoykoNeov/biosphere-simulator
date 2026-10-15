@@ -281,7 +281,14 @@ fn the_water_loss_pair_moves_whole_and_alone() {
         build(&split(GasExchangeStep::Minute, GasExchangeStep::PlantStep)).unwrap();
     let (_, _, bio_m, fast_m) = minute_build();
     assert_eq!(bio_m.flows().len(), bio_p.flows().len() - 2);
-    assert_eq!(fast_m.flows().len(), fast_p.flows().len() + 2);
+    // Minute water OPTS OUT of the chamber's latent-heat books (2026-10-15, the user's answer,
+    // `docs/plans/post-roadmap-latent-heat-books.md` §8): the plant-step form carries the latent
+    // flow and its recorder, the minute form neither — so the fast side gains the pair less one.
+    assert_eq!(fast_m.flows().len(), fast_p.flows().len() + 2 - 1);
+    let latent = station::latent_heat::CHAMBER_LATENT_HEAT;
+    assert_eq!((count(&fast_p, latent), count(&fast_m, latent)), (1, 0));
+    let recorder = station::latent_heat::EVAPORATION_RECORDER;
+    assert!(has_aux(&bio_p, recorder) && !has_aux(&bio_m, recorder));
     let types = [
         ("biosphere.transpiration", "Transpiration"),
         ("biosphere.condensation", "Condensation"),
@@ -329,6 +336,10 @@ fn the_move_refuses_what_it_cannot_do_whole() {
         .filter(|f| f.id() != WATER_LOSS_FLOWS[1])
         .collect();
     let half = Registry::new(flows, &state.stocks, aux).unwrap();
+    // The books off first, as the build does for minute water (2026-10-15): otherwise the move
+    // refuses for the books' reason before it reaches the half pair.
+    let (state, half, fast) =
+        station::latent_heat::without_latent_heat(state, half, fast).unwrap();
     let scenario = split_scenario(
         &sealed_station_scenario(),
         &split(GasExchangeStep::Minute, GasExchangeStep::PlantStep),

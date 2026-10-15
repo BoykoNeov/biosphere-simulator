@@ -21,4 +21,13 @@ note before the run was right: the latent path is uncapped). Every season is one
 +3.4 % — ripening is checked at day ends, and the room's ~0.05 K cooler day tips it over one. The lab
 structure walls cannot afford the evaporation's heat: the battery empties and the fast side rations.
 
-**Adoption: not yet taken** (plan §5: a lab surroundings rations).
+**ADOPTED 2026-10-15** on the user's four answers (plan §8): adopt; the structure walls' slow test restated
+to the battery running out (by day 1025); the separate-air build gets the heat, minute water opts out
+(`latent_heat::without_latent_heat`); the coil's shared 200 W documented, not built. Wired inside
+`build_sealed_station_unread` and `sealed_fast_flows`. A running total of the evaporated water joined the
+rate as a ledger (λ × it = the heat booked to date at any day end). 1 golden (`sealed_station_state`), the
+station manifest's `flow_set`, golden row and `chamber.yaml` hash (a provenance edit: the heater is not
+enough against the structure). The lab off switch reproduces the pre-adoption golden byte for byte;
+the adopted golden matched the scratch worktree's byte for byte before the ledger. 17 reds restated, none
+deleted. ⚠ The reference crop now matures ~6 % into its last day: a ~3 % grain move after a later change
+may be the once-a-day maturity check stepping a day, not an effect — read the re-sow days first.

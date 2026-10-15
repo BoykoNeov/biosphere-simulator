@@ -380,6 +380,11 @@ pub fn build_sealed_station_unread(
         ])),
     )?;
 
+    // The plant side of the chamber's latent-heat books (2026-10-15): the window's evaporation,
+    // recorded for the fast side's `ChamberLatentHeat` (`sealed_fast_flows`). Before any move of
+    // plant flows and before `wrap_last`, so the recorder and the flow it shares are wrapped alike.
+    let (state, bio_reg) = crate::latent_heat::book_latent_heat(state, bio_reg)?;
+
     // --- fast flows (the crew breathes the biosphere's own gas pools: shared air) ---
     let fast_flows = sealed_fast_flows(
         charge,
@@ -539,6 +544,10 @@ pub(crate) fn sealed_fast_flows(
             *harvest,
         )));
     }
+    // The heat the plants' evaporation takes from the chamber, handed to the coil (2026-10-15,
+    // `docs/plans/post-roadmap-latent-heat-books.md`); the plant side's recorder is booked by
+    // `build_sealed_station_unread`.
+    fast_flows.push(crate::latent_heat::latent_heat_flow());
     fast_flows
 }
 

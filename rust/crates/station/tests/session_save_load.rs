@@ -242,7 +242,10 @@ fn sealed_resume_across_a_season_boundary_is_bit_identical() {
     );
 }
 
-/// The first maturity re-sow of the reference sealed station: the start of day 139 after the
-/// day-0 sowing (maturity 138.875 days after sowing; `docs/plans/post-roadmap-room-
-/// temperature.md` §25f Q1, measured in §25g).
-const FIRST_RESOW_DAY: u64 = 139;
+/// The first maturity re-sow of the reference sealed station: the start of day 140 after the
+/// day-0 sowing. ⚠ It was day 139 (maturity 138.875 days after sowing; `docs/plans/post-roadmap-room-
+/// temperature.md` §25f Q1, measured in §25g) until 2026-10-15, when the plants' evaporation took
+/// heat from the room: the lit room ~0.056 K cooler cost the season ~3 °C·d, more than the 0.11 of
+/// a day the crop had to spare, so it matures early in day 140 instead
+/// (`docs/plans/post-roadmap-latent-heat-books.md` §7a, measured).
+const FIRST_RESOW_DAY: u64 = 140;

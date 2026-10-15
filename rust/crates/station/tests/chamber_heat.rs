@@ -54,6 +54,12 @@ fn warm_scenario() -> SealedStationScenario {
 /// Run the sealed station `DAYS` master days, the chamber's cooler at `health` throughout:
 /// `(states, rationed)`.
 fn run(health: f64) -> (Vec<State>, u64) {
+    run_with(health, true)
+}
+
+/// [`run`], with the chamber's latent-heat books on (the reference since 2026-10-15) or off (the
+/// lab switch, `station::latent_heat::without_latent_heat`).
+fn run_with(health: f64, books: bool) -> (Vec<State>, u64) {
     let scenario = warm_scenario();
     let charge = domains::params::charge();
     let lamp = station::params::lamp();
@@ -70,6 +76,11 @@ fn run(health: f64) -> (Vec<State>, u64) {
         false,
     )
     .unwrap();
+    let (state, bio_reg, fast_reg) = if books {
+        (state, bio_reg, fast_reg)
+    } else {
+        station::latent_heat::without_latent_heat(state, bio_reg, fast_reg).unwrap()
+    };
     let (flows, aux) = fast_reg.into_parts();
     let mut wrapped = 0;
     let flows: Vec<Box<dyn Flow>> = flows
@@ -145,15 +156,25 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
         "a crop in a chamber thousands of kelvin hot never rationed"
     );
 
-    // Nominal: the chamber holds its steady state on every day (P2).
+    // Nominal: the chamber holds its steady state on every day (P2). Since 2026-10-15 the plants'
+    // evaporation takes heat from the room (`docs/plans/post-roadmap-latent-heat-books.md` §8): a
+    // day end is dark and the walls are off, so the heater holds the room one step's evaporation
+    // below its start (the deadbeat offset), at the rate the last window recorded.
     let t0 = chamber_temperature(nominal[0].stocks[CHAMBER].amount, &ch);
+    let mut below = 0;
     for s in &nominal {
         let t = chamber_temperature(s.stocks[CHAMBER].amount, &ch);
+        let step = domains::biosphere::science::LATENT_HEAT_VAPORIZATION
+            * s.aux[station::latent_heat::EVAPORATION_RATE_AUX]
+            * scenario.cabin_dt
+            / ch.heat_capacity;
         assert!(
-            (t - t0).abs() <= 1e-9,
-            "nominal chamber drifted: {t} vs {t0}"
+            (t - (t0 - step)).abs() <= 1e-9,
+            "nominal chamber drifted: {t} vs {t0} less one step's evaporation {step} K"
         );
+        below += usize::from(step > 1e-9);
     }
+    assert!(below > 0, "no day end carried any evaporation: the offset is untested");
 
     // Failed: it warms at w / C_ch a day, linear from day end to day end (a day of the switched
     // draw is the average's energy; within the day it climbs only while the lamp is lit).
@@ -163,11 +184,32 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
         (per_day - 76.8).abs() < 1e-9,
         "the hand rate 3.2 K/h (133.33 W over 1.5e5 J/K): {per_day}"
     );
+    // ⚠ Since 2026-10-15 the plants' evaporation takes heat from the room too
+    // (`docs/plans/post-roadmap-latent-heat-books.md` §8), and a hot room's crop evaporates hard:
+    // measured, day 1 rises 28.8 K, not 76.8. The latent path is the dehumidifier's coil, which
+    // the cooler's failure does not touch (the model's condenser runs on its own). So a day's rise
+    // is the lamp's energy less the evaporation's — read off the ledger, λ × the water the day's
+    // windows recorded — over C_ch: an energy identity, no longer a straight line. It is taken on
+    // DAY 2: day 1 opens at the setpoint in the dark, where the night's evaporation draws the room
+    // below it and the (healthy) heater tops it up, ~20 kJ measured; from day 1's end the room is
+    // tens of kelvin above the setpoint and the heater cannot fire.
     let t1 = chamber_temperature(failed[1].stocks[CHAMBER].amount, &ch);
+    let t2 = chamber_temperature(failed[2].stocks[CHAMBER].amount, &ch);
+    let total = |d: usize| failed[d].aux[station::latent_heat::EVAPORATED_TOTAL_AUX];
+    let latent = domains::biosphere::science::LATENT_HEAT_VAPORIZATION * (total(2) - total(1));
+    let want = (w * 86_400.0 - latent) / ch.heat_capacity;
+    eprintln!(
+        "dead cooler: day-1 rise {} K; day 2 rise {} K, lamp {per_day} K less evaporation {} K",
+        t1 - t0,
+        t2 - t1,
+        latent / ch.heat_capacity
+    );
+    assert!(t1 - t0 > 10.0, "the dead cooler's room barely warmed on day 1");
+    assert!(latent > 0.0, "the hot room's crop evaporated nothing");
     assert!(
-        ((t1 - t0) - per_day).abs() <= 1e-9 * per_day,
-        "day-1 rise {} vs {per_day}",
-        t1 - t0
+        ((t2 - t1) - want).abs() <= 1e-9 * per_day,
+        "day-2 rise {} vs the lamp less the evaporation, {want}",
+        t2 - t1
     );
 
     // The node, losing the lamp's heat, relaxes toward the colder closed-form equilibrium.
@@ -202,12 +244,32 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
             * domains::thermal::STEFAN_BOLTZMANN
             * th.radiator_area
             * t_eq_failed.powf(3.0));
-    let bound = (t_eq_nominal - t_eq_failed) * (-(DAYS as f64) * 86_400.0 / tau_eq).exp();
+    // ⚠ Since 2026-10-15 (`docs/plans/post-roadmap-latent-heat-books.md` §8) the hot room's crop
+    // evaporates hard for its first days (~120 W on day 2) and that heat reaches the node by the
+    // dehumidifier's coil, so the node's input is not the lamp-less constant from t = 0; the crop
+    // dies and the evaporation stops (measured: none after day ~15). The bound is taken from the
+    // first day after which nothing more evaporates, at the node's temperature on that day — the
+    // same derivation, started where its premise (a constant input) begins to hold.
+    let total = |d: usize| failed[d].aux[station::latent_heat::EVAPORATED_TOTAL_AUX];
+    let dry_from = (0..DAYS)
+        .find(|&d| total(d) == total(DAYS))
+        .expect("the hot room's crop never stopped evaporating");
+    assert!(dry_from > 1 && dry_from < DAYS / 2, "evaporation stopped at day {dry_from}");
+    let gap0 = node_t(&failed[dry_from], &th) - t_eq_failed;
+    let bound = gap0 * (-((DAYS - dry_from) as f64) * 86_400.0 / tau_eq).exp();
+    eprintln!("dead cooler: evaporation stops by day {dry_from}; the node's gap then {gap0} K");
     assert!(
         last > t_eq_failed && last - t_eq_failed <= bound,
-        "after {DAYS} days the node is {} K above {t_eq_failed}; the bound is {bound} K",
+        "after {DAYS} days the node is {} K above {t_eq_failed}; the bound from day {dry_from} is          {bound} K",
         last - t_eq_failed
     );
+    // ⚠ Since 2026-10-15 (`docs/plans/post-roadmap-latent-heat-books.md` §8) the heater pays the
+    // night's evaporation and that heat reaches the node by the coil, so the node's daily input
+    // is the lamp PLUS the heater, and its equilibrium creeps up as the canopy grows (measured:
+    // 0.393 K off the lamp's equilibrium by day 25, past the 0.384 K swing). The derivation below
+    // assumes the lamp alone, so it is held on the run with the books OFF, where that premise
+    // holds; the run with them on is held to the direction and size the heater allows after it.
+    let (nominal_on, nominal) = (nominal, run_with(1.0, false).0);
     // Nominal node holds — to the lamp's within-day swing, since the room's lamp heat follows
     // the light (2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md` §8c; it held to 1e-6
     // while the lamp drew its daily average). With the walls off the cooler passes the lamp's
@@ -249,6 +311,26 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
         (last1 - last2).abs() <= settled,
         "the nominal node's last day moved {} K; the decayed bound is {settled} K",
         last1 - last2
+    );
+    // With the books on, the node sits above the books-off node, by no more than the night's
+    // evaporation can pay for: the heater gives at most all the evaporation's heat, so the
+    // equilibrium moves by at most the run's largest daily mean evaporation over the radiator's
+    // conductance at the node, 4εσA·T³.
+    let conductance = th.heat_capacity / tau_nominal;
+    let total = |d: usize| nominal_on[d].aux[station::latent_heat::EVAPORATED_TOTAL_AUX];
+    let l_max = (0..DAYS)
+        .map(|d| domains::biosphere::science::LATENT_HEAT_VAPORIZATION * (total(d + 1) - total(d)))
+        .fold(0.0, f64::max)
+        / 86_400.0;
+    let lift = node_t(&nominal_on[DAYS], &th) - last1;
+    eprintln!(
+        "nominal node with the books on: {lift} K above the books-off node; the largest daily          evaporation {l_max} W allows {} K",
+        l_max / conductance
+    );
+    assert!(
+        lift > 0.0 && lift <= l_max / conductance,
+        "the books moved the node {lift} K; the evaporation allows (0, {}] K",
+        l_max / conductance
     );
 
     // The crop reads the chamber (slice 3a): identical at the start, and over day 1 — the

@@ -21,7 +21,8 @@ use station::chamber::{
     chamber_temperature, ChamberSurroundings, CHAMBER, CHAMBER_HEATER, CHAMBER_SURROUNDINGS,
     OUTDOOR_TEMP_VAR,
 };
-use station::driver::run_master_day;
+use station::driver::{DayOrder, Side, TwoRate};
+use station::latent_heat::CHAMBER_LATENT_HEAT;
 use station::gas_exchange::GasExchangeStep;
 use station::perturbations::{with_lighting_failure, ScaledFlow};
 use station::scenario::sealed_station_scenario;
@@ -43,12 +44,32 @@ const HEATER_CUT_FROM: u64 = COLD.0;
 
 struct Run {
     states: Vec<State>,
+    /// The heat the plants' evaporation took from the chamber up to each day-end state (J,
+    /// cumulative, `latent[d]` beside `states[d]`) — the room's third outflow since 2026-10-15
+    /// (`docs/plans/post-roadmap-latent-heat-books.md` §8), summed minute by minute from the
+    /// latent flow's own legs.
+    latent: Vec<f64>,
+    /// Fast-side backstop firings (0 in every run but the structure's full horizon).
+    fast_rationed: u64,
 }
 
 /// Run the sealed station `days` master days with the walls facing `surroundings`; the lamp
 /// failed over `lamp_off` (days) if given; the heater scaled by `heater` from day
-/// [`HEATER_CUT_FROM`] on (whole at 1.0 before it).
+/// [`HEATER_CUT_FROM`] on (whole at 1.0 before it). Asserts nothing rationed.
 fn run(
+    days: usize,
+    surroundings: ChamberSurroundings,
+    lamp_off: Option<(u64, u64)>,
+    heater: f64,
+) -> Run {
+    let r = run_rationing(days, surroundings, lamp_off, heater);
+    assert_eq!(r.fast_rationed, 0);
+    r
+}
+
+/// [`run`] without its rationing assertion: the structure's full horizon empties its battery
+/// (§8 of the latent-heat plan) and the fast side rations from then on.
+fn run_rationing(
     days: usize,
     surroundings: ChamberSurroundings,
     lamp_off: Option<(u64, u64)>,
@@ -102,23 +123,58 @@ fn run(
         (bio, fast) = with_lighting_failure(bio, fast, a * PER_DAY, b * PER_DAY).unwrap();
     }
     let reset = sealed_reset_hook(&scenario);
-    let (states, rationed, events) = run_master_day(
-        &EulerIntegrator::new(bio_reg),
-        &EulerIntegrator::new(fast_reg),
-        state,
-        &bio,
-        &fast,
-        days,
-        scenario.steps_per_day,
-        scenario.bio_steps_per_day,
-        scenario.bio_dt,
-        scenario.cabin_dt,
-        Some(&*reset),
-    )
-    .unwrap();
-    assert_eq!(rationed, 0);
-    assert!(events.is_empty());
-    Run { states }
+    let (slow_i, fast_i) = (EulerIntegrator::new(bio_reg), EulerIntegrator::new(fast_reg));
+    // The reference day, operation for operation (`driver::TwoRate`, `DayOrder::Interleaved`),
+    // with an observer for the latent flow's legs.
+    let two = TwoRate {
+        slow: &slow_i,
+        fast: &fast_i,
+        slow_resolver: &bio,
+        fast_resolver: &fast,
+        steps_per_day: scenario.steps_per_day,
+        slow_steps_per_day: scenario.bio_steps_per_day,
+        slow_dt: scenario.bio_dt,
+        fast_dt: scenario.cabin_dt,
+        slow_reset: Some(&*reset),
+    };
+    let mut by_day = vec![0.0; days];
+    let mut observe = |side: Side, before: &State, _after: &State| {
+        if side != Side::Fast {
+            return;
+        }
+        let flow = two
+            .fast
+            .registry()
+            .flows()
+            .iter()
+            .find(|f| f.id() == CHAMBER_LATENT_HEAT)
+            .expect("the latent flow");
+        let r = flow
+            .evaluate(before, &two.fast_resolver.bind(before, two.fast_dt), two.fast_dt)
+            .unwrap();
+        let heat: f64 = -r
+            .legs
+            .iter()
+            .filter(|l| l.stock == CHAMBER)
+            .map(|l| l.amount)
+            .sum::<f64>();
+        // The minutes after plant step `k` run at `n = k + 1`: they lie in window `k`.
+        by_day[((before.n - 1) / PER_DAY) as usize] += heat;
+    };
+    let (states, totals) = two
+        .run(DayOrder::Interleaved, state, days, &mut observe)
+        .unwrap();
+    assert_eq!(totals.slow_rationed, 0);
+    assert!(totals.events.is_empty());
+    let mut latent = vec![0.0];
+    for d in by_day {
+        latent.push(latent.last().unwrap() + d);
+    }
+    Run {
+        states,
+        latent,
+        fast_rationed: totals.fast_rationed,
+    }
 }
 
 fn amount(s: &State, id: &str) -> f64 {
@@ -242,17 +298,24 @@ fn a_dead_lamp_on_cold_days_fires_the_heater() {
         amount(&cold.states[before], BATTERY).to_bits()
     );
     // What it drew from the window on: the two failed runs differ by the heater alone. With the
-    // lamp off the heater pays the walls' loss and whatever the room's store changed by — the
-    // books of the heated run, from the last state before the window to the end. (A pin of
+    // lamp off the heater pays the walls' loss, the plants' evaporation (since 2026-10-15,
+    // `docs/plans/post-roadmap-latent-heat-books.md` §8) and whatever the room's store changed by
+    // — the books of the heated run, from the last state before the window to the end. (A pin of
     // 1.4574e7 J stood here until 2026-10-15; the span now also carries the dark 90 minutes
     // after the window, which the averaged lamp used to heat.)
-    let drawn = amount(c, BATTERY) - amount(h, BATTERY);
     let h0 = &heated.states[before];
     let walls = amount(h, CHAMBER_SURROUNDINGS) - amount(h0, CHAMBER_SURROUNDINGS);
     let stored = amount(h, CHAMBER) - amount(h0, CHAMBER);
+    let latent = heated.latent[end] - heated.latent[before];
+    let drawn = amount(c, BATTERY) - amount(h, BATTERY);
+    eprintln!("L1: battery gap {drawn} J; walls {walls} J, latent {latent} J, stored {stored} J");
     assert!(
-        (drawn - (walls + stored)).abs() <= 1e-6 * drawn,
-        "the heater drew {drawn} J; the walls took {walls} J and the room stored {stored} J"
+        latent > 0.0,
+        "the plants evaporated nothing over five dark days"
+    );
+    assert!(
+        (drawn - (walls + latent + stored)).abs() <= 1e-6 * drawn,
+        "the heater drew {drawn} J; the walls took {walls} J, the evaporation {latent} J and the          room stored {stored} J"
     );
     // Against the nominal run: the lamp's energy not drawn, less the heater the failure added
     // over the nominal run's own — which fires on these nights too, the lamp being off at night.
@@ -273,15 +336,21 @@ fn a_dead_lamp_on_cold_days_fires_the_heater() {
          {nominal_heater} J; battery vs nominal {gained} J"
     );
 
-    // The chamber held: never more than one step's wall loss below the setpoint (≤ 0.0146 K).
+    // The chamber held: never more than one step's loss below the setpoint — the walls' (≤ 0.0146
+    // K) and, since 2026-10-15, one step of the window's evaporation at its recorded rate.
     // Days 113–117 are in the warm phase, so the setpoint is the warm one.
-    let set = station::params::chamber().warm_setpoint;
+    let ch = station::params::chamber();
+    let set = ch.warm_setpoint;
     // Day-end states inside the window: `states[113..118)` (the 118th is 90 lit minutes past it).
     for s in &heated.states[before..end] {
         let t = chamber_t(s);
+        let latent_step = domains::biosphere::science::LATENT_HEAT_VAPORIZATION
+            * s.aux[station::latent_heat::EVAPORATION_RATE_AUX]
+            * scenario.cabin_dt
+            / ch.heat_capacity;
         assert!(
-            t <= set && t >= set - 0.015,
-            "day {}: chamber {t}",
+            t <= set && t >= set - 0.015 - latent_step,
+            "day {}: chamber {t} (one step's evaporation {latent_step} K)",
             s.n / PER_DAY
         );
     }
@@ -339,9 +408,28 @@ fn a_cabin_hotter_or_colder_than_the_chamber() {
         );
         let out = amount(&r.states[days], CHAMBER_SURROUNDINGS);
         let mean_w = out / (days as f64 * 86_400.0);
+        // Since 2026-10-15 the plants' evaporation takes heat from the room too
+        // (`docs/plans/post-roadmap-latent-heat-books.md` §8): the closed form's input `P` is the
+        // lamp less the run's mean latent power. The form is linear in `P`, so the mean serves.
+        let ch = station::params::chamber();
+        let (ua, k) = (
+            ch.wall_conductance * ch.wall_area,
+            ch.response_time / ch.heat_capacity,
+        );
+        let latent_w = r.latent[days] / (days as f64 * 86_400.0);
+        let p = 40.0 * 8.0 / 24.0 - latent_w;
+        let t_pred = (cold_set + (p + ua * cabin_k) * k) / (1.0 + ua * k);
+        let pred_w = ua * (t_pred - cabin_k);
+        // The hand values stand for the lamp alone.
+        let t_lamp = (cold_set + (40.0 * 8.0 / 24.0 + ua * cabin_k) * k) / (1.0 + ua * k);
         assert!(
-            (mean_w - watts).abs() < 2e-3,
-            "cabin {cabin_k} K: {mean_w} W out, predicted {watts}"
+            (ua * (t_lamp - cabin_k) - watts).abs() < 1e-3,
+            "the closed form no longer gives the hand value {watts} W"
+        );
+        eprintln!("L2: cabin {cabin_k} K: latent {latent_w} W; predicted {pred_w} W out");
+        assert!(
+            (mean_w - pred_w).abs() < 2e-3,
+            "cabin {cabin_k} K: {mean_w} W out, predicted {pred_w} (lamp alone {watts})"
         );
         let t = chamber_t(&r.states[days]);
         assert!((t - cold_set).abs() < 0.1, "cabin {cabin_k} K: chamber {t}");
@@ -357,6 +445,12 @@ fn a_cabin_hotter_or_colder_than_the_chamber() {
 /// **51.785 W**. Direction from the change: the lit lamp (200 W) now outruns the walls by day,
 /// the cooler hands that excess to the node, and the heater makes it up by night — more heater
 /// energy, all of it ending in the node. Its size was not predicted.
+///
+/// ⚠ **Re-pinned 2026-10-15 again** (`docs/plans/post-roadmap-latent-heat-books.md` §8; the plants'
+/// evaporation takes heat from the room), measured by this tree: the node **189.2987 K**, the heater
+/// **136.919 W**. Direction from the change: the heater also pays the evaporation (the lamp's daytime
+/// surplus now goes to it), and that heat too ends in the node by the coil. Size not predicted. The
+/// day-end band gains one step of the window's evaporation.
 #[test]
 fn walls_onto_the_station_structure_run_the_heater_continuously() {
     let days = 120;
@@ -369,28 +463,45 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
         |run: &Run| amount(&run.states[days - span], BATTERY) - amount(&run.states[days], BATTERY);
     let heater_w = (fall(&r) - fall(&reference)) / (span as f64 * 86_400.0);
     eprintln!("L4: node {t} K, heater {heater_w} W");
-    assert!((t - 180.3016).abs() < 0.01, "node {t} K, measured 180.3016");
+    assert!((t - 189.2987).abs() < 0.01, "node {t} K, measured 189.2987");
     assert!(
-        (heater_w - 51.785).abs() < 0.05,
-        "heater {heater_w} W, measured 51.785"
+        (heater_w - 136.919).abs() < 0.05,
+        "heater {heater_w} W, measured 136.919"
     );
     // A day end is dark, so the heater holds the room against the walls' whole loss to the node
     // and the deadbeat controller leaves it one step's loss below the setpoint — derived since
-    // 2026-10-15 (0.0706 K here). Until then a fixed 0.05 K stood: the averaged lamp's 133 W
-    // covered most of the loss in the dark, so the step's deficit was 0.018 K.
+    // 2026-10-15 (0.0706 K here, then 0.0650 K once the node warmed with the evaporation's heat,
+    // plus one step of the evaporation itself). Until then a fixed 0.05 K stood: the averaged
+    // lamp's 133 W covered most of the loss in the dark, so the step's deficit was 0.018 K.
     let ch = station::params::chamber();
     let set = ch.warm_setpoint;
     let tc = chamber_t(&r.states[days]);
-    let step_loss =
-        ch.wall_conductance * ch.wall_area * (set - t) * sealed_station_scenario().cabin_dt
-            / ch.heat_capacity;
+    let dt = sealed_station_scenario().cabin_dt;
+    let wall_step = ch.wall_conductance * ch.wall_area * (set - t) * dt / ch.heat_capacity;
     assert!(
-        (step_loss - 0.0706).abs() < 1e-3,
-        "the hand step loss (1.536 W/K × 114.85 K × 60 s / 1.5e5 J/K): {step_loss}"
+        (wall_step - 0.0650).abs() < 1e-3,
+        "the hand step loss (1.536 W/K × 105.85 K × 60 s / 1.5e5 J/K): {wall_step}"
+    );
+    let step_loss = wall_step
+        + domains::biosphere::science::LATENT_HEAT_VAPORIZATION
+            * r.states[days].aux[station::latent_heat::EVAPORATION_RATE_AUX]
+            * dt
+            / ch.heat_capacity;
+    // ⚠ Since the plants' evaporation takes heat from the room (2026-10-15, latent-heat plan §8)
+    // the room is NOT held here: walls and evaporation together outrun the 200 W heater earlier
+    // in the night (the partly lit windows' and the first dark windows' evaporation), the room
+    // falls, and by the day end the heater is still climbing back on its few watts of margin.
+    // Measured: 0.9526 K below the setpoint, against one step's loss of 0.0771 K. Pinned as a
+    // record of the saturated heater — the horizon test below counts the nights it happens.
+    eprintln!("L4: chamber {} K below the setpoint; one step's loss {step_loss} K", set - tc);
+    assert!(
+        set - tc > step_loss,
+        "the room is held again: {} K below, one step's loss {step_loss} K",
+        set - tc
     );
     assert!(
-        tc < set && set - tc <= step_loss * (1.0 + 1e-3),
-        "chamber {tc}, {} K below the setpoint; one step's loss is {step_loss} K",
+        ((set - tc) - 0.9526).abs() < 0.01,
+        "chamber {tc}, {} K below the setpoint; measured 0.9526 K",
         set - tc
     );
 }
@@ -413,49 +524,64 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
 /// ⚠ **Re-pinned 2026-10-15** (`docs/plans/post-roadmap-room-lamp-heat.md` §8c; the room's lamp
 /// heat follows the light), measured by this tree: **1.4834e9 J** — the heater now also runs
 /// every night the lamp is off (L4 above: +6.9 W on the structure). Direction predicted, size not.
+///
+/// ⚠ **RESTATED 2026-10-15 to the new truth** (`docs/plans/post-roadmap-latent-heat-books.md` §8, the
+/// user's answer): since the plants' evaporation takes heat from the room, this lab room **cannot
+/// afford its own transpiration** — the walls lose ~184 W to the node around the clock, the lamp's
+/// daytime surplus that paid part of it now goes to evaporation, and the heater must find the
+/// evaporation's heat as well (~6.3 GJ more over the horizon against a 1.48 GJ margin). The battery
+/// empties inside the horizon and the fast side rations from then on. The test was
+/// `the_structures_heater_does_not_empty_the_battery_within_the_horizon`; it now pins the day the
+/// battery runs out, and holds the room to its band only before it.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
-fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
+fn the_structures_heater_empties_the_battery_within_the_horizon() {
+    // Measured 2026-10-15: the battery runs out by day 1025, the fast side rations 763 338 times,
+    // and before that 410 day ends fall off the held band — the nights the heater saturates.
+    const EMPTY_DAY_LO: usize = 1015;
+    const EMPTY_DAY_HI: usize = 1035;
+    const OFF_MAX: usize = 420;
     let days = sealed_station_scenario().days();
-    let r = run(days, ChamberSurroundings::Structure, None, 1.0);
+    let r = run_rationing(days, ChamberSurroundings::Structure, None, 1.0);
+    let empty_day = r
+        .states
+        .iter()
+        .position(|s| amount(s, BATTERY) < 1.0e6)
+        .expect("the battery never ran out");
     let b = amount(r.states.last().unwrap(), BATTERY);
-    eprintln!("L4 full horizon: battery ends at {b} J");
-    assert!(
-        b > 0.0 && (b / 1.4834e9 - 1.0).abs() < 0.02,
-        "battery ends at {b} J"
+    eprintln!(
+        "L4 full horizon: the battery runs out by day {empty_day}; ends at {b} J; fast side          rationed {} times",
+        r.fast_rationed
     );
-    // The room held (added 2026-10-15, §8d): a day end is dark, so the heater meets the walls'
-    // whole loss to the node, and the deadbeat controller leaves the room one step's loss below
-    // its setpoint — no more, unless the heater ran out of capacity. A saturated heater shows
-    // here first: the dark hours are when the heater carries the room alone.
     let scenario = sealed_station_scenario();
     let ch = station::params::chamber();
     let ua = ch.wall_conductance * ch.wall_area;
     let (mut off, mut node_min) = (0, [f64::MAX; 2]);
-    for s in r.states.iter().skip(1) {
+    for s in r.states.iter().skip(1).take(empty_day.saturating_sub(1)) {
         let phase = scenario.phase(s).unwrap();
         let set = scenario.chamber_setpoint(phase, ch.warm_setpoint);
         let (tc, tn) = (chamber_t(s), node_t(s));
         let i = usize::from(phase == station::scenario::Phase::Warm);
         node_min[i] = node_min[i].min(tn);
-        let step_loss = ua * (set - tn) * scenario.cabin_dt / ch.heat_capacity;
+        let latent_step = domains::biosphere::science::LATENT_HEAT_VAPORIZATION
+            * s.aux[station::latent_heat::EVAPORATION_RATE_AUX]
+            * scenario.cabin_dt
+            / ch.heat_capacity;
+        let step_loss = ua * (set - tn) * scenario.cabin_dt / ch.heat_capacity + latent_step;
         if !(tc <= set && set - tc <= step_loss * (1.0 + 1e-3)) {
             off += 1;
         }
     }
     eprintln!(
-        "L4 full horizon: node min cold {} / warm {} K; {off} day ends off the held band",
+        "L4 full horizon, before the battery ran out: node min cold {} / warm {} K; {off} day ends          off the held band",
         node_min[0], node_min[1]
     );
-    // The heater (200 W) saturates in the dark once the node is colder than the setpoint less
-    // 200 W / UA: ~147 K in the cold phase, ~165 K in the warm.
+    assert!(r.fast_rationed > 0, "the battery ran out and nothing rationed");
     assert!(
-        node_min[0] > scenario.cold.setpoint - ch.heater_capacity / ua
-            && node_min[1] > ch.warm_setpoint - ch.heater_capacity / ua,
-        "the node fell to where the heater saturates: {node_min:?}"
+        (EMPTY_DAY_LO..=EMPTY_DAY_HI).contains(&empty_day),
+        "the battery runs out by day {empty_day}"
     );
-    // The warm-ups (the setpoint jumps 18 K at each cold period's end): at most two per crop.
-    assert!(off <= 2 * 9, "{off} day ends off the held band");
+    assert!(off <= OFF_MAX, "{off} day ends off the held band before day {empty_day}");
 }
 
 /// R3 / R4 — the reference trajectory: the node's daily range and mean, the chamber's range.
@@ -481,6 +607,13 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
 /// 0.0146 K — L1's bound) or by the cooler (above, the walls bringing heat in): measured
 /// −0.0036 / +0.0112 K at the cold setpoint and −0.0146 / +0.0001 K at the warm, so ±0.015 K of
 /// either setpoint. Nine day ends fall outside (the warm-ups); the run ends at **295.1466290 K**.
+///
+/// ⚠ **Re-pinned 2026-10-15 again** (`docs/plans/post-roadmap-latent-heat-books.md` §8; the plants'
+/// evaporation takes heat from the room), measured by this tree: the node **162.4912 / 176.3676 /
+/// 170.4416 K** (warmer: the heater's extra ~1 GJ, paying the evaporation, ends in the node by the
+/// coil). The band gains one step of each day end's evaporation (409 day ends fell outside the
+/// walls-only band); the run ends at **295.1354351 K**, 8 days earlier in its season (each crop
+/// matures a day later).
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -500,22 +633,39 @@ fn the_reference_node_and_chamber_follow_the_weather() {
         sealed_station_scenario().cold.setpoint,
         station::params::chamber().warm_setpoint,
     );
-    let in_band = |t: f64| (t - cold_set).abs() <= 0.015 || (t - warm_set).abs() <= 0.015;
-    let outside = ch.iter().filter(|&&t| !in_band(t)).count();
+    // Since 2026-10-15 a day end also carries one step of the window's evaporation below the
+    // setpoint (latent-heat plan §8): the band is the walls' 0.015 K plus that step, per state.
+    let chamber = station::params::chamber();
+    let band = |s: &State| {
+        0.015
+            + domains::biosphere::science::LATENT_HEAT_VAPORIZATION
+                * s.aux[station::latent_heat::EVAPORATION_RATE_AUX]
+                * sealed_station_scenario().cabin_dt
+                / chamber.heat_capacity
+    };
+    let outside = r
+        .states
+        .iter()
+        .skip(1)
+        .filter(|s| {
+            let t = chamber_t(s);
+            (t - cold_set).abs() > band(s) && (t - warm_set).abs() > band(s)
+        })
+        .count();
     let end = chamber_t(r.states.last().unwrap());
     eprintln!(
         "chamber daily min {clo} max {chi}; {outside} day-end states between the bands; ends {end} K"
     );
     assert!(
-        (lo - 162.3792).abs() < 0.01 && (hi - 174.4180).abs() < 0.01,
+        (lo - 162.4912).abs() < 0.01 && (hi - 176.3676).abs() < 0.01,
         "{lo} {hi}"
     );
-    assert!((mean - 169.4745).abs() < 0.01, "{mean}");
+    assert!((mean - 170.4416).abs() < 0.01, "{mean}");
     assert!(
         clo >= cold_set - 0.015 && chi <= warm_set + 0.015,
         "{clo} {chi}"
     );
     // One mid-warm-up and one mid-cool-down day-end state per crop at most: 9 crops (§25g).
     assert!(outside <= 2 * 9, "{outside}");
-    assert!((end - 295.1466290).abs() < 1e-6, "chamber ends {end} K");
+    assert!((end - 295.1354351).abs() < 1e-6, "chamber ends {end} K");
 }

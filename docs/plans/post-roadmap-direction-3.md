@@ -571,10 +571,10 @@ sealed station's battery ends 2.6 % lower (1.0865e10 J). Scaling that note's dra
 (~2.2 % of the lamp's 1.41e10 J) moves "dark near day 1736" to roughly day 1700 — still past the horizon (a
 scaling, not a run). The third follow-on (latent heat in the room's books) stays the record's open question,
 next in the user's order, not added to §2. Nothing in §3 is re-proposed.
-⚠ *Re-read 2026-10-15* (`log/latent-heat-books.md`, BUILT lab-only and MEASURED, not adopted): grepped this
-plan for latent, evaporation, heater, battery, reheat, structure and season. It is the third of the
-latent-heat note's follow-ons (not on §2, so nothing struck). It bears on the 2026-10-01 battery note only
-if adopted: the heater would draw 1.34 GJ over 1220 days (~9.5 % of the lamp's 1.41e10 J, not ~2.2 %), so
+⚠ *Re-read 2026-10-15* (`log/latent-heat-books.md`, BUILT lab-only and MEASURED; ADOPTED the same day on
+the user's answers): grepped this plan for latent, evaporation, heater, battery, reheat, structure and
+season. It is the third of the latent-heat note's follow-ons (not on §2, so nothing struck); with it all
+three are adopted. It bears on the 2026-10-01 battery note: the heater draws 1.34 GJ over 1220 days (~9.5 % of the lamp's 1.41e10 J, not ~2.2 %), so
 the same scaling moves "dark near day 1736" to roughly day 1590 — still past the horizon (a scaling, not a
 run). It also finds the lab structure walls cannot carry the evaporation's heat (their battery empties
 inside the horizon). Nothing in §3 is re-proposed.

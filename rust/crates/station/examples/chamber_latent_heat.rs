@@ -20,12 +20,13 @@
 //! it is byte-exact (measured 2026-10-15). The room's temperature and its cooler and heater are printed
 //! for both.
 //!
-//! `-- --latent`: the evaporation's heat booked in the room (LAB-ONLY,
-//! `station::latent_heat::with_latent_heat`, `docs/plans/post-roadmap-latent-heat-books.md`). Adds the
-//! booked heat's identity per window (heat drawn over a window = λ × the window's moved water), the
+//! The evaporation's heat is booked in the room (`docs/plans/post-roadmap-latent-heat-books.md`; built
+//! lab-only behind `--latent`, ADOPTED 2026-10-15); `-- --no-latent` is the lab switch back
+//! (`station::latent_heat::without_latent_heat`), whose golden control reports DIFFERS by design. The
+//! probe adds the booked heat's identity per window (heat drawn over a window = λ × the window's moved water), the
 //! heater-saturated minutes, the minutes cooler + latent exceed the cooler's capacity, the minutes heat
 //! is booked to a node not colder than the room, the battery's minimum and the simple form's vapour
-//! bound. The golden control then reports DIFFERS by design.
+//! bound.
 //!
 //! `-- --surroundings=structure|cabin|space`: the chamber's walls face a lab surroundings instead of the
 //! outdoor weather (`ChamberSurroundings`; cabin at 18 °C, space at ε* = 0.01, WHAT-IF). The golden
@@ -54,7 +55,7 @@ use station::sealed::{
 };
 use station::chamber::ChamberSurroundings;
 use station::gas_exchange::GasExchangeStep;
-use station::latent_heat::{with_latent_heat, CHAMBER_LATENT_HEAT};
+use station::latent_heat::{without_latent_heat, CHAMBER_LATENT_HEAT};
 use station::sowing::{sown_step, twin};
 
 /// λ, J/kg — the model's own (`science.rs`, `LATENT_HEAT_VAPORIZATION`, private there).
@@ -82,7 +83,7 @@ struct Window {
     /// The chamber air's water vapour at the plant step's start (kg) — whether the night air holds
     /// its humidity setting (`docs/plans/post-roadmap-night-stomata.md`).
     vapour_kg: f64,
-    /// Heat the latent flow drew from the chamber over the window's minutes (J, ≥ 0; `--latent`).
+    /// Heat the latent flow drew from the chamber over the window's minutes (J, ≥ 0).
     booked_j: f64,
     /// Σ (room temperature − setpoint) over the window's minutes (K·min).
     dev_sum: f64,
@@ -149,7 +150,7 @@ struct Probe {
     latent: LatentBooks,
 }
 
-/// The booked latent heat's own checks (`--latent`), and the heater's and battery's limits.
+/// The booked latent heat's own checks, and the heater's and battery's limits.
 #[derive(Default)]
 struct LatentBooks {
     /// Windows checked, and the largest |booked − λ·evap| (J, and relative) over them.
@@ -295,11 +296,11 @@ fn main() {
         surroundings,
     )
     .expect("build_sealed_station");
-    let latent = std::env::args().any(|a| a == "--latent");
+    let latent = !std::env::args().any(|a| a == "--no-latent");
     let (state, bio, fast) = if latent {
-        with_latent_heat(state, bio, fast).expect("latent")
-    } else {
         (state, bio, fast)
+    } else {
+        without_latent_heat(state, bio, fast).expect("no latent")
     };
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
@@ -356,7 +357,7 @@ fn main() {
         }
         Side::Slow => {
             p.close();
-            if before.n % scenario.bio_steps_per_day == 0 {
+            if before.n.is_multiple_of(scenario.bio_steps_per_day) {
                 p.tt_day_start = before.aux[domains::biosphere::stocks::THERMAL_TIME];
             }
             let results = p.evaluate(two.slow.registry(), two.slow_resolver, two.slow_dt, before, after);
@@ -633,7 +634,7 @@ the room against its setpoint (minutes; T − setpoint min / max K; minutes > 0.
     let l = &p.latent;
     println!(
         "\nlatent heat booked in the room: {}; walls face {surroundings:?}",
-        if latent { "yes (lab, --latent)" } else { "no (the reference)" }
+        if latent { "yes (the reference)" } else { "no (lab, --no-latent)" }
     );
     println!(
         "  booked {:.6} GJ; λ × evaporated {:.6} GJ; window identity over {} windows: max |booked − λE| {:.3e} J, max relative {:.3e}",

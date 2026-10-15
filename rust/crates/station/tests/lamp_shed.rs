@@ -8,6 +8,8 @@
 //! The controls come first: the lab wiring with nothing shed must be the plain sealed run,
 //! bit for bit, or every difference below would be the wiring's.
 
+use domains::biosphere::science::LATENT_HEAT_VAPORIZATION;
+use station::latent_heat::{EVAPORATED_TOTAL_AUX, EVAPORATION_RATE_AUX};
 use std::sync::OnceLock;
 
 use domains::biosphere::perturbations::{window_override, with_forcing};
@@ -429,16 +431,29 @@ fn cutting_only_the_lamps_power_darkens_the_lab_crop() {
     // The plain build cannot see it: its crop is lit by the nameplate. (Since slice 3a it does
     // feel the cut lamp's missing HEAT, through the chamber — so the pin is on the light it
     // records, and the room was shown colder inside the cut, on day 4. Since 2026-10-15 the
-    // lamp heats the room only while lit, and a day-end state is dark: both rooms sit at the
-    // setpoint there, bit for bit, measured. The colder room is in the cut's lit hours, where
-    // this full lamp and the walls outrun the cooler; the crop that reads it grows less.)
+    // lamp heats the room only while lit, and a day-end state is dark: both rooms sat at the
+    // same temperature there, bit for bit, measured. The same day the plants' evaporation began
+    // taking heat from the room (`docs/plans/post-roadmap-latent-heat-books.md` §8): the deadbeat
+    // controller leaves each room one step's net input from its setpoint, and the evaporation is
+    // part of that input, at each crop's own recorded rate — so the two rooms now differ by
+    // exactly the difference of their evaporation steps. The colder room is in the cut's lit
+    // hours, where this full lamp and the walls outrun the cooler; the crop that reads it grows
+    // less.)
     let plain_cut = plain(&scn, &cut, &bio);
     let plain_lit = plain(&scn, &fast, &bio);
     assert_same_recorded_light(&plain_cut, &plain_lit);
-    assert_eq!(
-        chamber_t(&plain_cut.states[4]).to_bits(),
-        chamber_t(&plain_lit.states[4]).to_bits(),
-        "a dark day end no longer finds both rooms at the setpoint"
+    let ch = station::params::chamber();
+    let step = |r: &Run| {
+        LATENT_HEAT_VAPORIZATION * r.states[4].aux[EVAPORATION_RATE_AUX] * scn.cabin_dt
+            / ch.heat_capacity
+    };
+    let (dt_room, dt_step) = (
+        chamber_t(&plain_cut.states[4]) - chamber_t(&plain_lit.states[4]),
+        step(&plain_lit) - step(&plain_cut),
+    );
+    assert!(
+        dt_step != 0.0 && (dt_room - dt_step).abs() <= 1e-8,
+        "a dark day end no longer separates the rooms by their evaporation steps: rooms {dt_room}          K apart, steps {dt_step} K"
     );
     assert!(crop(plain_cut.states.last().unwrap()) < crop(plain_lit.states.last().unwrap()));
 }
@@ -548,16 +563,21 @@ fn a_lamp_failure_with_a_healthy_battery_keeps_its_heater() {
         at(&cold, days.0, BATTERY).to_bits()
     );
     let drawn = at(&cold, days.1, BATTERY) - at(&heated, days.1, BATTERY);
-    // With the lamp off the heater pays the walls' loss and the room's change of store.
+    // With the lamp off the heater pays the walls' loss, the plants' evaporation (since
+    // 2026-10-15, `docs/plans/post-roadmap-latent-heat-books.md` §8: λ × the water the windows
+    // recorded, every recorded window's heat drawn by a day end) and the room's change of store.
     let walls =
         at(&heated, days.1, CHAMBER_SURROUNDINGS) - at(&heated, days.0, CHAMBER_SURROUNDINGS);
     let stored = at(&heated, days.1, CHAMBER) - at(&heated, days.0, CHAMBER);
+    let evaporated = |day: usize| heated.states[day].aux[EVAPORATED_TOTAL_AUX];
+    let latent = LATENT_HEAT_VAPORIZATION * (evaporated(days.1) - evaporated(days.0));
     eprintln!(
-        "H4: the heater drew {drawn} J with the lamp's power cut (walls {walls}, stored {stored})"
+        "H4: the heater drew {drawn} J with the lamp's power cut (walls {walls}, latent {latent},          stored {stored})"
     );
+    assert!(latent > 0.0, "the plants evaporated nothing over three days");
     assert!(
-        (drawn - (walls + stored)).abs() <= 1e-6 * drawn,
-        "the heater drew {drawn} J; the walls took {walls} J and the room stored {stored} J"
+        (drawn - (walls + latent + stored)).abs() <= 1e-6 * drawn,
+        "the heater drew {drawn} J; the walls took {walls} J, the evaporation {latent} J and the          room stored {stored} J"
     );
     assert!(
         (drawn / 3.5e6 - 1.0).abs() < 0.2,

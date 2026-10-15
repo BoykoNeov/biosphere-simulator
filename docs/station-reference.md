@@ -134,21 +134,24 @@ stay **day-indexed** while biosphere trajectories are **step-indexed**. That asy
 load-bearing: slicing a station trajectory works in days, and "fixing" those sites to use
 steps introduces the bug it looks like it removes.
 
-### The flow set — 16 sibling + station flow classes (derived)
+### The flow set — sibling + station flow classes (derived; 20 since 2026-10-15, with the 3 biosphere types below 23)
 
 The frozen flow taxonomy of the coupled station, **derived from freshly assembled
 registries** (never hand-listed): the union over the four standalone sibling registries
 (`build_power` with `SelfDischarge`, `build_thermal`, `build_eclss`, `build_crew`) **and**
 the maximal sealed **fast** registry (`build_sealed_station(..., with_harvest=True)`), so a
 flow wired into any sibling or the station assembly is caught even if no golden exercises
-it. The 16 classes:
+it. The classes (16 when this section was written; the count is the manifest's `flow_set`):
 
 - **power** — `SolarCharge`, `LoadDraw`, `SelfDischarge`
 - **thermal** — `HeatInput`, `RadiatorReject`
 - **eclss** — `CrewMetabolism`, `CO2Scrubber`, `Condenser`, `O2Makeup`
 - **crew** — `OxygenConsumption`, `FoodMetabolism`, `WaterBalance`
 - **station seams** — `CrewRespiration`, `WaterRecovery`, `Lamp`, `Harvest`, `ChamberCooling`,
-  `ChamberWall`, `ChamberHeater`
+  `ChamberWall`, `ChamberHeater`, `ChamberLatentHeat`
+  (since 2026-10-15: the heat the plants' evaporation takes from the chamber, chamber →
+  `thermal.node`, drawn minute by minute at the rate the plant step's `WindowEvaporationRecorder`
+  records — that recorder is in the excluded slow registry, like `PlantWindowRecorder`)
   (since 2026-10-05: the plant chamber's cooler, chamber → `thermal.node`; the sealed `Lamp`'s
   whole draw — waste heat and light — goes to `thermal.chamber`, and the sealed build has no
   `boundary.light_used`; since 2b-iii the chamber's walls exchange heat with the outdoor
@@ -364,6 +367,37 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-10-15 — EVAPORATION'S HEAT IN THE ROOM'S BOOKS: a new station flow class, `ChamberLatentHeat`
+  (chamber → `thermal.node`), and the plant step's `WindowEvaporationRecorder` (excluded slow registry).
+  1 golden: `sealed_station_state` (carbon, water, energy; two new aux keys, the window's evaporation
+  rate and the running total); the manifest's `flow_set`, its `golden_sha256` row and one provenance hash
+  (`chamber.yaml`).** The user's *"yes"* to the latent-heat estimate's third follow-on, then their four
+  answers (adopt; restate the structure walls' slow test; the separate-air build gets the heat, minute
+  water opts out; the coil's shared 200 W documented, not built). Built lab-only, measured, priced in a
+  scratch worktree, adopted the same day (plan `docs/plans/post-roadmap-latent-heat-books.md` §7–§8).
+  **The form:** the plant step records its window's evaporation from the registry's own transpiration
+  flow (one instance, shared — not a copy of its law); the fast flow draws λ × it from the chamber minute
+  by minute across that window (drawn at once it would drop the room ~5 K every plant step) and hands it
+  to the node — the condensing coil, BVAD's one coolant loop. λ is `science.rs`'s own, now `pub`. The
+  node is credited at evaporation, not condensation (bound: λ × the air's vapour range, 8.2 MJ).
+  **Readers:** wired inside `build_sealed_station_unread` and `sealed_fast_flows`, so the separate-air
+  build inherits it; `air_split`'s minute water applies the lab off switch
+  (`latent_heat::without_latent_heat`) and `water_on_fast_step` refuses a build carrying the recorder; a
+  pre-change save resumes at a group boundary (the plant step records the key first; tested); the
+  chamber's start is unchanged (the first window evaporates 0.57 W). **Measured over the sealed station's
+  1220 days:** the window identity holds to 5.6e-15; the heater 0.31 → 1.34 GJ — by day too, the
+  dehumidified air driving the crop past what the lamp pays (the reheat cost); the battery −1.03 GJ; no
+  rationing; the cooler alone no longer saturates in the warm phase but cooler + latent exceed its
+  200 W as often as before (the latent path is uncapped — documented, §1b); each crop matures a day
+  later (day 140, not 139) and its grain is +3.4 % — a step of the once-a-day maturity check (the crop
+  had 0.11 of its last day to spare; it now has ~0.06, so a ~0.03 K warmer room could take the day back:
+  a ~3 % grain move after a later change may be this step, not an effect). The other 19 goldens and the
+  biosphere and authoring manifests are byte-identical. The lab off switch reproduces the pre-adoption
+  golden byte for byte (measured). **The lab structure walls** cannot afford the evaporation's heat: the
+  heater saturates on 410 nights, the battery runs out by day 1025 and the fast side rations 763 338
+  times — the slow test records it (`the_structures_heater_empties_the_battery_within_the_horizon`);
+  `chamber.yaml`'s `heater_capacity` source says so.
 
 - **2026-10-15 — THE LAMP'S DRAW SWITCHED WITH ITS LIGHT: the fast side's `lamp_power` is the lamp's
   on-power on the plant step's own top-hat (`station::lighting::switched_lamp_draw`), not the daily

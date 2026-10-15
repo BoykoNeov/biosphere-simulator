@@ -157,8 +157,8 @@ pub fn water_on_fast_step(
     {
         return Err(SimError::Validation(
             "water loss on the fast step would leave the chamber's latent-heat recorder reading \
-             transpiration on a plant step it has left: move the water before booking its heat, \
-             which then refuses the build"
+             transpiration on a plant step it has left: switch the books off first \
+             (latent_heat::without_latent_heat)"
                 .into(),
         ));
     }
@@ -460,9 +460,17 @@ pub fn build_split_station(
             gas_exchange_on_fast_step(&state.stocks, bio_reg, fast_reg, &shared)?
         }
     };
-    let (bio_reg, fast_reg) = match split.transpiration {
-        GasExchangeStep::PlantStep => (bio_reg, fast_reg),
-        GasExchangeStep::Minute => water_on_fast_step(&state.stocks, bio_reg, fast_reg, &shared)?,
+    let (state, bio_reg, fast_reg) = match split.transpiration {
+        GasExchangeStep::PlantStep => (state, bio_reg, fast_reg),
+        GasExchangeStep::Minute => {
+            // Minute water OPTS OUT of the chamber's latent-heat books (the user's answer,
+            // `docs/plans/post-roadmap-latent-heat-books.md` §8): its recorder reads transpiration on
+            // the plant step, which this move empties, and a per-minute form is not built.
+            let (state, bio_reg, fast_reg) =
+                crate::latent_heat::without_latent_heat(state, bio_reg, fast_reg)?;
+            let (bio_reg, fast_reg) = water_on_fast_step(&state.stocks, bio_reg, fast_reg, &shared)?;
+            (state, bio_reg, fast_reg)
+        }
     };
     let (bio_reg, fast_reg) = crate::sealed::wrap_last(bio_reg, fast_reg, &state.stocks, &resized)?;
     Ok((state, bio_reg, fast_reg))
