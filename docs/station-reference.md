@@ -366,7 +366,7 @@ gate), so the discipline is enforced, not merely requested.
   `lighting` (day 7): condensate −2.17 %, root zone +0.91 %. `sealed_station` (end state, one day of a
   watering cycle): condensate −29.3 %, root zone +32.5 %, below the roots −0.19 %; over the 1220-day run the
   chamber's water throughput falls 18.5 % (§6). `sealed_energy_drift_summary` holds no water value and is
-  byte-identical; the other 11 station goldens likewise. **The scorecard** (`tests/scorecard_tm102788.rs`, a
+  byte-identical; the other 10 station goldens likewise (13 in all). **The scorecard** (`tests/scorecard_tm102788.rs`, a
   diagnostic, not a gate): the scored row's water ratio goes 1.04 → 0.958, its carbon rows unchanged.
   `w1_by_hand` and `w1_by_hand_with` now apply `science::night_surface_resistance` on each step's own lamp
   net radiation at the loader's form, because their model side (`run`) closes at night too — §11 Q2's

@@ -27,3 +27,5 @@ byte-exact).
 * **Not decided — three follow-ons, each its own call:** night-time stomatal closure (a lead, the ASCE-EWRI
   2005 hourly night resistance, is not on the shelf); lamp heat switched with the light; latent heat in the
   room's books (worth taking only after the other two). Recommended first: night-time closure, the dominant term.
+  **Night-time closure ADOPTED 2026-10-15** (`log/night-stomata.md`): the dark-hours shortfall is ~0.31 GJ
+  now, not 1.80. The other two are still open.
