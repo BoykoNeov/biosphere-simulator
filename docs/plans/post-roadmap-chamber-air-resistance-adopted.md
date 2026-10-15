@@ -251,6 +251,11 @@ and a closed level is not a validated mechanism — the shape (P8) was not re-re
 * The TM scored row reads 7.5: water ratio 0.62 → 1.04, nothing else moves.
 * The energy side is **unmeasured, not zero** (§7).
 * Open: the water path's rounding lean (§9b); the sealed station's non-monotone condensate drain (§9).
+* **Every reader checked (advisor, 2026-10-15):** the one production builder of `Transpiration`
+  (`system.rs`) takes the selector; every other direct read of `aerodynamic_resistance` is an open-field
+  context (`DEFAULT_SCENARIO`, the scorecard's §10–§13 instruments, `soil_evaporation`'s S3), a
+  self-consistent flow unit fixture, a param pin, or the frozen C1 control table. The only what-if on the
+  key (the scorecard's R1) runs on the open build, so no what-if has gone silently inert.
 * Evidence cited as `W:\temp\claude\ra-adopt\` (the golden diff script and output, before/after golden
   copies, the throughput probe, suite and scorecard logs) now lives in `sources\temp-evidence\ra-adopt\`
   (local, not in git), by the repo's convention for cited temp paths.
