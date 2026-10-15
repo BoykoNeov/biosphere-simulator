@@ -674,7 +674,9 @@ pub fn switched_lamp_draw_for(
 /// LAB-ONLY (`docs/plans/post-roadmap-room-lamp-heat.md`): `fast_resolver` with both `lamp_power`
 /// twins replaced by the lamp's DAILY AVERAGE ([`SealedStationScenario::lamp_average_power`]) —
 /// the reference until 2026-10-15, for instruments that reproduce records made with it. ⚠ It
-/// REPLACES the twins, so apply it before any perturbation of the lamp's draw.
+/// REPLACES the twins, so apply it before any perturbation of the lamp's draw. ⚠ It restores the
+/// DRAW only: the built state's chamber starts at the switched draw's steady state; pair it with
+/// [`with_averaged_chamber_start`] to reproduce a pre-2026-10-15 run bit for bit (§8d).
 pub fn with_averaged_lamp_heat(
     fast_resolver: SourceResolver,
     scenario: &SealedStationScenario,
@@ -694,6 +696,34 @@ pub fn with_averaged_lamp_heat(
         );
     }
     SourceResolver::new(forcings, shared)
+}
+
+/// LAB-ONLY, the other half of [`with_averaged_lamp_heat`]: `state` (a fresh sealed build) with
+/// the chamber started at the steady state of the lamp's DAILY AVERAGE, as every build was until
+/// 2026-10-15, instead of its first window's switched draw. Only the chamber's start moves.
+pub fn with_averaged_chamber_start(
+    state: State,
+    scenario: &SealedStationScenario,
+) -> Result<State, SimError> {
+    if state.n != 0 {
+        return Err(SimError::Reference(format!(
+            "the chamber's start is a fresh build's (n = 0), not n = {}",
+            state.n
+        )));
+    }
+    let chamber = crate::params::chamber();
+    let phase = scenario.phase_since_sowing(0);
+    let q0 = chamber_heat0(
+        &chamber,
+        scenario.chamber_setpoint(phase, chamber.warm_setpoint),
+        scenario.lamp_average_power(phase, crate::params::lamp().photon_efficacy),
+    );
+    let mut stocks = state.stocks.clone();
+    stocks
+        .get_mut(CHAMBER)
+        .ok_or_else(|| SimError::Reference("the state carries no chamber".to_string()))?
+        .amount = q0;
+    State::new(state.n, stocks, state.rng_seed, state.aux.clone())
 }
 
 /// The chamber's setpoint (K) on the fast step, as its two phase twins: the cold program's and

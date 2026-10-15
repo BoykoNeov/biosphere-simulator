@@ -14,9 +14,11 @@
 //!
 //! `-- --averaged`: the room's lamp heat at its daily average on every minute (LAB-ONLY since the
 //! switched lamp was adopted, 2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md`,
-//! `station::sealed::with_averaged_lamp_heat`) — how the records before that date were made. The
-//! golden control then reports DIFFERS by design; the room's temperature and its cooler and heater are
-//! printed for both.
+//! `station::sealed::with_averaged_lamp_heat`, with the chamber's start restored by
+//! `with_averaged_chamber_start`) — how the records before that date were made. The golden control
+//! then reports DIFFERS against today's golden by design; against the pre-adoption golden (`06a064e`)
+//! it is byte-exact (measured 2026-10-15). The room's temperature and its cooler and heater are printed
+//! for both.
 
 use std::collections::BTreeMap;
 
@@ -37,7 +39,7 @@ use station::flows::LAMP;
 use station::scenario::{sealed_station_scenario, Phase};
 use station::sealed::{
     build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
-    with_averaged_lamp_heat,
+    with_averaged_chamber_start, with_averaged_lamp_heat,
 };
 use station::sowing::{sown_step, twin};
 
@@ -220,10 +222,13 @@ fn main() {
     let averaged = std::env::args().any(|a| a == "--averaged");
     let chamber = station::params::chamber();
     let fast_r = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
-    let fast_r = if averaged {
-        with_averaged_lamp_heat(fast_r, &scenario).expect("averaged")
+    let (state, fast_r) = if averaged {
+        (
+            with_averaged_chamber_start(state, &scenario).expect("averaged start"),
+            with_averaged_lamp_heat(fast_r, &scenario).expect("averaged"),
+        )
     } else {
-        fast_r
+        (state, fast_r)
     };
     let reset = sealed_reset_hook(&scenario);
     let two = TwoRate {

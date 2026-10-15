@@ -46,5 +46,12 @@ comes_back` caught it, unchanged). **Not predicted:** in the lab's full-lamp col
 and the walls outrun the cooler and warm the room ~4 K by day, so the plain crop feels a cut lamp only
 in the lit hours — a day-end state cannot see it.
 
+**Closing checks** (plan §8d, after the advisor's review): the lab switch restored the DRAW but not the
+chamber's start, so it did not reproduce a pre-adoption run; `with_averaged_chamber_start` restores the start,
+and the two together are byte-exact to the pre-adoption golden. `chamber.yaml`'s `heater_capacity` source
+quoted the structure option's loss net of the averaged lamp (44.8 W); in the dark the heater now carries up
+to 182 W of its 200 W there, measured over 1220 days, and never saturates — the text corrected (a
+provenance edit, the manifest's one hash), and the full-horizon structure test now checks the room held.
+
 **For the third follow-on** (latent heat in the room's books): with the room's heat switched, 1787 warm
 dark windows' water heat is not covered by what comes in (walls and heater) — 0.10 GJ over the run.

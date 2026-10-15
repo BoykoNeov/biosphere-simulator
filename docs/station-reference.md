@@ -44,7 +44,8 @@ this contract's. See the unfreeze log.
 `lamp_power` is the on-power on the plant step's own top-hat (`station::lighting::switched_lamp_draw`,
 read for the windows of the interleaved day's group behind `n`), not the daily average on every minute
 — so the plant chamber's heat input is 0 in the dark. The daily average is the lab switch
-`station::sealed::with_averaged_lamp_heat`. See the unfreeze log.
+`station::sealed::with_averaged_lamp_heat` (with `with_averaged_chamber_start` for the chamber's start).
+See the unfreeze log.
 
 ⚠ **Since 2026-10-05 (slice 3a) the sealed station also owns the crop's TEMPERATURE.** Every
 plant-step flow and aux process of `sealed_station` is wrapped to read `temp` from the plant
@@ -383,7 +384,13 @@ gate), so the discipline is enforced, not merely requested.
   heat-closure station, which has no lamp: byte-identical, as are the other 10 station goldens. The
   biosphere and authoring manifests are byte-identical. ⚠ The reason the average stood — *"`substep`
   freezes `n`, so a within-day shape is not expressible"* (the 2026-08-14 entry below) — was true only
-  while the plant step was a day; it is withdrawn in `lighting.rs`.
+  while the plant step was a day; it is withdrawn in `lighting.rs`. **Follow-up the same day (plan §8d):
+  one provenance edit** — `chamber.yaml`'s `heater_capacity` source said the heater must exceed "44.8 W
+  against the station structure", the loss net of the averaged lamp; in the dark the heater now carries the
+  walls' whole loss, up to 182 W on that lab option (measured over 1220 days; it would saturate below a
+  ~165 K node and never does). The manifest's `chamber.yaml` hash moves; no golden. The lab switch restores
+  the old run whole only with its second half, `with_averaged_chamber_start` (the chamber's start): together
+  byte-exact to the pre-adoption `sealed_station_state` (measured).
 - **2026-10-15 — the biosphere's night stomata closing adopted, delegated: 2 station goldens move
   (`lighting`, `sealed_station`) and their 2 `golden_sha256` rows follow. Water only. No station flow,
   param or seam changed; one station-side edit rides along: the TM 102788 scorecard's by-hand water path

@@ -211,7 +211,7 @@ dark windows are short, 0.10 GJ over the run.
   "must exceed the largest steady loss of any surroundings option: 44.8 W against the station structure".
   That was the loss net of the averaged lamp; in the dark the structure option now asks 176 W of the
   200 W heater. The claim still holds, with a narrower margin; the reference's own walls (outdoors,
-  36.6 W on the coldest day with the lamp off) are unchanged. A provenance edit is its own unfreeze.
+  36.6 W on the coldest day with the lamp off) are unchanged. *(Corrected in §8d.)*
 * `chamber_walls`, the reference trajectory (slow): the node re-pinned as measured, 162.3792 / 174.4180 /
   169.4745 K; the chamber's day-end bands **derived** instead of measured — a day end is dark, so the room
   is held within one step's wall loss of its setpoint (measured −0.0036 / +0.0112 K cold, −0.0146 /
@@ -235,3 +235,18 @@ dark windows are short, 0.10 GJ over the run.
     full-lamp cold period, the lit lamp and the walls outrun the 200 W cooler and warm the room up to
     ~4 K by day, so the cut lamp's room is colder only in the lit hours; restated on the crop, which
     reads them (−4.5 % at day 8 with the light pinned identical), and the day-end rooms asserted equal.
+
+### 8d. Closing checks (2026-10-15, after the advisor's review)
+
+* **The lab switch did not restore the old run.** `with_averaged_lamp_heat` replaces the draw, but a
+  fresh build starts the chamber at the switched draw's steady state (0 W, window 0 dark) — 0.0053 K below
+  the averaged start (13.33 W × 60 s / 1.5e5 J/K, the cold phase's dimmed lamp). Its second half,
+  `station::sealed::with_averaged_chamber_start`, restores the start; `chamber_latent_heat -- --averaged`
+  now uses both and is **byte-exact to the pre-adoption `sealed_station_state`** (`06a064e`, measured by
+  swapping that golden in for one run and back).
+* **The heater's margin, measured over the whole horizon.** §8c's "still holds" was read at day 120 only.
+  The structure option's full 1220 days now checks every day end: the room within one step's loss of its
+  setpoint (9 off, the warm-ups), and the node's lowest day end 175.15 K cold / 176.91 K warm — the heater
+  would saturate below ~147 / ~165 K, so it never does; its worst dark load is ~182 W of 200. So
+  `chamber.yaml`'s `heater_capacity` source is corrected under this unfreeze (provenance only: the station
+  manifest's `chamber.yaml` hash moves, no golden), not deferred.

@@ -118,7 +118,7 @@
   },
   "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/16 day, 16 slow sub-steps per master day, each followed by its sixteenth of the everything-fast dt=60 s sub-steps (90 of them; interleaved since 2026-09-30, slow-first before); Tier-1 energy single-rate dt=3600 s.",
   "param_files": {
-    "chamber.yaml": "860c1fbf767b53d683021463f5aa0413eccb2e8aaa4d6e96ccfeb3bd8ba9777e",
+    "chamber.yaml": "e42eb4aef52d27e48c1bddb55d59e8190a608e97fba8d00f9dcc6dd7afc5a6bf",
     "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
     "cold_period.yaml": "8a583bc8b85583d4821ba1ce3537942c98acf36323a3cae599a9cb276c112154",
     "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",

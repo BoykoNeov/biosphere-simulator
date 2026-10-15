@@ -424,6 +424,38 @@ fn the_structures_heater_does_not_empty_the_battery_within_the_horizon() {
         b > 0.0 && (b / 1.4834e9 - 1.0).abs() < 0.02,
         "battery ends at {b} J"
     );
+    // The room held (added 2026-10-15, §8d): a day end is dark, so the heater meets the walls'
+    // whole loss to the node, and the deadbeat controller leaves the room one step's loss below
+    // its setpoint — no more, unless the heater ran out of capacity. A saturated heater shows
+    // here first: the dark hours are when the heater carries the room alone.
+    let scenario = sealed_station_scenario();
+    let ch = station::params::chamber();
+    let ua = ch.wall_conductance * ch.wall_area;
+    let (mut off, mut node_min) = (0, [f64::MAX; 2]);
+    for s in r.states.iter().skip(1) {
+        let phase = scenario.phase(s).unwrap();
+        let set = scenario.chamber_setpoint(phase, ch.warm_setpoint);
+        let (tc, tn) = (chamber_t(s), node_t(s));
+        let i = usize::from(phase == station::scenario::Phase::Warm);
+        node_min[i] = node_min[i].min(tn);
+        let step_loss = ua * (set - tn) * scenario.cabin_dt / ch.heat_capacity;
+        if !(tc <= set && set - tc <= step_loss * (1.0 + 1e-3)) {
+            off += 1;
+        }
+    }
+    eprintln!(
+        "L4 full horizon: node min cold {} / warm {} K; {off} day ends off the held band",
+        node_min[0], node_min[1]
+    );
+    // The heater (200 W) saturates in the dark once the node is colder than the setpoint less
+    // 200 W / UA: ~147 K in the cold phase, ~165 K in the warm.
+    assert!(
+        node_min[0] > scenario.cold.setpoint - ch.heater_capacity / ua
+            && node_min[1] > ch.warm_setpoint - ch.heater_capacity / ua,
+        "the node fell to where the heater saturates: {node_min:?}"
+    );
+    // The warm-ups (the setpoint jumps 18 K at each cold period's end): at most two per crop.
+    assert!(off <= 2 * 9, "{off} day ends off the held band");
 }
 
 /// R3 / R4 — the reference trajectory: the node's daily range and mean, the chamber's range.
