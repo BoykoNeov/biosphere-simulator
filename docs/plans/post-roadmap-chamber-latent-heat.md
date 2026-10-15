@@ -107,7 +107,10 @@ transpiration with daytime heat. The meaningful closure is over a phase or the r
 
 ### 5a. The estimate
 
-**The warm phase** (the crop grown; three quarters of the windows lit), latent power against lamp heat:
+**The warm phase** (the crop grown), latent power against lamp heat. ⚠ A "lit" window is any plant step
+with net radiation above 0, so the two partly lit steps of each 16-hour day count as lit: three quarters of
+the windows, not two thirds. That biases the lit rates slightly low and the dark/lit ratio slightly high;
+no conclusion turns on it.
 
 | | 7.5 | 50 |
 |---|---|---|
@@ -120,23 +123,30 @@ transpiration with daytime heat. The meaningful closure is over a phase or the r
 **Over the run**, the room's books (identical on both trees): lamp 83.8 W in, heater 0.14 W in, walls
 6.0 W out, cooler **77.9 W** out (93 % of the lamp). Latent: **80.7 W** at 7.5, 43.3 W at 50.
 
-**What it says, on BVAD's one-coil reading (§1):**
+**What it says, on BVAD's one-coil reading (§1).** ⚠ *Corrected before reporting (advisor, 2026-10-15):* a
+first draft read the run totals as "at 50 the energy totals held, at 7.5 they break". That nets windows short
+of heat against windows with heat to spare — across the night and the day, and the cold phase against the
+warm — and a held room cannot bank heat: its store is 1.5e5 J/K (0.053 K per minute of full lamp), and the
+cooler removes any surplus at once. The run totals are kept below as the netted figure only.
 
-1. **At 50 the "water only" claim held for the energy totals.** The crop's water carried 56 % of what the
-   cooler removes; a coil taking both would have split the same total, 43 W latent and 35 W sensible.
-2. **At 7.5 it does not.** The water carries **more heat than the cooler removes in total** — 80.7 W against
-   77.9 W over the run, and in the warm phase more than the lamp delivers (1.01). A coil condensing that
-   water removes ≥ 8.50 GJ (3470 kg × λ) where the model's cooler removes 8.21 GJ: **0.29 GJ (2.8 W over
-   the run) the room has no source for** — on the order of 20 times everything the model's heater gives
-   (0.015 GJ). In a held room that heat would come from the heater, i.e. the battery.
-3. **Night transpiration is what tips it.** It is 1.80 GJ of the 8.51 GJ at 7.5 (116.2 W × 2864 dark windows), six times the shortfall; at 50 it is 0.67 GJ. At 7.5 the crop in the dark transpires at 92 % of its lit rate;
-   the dark windows alone carry 116 W against a lamp that, in a real room, is off. The model's stomata
-   never close: Penman–Monteith reads the room's held 75 % air at 22 °C, and `rs` (Szeicz–Long, from leaf
-   area) does not read light. ⚠ A lead, **not on the shelf**: the ASCE-EWRI (2005) hourly reference
-   equation uses a larger night-time surface resistance than its daytime one, for exactly this reason
-   (general knowledge — unread, uncited here).
-4. **The room's heat being a daily average** hides all of this from the heater: the night that would need
-   heating never exists in the room's books.
+1. **The model's night transpiration has no heat to pay for it, at either value.** The lamp is off at night
+   in any real room (the model averages its heat over the day, item 4). The dark windows alone take
+   **1.80 GJ at 7.5** (116.2 W × 2864 windows × 5400 s) and **0.67 GJ at 50** (43.6 W) — a lower bound on
+   what a held room would have to find, since the walls lose heat at night too. The new value made it
+   **2.7×** larger; it did not create it.
+2. **Even with the averaged lamp**, windows short of heat add up to **1.66 GJ at 7.5** (7465 of 11 456 warm
+   windows) and **0** at 50 — the probe's un-netted sum.
+3. **The netted figure:** a coil condensing the run's water removes ≥ 8.50 GJ (3470 kg × λ) at 7.5 where the
+   model's cooler removes 8.21 GJ — 0.29 GJ short; at 50 it is 4.55 GJ against 8.21 GJ, a surplus. This is
+   the most favourable reading, and only it separates the two values.
+4. **Why the crop transpires at night.** At 7.5 its dark rate is 92 % of its lit rate (66 % at 50).
+   Penman–Monteith reads the room's held 75 % air at 22 °C, and the surface resistance (Szeicz–Long,
+   `science::canopy_surface_resistance`) takes the leaf area and constants only — checked in the code
+   (`flows.rs` `CanopyRead::surface_resistance`), nothing about light. So the stomata never close. ⚠ A lead,
+   **not on the shelf**: the ASCE-EWRI (2005) hourly reference equation uses a larger night-time surface
+   resistance than its daytime one, for this reason (general knowledge — unread, uncited here).
+5. **The room's lamp heat being a daily average** hides all of this from the heater: the night that would
+   need heating never exists in the room's books.
 
 **Not measured, and why it matters:** whether the TM 102788 trial's water use (which 7.5 now matches,
 1.04) includes night transpiration at this rate. The trial logged condensate daily (`post-roadmap-real-world-checks.md`
@@ -152,4 +162,4 @@ Three possible follow-ons, each its own decision, none started:
   unfreeze; it moves the chamber's temperature and heater books, not water.
 * **Latent heat in the room's books** (evaporation draws from the chamber store, condensation into the
   cooler's path) — the §0 build. Only worth taking after the two above, since today it would book a deficit
-  produced mostly by night transpiration.
+  that is night transpiration under an averaged lamp.

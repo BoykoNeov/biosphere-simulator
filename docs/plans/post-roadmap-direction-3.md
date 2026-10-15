@@ -550,9 +550,10 @@ the 2026-10-14 note said was missing now exists (Monje & Bugbee 2019), and the r
 ⚠ *Re-read 2026-10-15* (`log/chamber-latent-heat.md`, ESTIMATED lab-only, nothing built): grepped this
 plan for latent, night, stomata, dark, heater, lamp heat, energy and evaporation. The only energy item is
 the 2026-10-01 note above (the sealed station's battery pays for the lamp from its starting charge). This
-bears on it at a distance: a room whose books took the water's heat would ask the heater, on that battery,
-for ~0.29 GJ over 1220 days — about 2 % of the lamp's 1.41e10 J, so it does not move that note's "dark near
-day 1736". The item names three follow-ons (night stomatal closure, lamp heat switched with the light, latent
+bears on it: a room whose lamp went off at night and whose books took the water's heat would ask the
+heater, on that battery, for at least 1.80 GJ over 1220 days at 7.5 — about 13 % of the lamp's 1.41e10 J.
+Scaling that note's drain by 1.13 moves "dark near day 1736" to roughly day 1540: earlier, still past the
+1220-day horizon (a scaling, not a run). The item names three follow-ons (night stomatal closure, lamp heat switched with the light, latent
 heat in the room's books); they are the record's open questions, recorded there and in its plan, not added
 to §2 here, since none has a source or a user decision yet. Nothing in §3 is re-proposed.
 
