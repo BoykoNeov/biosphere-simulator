@@ -260,7 +260,7 @@ model can see (§7d point 7).
 **The user's call:** *"1. use 50"*. Every room keeps the uncited `ra` = 50 s m⁻¹; no chamber value is
 adopted, no param, golden or manifest moves. The price above stands as the record of what a lower value
 would have cost. The local branch `wip/chamber-ra-price` was never pushed and is left as it is until the
-user says whether to delete it.
+user says whether to delete it. Deleted 2026-10-15 (tip `226e9d7`) on the user's "delete obsolete branches", after 7.5 was adopted (`2f6671f`).
 
 ⚠ **What keeping 50 does and does not say.** It is a decision about the model, not evidence about TM
 102788: the trial's water gap (`post-roadmap-real-world-checks.md` §11–§12) stays open, and air coupling

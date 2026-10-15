@@ -1349,7 +1349,7 @@ records (`post-roadmap-room-temperature.md` §13–§18) are
 **pre-adoption**. The fix (feed the account from whatever waters the root zone) is offered as a follow-on.
 
 **The pricing branch** `wip/three-forms-price` (three local commits, never pushed) is superseded by
-`20fe5b7` and `448671c`; deleting it is the user's call.
+`20fe5b7` and `448671c`; deleting it is the user's call. Deleted 2026-10-15 (tip `0b5814a`) on the user's "delete obsolete branches".
 
 **Linux CI on `a5332e8` (run 38045315936): green** — `cargo test`, the ignored sealed-station golden and band
 (the first Linux read of the moved station goldens' bands: they hold), clippy, and the Godot parity job. Logs

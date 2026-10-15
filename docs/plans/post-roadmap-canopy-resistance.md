@@ -410,6 +410,6 @@ keep potato on the constant.
    together (over adopting Szeicz–Long as it stands, and over keeping both lab-only). The reason on
    record: without it a sealed chamber's air goes dry whenever its crop is dead (§10c).
 2. **Potato adopts with wheat** under any adoption (over a potato-only constant).
-3. **The pricing branch `wip/canopy-resistance-price` is kept** (local, `b5d20b5`, not pushed).
+3. **The pricing branch `wip/canopy-resistance-price` was kept** (local, `b5d20b5`, not pushed). Deleted 2026-10-15 on the user's "delete obsolete branches": Szeicz–Long was adopted 2026-10-10, so the price is spent.
 
 Nothing adopted; main keeps the constant form.
