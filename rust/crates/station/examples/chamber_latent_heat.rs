@@ -19,6 +19,17 @@
 //! then reports DIFFERS against today's golden by design; against the pre-adoption golden (`06a064e`)
 //! it is byte-exact (measured 2026-10-15). The room's temperature and its cooler and heater are printed
 //! for both.
+//!
+//! `-- --latent`: the evaporation's heat booked in the room (LAB-ONLY,
+//! `station::latent_heat::with_latent_heat`, `docs/plans/post-roadmap-latent-heat-books.md`). Adds the
+//! booked heat's identity per window (heat drawn over a window = λ × the window's moved water), the
+//! heater-saturated minutes, the minutes cooler + latent exceed the cooler's capacity, the minutes heat
+//! is booked to a node not colder than the room, the battery's minimum and the simple form's vapour
+//! bound. The golden control then reports DIFFERS by design.
+//!
+//! `-- --surroundings=structure|cabin|space`: the chamber's walls face a lab surroundings instead of the
+//! outdoor weather (`ChamberSurroundings`; cabin at 18 °C, space at ε* = 0.01, WHAT-IF). The golden
+//! control then reports DIFFERS by design.
 
 use std::collections::BTreeMap;
 
@@ -38,9 +49,12 @@ use station::driver::{DayOrder, Side, TwoRate};
 use station::flows::LAMP;
 use station::scenario::{sealed_station_scenario, Phase};
 use station::sealed::{
-    build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
+    build_sealed_station_in, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
     with_averaged_chamber_start, with_averaged_lamp_heat,
 };
+use station::chamber::ChamberSurroundings;
+use station::gas_exchange::GasExchangeStep;
+use station::latent_heat::{with_latent_heat, CHAMBER_LATENT_HEAT};
 use station::sowing::{sown_step, twin};
 
 /// λ, J/kg — the model's own (`science.rs`, `LATENT_HEAT_VAPORIZATION`, private there).
@@ -68,6 +82,8 @@ struct Window {
     /// The chamber air's water vapour at the plant step's start (kg) — whether the night air holds
     /// its humidity setting (`docs/plans/post-roadmap-night-stomata.md`).
     vapour_kg: f64,
+    /// Heat the latent flow drew from the chamber over the window's minutes (J, ≥ 0; `--latent`).
+    booked_j: f64,
 }
 
 /// Run-wide sums for one class of window.
@@ -118,6 +134,32 @@ struct Probe {
     first_mismatch: Option<String>,
     firings: u64,
     room: Room,
+    /// The step count at each re-sow (the season reset).
+    resets: Vec<u64>,
+    /// The crop at each re-sow, before the reset: grain, leaf, stem, root (mol C).
+    harvests: Vec<[f64; 4]>,
+    latent: LatentBooks,
+}
+
+/// The booked latent heat's own checks (`--latent`), and the heater's and battery's limits.
+#[derive(Default)]
+struct LatentBooks {
+    /// Windows checked, and the largest |booked − λ·evap| (J, and relative) over them.
+    windows: u64,
+    max_rel_err: f64,
+    max_abs_err_j: f64,
+    booked_j: f64,
+    /// Minutes the heater gave its whole capacity, by phase.
+    heater_saturated: BTreeMap<&'static str, u64>,
+    /// Minutes cooler + latent exceeded the cooler's capacity, by phase.
+    over_coil: BTreeMap<&'static str, u64>,
+    /// Minutes heat was booked to a node not colder than the room.
+    node_not_colder: u64,
+    battery_min_j: f64,
+    vapour_min_kg: f64,
+    vapour_max_kg: f64,
+    /// The first window's evaporation (kg) and whether it was dark.
+    first_window: Option<(f64, bool)>,
 }
 
 /// The room's temperature against its setpoint, and its cooler, per phase ("cold" / "warm").
@@ -143,6 +185,18 @@ impl Probe {
         };
         let w = self.w.clone();
         self.classes.entry(key).or_default().add(&w);
+        if self.latent.first_window.is_none() {
+            self.latent.first_window = Some((w.evap_kg, w.dark));
+        }
+        if w.booked_j > 0.0 || w.evap_kg > 0.0 {
+            let want = LAMBDA * w.evap_kg;
+            let err = (w.booked_j - want).abs();
+            self.latent.windows += 1;
+            self.latent.max_abs_err_j = self.latent.max_abs_err_j.max(err);
+            if want > 0.0 {
+                self.latent.max_rel_err = self.latent.max_rel_err.max(err / want);
+            }
+        }
         self.w = Window::default();
     }
 
@@ -204,7 +258,21 @@ fn main() {
     let scenario = sealed_station_scenario();
     let charge = domains::params::charge();
     let lamp = station::params::lamp();
-    let (state, bio, fast) = build_sealed_station(
+    let surroundings = match std::env::args()
+        .find_map(|a| a.strip_prefix("--surroundings=").map(str::to_string))
+        .as_deref()
+    {
+        None | Some("outdoor") => ChamberSurroundings::Outdoor,
+        Some("structure") => ChamberSurroundings::Structure,
+        Some("cabin") => ChamberSurroundings::Cabin {
+            temperature_k: 291.15,
+        },
+        Some("space") => ChamberSurroundings::Space {
+            effective_emittance: 0.01,
+        },
+        Some(other) => panic!("unknown surroundings {other:?}"),
+    };
+    let (state, bio, fast) = build_sealed_station_in(
         &charge,
         &domains::params::thermal(),
         &domains::params::crew(),
@@ -215,12 +283,21 @@ fn main() {
         &scenario,
         false,
         false,
+        GasExchangeStep::Minute,
+        surroundings,
     )
     .expect("build_sealed_station");
+    let latent = std::env::args().any(|a| a == "--latent");
+    let (state, bio, fast) = if latent {
+        with_latent_heat(state, bio, fast).expect("latent")
+    } else {
+        (state, bio, fast)
+    };
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
     let averaged = std::env::args().any(|a| a == "--averaged");
     let chamber = station::params::chamber();
+    let thermal = domains::params::thermal();
     let fast_r = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
     let (state, fast_r) = if averaged {
         (
@@ -245,6 +322,12 @@ fn main() {
     let vapour0 = state.stocks[WATER_VAPOR].amount;
     let mut p = Probe {
         min_crop_kg: f64::INFINITY,
+        latent: LatentBooks {
+            battery_min_j: f64::INFINITY,
+            vapour_min_kg: f64::INFINITY,
+            vapour_max_kg: f64::NEG_INFINITY,
+            ..LatentBooks::default()
+        },
         room: Room {
             outdoor_max_c: f64::NEG_INFINITY,
             ..Room::default()
@@ -252,7 +335,11 @@ fn main() {
         ..Probe::default()
     };
     let mut observe = |side: Side, before: &State, after: &State| match side {
-        Side::Reset => {}
+        Side::Reset => {
+            use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C, STORAGE_C};
+            p.resets.push(after.n);
+            p.harvests.push([STORAGE_C, LEAF_C, STEM_C, ROOT_C].map(|k| before.stocks[k].amount));
+        }
         Side::Slow => {
             p.close();
             let results = p.evaluate(two.slow.registry(), two.slow_resolver, two.slow_dt, before, after);
@@ -284,18 +371,30 @@ fn main() {
                 vapour_kg: before.stocks[WATER_VAPOR].amount,
                 ..Window::default()
             };
+            let v = before.stocks[WATER_VAPOR].amount;
+            p.latent.vapour_min_kg = p.latent.vapour_min_kg.min(v);
+            p.latent.vapour_max_kg = p.latent.vapour_max_kg.max(v);
         }
         Side::Fast => {
             let results = p.evaluate(two.fast.registry(), two.fast_resolver, two.fast_dt, before, after);
+            let key = if p.w.cold { "cold" } else { "warm" };
+            let mut latent_out = 0.0;
             for (f, r) in two.fast.registry().flows().iter().zip(&results) {
                 let e = leg_on(r, CHAMBER);
                 match f.id() {
+                    CHAMBER_LATENT_HEAT => {
+                        latent_out = -e;
+                        p.w.booked_j -= e;
+                        p.latent.booked_j -= e;
+                    }
                     LAMP => p.w.lamp_j += e,
                     CHAMBER_WALL => p.w.wall_in_j += e.max(0.0),
                     CHAMBER_HEATER => {
                         p.w.heater_j += e;
+                        if e >= chamber.heater_capacity * two.fast_dt * (1.0 - 1e-12) {
+                            *p.latent.heater_saturated.entry(key).or_default() += 1;
+                        }
                         if e > 0.0 {
-                            let key = if p.w.cold { "cold" } else { "warm" };
                             let h = p.heater_minutes.entry(key).or_default();
                             h.0 += 1;
                             h.1 += p.w.latent_w * two.fast_dt;
@@ -306,7 +405,20 @@ fn main() {
                 }
             }
             p.w.seconds += two.fast_dt;
-            let key = if p.w.cold { "cold" } else { "warm" };
+            let t_node = domains::thermal::temperature(
+                before.stocks[domains::thermal::NODE].amount,
+                thermal.heat_capacity,
+                thermal.space_temperature,
+            );
+            if latent_out > 0.0
+                && t_node >= chamber_temperature(before.stocks[CHAMBER].amount, &chamber)
+            {
+                p.latent.node_not_colder += 1;
+            }
+            p.latent.battery_min_j = p
+                .latent
+                .battery_min_j
+                .min(after.stocks[domains::power::BATTERY].amount);
             let bound = two.fast_resolver.bind(before, two.fast_dt);
             let phase = if p.w.cold { Phase::Cold } else { Phase::Warm };
             let set = bound.get(&twin(CHAMBER_SETPOINT_VAR, phase)).expect("setpoint");
@@ -337,6 +449,9 @@ fn main() {
                 r.4 += 1;
             }
             r.5 += cooled;
+            if cooled + latent_out > chamber.cooling_capacity * two.fast_dt {
+                *p.latent.over_coil.entry(key).or_default() += 1;
+            }
         }
     };
     let (states, totals) = two
@@ -479,4 +594,47 @@ the room against its setpoint (minutes; T − setpoint min / max K; minutes > 0.
         println!("  {k:<32} {:.10e}", end.stocks[k].amount);
     }
     println!("  harvested (food store)           {:.10e}", end.stocks.get("crew.food_store").map_or(f64::NAN, |s| s.amount));
+
+    // --- the booked latent heat (docs/plans/post-roadmap-latent-heat-books.md) ---
+    println!(
+        "re-sown at day {:?}",
+        p.resets.iter().map(|n| *n as f64 / scenario.bio_steps_per_day as f64).collect::<Vec<_>>()
+    );
+    println!("the crop at each maturity (mol C): grain, leaf, stem, root");
+    for h in &p.harvests {
+        println!("  {:.6e} {:.6e} {:.6e} {:.6e}", h[0], h[1], h[2], h[3]);
+    }
+    let l = &p.latent;
+    println!(
+        "\nlatent heat booked in the room: {}; walls face {surroundings:?}",
+        if latent { "yes (lab, --latent)" } else { "no (the reference)" }
+    );
+    println!(
+        "  booked {:.6} GJ; λ × evaporated {:.6} GJ; window identity over {} windows: max |booked − λE| {:.3e} J, max relative {:.3e}",
+        l.booked_j / 1e9,
+        LAMBDA * evaporated / 1e9,
+        l.windows,
+        l.max_abs_err_j,
+        l.max_rel_err
+    );
+    if let Some((kg, dark)) = l.first_window {
+        println!(
+            "  first window: {kg:.6e} kg evaporated ({}), latent {:.4} W over it",
+            if dark { "dark" } else { "lit" },
+            LAMBDA * kg / (two.slow_dt * SECONDS_PER_DAY)
+        );
+    }
+    let heater_total: f64 = p.heater_minutes.values().map(|h| h.2).sum();
+    println!("  heater total {:.4} GJ", heater_total / 1e9);
+    println!("  heater at full capacity (minutes): {:?}", l.heater_saturated);
+    println!("  cooler + latent above the cooler's capacity (minutes): {:?}", l.over_coil);
+    println!("  minutes heat was booked to a node not colder than the room: {}", l.node_not_colder);
+    println!("  battery minimum {:.6e} J", l.battery_min_j);
+    println!(
+        "  the simple form's bound: chamber air vapour {:.4}–{:.4} kg at plant-step starts → λ × range {:.3} MJ; λ × Δvapour over the run {:.3} MJ",
+        l.vapour_min_kg,
+        l.vapour_max_kg,
+        LAMBDA * (l.vapour_max_kg - l.vapour_min_kg) / 1e6,
+        LAMBDA * d_vapour / 1e6
+    );
 }

@@ -151,6 +151,17 @@ pub fn water_on_fast_step(
                 .into(),
         ));
     }
+    if bio_aux
+        .iter()
+        .any(|a| a.id() == crate::latent_heat::EVAPORATION_RECORDER)
+    {
+        return Err(SimError::Validation(
+            "water loss on the fast step would leave the chamber's latent-heat recorder reading \
+             transpiration on a plant step it has left: move the water before booking its heat, \
+             which then refuses the build"
+                .into(),
+        ));
+    }
     let (moved, rest): (Vec<_>, Vec<_>) = flows
         .into_iter()
         .partition(|f| WATER_LOSS_FLOWS.contains(&f.id()));

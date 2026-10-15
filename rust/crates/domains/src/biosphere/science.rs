@@ -23,7 +23,9 @@ const MOLEFRAC_TO_MICRO: f64 = 1.0e6;
 const GAMMA_PSYCHROMETRIC: f64 = 67.0;
 const AIR_DENSITY: f64 = 1.205;
 const AIR_SPECIFIC_HEAT: f64 = 1013.0;
-const LATENT_HEAT_VAPORIZATION: f64 = 2.45e6;
+/// λ (J/kg). `pub` since 2026-10-15 so the station's chamber books the heat of the water this
+/// module computes with the same value (`station::latent_heat`), not a second literal.
+pub const LATENT_HEAT_VAPORIZATION: f64 = 2.45e6;
 const SECONDS_PER_DAY: f64 = 86400.0;
 
 // --- canopy (Beer–Lambert) --------------------------------------------------

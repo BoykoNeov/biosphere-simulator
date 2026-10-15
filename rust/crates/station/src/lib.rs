@@ -28,6 +28,7 @@ pub mod greenhouse;
 pub mod harvest;
 pub mod inspection;
 pub mod lamp_shed;
+pub mod latent_heat;
 pub mod lighting;
 pub mod objectives;
 pub mod palette;

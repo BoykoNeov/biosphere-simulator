@@ -151,3 +151,51 @@ bound turns out not small against the booked heat, or if a scope question has no
    against today's golden.
 3. The four surroundings, heater books only.
 4. A scratch worktree with the switch wired in: `regen_goldens` (report) and the suite.
+
+## 7. Measured (2026-10-15)
+
+**The lab switch** (`station::latent_heat::with_latent_heat`; `pub` λ in `science.rs`; the lab
+`water_on_fast_step` refuses a build carrying the recorder) and its tests,
+`rust/crates/station/tests/latent_heat.rs`: the window identity over four days, the switch's own pieces,
+the two refusals, a fresh build only. **Liveness:** the heat × (1 + 1e-9) turns the identity red.
+
+**The probe** (`chamber_latent_heat -- --latent [--surroundings=…]`, which also gained the re-sow days and
+the crop at each maturity). Logs: `W:\temp\claude\latent-heat-build\` — `base3_outdoor.txt` /
+`latent3_outdoor.txt` (the reference walls, without / with), `base_structure.txt`,
+`latent_{structure,cabin,space}.txt`.
+
+| | measured | predicted | grade |
+|---|---|---|---|
+| Q1 window identity | max relative **5.6e-15** over 19 504 windows; booked = λE = **6.948 GJ** | ≤ 1e-12 | **held** |
+| Q2 heater | **1.340 GJ** (+1.034); warm minutes **584 549** | 1.0–1.3 (+0.7–1.0); ~330–370 k | **missed high**: the heater also runs by DAY (below) |
+| Q3 cooler | **2.586 GJ** (cold 0.946, warm 1.640) | 2.2–2.6 | held, at the edge |
+| Q4 shared coil | cooler + latent > 200 W: warm **1816** min (cooler alone at run 0: 1800), cold 720; the cooler alone: warm **0**, cold 1770 | ≈ run 0's saturation; cooler alone < 100 | **held** — the cooler's warm saturation vanished and the coil's did not: the side note was right |
+| Q5 heater saturation, reference walls | warm 1237 min, cold 810 (run 0 **1250 / 810**: the warm-ups); warm minimum **−10.89 K** (−11.18) | none beyond the warm-ups; 11.2–11.8 K | held; the dip **missed** (shallower) |
+| Q6 the plants | **each season one day longer** (re-sown day 140, 280 … 1120; run 0 139, 278 … 1112); grain at maturity **+3.4 %** in every season (14.576 → 15.070 mol C), leaf −1.7 %, stem +0.5 %, root +0.2 %; water −0.19 %; the day-1220 end state is **8 days earlier in its season** (storage 0.895 → 0, leaf −18 %) | carbon ≤ 0.1 %, water ≤ 0.3 % | **MISSED** (mechanism below) |
+| Q7 battery | **−1.034 GJ** (1.0865e10 → 9.831e9); `rationed` 0 | −0.6–1.0 GJ | missed narrowly high (Q2's heater) |
+| Q8 node colder | 0 minutes | 0 | held |
+| Q9 vapour bound | 0.000–3.363 kg: the air **starts dry** (0 kg at step 0), so λ × range **8.24 MJ**; 0.8 % of the heater's rise | 5–6 MJ; < 1 % | the range missed (the dry start), the conclusion held |
+| Q10 first window | 1.26e-3 kg, dark, **0.57 W** | < 1 W | held: the chamber's start stays |
+| Q11 structure walls | the heater saturates **547 113** warm min; the room falls to **−49.4 K**; **the battery empties** (1.8e4 J) and the fast side **rations 763 338 times** | saturates; −0.5–5 K; battery 0.4–1.0e9 J above zero | **REFUTED** |
+| Q12 cabin, space | heater saturated only at the warm-ups (warm 1143 / 1431 min, cold 810); no rationing; heater 0.98 / 1.92 GJ | none beyond the warm-ups | held |
+
+**Why the heater runs by day (Q2).** The lit crop's latent power averages 140 W against the lamp's 178 W
+over a lit window, but with a grown canopy it exceeds the lamp less the walls, so the room needs heat with
+the lamp on (heater 37.7 W mean over its warm minutes, latent 106 W over them). Penman–Monteith's
+air-dryness term does it: the dehumidifier holds the air at 75 %, and with `ra` 7.5 the dry air drives
+transpiration beyond what the light pays for — the energy comes out of the room's air, and the heater
+replaces it. This is the "dehumidify, then reheat" cost a controlled-environment room's HVAC pays.
+
+**Why the season is a day longer (Q6).** The room's temperature by day falls by the deadbeat offset of
+~140 W less input (`input·τ/C`: ~0.07 K above the setpoint → ~0 or just below), a ~0.3 % cut in the crop's
+thermal time; ripening is checked at day ends, so the season crosses into one more whole day, and that day
+is grain fill (+3.4 %). The size is a step of the day-end check, not a smooth response to 0.05 K: a run
+whose maturity sat further from a day boundary would have moved by 0 days.
+
+**Why the structure walls empty the battery (Q11).** They lose ~184 W to the node around the clock. The
+lamp's daytime surplus paid part of that; evaporation now takes the surplus, so the heater must find the
+evaporation's whole heat as well — ~66 W more on average, ~6.3 GJ over the run (heater 9.69 → 16.03 GJ)
+against a battery that ended 1.48 GJ above zero. Not a fault of the form: that lab room cannot afford its
+own transpiration. Its slow test (`chamber_walls.rs`,
+`the_structures_heater_does_not_empty_the_battery_within_the_horizon`) asserts the opposite and would go
+red at adoption.
