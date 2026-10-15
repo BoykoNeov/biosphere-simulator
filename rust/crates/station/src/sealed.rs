@@ -641,6 +641,38 @@ pub fn sealed_fast_resolver(
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }
 
+/// LAB-ONLY (`docs/plans/post-roadmap-room-lamp-heat.md`): `fast_resolver` with both `lamp_power`
+/// twins replaced by the lamp's draw switched with its light ([`crate::lighting::switched_lamp_draw`],
+/// at the phase's on-power and photoperiod) in place of the daily average. ⚠ It REPLACES the twins,
+/// so apply it before any perturbation of the lamp's draw.
+pub fn with_switched_lamp_heat(
+    fast_resolver: SourceResolver,
+    scenario: &SealedStationScenario,
+) -> Result<SourceResolver, SimError> {
+    let (mut forcings, shared) = fast_resolver.into_parts();
+    let efficacy = crate::params::lamp().photon_efficacy;
+    let groups = crate::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day)?;
+    for phase in Phase::BOTH {
+        let name = crate::sowing::twin(LAMP_POWER_VAR, phase);
+        if forcings.remove(&name).is_none() {
+            return Err(SimError::Reference(format!(
+                "the fast resolver carries no {name:?} to switch"
+            )));
+        }
+        forcings.insert(
+            name,
+            crate::lighting::switched_lamp_draw(
+                scenario.lamp_power(phase, efficacy),
+                scenario.photoperiod_hours(phase) as f64 * 3600.0,
+                scenario.bio_dt,
+                scenario.bio_steps_per_day,
+                groups.slow,
+            ),
+        );
+    }
+    SourceResolver::new(forcings, shared)
+}
+
 /// The chamber's setpoint (K) on the fast step, as its two phase twins: the cold program's and
 /// `chamber.yaml`'s warm one ([`SealedStationScenario::chamber_setpoint`]). The fast registry's
 /// sowing clock selects between them by the fast state's `n` — which leads the plants' day by

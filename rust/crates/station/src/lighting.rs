@@ -154,6 +154,39 @@ pub(crate) fn lamp_net_radiation_path(on_par: f64, photoperiod_s: f64) -> Schedu
     lamp_light_path(lamp_net_radiation(on_par), photoperiod_s)
 }
 
+/// The lamp's DRAW switched with its light — LAB-ONLY until adopted
+/// (`docs/plans/post-roadmap-room-lamp-heat.md`): `on_w` on the plant step's top-hat, read on the
+/// FAST side, where today's lamp draws the daily average on every minute.
+///
+/// ⚠ **The windows are the group's, behind `n`.** The interleaved day runs a group's
+/// `slow_per_group` plant steps (moving `n` past them) and then its fast steps, which lie in those
+/// plant windows, `n − slow_per_group .. n − 1` ([`crate::driver::day_groups`]; the plant step
+/// records its window, [`crate::gas_exchange`]). Keyed on `n` the room would heat a group before
+/// the light came on. The draw is the mean of those windows' top-hats — exactly window `n − 1` when
+/// a group is one plant step (the sealed station's 90 minutes); the group's mean when it is more
+/// (the lighting seam's 3 power hours over 2 plant windows, where `n` cannot tell the hours apart).
+/// Each window is read a whole day later (`+ bio_steps_per_day`): the same time of day, and no
+/// underflow at small `n`. A day's energy is `on_w · photoperiod_s`, the daily average's, to
+/// rounding.
+pub fn switched_lamp_draw(
+    on_w: f64,
+    photoperiod_s: f64,
+    bio_dt: f64,
+    bio_steps_per_day: u64,
+    slow_per_group: u64,
+) -> Schedule {
+    Box::new(move |n, _fast_dt| {
+        let sum: f64 = (1..=slow_per_group)
+            .map(|back| {
+                let t = (n + bio_steps_per_day - back) as f64 * bio_dt;
+                light_path::top_hat_window_mean(t - t.trunc(), bio_dt, on_w, photoperiod_s)
+                    .unwrap_or(0.0)
+            })
+            .sum();
+        sum / slow_per_group as f64
+    })
+}
+
 /// The biosphere forcing resolver: weather-driven, with `PAR`, net radiation and `daylength`
 /// from the lamp.
 ///
@@ -198,6 +231,26 @@ pub fn lighting_power_resolver(scenario: &LightingScenario) -> Result<SourceReso
     forcings.insert(
         LAMP_POWER_VAR.to_string(),
         constant(lamp_average_power(scenario))?,
+    );
+    SourceResolver::new(forcings, std::collections::HashMap::new())
+}
+
+/// LAB-ONLY (`docs/plans/post-roadmap-room-lamp-heat.md`): [`lighting_power_resolver`] with the
+/// lamp's draw switched with its light ([`switched_lamp_draw`]) in place of the daily average.
+pub fn lighting_power_resolver_switched(
+    scenario: &LightingScenario,
+) -> Result<SourceResolver, SimError> {
+    let groups = crate::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day)?;
+    let mut forcings = std::collections::HashMap::new();
+    forcings.insert(
+        LAMP_POWER_VAR.to_string(),
+        switched_lamp_draw(
+            scenario.lamp_power_w,
+            scenario.photoperiod_hours as f64 * 3600.0,
+            scenario.bio_dt,
+            scenario.bio_steps_per_day,
+            groups.slow,
+        ),
     );
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }

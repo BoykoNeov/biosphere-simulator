@@ -45,7 +45,7 @@ top-hat: for phase `p`,
 | Reader | Today | Under the switch | Why |
 |---|---|---|---|
 | `sealed::sealed_fast_resolver` (`lamp_power` twins) | daily average | **switched** | the change |
-| `lighting::lighting_power_resolver` (the standalone `lighting` seam) | daily average | **switched** | one lamp, one law; its energy goes to boundary sinks, no room |
+| `lighting::lighting_power_resolver` (the standalone `lighting` seam) | daily average | **switched**, as the group's mean | one lamp, one law; its energy goes to boundary sinks, no room. ⚠ Its 24 power hours run in 8 groups of 3 over 2 plant windows, and `n` cannot tell a group's hours apart, so the draw is the mean of the group's two windows (found while building; the sealed station's group is one window) |
 | `chamber::chamber_heat0` via `sealed.rs` (the chamber's start) | steady state of the average | the **first window's** draw (0: window 0 is dark) | the start assumes a constant input; the first minutes are dark |
 | `sealed::sealed_node_heat` (the thermal node's start) | the average | **kept** | the node's time constant is days; its start is a daily-mean equilibrium, and the switch keeps the daily mean |
 | `lamp_shed.rs` (lab) `nominal` | the average | the program's switched draw | otherwise every group compares a switched delivery with an averaged nominal; dark groups need a stated rule (0/0) |
@@ -98,3 +98,73 @@ scope question has no answer on physics.
    (lamp, walls, heater, cooler; heater and saturated minutes), the chamber temperature's range, the
    dark windows' unfunded heat, the end state against the averaged run.
 3. A scratch worktree with the switch wired in: `regen_goldens` (report) and the suite.
+
+## 7. Measured (2026-10-15)
+
+**The lab switch** (`station::sealed::with_switched_lamp_heat`, `station::lighting::switched_lamp_draw`,
+`lighting_power_resolver_switched`; tests `rust/crates/station/tests/room_lamp_heat.rs`). **L5 held**: the
+fast minutes after plant step `k` draw the on-power × plant window `k`'s lit share (to 1e-12, both phases,
+across a day boundary); a day's draw is the average's energy to 1e-12; the lighting seam's 3-hour groups
+draw the light of their two windows.
+
+**The sealed station, 1220 days** (`chamber_latent_heat`, averaged against `--switched`). Controls in both:
+`rationed` 0/0, legs re-applied 0 mismatches, water books closing to 7e-12 kg; the averaged run byte-exact to
+its golden.
+
+| | averaged (today) | switched |
+|---|---|---|
+| lamp into the room, warm lit / warm dark windows | 133.3 / 133.3 W | 177.8 / **0** W (partly lit windows count as lit) |
+| heater-on minutes, warm / cold phase | 421 / 810 | **257 040 / 38 310** |
+| heater energy, warm / cold | 5.0 / 9.7 MJ | 287.5 / 18.4 MJ |
+| cooler energy, warm / cold | 7145 / 1064 MJ | 7422 / 1074 MJ |
+| warm phase: room above setpoint, max / minutes > 0.1 K / cooler at capacity | +0.053 K / 0 / 0 min | **+0.131 K / 1208 / 1800 min** |
+| warm phase: room below setpoint, deepest (the warm-up after each cold period) | −6.46 K | **−11.18 K** |
+| warm dark windows: crop latent / heat in | 19.75 / 133.66 W | 19.62 / 18.54 W |
+| dark windows whose water heat is not covered | 0 | 1787 warm (0.10 GJ), 17 cold |
+| water through the root zone | 2832.3 kg | 2841.3 kg (+0.32 %) |
+| end crop: leaf / stem / root / grain C | 6.5068 / 4.2908 / 4.4345 / 0.8963 | 6.5137 / 4.2919 / 4.4390 / 0.8953 (≤ 0.11 %) |
+| end battery | 1.1150e10 J | 1.0865e10 J (−2.6 %, the heater) |
+| end node | 1.71331e9 J | 1.71533e9 J (+0.12 %) |
+
+**Graded.** L5 held. **L2 held**: carbon moves, ≤ 0.11 % on every crop stock. **L3 held**: the heater fires
+on the warm nights (257 040 minutes against 421); the cooler removes 3.9 % more in the warm phase, not "about
+the same" — the heater's night heat leaves through it by day. **L4 held, smaller than feared**: the cooler
+saturates 1800 minutes (30 hours in 3.3 years) and the room peaks 0.13 K above its setpoint — the warmest
+outdoor day is 22.20 °C, 0.05 K above the setpoint. **L6 held** (no rationing). L1 is graded at adoption.
+
+**Not predicted:** the warm-up after each cold period is slower — the room dips to 11.2 K below its new
+setpoint, where the averaged lamp's night heat (133 W on top of the 200 W heater) held it to 6.5 K. That is
+the real lamp: off at night, so only the heater warms the room in the dark.
+
+**No fork** (§5): the cooler's saturation is 0.13 K for 30 hours, nothing rations or sheds, and the form has
+no free choice — the lamp is on when its light is on. So it is adopted (§8).
+
+**For the latent-heat follow-on** (`post-roadmap-chamber-latent-heat.md`): with the room's heat switched, the
+dark windows' water heat is now booked against what actually comes in (the walls and the heater): 1787 warm
+dark windows are short, 0.10 GJ over the run.
+
+## 8. Adoption (2026-10-15)
+
+### 8a. What changes
+
+* `sealed_fast_resolver` and `lighting_power_resolver` carry the switched draw (the phase twins on the
+  sealed station). The lab switch inverts: `with_averaged_lamp_heat` restores the average for instruments
+  that reproduce older records; `lighting_power_resolver_switched` folds into `lighting_power_resolver`.
+* `chamber_heat0`'s start input is the first window's draw (0: window 0 is dark), not the average.
+* `lamp_shed` (lab): `nominal` is the program's switched draw; a group with nothing owed (dark) delivers 1.
+* `sealed_node_heat` keeps the average (§2).
+* The tests that pin the average by name are restated to the switched lamp, not deleted.
+
+### 8b. Predictions (written before the resolvers change)
+
+* **A1** `regen_goldens`: `sealed_station_state` moves; `lighting_state` moves at most at rounding in
+  `power.battery`, `boundary.light_used` and `boundary.waste_heat` only, or not at all; the other 18
+  byte-identical (the energy-drift golden has no lamp).
+* **A2** `sealed_station_state`'s moved keys include carbon, water, energy and the chamber; its end
+  state matches the §7 switched run's to the digits printed there.
+* **A3** Manifests: the station manifest's `golden_sha256` rows for the moved goldens only; biosphere and
+  authoring byte-identical; `simcore` untouched.
+* **A4** Before regeneration the reds are: the goldens' byte and band checks, `chamber_heat`'s
+  failed-cooler linear warming and nominal day-end checks, `chamber_walls`' lamp-energy saving,
+  `sowing_clock`'s average-draw check, and the lab `lamp_shed` tests that read a delivery or a nominal.
+  Others are findings.

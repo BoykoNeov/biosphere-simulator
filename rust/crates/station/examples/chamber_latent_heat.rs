@@ -11,6 +11,11 @@
 //! state is byte-exact to the tree's own `sealed_station` golden. Writes nothing.
 //!
 //! Run from `rust/`: `cargo run --release -q -p station --example chamber_latent_heat`.
+//!
+//! `-- --switched`: the room's lamp heat switched with the light (LAB-ONLY,
+//! `docs/plans/post-roadmap-room-lamp-heat.md`, `station::sealed::with_switched_lamp_heat`) in place of
+//! the daily average. The golden control then reports DIFFERS by design; the room's temperature and its
+//! cooler and heater are printed for both.
 
 use std::collections::BTreeMap;
 
@@ -22,12 +27,16 @@ use simcore::flow::FlowResult;
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
-use station::chamber::{CHAMBER, CHAMBER_HEATER, CHAMBER_WALL};
+use station::chamber::{
+    chamber_temperature, CHAMBER, CHAMBER_COOLING, CHAMBER_HEATER, CHAMBER_SETPOINT_VAR,
+    CHAMBER_WALL, OUTDOOR_TEMP_VAR,
+};
 use station::driver::{DayOrder, Side, TwoRate};
 use station::flows::LAMP;
 use station::scenario::{sealed_station_scenario, Phase};
 use station::sealed::{
     build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
+    with_switched_lamp_heat,
 };
 use station::sowing::{sown_step, twin};
 
@@ -105,8 +114,19 @@ struct Probe {
     mismatched: u64,
     first_mismatch: Option<String>,
     firings: u64,
+    room: Room,
 }
 
+/// The room's temperature against its setpoint, and its cooler, per phase ("cold" / "warm").
+#[derive(Default)]
+struct Room {
+    /// (minutes, min T − setpoint, max T − setpoint, minutes > 0.1 K above, cooler-at-capacity minutes,
+    /// cooler J removed) by phase.
+    by_phase: BTreeMap<&'static str, (u64, f64, f64, u64, u64, f64)>,
+    /// The warmest outdoor air the walls faced (°C), and the minutes it was above the setpoint.
+    outdoor_max_c: f64,
+    outdoor_above_minutes: u64,
+}
 impl Probe {
     fn close(&mut self) {
         if !self.w.open {
@@ -196,7 +216,14 @@ fn main() {
     .expect("build_sealed_station");
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
+    let switched = std::env::args().any(|a| a == "--switched");
+    let chamber = station::params::chamber();
     let fast_r = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
+    let fast_r = if switched {
+        with_switched_lamp_heat(fast_r, &scenario).expect("switched")
+    } else {
+        fast_r
+    };
     let reset = sealed_reset_hook(&scenario);
     let two = TwoRate {
         slow: &bio,
@@ -212,6 +239,10 @@ fn main() {
     let vapour0 = state.stocks[WATER_VAPOR].amount;
     let mut p = Probe {
         min_crop_kg: f64::INFINITY,
+        room: Room {
+            outdoor_max_c: f64::NEG_INFINITY,
+            ..Room::default()
+        },
         ..Probe::default()
     };
     let mut observe = |side: Side, before: &State, after: &State| match side {
@@ -269,6 +300,37 @@ fn main() {
                 }
             }
             p.w.seconds += two.fast_dt;
+            let key = if p.w.cold { "cold" } else { "warm" };
+            let bound = two.fast_resolver.bind(before, two.fast_dt);
+            let phase = if p.w.cold { Phase::Cold } else { Phase::Warm };
+            let set = bound.get(&twin(CHAMBER_SETPOINT_VAR, phase)).expect("setpoint");
+            let outdoor = bound.get(OUTDOOR_TEMP_VAR).expect("outdoor");
+            p.room.outdoor_max_c = p.room.outdoor_max_c.max(outdoor);
+            if outdoor + 273.15 > set {
+                p.room.outdoor_above_minutes += 1;
+            }
+            let dev = chamber_temperature(after.stocks[CHAMBER].amount, &chamber) - set;
+            let cooled = -results
+                .iter()
+                .zip(two.fast.registry().flows())
+                .filter(|(_, f)| f.id() == CHAMBER_COOLING)
+                .map(|(r, _)| leg_on(r, CHAMBER))
+                .sum::<f64>();
+            let r = p
+                .room
+                .by_phase
+                .entry(key)
+                .or_insert((0, f64::INFINITY, f64::NEG_INFINITY, 0, 0, 0.0));
+            r.0 += 1;
+            r.1 = r.1.min(dev);
+            r.2 = r.2.max(dev);
+            if dev > 0.1 {
+                r.3 += 1;
+            }
+            if cooled >= chamber.cooling_capacity * two.fast_dt * (1.0 - 1e-12) {
+                r.4 += 1;
+            }
+            r.5 += cooled;
         }
     };
     let (states, totals) = two
@@ -296,6 +358,10 @@ fn main() {
     // Which value the sealed flow reads is the tree's (the golden control pins the tree); both
     // fields print, since the commit before the adoption carries the chamber's 7.5 read by nothing.
     let t = domains::biosphere::params::biosphere().transp;
+    println!(
+        "lamp heat: {}",
+        if switched { "SWITCHED with the light (lab)" } else { "daily average (the reference)" }
+    );
     println!(
         "sealed station, {} days; transpiration.yaml: open-field ra {} s/m, chamber ra {} s/m",
         states.len() - 1,
@@ -384,4 +450,27 @@ fn main() {
             latent_j / 1e6
         );
     }
+
+    // --- the room (docs/plans/post-roadmap-room-lamp-heat.md) ---
+    println!(
+        "
+the room against its setpoint (minutes; T − setpoint min / max K; minutes > 0.1 K above; cooler at capacity; cooler MJ):"
+    );
+    for (k, (n, lo, hi, above, sat, cooled)) in &p.room.by_phase {
+        println!(
+            "  {k:<5} {n:>9} {lo:>+9.4} {hi:>+9.4} {above:>9} {sat:>9} {:>10.2}",
+            cooled / 1e6
+        );
+    }
+    println!(
+        "outdoor air: warmest {:.2} °C; minutes above the setpoint {}",
+        p.room.outdoor_max_c, p.room.outdoor_above_minutes
+    );
+    use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C, STORAGE_C};
+    use domains::power::BATTERY;
+    println!("end state:");
+    for k in [LEAF_C, STEM_C, ROOT_C, STORAGE_C, SOIL_WATER, CONDENSATE, BATTERY, CHAMBER, domains::thermal::NODE] {
+        println!("  {k:<32} {:.10e}", end.stocks[k].amount);
+    }
+    println!("  harvested (food store)           {:.10e}", end.stocks.get("crew.food_store").map_or(f64::NAN, |s| s.amount));
 }
