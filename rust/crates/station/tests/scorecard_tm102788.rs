@@ -486,8 +486,8 @@ fn loader_night_rule() -> NightRule {
 }
 
 /// One step's by-hand crop water (kg m⁻² per step) under `night` and the night rule `rule` (the
-/// loader's, [`loader_night_rule`]) — the lit share is read only under the lab
-/// `NightRule::LitShare`, as the model reads it.
+/// loader's, [`loader_night_rule`]) — the lit share is read only under `NightRule::LitShare` (the
+/// loader's since 2026-10-16), as the model reads it.
 #[allow(clippy::too_many_arguments)]
 fn step_water(
     rn: f64,

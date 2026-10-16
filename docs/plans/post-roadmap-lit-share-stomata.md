@@ -287,7 +287,9 @@ wet steps), not a lower drying-stage rate. If instead the events are unchanged a
 drying stage, the hypothesis is wrong and is recorded as such.
 
 **Traced 2026-10-16** (the probe's new watering / drying-stage count, run on the tree before the
-loader line changed and after it; the after run reproduces §5a's flipped probe line for line — B3):
+loader line changed and after it; the after run reproduces §5a's flipped probe line for line — B3). The
+two outputs are kept at `W:\Claude_projects\space-station\sources\temp-evidence\lit-share-build\`
+(`litshare_adopt_probe_base.txt`, `litshare_adopt_probe_split.txt`; git-ignored, local):
 
 | | binary | split | change |
 |---|---|---|---|

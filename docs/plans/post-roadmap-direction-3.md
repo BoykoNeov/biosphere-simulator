@@ -584,7 +584,9 @@ hit beyond the notes above; it is the night-stomata item's stated bias, not a §
 struck and nothing added. It bears on the 2026-10-01 battery note only if adopted: the heater would draw
 0.87 GJ, not 1.34 (~6.2 % of the lamp's 1.41e10 J), and the same scaling moves "dark near day 1736" to
 roughly day 1635 rather than 1590 — later, still past the horizon (a scaling, not a run; the lab run's
-battery ends 4.8 % fuller). Nothing in §3 is re-proposed.
+battery ends 4.8 % fuller). Nothing in §3 is re-proposed. **Adopted the same day** (that log's
+"ADOPTED" block): the 0.87 GJ stands, measured on the adopted tree; the weather's builds take φ = 1 as a
+staging step toward the user's choice of a real day/night share outdoors, filed there as the next item.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

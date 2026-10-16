@@ -223,7 +223,7 @@ pub fn lighting_bio_resolver(
         lamp_net_radiation_path(par, photoperiod_s),
     );
     forcings.insert(DAYLENGTH_VAR.to_string(), constant(photoperiod_s)?);
-    // The lamp's lit share (read only under the lab lit-share night rule); no lamp, no lit share.
+    // The lamp's lit share (read by the loader's lit-share night rule); no lamp, no lit share.
     forcings.insert(
         LIT_FRACTION_VAR.to_string(),
         if with_lamp {

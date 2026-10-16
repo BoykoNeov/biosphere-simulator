@@ -615,7 +615,7 @@ pub fn sealed_bio_resolver(
         constant(cold_s)?,
         constant(warm_s)?,
     );
-    // The lamp's lit share, phase by phase (read only under the lab lit-share night rule).
+    // The lamp's lit share, phase by phase (read by the loader's lit-share night rule).
     insert_twins(
         &mut forcings,
         LIT_FRACTION_VAR,

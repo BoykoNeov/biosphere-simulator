@@ -1026,7 +1026,9 @@ pub enum NightStomata {
     /// On a step with net radiation `≤ 0` the canopy conducts `f` of its daytime value, so the
     /// surface resistance is the day value `/ f`. The day/night rule is ASCE-EWRI (2005)'s hourly
     /// one (*"during daylight (when Rn > 0)"*, via Snyder 2002), applied to the model's own day
-    /// resistance; partly lit steps count as day, as that rule has it. Under Szeicz–Long
+    /// resistance. Under the loader's [`NightRule::LitShare`] (2026-10-16) a partly lit step is split
+    /// into its lit and dark time; under the lab's `NetRadiation` it counts as day, as ASCE's rule
+    /// on the step's mean has it. Under Szeicz–Long
     /// (`rc = rst / L`) a canopy ratio equals the leaf ratio, so `f` is the leaf's.
     Closing(f64),
 }
