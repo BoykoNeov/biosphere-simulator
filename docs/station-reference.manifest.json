@@ -159,7 +159,7 @@
     },
     "lighting": {
       "golden": "lighting_state.json",
-      "golden_sha256": "47c7088a5d5bf845b6dd512a60c71cd9d913d142777b6a8b03e3db135c36c2ac",
+      "golden_sha256": "e38a577f5a9a3e6885a45cf1d5dcbdb6f8a0eea4037b2448de6134b92aafeb65",
       "scenario": "LIGHTING_SCENARIO (P6.5 Power\u2192biosphere lamp)"
     },
     "power_bounded_soc": {
@@ -179,7 +179,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "24259fde855988b07f757a8a10f61ab39b76fb955b375025270d17eca3c736d7",
+      "golden_sha256": "c3d4d2eec40f53d893a096fa1f140140a104f6c5fd6182757f292938226663f6",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

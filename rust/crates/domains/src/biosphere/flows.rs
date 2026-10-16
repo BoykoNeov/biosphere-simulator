@@ -789,8 +789,9 @@ pub struct CanopyRead {
     /// Whether the stomata close in the dark — `Closing` at the booting ratio on every frozen build
     /// since 2026-10-15; `Open` is lab-only (`docs/plans/post-roadmap-night-stomata.md`).
     pub night: science::NightStomata,
-    /// The step's lit-share forcing under the lab [`science::NightRule::LitShare`]
-    /// (`docs/plans/post-roadmap-lit-share-stomata.md`); `None`, the loader's, is the binary rule.
+    /// The step's lit-share forcing under [`science::NightRule::LitShare`], the loader's since
+    /// 2026-10-16 (`docs/plans/post-roadmap-lit-share-stomata.md` §6); `None`, the lab's, is the
+    /// binary rule.
     pub lit_var: Option<String>,
 }
 

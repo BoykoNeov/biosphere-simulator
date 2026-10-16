@@ -32,8 +32,8 @@ use domains::biosphere::flows::Irrigation;
 use domains::biosphere::science::N2_MOLAR_MASS_KG_PER_MOL;
 use domains::biosphere::science::{fraction_transpirable, transpirable_capacity};
 use domains::biosphere::stocks::{
-    CARBON_POOL, CHAMBER_INERT, IRRIGATION_VAR, O2_POOL, RN_VAR, ROOTED_DEPTH, SOIL_WATER,
-    TEMP_VAR, WATER_VAPOR,
+    CARBON_POOL, CHAMBER_INERT, IRRIGATION_VAR, LIT_FRACTION_VAR, O2_POOL, RN_VAR, ROOTED_DEPTH,
+    SOIL_WATER, TEMP_VAR, WATER_VAPOR,
 };
 use domains::biosphere::system::{soil_surface_account_with, weather_shared, SOIL_SURFACE_ACCOUNT};
 use domains::crew::{CrewParams, FECAL_WASTE, WATER_STORE};
@@ -100,16 +100,19 @@ pub struct AirSplit {
 pub const WATER_LOSS_FLOWS: [&str; 2] = ["biosphere.transpiration", "biosphere.condensation"];
 
 /// The forcings the water-loss pair reads, as recorded by the plant step: temperature (by
-/// [`PlantWindowRecorder`](crate::gas_exchange::PlantWindowRecorder)) and net radiation (by [`NetRadiationRecorder`]).
-pub const WATER_LOSS_WINDOW: [&str; 2] = [TEMP_VAR, RN_VAR];
+/// [`PlantWindowRecorder`](crate::gas_exchange::PlantWindowRecorder)), and net radiation and the lit
+/// share (by [`NetRadiationRecorder`]). The lit share since the split's adoption
+/// (`docs/plans/post-roadmap-lit-share-stomata.md` §6): every minute of a plant step reads that
+/// step's MEAN net radiation, so it splits by that step's lit share, as the plant step does.
+pub const WATER_LOSS_WINDOW: [&str; 3] = [TEMP_VAR, RN_VAR, LIT_FRACTION_VAR];
 
 /// The lab recorder's aux-process id.
 pub const NET_RADIATION_RECORDER: &str = "station.plant_window_rn";
 
-/// **LAB-ONLY** — the plant-step aux process that records the window's net radiation under
-/// [`window_key`]`(RN_VAR)`, as [`PlantWindowRecorder`](crate::gas_exchange::PlantWindowRecorder) records PAR and temperature. A recorder of
-/// its own so the reference's aux keys do not change; it records net radiation ONLY, since the
-/// aux channel is additive and a second writer of the temperature key would double it.
+/// **LAB-ONLY** — the plant-step aux process that records the window's net radiation and lit share
+/// under [`window_key`]`(RN_VAR)` and [`window_key`]`(LIT_FRACTION_VAR)`, as [`PlantWindowRecorder`](crate::gas_exchange::PlantWindowRecorder) records PAR and
+/// temperature. A recorder of its own so the reference's aux keys do not change; it records those two
+/// ONLY, since the aux channel is additive and a second writer of the temperature key would double it.
 pub struct NetRadiationRecorder;
 
 impl AuxProcess for NetRadiationRecorder {
@@ -127,9 +130,14 @@ impl AuxProcess for NetRadiationRecorder {
         env: &dyn Environment,
         _dt: f64,
     ) -> Result<BTreeMap<String, f64>, SimError> {
-        let key = window_key(RN_VAR);
-        let old = snapshot.aux.get(&key).copied().unwrap_or(0.0);
-        Ok(BTreeMap::from([(key, env.get(RN_VAR)? - old)]))
+        [RN_VAR, LIT_FRACTION_VAR]
+            .into_iter()
+            .map(|var| {
+                let key = window_key(var);
+                let old = snapshot.aux.get(&key).copied().unwrap_or(0.0);
+                Ok((key, env.get(var)? - old))
+            })
+            .collect()
     }
 }
 

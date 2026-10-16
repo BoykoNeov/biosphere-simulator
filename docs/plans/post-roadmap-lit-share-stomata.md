@@ -211,3 +211,131 @@ worktree: `minute_transpiration.rs`'s one-day run stops at its first fast step w
 fast step reads "lit_fraction", which is not in its recorded window"* — and would need the lit share
 recorded or an explicit refusal; (3) the unfreeze ceremony for the 2 station goldens and
 their manifest rows; (4) the soil's 42 kg traced before it is described as the watering trigger's.
+
+## 6. Adoption (opened 2026-10-16)
+
+**The user's answers** (2026-10-16): **adopt**; the minute water path **records the lit share** (as
+recommended); and for the open field and the weather-lit builds **a real day/night share**, against the
+recommendation of φ = 1 — then, asked how to take it, **stage it** (recommended). So:
+
+* **This adoption** takes the split for every lamp-lit build. The weather's builds get **φ = 1 for now**:
+  exactly what they do today (their net radiation is a daily mean, > 0 every step, so the binary rule
+  never fired there either), recorded as a **temporary step toward the user's choice, not a decision
+  against it**.
+* **The next item** is *"the open field gets a night"*, lab-only first. It is not a forcing line: the
+  built rule refuses `Rn > 0` with φ = 0 (§1), so a real night needs the weather's net radiation given a
+  within-day shape — and since its temperature and deficit are daily means too, whether they need a
+  daily cycle as well is that item's first scoping question (a night with daytime air may be a
+  half-built form). It is a **biosphere** unfreeze (likely all 7 biosphere goldens and every open-field
+  station golden), so it is priced in the lab before any decision. Starting source: ASCE-EWRI's hourly
+  method.
+
+**⚠ §1a was wrong about the minute path** (advisor, 2026-10-16). It said the binary rule is "already
+nearly exact" there. It is not: `water_on_fast_step` reads `WATER_LOSS_WINDOW = [TEMP_VAR, RN_VAR]`,
+the plant step's **recorded** window, so every minute of a 1.5-h step reads the step's mean net
+radiation and carries the reference's partly lit bias unchanged.
+
+### 6a. What changes
+
+* **The loader line** (`params.rs`): `night_rule: NightRule::LitShare`. No YAML key, flow, aux or param
+  set changes.
+* **The weather** (`system::weather_forcings`, a frozen biosphere file): supplies `lit_fraction = 1`, a
+  constant, with the staging stated beside it. No biosphere manifest key reads the forcing set (its
+  `forcing` block hashes the light path and the weather fixture), so the manifest cannot move; the
+  biosphere goldens are the pin.
+* **The minute path** (`air_split`): `NetRadiationRecorder` also records `window_key(LIT_FRACTION_VAR)`
+  (the same additive pattern; it is the only writer of that key), and `WATER_LOSS_WINDOW` gains
+  `LIT_FRACTION_VAR`, so each minute splits as its plant step does.
+* **Every build that reaches the flow** supplies φ: the lamp builds (`lighting_bio_resolver`, the sealed
+  station's twins, the TM scorecard) already; everything else builds on `weather_forcings` (the
+  greenhouse, the open fields, the weather-lit jars, and through them the authoring and Godot
+  sessions). The lamp-failure perturbation zeroes the net radiation and not φ: the `Rn ≤ 0` guard
+  makes that step dark.
+* **Tests** — restated, none deleted. `the_loader_keeps_the_binary_rule` → pins `LitShare`.
+  `a_build_without_the_lit_share_fails_under_the_switch` → the weather now supplies φ, so it takes the
+  forcing **out** of the resolver to keep its claim (no silent fallback), and a new assertion pins the
+  open field under the adopted loader bit-identical to the binary rule over its first days. The reach
+  test's baseline was named `NetRadiation` in its own commit first (`eaa8f16`). `minute_transpiration.rs`:
+  the recorder test checks the lit-share key too, and its raw-flow window resolver serves φ.
+* **Wording**: the "lab-only" comments on `NightRule`, `LIT_FRACTION_VAR`, the lamp forcing, the flow
+  field, `lab::with_night_rule` and the loader say what the loader now sets.
+* **Goldens and manifests**: `lighting_state`, `sealed_station_state`; their two station-manifest rows.
+* **The probe** (`examples/chamber_latent_heat.rs`) gains a watering / drying-stage count, for the
+  soil's 42 kg (§6c).
+
+### 6b. Predictions (written before the loader line changed)
+
+| | prediction |
+|---|---|
+| B1 | `regen_goldens` (report): exactly `lighting_state` and `sealed_station_state` differ; the other 18 identical, the 7 biosphere goldens and `sealed_energy_drift_summary` among them — the scratch worktree's §5c, which made the same two edits |
+| B2 | `lighting_state` moves in water keys only; `sealed_station_state` in water, energy, and carbon / nitrogen at 1–2e-4 through `thermal_time` (§5c) — **not** "water only" |
+| B3 | the probe reproduces §5a's flipped column to its printed digits (evaporated 2594.09 kg, heater 0.872 GJ, latent 6.356 GJ) |
+| B4 | TM 102788: W1 **0.9283**, W2 0.849, model / hand 0.9962; U1, C1, B1 unchanged; `scorecard_tm102788` still ~2 s |
+| B5 | manifests: station REWRITTEN in exactly the two `golden_sha256` rows; biosphere and authoring `unchanged` |
+| B6 | before regeneration the reds are: the two restated tests' old forms (gone once restated), `golden_regression` and `tier_contract` (both on `lighting_state`), and in `--ignored` the slow test(s) reading `sealed_station_state`. `manifest_writer` stays green until the goldens are rewritten (it hashes the committed files), then goes red until the manifest is. After: full suite, `--ignored`, clippy all green |
+| B7 | the minute path runs under the adopted loader; its tests green after the stated restatement; no golden reads it |
+| B8 | no science gate moves: no biosphere band or floor reads a lamp-lit build, and the weather builds are bit-identical |
+
+### 6c. The soil's 42 kg (traced before any golden moves)
+
+Hypothesis (§5a, not yet shown): the crop drinks less, so the root zone reaches the FAO-56 trigger less
+often, the sealed station's watering (`EventRecycling`, condensate to soil) fires fewer times, and the
+surface spends more plant steps drying (Stage II) than wet (Stage I). **Prediction:** fewer trigger
+events and less water delivered under the split (roughly the −11.6 % fall in recycled water, §5a's legs
+2689 → 2377 kg); more drying steps; and most of the −41.6 kg in the **wet-surface** stage's total (fewer
+wet steps), not a lower drying-stage rate. If instead the events are unchanged and the fall is in the
+drying stage, the hypothesis is wrong and is recorded as such.
+
+**Traced 2026-10-16** (the probe's new watering / drying-stage count, run on the tree before the
+loader line changed and after it; the after run reproduces §5a's flipped probe line for line — B3):
+
+| | binary | split | change |
+|---|---|---|---|
+| watering events (trigger steps whose recycling moved water) | 37 | 33 | −4 |
+| water into the root zone (kg) | 2689.18 | 2377.31 | −11.6 % |
+| plant steps with a wet surface / drying | 11 840 / 7 680 | 8 434 / 11 086 | wet −29 % |
+| soil evaporation, wet surface (kg) | 244.43 | 214.37 | **−30.1** |
+| soil evaporation, drying (kg) | 82.12 | 70.80 | −11.3 |
+
+**The hypothesis holds**, with one correction. The crop drinks less, the root zone reaches the trigger 4
+times fewer, the surface is wet for 29 % fewer steps, and **three quarters of the fall (30 of 41 kg) is
+the wet stage's**. The other quarter is the drying stage's, and there the prediction's "not a lower
+drying-stage rate" was wrong: the drying steps are 44 % more, but the spells are longer, so more of them
+sit deep in Stage II, where the book's day factor `√(d+1) − √d` (Eqn 14.19, `science.rs`) falls with the
+dry days — per drying step 0.0107 → 0.0064 kg. (These stage sums total 41.4 kg against §5a's 41.6: the stage split is read from
+the soil-evaporation day counter at each plant step, §5a's from the end-of-run legs.)
+
+### 6d. Graded (2026-10-16)
+
+* **B1 held.** `regen_goldens`: exactly `lighting_state` and `sealed_station_state` CHANGED; 18 identical,
+  the 7 biosphere goldens and `sealed_energy_drift_summary` among them.
+* **B2 held.** `lighting_state`: two water stocks and `top_soil_water`, nothing else. `sealed_station_state`:
+  soil water −44.6 %, condensate ×6.90, subsoil −26.9 %, battery +4.76 %, space −1.07 %, node −0.49 %;
+  leaf −2.0e-4, root −1.9e-4, humus C −1.2e-4, humus N −1.9e-4; `thermal_time` +1.9e-4 — §5c's figures.
+* **B3 held.** The probe on the adopted tree is the scratch worktree's flipped run line for line (the new
+  watering line aside).
+* **B4 held.** W1 **0.9283** (3.8712), W2 0.8493, model / hand 0.9962; U1, C1, B1 unchanged;
+  `scorecard_tm102788` 2.35 s (3.6 s with `--nocapture`).
+* **B5 held.** Station REWRITTEN in the two `golden_sha256` rows; biosphere and authoring `unchanged`.
+* **B6 MISSED.** Before regeneration 5 reds, not the 2 named (`golden_regression`, `tier_contract`, both
+  hit). Unpredicted: (1) `scorecard_tm102788::every_weather_forcing_is_the_chambers` — the weather's new
+  `lit_fraction` was not in the trial chamber's replaced list (the chamber already supplied its own; it is
+  now listed — the test did its job); (2) `chamber_walls` L4 (node 188.7373 K, heater 139.788 W) and its
+  day-end band: the room is **held again** at day 120's end, 0.07642 K below the setpoint inside one
+  step's loss (was 0.9526 K) — restated; (3) `chamber_heat`'s dead-cooler run: its collapsing leaf now
+  reaches the extinction snap on step 93 (day 6), residual −4.0e-205 mol — restated so the working
+  cooler's run still asserts no events and the dead one's may lose only crop carbon. In `--ignored`, 2
+  reds, both re-pinned to measured values: the structure's battery runs out by **day 1051** (was 1025),
+  8 day ends off the band (was 410); the reference node **162.4715 / 175.3180 / 170.0109 K**, the room
+  ends **295.1355095 K**. The two restated tests' old forms were gone before the run (restated first).
+  After: suite **1398 passed / 0 failed** (`--release --no-fail-fast`), `--ignored` **9 / 0**, clippy clean.
+* **B7 held.** `minute_transpiration.rs` 5 / 5 with the lit share recorded and served.
+* **B8 held.** No science gate went red.
+
+**Lessons.**
+* **A heat-carrying change moves every lab room that heat reaches.** Four of the five unpredicted reds
+  are the room's heat (walls, node, the dead cooler's crop), reached through the latent-heat books — the
+  same reach §5d's L9 found for carbon. Predicting "the same 2 goldens" was right; predicting the reds
+  from the goldens alone was not: the lab pins read rooms no golden records.
+* **A list-of-replaced-keys test catches a forcing added upstream.** The TM chamber's own lit share had
+  been *inserted after* the replaced list, so the new weather key went unlisted; the test named it.

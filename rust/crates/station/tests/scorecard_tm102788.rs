@@ -129,15 +129,15 @@ fn chamber_resolver(s: &SeasonScenario, rn_scale: f64) -> (SourceResolver, Vec<S
             VPD_VAR,
             Box::new(|n, dt| saturation_vapor_pressure(temp(n, dt)) * (1.0 - RH)),
         ),
+        // The lamp's lit share, as the station's lamp-lit builds supply it; the weather's is 1
+        // since the split's adoption (docs/plans/post-roadmap-lit-share-stomata.md §6).
+        (LIT_FRACTION_VAR, Box::new(lit)),
     ];
     let mut keys = Vec::new();
     for (k, f) in replaced {
         assert!(forcings.insert(k.to_string(), f).is_some(), "{k} was not a weather forcing");
         keys.push(k.to_string());
     }
-    // The lamp's lit share, as the station's lamp-lit builds supply it (read only under the lab
-    // lit-share night rule, docs/plans/post-roadmap-lit-share-stomata.md).
-    forcings.insert(LIT_FRACTION_VAR.to_string(), Box::new(lit));
     let resolver = SourceResolver::new(forcings, weather_shared(s)).expect("resolver");
     (resolver, keys)
 }

@@ -927,6 +927,23 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-16 — A PARTLY LIT STEP CLOSES FOR ITS DARK TIME: the loader sets `night_rule:
+  NightRule::LitShare`, and `weather_forcings` supplies `lit_fraction = 1`. A step the lamp is on for
+  part of is its lit share φ of lit time (open stomata, at `Rn / φ`) and `1 − φ` of dark time (closed,
+  the night-stomata ratio): `φ · PM(s·Rn/φ, rs_day) + (1 − φ) · PM(0, rs_day / f)`. No biosphere golden
+  moves and `biosphere-reference.manifest.json` is byte-identical; 2 station goldens move (the station
+  entry of this date).** The user's call, on the lab build's measurements the same day (plan
+  `docs/plans/post-roadmap-lit-share-stomata.md` §5–§6, predictions B1–B8 graded there). No YAML key,
+  flow, aux or param set changed; the manifest's `forcing` block hashes the light path and the weather
+  fixture, not the forcing set, so the new weather forcing is invisible to it — **no automatic gate can
+  see this unfreeze**: the restated `the_loader_splits_a_partly_lit_step` and the new
+  `the_weather_is_wholly_lit_and_moves_nothing` (`domains/tests/lit_share_stomata.rs`) are its pins, and
+  this entry is the ceremony's record. **The weather's φ = 1 is a STAGING STEP, not a decision:** the user
+  chose a real day/night share for the open field, which needs its net radiation (a daily mean, > 0 on
+  every step) shaped within the day first — the next item, a biosphere unfreeze of its own. Until then
+  the weather's builds are today's rule to the bit (all 7 biosphere goldens byte-identical). **Science
+  gates:** none moves (no band or floor reads a lamp-lit build). **Caveat:** closure is instant at the
+  switch, where real stomata lag tens of minutes, so the saving is an upper bound.
 - **2026-10-15 — STOMATA CLOSE IN THE DARK: the loader sets `night_stomata:
   NightStomata::Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING)` — on a step whose net radiation is ≤ 0 the
   canopy's surface resistance is the day value / 0.123, McAusland et al. (2023)'s night-over-day

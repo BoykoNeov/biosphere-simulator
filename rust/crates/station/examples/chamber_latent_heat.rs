@@ -34,7 +34,9 @@
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::{CONDENSATE, RN_VAR, SOIL_EVAP_TODAY, SOIL_WATER, WATER_VAPOR};
+use domains::biosphere::stocks::{
+    CONDENSATE, RN_VAR, SOIL_DRY_DAYS, SOIL_EVAP_TODAY, SOIL_WATER, WATER_VAPOR,
+};
 use domains::goldens::{committed, compare, Verdict};
 use simcore::arbitration;
 use simcore::environment::{Environment, SourceResolver};
@@ -62,6 +64,7 @@ use station::sowing::{sown_step, twin};
 const LAMBDA: f64 = 2.45e6;
 const SECONDS_PER_DAY: f64 = 86400.0;
 const TRANSPIRATION: &str = "biosphere.transpiration";
+const RECYCLING: &str = "biosphere.recycling";
 const CONDENSATION: &str = "biosphere.condensation";
 
 /// One plant step and the minutes after it (the interleaved day runs the plant step first).
@@ -148,6 +151,15 @@ struct Probe {
     tt_day_start: f64,
     maturity_margins: Vec<(f64, f64)>,
     latent: LatentBooks,
+    /// The soil's evaporation against its watering: trigger events (plant steps whose recycling
+    /// moved water), and plant steps and soil evaporation (kg) by stage — a wet surface
+    /// (`soil_dry_days == 0` at the step's start) and a drying one.
+    watering_events: u64,
+    watered_kg: f64,
+    wet_steps: u64,
+    dry_steps: u64,
+    soil_wet_kg: f64,
+    soil_dry_kg: f64,
 }
 
 /// The booked latent heat's own checks, and the heater's and battery's limits.
@@ -367,9 +379,20 @@ fn main() {
                     evap += -leg_on(r, SOIL_WATER);
                     p.transpiration_seen += 1;
                 }
+                if f.id() == RECYCLING && leg_on(r, SOIL_WATER) > 0.0 {
+                    p.watering_events += 1;
+                    p.watered_kg += leg_on(r, SOIL_WATER);
+                }
             }
             let (t0, t1) = (before.aux[SOIL_EVAP_TODAY], after.aux[SOIL_EVAP_TODAY]);
             let soil = if t1 >= t0 { t1 - t0 } else { t1 };
+            if before.aux[SOIL_DRY_DAYS] == 0.0 {
+                p.wet_steps += 1;
+                p.soil_wet_kg += soil;
+            } else {
+                p.dry_steps += 1;
+                p.soil_dry_kg += soil;
+            }
             p.min_crop_kg = p.min_crop_kg.min(evap - soil);
             let since = before.n - sown_step(before).expect("sown");
             let phase = scenario.phase_since_sowing(since);
@@ -520,6 +543,11 @@ fn main() {
     );
 
     // --- water books ---
+    println!(
+        "\nsoil against watering: {} trigger events, {:.4} kg into the root zone; plant steps wet {} / \
+         drying {}; soil evaporation wet {:.4} kg / drying {:.4} kg",
+        p.watering_events, p.watered_kg, p.wet_steps, p.dry_steps, p.soil_wet_kg, p.soil_dry_kg
+    );
     println!("\nlegs over the run (kg for water, J for the chamber), by flow:");
     for ((flow, stock), v) in &p.legs {
         println!("  {flow:<40} {stock:<26} {v:>16.6e}");

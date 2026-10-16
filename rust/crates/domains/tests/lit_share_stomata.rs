@@ -1,10 +1,11 @@
 //! **Stomata that close for the dark part of a partly lit step** — the lab form's own checks.
 //!
-//! Plan: `docs/plans/post-roadmap-lit-share-stomata.md`. [`NightRule::NetRadiation`] (a partly lit
-//! step counts as day) is the loader's; [`NightRule::LitShare`] splits such a step into its lit and
-//! dark time, lab-only. This file asserts the form (§1), that it reaches `Transpiration` and moves
-//! only a partly lit step, that a build without the `lit_fraction` forcing fails rather than falling
-//! back, and the loader's choice.
+//! Plan: `docs/plans/post-roadmap-lit-share-stomata.md`. [`NightRule::LitShare`] splits a partly
+//! lit step into its lit and dark time — the loader's since 2026-10-16 (§6);
+//! [`NightRule::NetRadiation`] (a partly lit step counts as day) is lab-only. This file asserts the
+//! form (§1), that it reaches `Transpiration` and moves only a partly lit step, that a build without
+//! the `lit_fraction` forcing fails rather than falling back, that the weather's builds are today's
+//! rule to the bit, and the loader's choice.
 
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::science::{
@@ -128,23 +129,31 @@ fn a_lit_share_that_disagrees_with_the_light_is_refused() {
     }
 }
 
-/// The loader counts a partly lit step as day; the split is lab-only (plan §1a).
+/// The loader splits a partly lit step (plan §6, adopted 2026-10-16); until then it counted one as
+/// day (§1a), which this test pinned as `the_loader_keeps_the_binary_rule`.
 #[test]
-fn the_loader_keeps_the_binary_rule() {
-    assert_eq!(params::biosphere().transp.night_rule, NightRule::NetRadiation);
+fn the_loader_splits_a_partly_lit_step() {
+    assert_eq!(params::biosphere().transp.night_rule, NightRule::LitShare);
 }
 
 fn setup(s: &SeasonScenario, p: &BiosphereParams) -> (State, EulerIntegrator, SourceResolver) {
     season_setup_composed(s, 1, p, &|s, p| build_season_with(s, p)).expect("setup")
 }
 
-/// The open field supplies no lit share (its light is a daily mean): under the switch its
-/// transpiration fails at the first step rather than quietly reading the binary rule.
+/// A build without the lit share fails at its first step rather than quietly reading the binary
+/// rule. Until the adoption the open field was such a build; the weather now supplies φ = 1 (plan
+/// §6), so the forcing is taken out of its resolver here to keep the claim.
 #[test]
-fn a_build_without_the_lit_share_fails_under_the_switch() {
+fn a_build_without_the_lit_share_fails_under_the_split() {
     let s = DEFAULT_SCENARIO;
     let p = with_night_rule(params::biosphere(), NightRule::LitShare);
     let (state, integrator, resolver) = setup(&s, &p);
+    let (mut forcings, shared) = resolver.into_parts();
+    assert!(
+        forcings.remove(LIT_FRACTION_VAR).is_some(),
+        "the weather supplies no lit share, so nothing was taken out"
+    );
+    let resolver = SourceResolver::new(forcings, shared).expect("rewired");
     let err = integrator
         .step_report(&state, &resolver, BIO_DT)
         .expect_err("the open field ran without a lit share");
@@ -152,6 +161,37 @@ fn a_build_without_the_lit_share_fails_under_the_switch() {
         format!("{err:?}").contains(LIT_FRACTION_VAR),
         "the failure does not name the forcing: {err:?}"
     );
+}
+
+/// The weather's φ = 1 is today's rule to the bit (plan §6, the staging step): the open field run
+/// 30 days under the split and under the binary rule ends in the same state, every stock and aux.
+/// (Its net radiation is a daily mean, > 0 on every step, so neither rule ever sees a dark step.)
+#[test]
+fn the_weather_is_wholly_lit_and_moves_nothing() {
+    let s = DEFAULT_SCENARIO;
+    let run = |rule: NightRule| -> State {
+        let p = with_night_rule(params::biosphere(), rule);
+        let (mut state, integrator, resolver) = setup(&s, &p);
+        for _ in 0..30 * STEPS_PER_DAY {
+            state = integrator
+                .step_report(&state, &resolver, BIO_DT)
+                .expect("step")
+                .state;
+        }
+        state
+    };
+    let (split, binary) = (run(NightRule::LitShare), run(NightRule::NetRadiation));
+    assert!(split.stocks[SOIL_WATER].amount != run_start_water(&s), "no water moved");
+    for (id, stock) in &binary.stocks {
+        assert_eq!(split.stocks[id].amount.to_bits(), stock.amount.to_bits(), "{id}");
+    }
+    for (key, value) in &binary.aux {
+        assert_eq!(split.aux[key].to_bits(), value.to_bits(), "{key}");
+    }
+}
+
+fn run_start_water(s: &SeasonScenario) -> f64 {
+    setup(s, &params::biosphere()).0.stocks[SOIL_WATER].amount
 }
 
 /// The reach: the open season grown 200 days for a canopy, then its `Transpiration` evaluated with

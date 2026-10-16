@@ -43,3 +43,29 @@ loader call inside a per-step closure is a cost no gate times.
 **Owed to an adoption:** φ for the open field and weather-lit builds (φ = 1, or per build); the minute
 water path (lab) fails under the switch (measured: it names the missing `lit_fraction`); the unfreeze
 ceremony for 2 goldens; the soil's 42 kg traced.
+
+**ADOPTED 2026-10-16** (plan §6) on the user's answers: **adopt**; the minute water path **records the
+lit share** (`NetRadiationRecorder` writes `window_key(LIT_FRACTION_VAR)`, `WATER_LOSS_WINDOW` reads it —
+§1a had wrongly called the binary rule "nearly exact" there: each minute reads its plant step's MEAN net
+radiation); and the weather's builds **a real day/night share**, then **staged**: they supply φ = 1 for
+now (`weather_forcings`; exact, their net radiation is a daily mean > 0 every step), recorded as a step
+toward that choice. The loader is `NightRule::LitShare`. 2 goldens (`lighting_state` water only;
+`sealed_station_state` water, energy, carbon / nitrogen at 1–2e-4 through `thermal_time`) and their 2
+station-manifest rows; biosphere and authoring manifests unchanged; the probe reproduced the scratch
+worktree's flipped run line for line.
+
+* **The soil's 42 kg, traced:** watering events 37 → 33, water into the root zone −11.6 %, the surface
+  wet for 29 % fewer plant steps; 30 of the 41 kg is the wet stage's, 11 the drying stage's (longer dry
+  spells sit deeper in Stage II, `√(d+1) − √d`).
+* **Three reds the predictions missed, restated, none deleted:** the TM scorecard's
+  `every_weather_forcing_is_the_chambers` (the weather's new forcing; the trial's chamber now lists its
+  own lit share as replaced — the test worked); the structure walls' L4 (node 188.74 K, heater 139.8 W;
+  and the room is **held again** at the day end, 0.076 K below the setpoint, inside one step's loss —
+  the partly lit windows' evaporation had been what outran the heater); and the dead-cooler lab run,
+  whose collapsing leaf now reaches the extinction snap on day 6 (recorded as found, as its rationing
+  is; only crop carbon may go). Two slow ones re-pinned: the structure's battery runs out by day 1051
+  (was 1025), and the reference node runs colder (mean 170.01 K, was 170.44). Four of the five reached the
+  ROOM's heat through the latent-heat books — rooms no golden records. Suite 1398 / 0, `--ignored` 9 / 0.
+* **Next (the user's choice, staged): the open field gets a night** — the weather's net radiation given
+  a within-day shape, and whether its temperature and deficit need a daily cycle too; a biosphere
+  unfreeze, lab-only first, from ASCE-EWRI's hourly method.

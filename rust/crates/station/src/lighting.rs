@@ -157,7 +157,8 @@ pub(crate) fn lamp_net_radiation_path(on_par: f64, photoperiod_s: f64) -> Schedu
 
 /// The share of each plant step the lamp is on: the lamp's own top-hat at unit light, so it is the
 /// light's shape exactly — `net_radiation == φ · lamp_net_radiation(on_par)` on every step. Read
-/// only under the lab `NightRule::LitShare` (`docs/plans/post-roadmap-lit-share-stomata.md`).
+/// by the loader's `NightRule::LitShare` since 2026-10-16
+/// (`docs/plans/post-roadmap-lit-share-stomata.md` §6).
 pub(crate) fn lamp_lit_fraction_path(photoperiod_s: f64) -> Schedule {
     lamp_light_path(1.0, photoperiod_s)
 }

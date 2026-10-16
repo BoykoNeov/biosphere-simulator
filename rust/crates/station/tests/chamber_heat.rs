@@ -21,6 +21,7 @@
 //! the heater have their own file, `tests/chamber_walls.rs`.
 
 use domains::biosphere::perturbations::{window_override, with_forcing};
+use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C, STEM_RESERVE_C, STORAGE_C};
 use domains::thermal::{equilibrium_temperature, ThermalParams, NODE};
 use simcore::environment::constant;
 use simcore::flow::Flow;
@@ -125,13 +126,28 @@ fn run_with(health: f64, books: bool) -> (Vec<State>, u64) {
         Some(&*reset),
     )
     .unwrap();
-    assert!(events.is_empty());
+    // A working cooler's run has no extinction. A dead one's runs outside every plant formula's
+    // range (module doc), and since the lit-share split's adoption (2026-10-16,
+    // docs/plans/post-roadmap-lit-share-stomata.md §6d) its collapsing leaf reaches the
+    // extinction snap there (day 6): recorded as found, as its rationing is — but only a crop
+    // carbon pool may go, so any other extinction is still red.
+    let crop = [LEAF_C, STEM_C, ROOT_C, STORAGE_C, STEM_RESERVE_C];
+    if health > 0.0 {
+        assert!(events.is_empty(), "health {health}, books {books}: {events:?}");
+    } else {
+        for e in &events {
+            assert!(
+                crop.contains(&e.stock.as_str()) && e.quantity == Quantity::Carbon,
+                "the dead cooler's run lost something other than crop carbon: {e:?}"
+            );
+        }
+        eprintln!("dead cooler, books {books}: {} extinctions {events:?}", events.len());
+    }
     (states, rationed)
 }
 
 /// Leaf + stem + root carbon (mol).
 fn veg(s: &State) -> f64 {
-    use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C};
     s.stocks[LEAF_C].amount + s.stocks[STEM_C].amount + s.stocks[ROOT_C].amount
 }
 

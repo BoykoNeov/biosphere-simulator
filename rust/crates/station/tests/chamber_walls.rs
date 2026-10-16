@@ -451,6 +451,13 @@ fn a_cabin_hotter_or_colder_than_the_chamber() {
 /// **136.919 W**. Direction from the change: the heater also pays the evaporation (the lamp's daytime
 /// surplus now goes to it), and that heat too ends in the node by the coil. Size not predicted. The
 /// day-end band gains one step of the window's evaporation.
+///
+/// ⚠ **Re-pinned 2026-10-16** (`docs/plans/post-roadmap-lit-share-stomata.md` §6d; stomata close for
+/// the dark part of a partly lit step), measured by this tree: the node **188.7373 K** (was
+/// 189.2987), the heater **139.788 W** (was 136.919). Neither size was predicted, nor the heater's
+/// sign: the plants evaporate less, which lowers what the coil hands the node, but this heater
+/// figure is the battery's fall LESS the outdoor reference's, so it moves with both runs — not
+/// traced.
 #[test]
 fn walls_onto_the_station_structure_run_the_heater_continuously() {
     let days = 120;
@@ -463,10 +470,10 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
         |run: &Run| amount(&run.states[days - span], BATTERY) - amount(&run.states[days], BATTERY);
     let heater_w = (fall(&r) - fall(&reference)) / (span as f64 * 86_400.0);
     eprintln!("L4: node {t} K, heater {heater_w} W");
-    assert!((t - 189.2987).abs() < 0.01, "node {t} K, measured 189.2987");
+    assert!((t - 188.7373).abs() < 0.01, "node {t} K, measured 188.7373");
     assert!(
-        (heater_w - 136.919).abs() < 0.05,
-        "heater {heater_w} W, measured 136.919"
+        (heater_w - 139.788).abs() < 0.05,
+        "heater {heater_w} W, measured 139.788"
     );
     // A day end is dark, so the heater holds the room against the walls' whole loss to the node
     // and the deadbeat controller leaves it one step's loss below the setpoint — derived since
@@ -491,17 +498,21 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
     // the room is NOT held here: walls and evaporation together outrun the 200 W heater earlier
     // in the night (the partly lit windows' and the first dark windows' evaporation), the room
     // falls, and by the day end the heater is still climbing back on its few watts of margin.
-    // Measured: 0.9526 K below the setpoint, against one step's loss of 0.0771 K. Pinned as a
-    // record of the saturated heater — the horizon test below counts the nights it happens.
+    // Measured: 0.9526 K below the setpoint, against one step's loss of 0.0771 K.
+    // ⚠ Re-stated 2026-10-16 (lit-share plan §6d): the partly lit windows' dark minutes now keep
+    // their stomata shut, which is most of the evaporation that outran the heater, so at day 120's
+    // end the room IS held again — measured 0.07642 K below the setpoint, inside one step's loss
+    // (0.07647 K), the deadbeat offset. Pinned as measured; the horizon test below still counts
+    // the nights the heater saturates.
     eprintln!("L4: chamber {} K below the setpoint; one step's loss {step_loss} K", set - tc);
     assert!(
-        set - tc > step_loss,
-        "the room is held again: {} K below, one step's loss {step_loss} K",
+        set - tc <= step_loss,
+        "the room is no longer held at the day end: {} K below, one step's loss {step_loss} K",
         set - tc
     );
     assert!(
-        ((set - tc) - 0.9526).abs() < 0.01,
-        "chamber {tc}, {} K below the setpoint; measured 0.9526 K",
+        ((set - tc) - 0.07642).abs() < 1e-3,
+        "chamber {tc}, {} K below the setpoint; measured 0.07642 K",
         set - tc
     );
 }
@@ -533,14 +544,21 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
 /// empties inside the horizon and the fast side rations from then on. The test was
 /// `the_structures_heater_does_not_empty_the_battery_within_the_horizon`; it now pins the day the
 /// battery runs out, and holds the room to its band only before it.
+///
+/// ⚠ **Re-pinned 2026-10-16** (`docs/plans/post-roadmap-lit-share-stomata.md` §6d; a partly lit step
+/// closes for its dark time), measured by this tree: the battery runs out by **day 1051** (was
+/// 1025), the fast side rations 672 003 times (was 763 338), and only **8** day ends fall off the
+/// held band (was 410). Direction from the change: less evaporation for the heater to pay, and
+/// the partly lit windows' was most of what saturated it at night (L4 above: the room is held
+/// again at day 120's end). Not predicted.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_structures_heater_empties_the_battery_within_the_horizon() {
-    // Measured 2026-10-15: the battery runs out by day 1025, the fast side rations 763 338 times,
-    // and before that 410 day ends fall off the held band — the nights the heater saturates.
-    const EMPTY_DAY_LO: usize = 1015;
-    const EMPTY_DAY_HI: usize = 1035;
-    const OFF_MAX: usize = 420;
+    // Measured 2026-10-16: the battery runs out by day 1051, the fast side rations 672 003 times,
+    // and before that 8 day ends fall off the held band — the nights the heater saturates.
+    const EMPTY_DAY_LO: usize = 1041;
+    const EMPTY_DAY_HI: usize = 1061;
+    const OFF_MAX: usize = 18;
     let days = sealed_station_scenario().days();
     let r = run_rationing(days, ChamberSurroundings::Structure, None, 1.0);
     let empty_day = r
@@ -614,6 +632,12 @@ fn the_structures_heater_empties_the_battery_within_the_horizon() {
 /// coil). The band gains one step of each day end's evaporation (409 day ends fell outside the
 /// walls-only band); the run ends at **295.1354351 K**, 8 days earlier in its season (each crop
 /// matures a day later).
+///
+/// ⚠ **Re-pinned 2026-10-16** (`docs/plans/post-roadmap-lit-share-stomata.md` §6d; a partly lit step
+/// closes for its dark time), measured by this tree: the node **162.4715 / 175.3180 / 170.0109 K**
+/// (colder: 8.5 % less evaporation, so less of its heat reaches the node by the coil); the run
+/// ends at **295.1355095 K**; 9 day ends between the bands, as before. Direction from the change,
+/// size not predicted.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -657,15 +681,15 @@ fn the_reference_node_and_chamber_follow_the_weather() {
         "chamber daily min {clo} max {chi}; {outside} day-end states between the bands; ends {end} K"
     );
     assert!(
-        (lo - 162.4912).abs() < 0.01 && (hi - 176.3676).abs() < 0.01,
+        (lo - 162.4715).abs() < 0.01 && (hi - 175.3180).abs() < 0.01,
         "{lo} {hi}"
     );
-    assert!((mean - 170.4416).abs() < 0.01, "{mean}");
+    assert!((mean - 170.0109).abs() < 0.01, "{mean}");
     assert!(
         clo >= cold_set - 0.015 && chi <= warm_set + 0.015,
         "{clo} {chi}"
     );
     // One mid-warm-up and one mid-cool-down day-end state per crop at most: 9 crops (§25g).
     assert!(outside <= 2 * 9, "{outside}");
-    assert!((end - 295.1354351).abs() < 1e-6, "chamber ends {end} K");
+    assert!((end - 295.1355095).abs() < 1e-6, "chamber ends {end} K");
 }

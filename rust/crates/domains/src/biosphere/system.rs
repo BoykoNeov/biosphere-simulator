@@ -1380,6 +1380,12 @@ pub fn weather_forcings(
     );
     forcings.insert(DAYLENGTH_VAR.to_string(), table_schedule(f.daylength));
     forcings.insert(RN_VAR.to_string(), table_schedule(f.net_radiation));
+    // Every weather step is wholly lit: its net radiation is the day's mean, > 0 on every step, so
+    // the split reads it as today's rule did, bit for bit. ⚠ A STAGING STEP, not a decision: the
+    // user chose a real day/night share here (2026-10-16), which needs the net radiation shaped
+    // within the day first — the next item (docs/plans/post-roadmap-lit-share-stomata.md §6).
+    // The lamp builds replace it with their light's own top-hat.
+    forcings.insert(LIT_FRACTION_VAR.to_string(), constant(1.0)?);
     forcings.insert(VPD_VAR.to_string(), table_schedule(f.vpd));
     forcings.insert(CI_VAR.to_string(), constant(scenario.ci)?);
     forcings.insert(

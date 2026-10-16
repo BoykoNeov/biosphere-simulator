@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use domains::biosphere::science::humidity_target_kg;
-use domains::biosphere::stocks::{RN_VAR, TEMP_VAR, WATER_VAPOR};
+use domains::biosphere::stocks::{LIT_FRACTION_VAR, RN_VAR, TEMP_VAR, WATER_VAPOR};
 use domains::params;
 use simcore::environment::{constant, SourceResolver};
 use simcore::error::SimError;
@@ -88,12 +88,13 @@ fn raw_plant_registry(scenario: &SealedStationScenario) -> Registry {
         .1
 }
 
-/// A resolver serving exactly `temp` and `net radiation` — what the raw flows read on the
-/// plant step, set to the recorded window.
-fn window_resolver(temp: f64, rn: f64) -> SourceResolver {
+/// A resolver serving exactly `temp`, `net radiation` and the lit share — what the raw flows read
+/// on the plant step, set to the recorded window.
+fn window_resolver(temp: f64, rn: f64, lit: f64) -> SourceResolver {
     let forcings = HashMap::from([
         (TEMP_VAR.to_string(), constant(temp).unwrap()),
         (RN_VAR.to_string(), constant(rn).unwrap()),
+        (LIT_FRACTION_VAR.to_string(), constant(lit).unwrap()),
     ]);
     SourceResolver::new(forcings, HashMap::new()).unwrap()
 }
@@ -120,7 +121,8 @@ fn assert_bits(got: &FlowResult, want: &FlowResult, what: &str) {
 }
 
 /// THE WINDOW, and THE ADDITIVE CHANNEL. After each plant step from `n`, the recorded net
-/// radiation is the resolver's at `n` (within an ULP), over two days — and the temperature and
+/// radiation and lit share (since the split's adoption, `docs/plans/post-roadmap-lit-share-stomata.md`
+/// §6) are the resolver's at `n` (within an ULP), over two days — and the temperature and
 /// PAR keys are still the window's values, not twice them (a second writer of either would
 /// double it). Meaningful only because the net radiation changes between windows (asserted: it
 /// is a per-day table, so it changes at the day boundary).
@@ -135,7 +137,12 @@ fn the_plant_step_records_the_windows_net_radiation_and_nothing_twice() {
     for n in 0..(2 * scenario.bio_steps_per_day) {
         // The temperature is the chamber's since slice 3a; the light and radiation the resolver's
         // twins for the state's phase (slice 4: the plain names are in no sealed resolver).
-        let want: Vec<(String, f64)> = [RN_VAR, TEMP_VAR, domains::biosphere::stocks::PAR_VAR]
+        let want: Vec<(String, f64)> = [
+            RN_VAR,
+            TEMP_VAR,
+            domains::biosphere::stocks::PAR_VAR,
+            LIT_FRACTION_VAR,
+        ]
             .iter()
             .map(|v| {
                 let value = if *v == TEMP_VAR {
@@ -189,7 +196,11 @@ fn the_wrapped_pair_is_the_raw_pair_on_a_minute_in_days() {
     let s = states.last().unwrap();
     let raw_bio = raw_plant_registry(&scenario);
     let (_, _, _, wrapped_fast) = minute_build();
-    let window = window_resolver(s.aux[&window_key(TEMP_VAR)], s.aux[&window_key(RN_VAR)]);
+    let window = window_resolver(
+        s.aux[&window_key(TEMP_VAR)],
+        s.aux[&window_key(RN_VAR)],
+        s.aux[&window_key(LIT_FRACTION_VAR)],
+    );
     let fast_dt = scenario.cabin_dt;
     for id in WATER_LOSS_FLOWS {
         let got = flow(&wrapped_fast, id)
@@ -243,7 +254,10 @@ fn a_chamber_held_at_22c_reaches_the_minute_steps_condenser() {
     stocks.get_mut(WATER_VAPOR).unwrap().amount = 0.5 * (target(weather_t) + target(held_t));
     let s = State::new(s.n, stocks, s.rng_seed, s.aux.clone()).unwrap();
     let raw_bio = raw_plant_registry(&scenario);
-    let rn = s.aux[&window_key(RN_VAR)];
+    let (rn, lit) = (
+        s.aux[&window_key(RN_VAR)],
+        s.aux[&window_key(LIT_FRACTION_VAR)],
+    );
     let fast_dt = scenario.cabin_dt;
     let condensation = WATER_LOSS_FLOWS[1];
     let got = flow(&fast, condensation)
@@ -253,7 +267,7 @@ fn a_chamber_held_at_22c_reaches_the_minute_steps_condenser() {
         flow(&raw_bio, condensation)
             .evaluate(
                 &s,
-                &window_resolver(t, rn).bind(&s, fast_dt),
+                &window_resolver(t, rn, lit).bind(&s, fast_dt),
                 fast_dt / 86_400.0,
             )
             .expect("raw")

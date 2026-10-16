@@ -368,6 +368,25 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-16 — the biosphere's lit-share split adopted, delegated: 2 station goldens move
+  (`lighting`, `sealed_station`) and their 2 `golden_sha256` rows follow. No station flow, param or seam
+  changed; three station-side edits ride along.** A plant step the lamp is on for part of now closes its
+  stomata for its dark time (the biosphere entry of the same date; plan
+  `docs/plans/post-roadmap-lit-share-stomata.md` §6). `lighting` (day 7): water only — two water stocks
+  and `top_soil_water`. `sealed_station` (end state): soil water −45 %, condensate ×6.9, below the roots
+  −27 % (the end of a watering cycle), the battery +4.8 %, space −1.1 %, the node −0.5 %, and carbon /
+  nitrogen at 1–2e-4 through `thermal_time` (+1.9e-4) — the room's warmth, since the latent-heat books
+  turn water into heat. Over the 1220-day run: evaporation −8.5 %, the heater 1.34 → 0.87 GJ, re-sow days
+  unchanged; the soil's −42 kg is 4 fewer watering events. `sealed_energy_drift_summary` and the other
+  10 station goldens byte-identical. **Ride-alongs:** the lab minute water path records the lit share
+  with the net radiation (`air_split::NetRadiationRecorder`, `WATER_LOSS_WINDOW`), so its minutes split
+  as their plant step does; the TM 102788 scorecard's chamber lists its lit share among the weather keys
+  it replaces (its W1 0.958 → 0.928, carbon unchanged); and lab and slow pins restated to measured
+  values — the structure walls' node 188.74 K / heater 139.8 W, with the room now held at the day end,
+  and their battery running out by day 1051 (was 1025); the reference node colder (162.47 / 175.32 /
+  170.01 K); the dead-cooler run's collapsing leaf reaching the extinction snap (recorded, crop carbon
+  only).
+
 - **2026-10-15 — EVAPORATION'S HEAT IN THE ROOM'S BOOKS: a new station flow class, `ChamberLatentHeat`
   (chamber → `thermal.node`), and the plant step's `WindowEvaporationRecorder` (excluded slow registry).
   1 golden: `sealed_station_state` (carbon, water, energy; two new aux keys, the window's evaporation

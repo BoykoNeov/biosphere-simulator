@@ -6,7 +6,7 @@
     "soil_potential_today": "0x1.5874d0b26a049p+0",
     "soil_shade_lai": "0x1.42a574c4a6c11p-4",
     "thermal_time": "0x0.0p+0",
-    "top_soil_water": "0x1.2aadceaad2458p+3",
+    "top_soil_water": "0x1.2d33fb8a2db2fp+3",
     "vernalization_days": "0x0.0p+0"
   },
   "n": 112,
@@ -40,7 +40,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.3ee9c3c494006p+3",
+      "amount": "0x1.3c6396e538929p+3",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -196,7 +196,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.878d227ad91e6p+4",
+      "amount": "0x1.88d038ea86d54p+4",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },

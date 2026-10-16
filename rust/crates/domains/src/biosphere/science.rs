@@ -1055,8 +1055,9 @@ pub fn night_surface_resistance(day: f64, net_radiation: f64, form: NightStomata
 /// How [`NightStomata::Closing`] reads a plant step the lamp is on for PART of
 /// (`docs/plans/post-roadmap-lit-share-stomata.md`).
 ///
-/// Never loaded from a param file — it selects a form. The loader's is [`NightRule::NetRadiation`];
-/// [`NightRule::LitShare`] is lab-only.
+/// Never loaded from a param file — it selects a form. The loader's is [`NightRule::LitShare`]
+/// since 2026-10-16 (plan §6); [`NightRule::NetRadiation`] is lab-only. (The enum's own `Default`
+/// is not the loader's, as for [`NightStomata`]: nothing builds the params from it.)
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum NightRule {
     /// ASCE-EWRI's hourly rule on the step's mean: `Rn > 0` is day, so a partly lit step keeps
@@ -1064,7 +1065,8 @@ pub enum NightRule {
     #[default]
     NetRadiation,
     /// A partly lit step is its lit share `φ` of lit time and `1 − φ` of dark time
-    /// ([`step_crop_transpiration`]); `φ` is the `lit_fraction` forcing the lamp-lit build supplies.
+    /// ([`step_crop_transpiration`]); `φ` is the `lit_fraction` forcing every build supplies — a
+    /// lamp-lit one from its light's top-hat, the weather's as 1 (its light is a daily mean).
     LitShare,
 }
 

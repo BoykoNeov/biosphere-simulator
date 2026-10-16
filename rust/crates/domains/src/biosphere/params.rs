@@ -280,8 +280,8 @@ pub struct TranspirationParams {
     /// (`docs/plans/post-roadmap-night-stomata.md`).
     pub night_stomata: NightStomata,
     /// How the night rule reads a partly lit step ([`NightRule`]). Never loaded from the file: the
-    /// loader sets `NetRadiation`; `LitShare` is lab-only
-    /// (`docs/plans/post-roadmap-lit-share-stomata.md`).
+    /// loader sets `LitShare` since 2026-10-16; `NetRadiation` is lab-only
+    /// (`docs/plans/post-roadmap-lit-share-stomata.md` §6).
     pub night_rule: NightRule,
     /// `rl`, a well-watered leaf's stomatal resistance (s/m), read by the two leaf-area forms of
     /// [`SurfaceResistanceForm`] (FAO-56 Box 5's 100 s/m).
@@ -818,9 +818,10 @@ pub fn transpiration_from_bounded(
         // 2026-10-15 on the user's call; moved 2 station goldens, water only
         // (docs/plans/post-roadmap-night-stomata.md §7). `Open` and the heading ratio are lab-only.
         night_stomata: NightStomata::Closing(NIGHT_CONDUCTANCE_RATIO_BOOTING),
-        // A partly lit step counts as day (ASCE's rule on the step's mean); the lit-share split
-        // is lab-only (docs/plans/post-roadmap-lit-share-stomata.md).
-        night_rule: NightRule::NetRadiation,
+        // A partly lit step is split into its lit and dark time, adopted 2026-10-16 on the user's
+        // call; moved 2 station goldens (docs/plans/post-roadmap-lit-share-stomata.md §6). The
+        // binary rule (a partly lit step counts as day) is lab-only.
+        night_rule: NightRule::LitShare,
     }
 }
 

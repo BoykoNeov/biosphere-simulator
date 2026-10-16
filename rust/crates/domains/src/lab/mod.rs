@@ -240,12 +240,12 @@ pub fn with_night_stomata(mut p: BiosphereParams, form: NightStomata) -> Biosphe
 
 /// `p` with the night rule reading a partly lit step by its lit share, or not ([`NightRule`],
 /// `docs/plans/post-roadmap-lit-share-stomata.md`). Under [`NightRule::LitShare`] the build must
-/// supply the `lit_fraction` forcing (every lamp-lit station build does), or it fails at its
-/// first step.
+/// supply the `lit_fraction` forcing (every lamp-lit station build and the weather do), or it
+/// fails at its first step.
 ///
 /// # ⚠ A switch, not an endorsement of the form switched to
 ///
-/// [`NightRule::NetRadiation`] is the loader's; `LitShare` is the lab's.
+/// [`NightRule::LitShare`] is the loader's since 2026-10-16; `NetRadiation` is the lab's.
 pub fn with_night_rule(mut p: BiosphereParams, rule: NightRule) -> BiosphereParams {
     p.transp.night_rule = rule;
     p
