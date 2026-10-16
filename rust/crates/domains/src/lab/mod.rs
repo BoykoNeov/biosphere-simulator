@@ -41,8 +41,8 @@
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
 use crate::biosphere::science::{
-    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, NightStomata, O2Form,
-    SoilEvaporationForm, SurfaceResistanceForm, VpdRead, WateringForm,
+    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, NightRule, NightStomata,
+    O2Form, SoilEvaporationForm, SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{with_override, ConfigError, ParamFile};
 
@@ -235,6 +235,19 @@ pub fn biosphere_with_rs_form(
 /// heading ratio are the lab's.
 pub fn with_night_stomata(mut p: BiosphereParams, form: NightStomata) -> BiosphereParams {
     p.transp.night_stomata = form;
+    p
+}
+
+/// `p` with the night rule reading a partly lit step by its lit share, or not ([`NightRule`],
+/// `docs/plans/post-roadmap-lit-share-stomata.md`). Under [`NightRule::LitShare`] the build must
+/// supply the `lit_fraction` forcing (every lamp-lit station build does), or it fails at its
+/// first step.
+///
+/// # ⚠ A switch, not an endorsement of the form switched to
+///
+/// [`NightRule::NetRadiation`] is the loader's; `LitShare` is the lab's.
+pub fn with_night_rule(mut p: BiosphereParams, rule: NightRule) -> BiosphereParams {
+    p.transp.night_rule = rule;
     p
 }
 

@@ -31,9 +31,10 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::light_path::top_hat_window_mean;
 use domains::biosphere::params::{self, BiosphereParams};
-use domains::biosphere::science::{self, NightStomata};
+use domains::biosphere::science::{self, NightRule, NightStomata};
 use domains::biosphere::stocks::{
-    CI_VAR, CO2_ATMOS, CO2_RESP, DAYLENGTH_VAR, FERTILIZATION_VAR, IRRIGATION_VAR, LEAF_C, PAR_VAR,
+    CI_VAR, CO2_ATMOS, CO2_RESP, DAYLENGTH_VAR, FERTILIZATION_VAR, IRRIGATION_VAR, LEAF_C,
+    LIT_FRACTION_VAR, PAR_VAR,
     PLANT_N, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C,
     LITTER_SINK, TEMP_VAR, VPD_VAR,
 };
@@ -134,6 +135,9 @@ fn chamber_resolver(s: &SeasonScenario, rn_scale: f64) -> (SourceResolver, Vec<S
         assert!(forcings.insert(k.to_string(), f).is_some(), "{k} was not a weather forcing");
         keys.push(k.to_string());
     }
+    // The lamp's lit share, as the station's lamp-lit builds supply it (read only under the lab
+    // lit-share night rule, docs/plans/post-roadmap-lit-share-stomata.md).
+    forcings.insert(LIT_FRACTION_VAR.to_string(), Box::new(lit));
     let resolver = SourceResolver::new(forcings, weather_shared(s)).expect("resolver");
     (resolver, keys)
 }
@@ -466,11 +470,18 @@ fn w1_by_hand_at(ra: f64, rs: f64, rn_scale: f64, night: NightStomata) -> f64 {
                 let t = temp(n, BIO_DT);
                 let rn = rn_scale * lamp_net_radiation(par_on(n)) * lit(n, BIO_DT);
                 let vpd = saturation_vapor_pressure(t) * (1.0 - RH);
-                let rs = science::night_surface_resistance(rs, rn, night);
-                science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * BIO_DT
+                step_water(rn, lit(n, BIO_DT), vpd, t, ra, rs, night)
             })
             .sum::<f64>()
     }))
+}
+
+/// One step's by-hand crop water (kg m⁻² per step) under `night` and the loader's night rule —
+/// the lit share is read only under the lab `NightRule::LitShare`, as the model reads it.
+fn step_water(rn: f64, lit: f64, vpd: f64, t: f64, ra: f64, rs: f64, night: NightStomata) -> f64 {
+    let lit = (params::biosphere().transp.night_rule == NightRule::LitShare).then_some(lit);
+    science::step_crop_transpiration(rn, 1.0, lit, vpd, t, ra, rs, night).expect("a valid step")
+        * BIO_DT
 }
 
 fn transpiration_params() -> (f64, f64) {
@@ -800,8 +811,7 @@ fn w1_by_hand_with(ra: f64, rs: f64, f: Forcing) -> f64 {
                 };
                 let rn = f.rn_scale * lamp_net_radiation(par_on(n)) * l;
                 let vpd = saturation_vapor_pressure(t) * (1.0 - rh);
-                let rs = science::night_surface_resistance(rs, rn, night);
-                science::penman_monteith_transpiration(rn, vpd, t, ra, rs) * BIO_DT
+                step_water(rn, l, vpd, t, ra, rs, night)
             })
             .sum::<f64>()
     }))

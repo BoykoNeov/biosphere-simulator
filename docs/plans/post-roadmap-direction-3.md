@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `latent-heat-books.md`
+**Re-read against the record's last row:** `lit-share-stomata.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -578,6 +578,13 @@ three are adopted. It bears on the 2026-10-01 battery note: the heater draws 1.3
 the same scaling moves "dark near day 1736" to roughly day 1590 — still past the horizon (a scaling, not a
 run). It also finds the lab structure walls cannot carry the evaporation's heat (their battery empties
 inside the horizon). Nothing in §3 is re-proposed.
+⚠ *Re-read 2026-10-16* (`log/lit-share-stomata.md`, BUILT lab-only and MEASURED; adoption the user's):
+grepped this plan for partly lit, lit share, lit fraction, top-hat, stomata, night, heater and battery. No
+hit beyond the notes above; it is the night-stomata item's stated bias, not a §2 item, so nothing is
+struck and nothing added. It bears on the 2026-10-01 battery note only if adopted: the heater would draw
+0.87 GJ, not 1.34 (~6.2 % of the lamp's 1.41e10 J), and the same scaling moves "dark near day 1736" to
+roughly day 1635 rather than 1590 — later, still past the horizon (a scaling, not a run; the lab run's
+battery ends 4.8 % fuller). Nothing in §3 is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

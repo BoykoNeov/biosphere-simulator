@@ -78,6 +78,10 @@ pub const CI_VAR: &str = "ci";
 pub const TEMP_VAR: &str = "temp";
 pub const DAYLENGTH_VAR: &str = "daylength_s";
 pub const RN_VAR: &str = "net_radiation";
+/// The share of a plant step the lamp is on, `[0, 1]` — supplied by every lamp-lit station build
+/// from the same top-hat that shapes its light; read only under the lab `NightRule::LitShare`
+/// (`docs/plans/post-roadmap-lit-share-stomata.md`).
+pub const LIT_FRACTION_VAR: &str = "lit_fraction";
 pub const VPD_VAR: &str = "vpd";
 pub const IRRIGATION_VAR: &str = "irrigation";
 pub const FERTILIZATION_VAR: &str = "fertilization";

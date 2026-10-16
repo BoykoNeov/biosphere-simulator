@@ -13,7 +13,7 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
-    DAYLENGTH_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER, TEMP_VAR, THERMAL_TIME,
+    DAYLENGTH_VAR, LIT_FRACTION_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER, TEMP_VAR, THERMAL_TIME,
     VERNALIZATION_DAYS,
 };
 use domains::biosphere::system::{
@@ -155,6 +155,13 @@ pub(crate) fn lamp_net_radiation_path(on_par: f64, photoperiod_s: f64) -> Schedu
     lamp_light_path(lamp_net_radiation(on_par), photoperiod_s)
 }
 
+/// The share of each plant step the lamp is on: the lamp's own top-hat at unit light, so it is the
+/// light's shape exactly — `net_radiation == φ · lamp_net_radiation(on_par)` on every step. Read
+/// only under the lab `NightRule::LitShare` (`docs/plans/post-roadmap-lit-share-stomata.md`).
+pub(crate) fn lamp_lit_fraction_path(photoperiod_s: f64) -> Schedule {
+    lamp_light_path(1.0, photoperiod_s)
+}
+
 /// The lamp's DRAW switched with its light (`docs/plans/post-roadmap-room-lamp-heat.md`; the
 /// reference since 2026-10-15, §8): `on_w` on the plant step's top-hat, read on the FAST side,
 /// where until then the lamp drew the daily average on every minute.
@@ -215,6 +222,15 @@ pub fn lighting_bio_resolver(
         lamp_net_radiation_path(par, photoperiod_s),
     );
     forcings.insert(DAYLENGTH_VAR.to_string(), constant(photoperiod_s)?);
+    // The lamp's lit share (read only under the lab lit-share night rule); no lamp, no lit share.
+    forcings.insert(
+        LIT_FRACTION_VAR.to_string(),
+        if with_lamp {
+            lamp_lit_fraction_path(photoperiod_s)
+        } else {
+            constant(0.0)?
+        },
+    );
     // A warm lamp-lit habitat overrides the weather-table temperature with a constant
     // (the lamp supplies light, the environment supplies warmth) — beside the PAR /
     // daylength overrides, in this non-frozen station module (the embedded `weather_facts`

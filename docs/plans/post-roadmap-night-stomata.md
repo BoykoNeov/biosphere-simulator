@@ -194,6 +194,10 @@ per warm day keep open stomata. At the measured open dark rate (116.19 W) those 
 over the 716 warm days; closing them as the dark windows close would remove another ~0.50 GJ
 (booting) or ~0.44 GJ (heading) — about as much again as the dark windows have left. A lit-fraction
 rule is the form that would; it needs a lit-fraction signal the flow does not have.
+⚠ *Measured 2026-10-16* (`post-roadmap-lit-share-stomata.md` §5, lab-only): the lit-share split, with a
+lit-fraction forcing built for it, takes the sealed crop's water −200 kg (−8.0 %) and the booked latent
+heat −0.59 GJ (−0.49 the crop's) over 1220 days at the booting ratio — the estimate's ~0.50 held for the
+crop. An upper bound: closure there is instant.
 
 **The four other readers of `science::canopy_surface_resistance`, re-read (as §2 promised).**
 

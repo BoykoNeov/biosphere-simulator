@@ -27,7 +27,7 @@
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::{DAYLENGTH_VAR, PAR_VAR, RN_VAR};
+use domains::biosphere::stocks::{DAYLENGTH_VAR, LIT_FRACTION_VAR, PAR_VAR, RN_VAR};
 use simcore::auxiliary::AuxProcess;
 use simcore::environment::{Environment, Schedule, SourceResolver};
 use simcore::error::SimError;
@@ -43,8 +43,8 @@ use crate::scenario::{Phase, SealedStationScenario};
 /// The aux entry holding the slow step `n` at which the standing crop was sown.
 pub const SOWN_STEP: &str = "station.sown_step";
 
-/// The plant-step variables the cold program drives (the lamp's light and day).
-pub const PLANT_PROGRAM_VARS: [&str; 3] = [PAR_VAR, RN_VAR, DAYLENGTH_VAR];
+/// The plant-step variables the cold program drives (the lamp's light, its lit share and day).
+pub const PLANT_PROGRAM_VARS: [&str; 4] = [PAR_VAR, RN_VAR, DAYLENGTH_VAR, LIT_FRACTION_VAR];
 
 /// The fast-step variables the cold program drives (the lamp's draw, the chamber's setpoint).
 pub const FAST_PROGRAM_VARS: [&str; 2] = [LAMP_POWER_VAR, CHAMBER_SETPOINT_VAR];

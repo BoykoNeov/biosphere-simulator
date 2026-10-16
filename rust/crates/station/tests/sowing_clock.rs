@@ -11,7 +11,7 @@
 use std::cell::Cell;
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::{DAYLENGTH_VAR, PAR_VAR, RN_VAR};
+use domains::biosphere::stocks::{DAYLENGTH_VAR, LIT_FRACTION_VAR, PAR_VAR, RN_VAR};
 use domains::power::BATTERY;
 use simcore::auxiliary::AuxProcess;
 use simcore::environment::{constant, Environment, SourceResolver};
@@ -65,16 +65,18 @@ fn sown_at(state: &State, n: u64, sown: u64) -> State {
 
 /// P3 — **off the calendar**, every program variable on both sides follows the state's sowing.
 /// A crop sown on day 10 is cold through day 65 and warm from day 66; the calendar would have
-/// it warm from day 56. Each variable's two twins differ at midday, so a reader on the wrong
-/// clock would read the other value.
+/// it warm from day 56. Each variable's two twins differ at its probe step (midday; for the lamp's
+/// lit share, which is 1 at midday in both phases, 07:30–09:00 — lit two thirds on the cold 8-h day,
+/// wholly on the warm 16-h one), so a reader on the wrong clock would read the other value.
 #[test]
 fn a_crop_sown_off_the_calendar_moves_its_cold_period_on_both_sides() {
     let scenario = sealed_station_scenario();
     let (state, _, _) = built();
-    let midday = |day: u64| day * PER_DAY + PER_DAY / 2;
     let sown = 10 * PER_DAY;
     let (bio_r, fast_r) = resolvers(&scenario);
     for var in PLANT_PROGRAM_VARS.into_iter().chain(FAST_PROGRAM_VARS) {
+        let of_day = if var == LIT_FRACTION_VAR { 5 } else { PER_DAY / 2 };
+        let midday = |day: u64| day * PER_DAY + of_day;
         let (r, dt) = if PLANT_PROGRAM_VARS.contains(&var) {
             (&bio_r, scenario.bio_dt)
         } else {

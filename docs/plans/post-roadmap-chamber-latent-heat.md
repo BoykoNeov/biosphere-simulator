@@ -163,7 +163,8 @@ Three possible follow-ons, each its own decision, none started:
   sealed one; the TM ratio did move (1.04 → 0.96–0.97).
   **ADOPTED 2026-10-15** at the booting ratio (0.123; `post-roadmap-night-stomata.md` §7): the
   dark-hours heat with nothing to pay for it, once the lamp is off at night, is now **~0.31 GJ, not
-  1.80** (§6 there; the partly lit windows' dark minutes still count as day, ~0.5 GJ more, estimated).
+  1.80** (§6 there; the partly lit windows' dark minutes still count as day, ~0.5 GJ more, estimated; ⚠ *measured 2026-10-16*, lab-only:
+−0.49 GJ of the crop's latent heat, `post-roadmap-lit-share-stomata.md` §5).
 * **The room's lamp heat switched with the light** (on/off rather than a daily average) — a station
   unfreeze; it moves the chamber's temperature and heater books, not water.
   **ADOPTED 2026-10-15** (`post-roadmap-room-lamp-heat.md` §7–§8). ⚠ *"Not water"* was wrong in a small

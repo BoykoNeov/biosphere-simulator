@@ -10,6 +10,8 @@
 //! rate laws; the *behavioral* clamps (`lai == 0 → 0`, `max(0, …)`, piecewise cutoffs)
 //! are kept exactly.
 
+use simcore::error::SimError;
+
 use super::params;
 use super::params::{CanopyParams, PartitionRow, PhotosynthesisParams, RespirationParams};
 use super::weather::{saturation_vapor_pressure, SVP_B, SVP_C};
@@ -1048,6 +1050,83 @@ pub fn night_surface_resistance(day: f64, net_radiation: f64, form: NightStomata
         NightStomata::Closing(f) if net_radiation <= 0.0 => day / f,
         _ => day,
     }
+}
+
+/// How [`NightStomata::Closing`] reads a plant step the lamp is on for PART of
+/// (`docs/plans/post-roadmap-lit-share-stomata.md`).
+///
+/// Never loaded from a param file — it selects a form. The loader's is [`NightRule::NetRadiation`];
+/// [`NightRule::LitShare`] is lab-only.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum NightRule {
+    /// ASCE-EWRI's hourly rule on the step's mean: `Rn > 0` is day, so a partly lit step keeps
+    /// open stomata through its dark minutes.
+    #[default]
+    NetRadiation,
+    /// A partly lit step is its lit share `φ` of lit time and `1 − φ` of dark time
+    /// ([`step_crop_transpiration`]); `φ` is the `lit_fraction` forcing the lamp-lit build supplies.
+    LitShare,
+}
+
+/// The crop's Penman–Monteith potential (kg m⁻² d⁻¹) over one plant step whose mean net radiation
+/// is `net_radiation`, of which the crop's radiation term reads `radiation_share` (1 without the
+/// soil evaporation's energy split), under the night rule. Day and night are told by the step's
+/// `net_radiation`, not the crop's share of it (the rule before the split did the same).
+///
+/// `lit` is the step's lit share under [`NightRule::LitShare`] (`None` is the binary rule). A
+/// partly lit step (`0 < φ < 1`, `Rn > 0`) is the time-weighted sum of its lit part at `Rn / φ`
+/// with the day resistance and its dark part at no light with the night resistance:
+/// `φ · PM(s·Rn/φ, rs_day) + (1 − φ) · PM(0, rs_day/f)` (`s` the share). Every other step — `φ = 1`, `Rn ≤ 0`, the
+/// binary rule, or [`NightStomata::Open`] — is exactly `PM(s·Rn, night_surface_resistance(..))`, the
+/// rule before the split. `Rn ≤ 0` is dark whatever `φ` says: a shed lamp scales the light, not
+/// `φ`. An error when `Rn > 0` with `φ ≤ 0`, or `φ > 1` — a wiring fault.
+#[allow(clippy::too_many_arguments)]
+pub fn step_crop_transpiration(
+    net_radiation: f64,
+    radiation_share: f64,
+    lit: Option<f64>,
+    vpd: f64,
+    temp_c: f64,
+    aerodynamic_resistance: f64,
+    day_resistance: f64,
+    night: NightStomata,
+) -> Result<f64, SimError> {
+    let binary = || {
+        penman_monteith_transpiration(
+            net_radiation * radiation_share,
+            vpd,
+            temp_c,
+            aerodynamic_resistance,
+            night_surface_resistance(day_resistance, net_radiation, night),
+        )
+    };
+    let (Some(phi), NightStomata::Closing(f)) = (lit, night) else {
+        return Ok(binary());
+    };
+    if phi.is_nan() || phi > 1.0 || (net_radiation > 0.0 && phi <= 0.0) {
+        return Err(SimError::Validation(format!(
+            "lit share {phi:?} with net radiation {net_radiation:?}: the lamp-lit build's \
+             lit_fraction and its light disagree"
+        )));
+    }
+    if net_radiation <= 0.0 || phi == 1.0 {
+        return Ok(binary());
+    }
+    let lit_part = penman_monteith_transpiration(
+        net_radiation * radiation_share / phi,
+        vpd,
+        temp_c,
+        aerodynamic_resistance,
+        day_resistance,
+    );
+    let dark_part = penman_monteith_transpiration(
+        0.0,
+        vpd,
+        temp_c,
+        aerodynamic_resistance,
+        day_resistance / f,
+    );
+    Ok(phi * lit_part + (1.0 - phi) * dark_part)
 }
 
 /// Whether the soil evaporates (`docs/plans/post-roadmap-soil-evaporation.md`).

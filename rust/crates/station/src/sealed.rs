@@ -20,8 +20,8 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
-    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER,
-    STORAGE_C, TEMP_VAR, THERMAL_TIME, VERNALIZATION_DAYS,
+    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, LIT_FRACTION_VAR, O2_POOL, PAR_VAR, RN_VAR,
+    ROOTED_DEPTH, SOIL_WATER, STORAGE_C, TEMP_VAR, THERMAL_TIME, VERNALIZATION_DAYS,
 };
 use domains::biosphere::params::PhenologyParams;
 use domains::biosphere::science;
@@ -68,7 +68,7 @@ use crate::flows::{
 use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
 };
-use crate::lighting::{lamp_light_path, lamp_net_radiation_path};
+use crate::lighting::{lamp_light_path, lamp_lit_fraction_path, lamp_net_radiation_path};
 use crate::scenario::{Phase, SealedStationScenario};
 use crate::sowing::{insert_twins, on_sowing_clock, sow_now, PLANT_PROGRAM_VARS, SOWN_STEP};
 use crate::stocks::{
@@ -614,6 +614,13 @@ pub fn sealed_bio_resolver(
         DAYLENGTH_VAR,
         constant(cold_s)?,
         constant(warm_s)?,
+    );
+    // The lamp's lit share, phase by phase (read only under the lab lit-share night rule).
+    insert_twins(
+        &mut forcings,
+        LIT_FRACTION_VAR,
+        lamp_lit_fraction_path(cold_s),
+        lamp_lit_fraction_path(warm_s),
     );
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }

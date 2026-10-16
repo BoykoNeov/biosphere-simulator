@@ -955,6 +955,8 @@ fn transpiration_flow(
                 leaf_resistance: p.transp.leaf_stomatal_resistance,
                 threshold_lai: p.transp.threshold_lai,
                 night: p.transp.night_stomata,
+                lit_var: (p.transp.night_rule == science::NightRule::LitShare)
+                    .then(|| LIT_FRACTION_VAR.to_string()),
             }
         }),
         // The two-stage soil evaporation (the reference's since 2026-10-10); `None` under `Off`.
