@@ -186,6 +186,14 @@ printed digit; model / hand 0.9967 → 0.9962.
 | L8 | the same 2 goldens | **HIT** |
 | L9 | carbon unchanged unless a re-sow day moves | **PARTLY MISSED**: no re-sow day moved, but carbon moved at 1–2e-4 through the room's temperature — the latent-heat books carry a water change into the room's heat, and the room's heat into the crop's clock |
 
+### 5d′. A test-runtime regression, caught after the commit (advisor review, 2026-10-16)
+
+`ff84e7f`'s by-hand TM helper read the loader (`params::biosphere()`, which parses every param file)
+on **every step**; the bisections call the by-hand sums hundreds of times, so `scorecard_tm102788`
+went from 0.66–2.52 s to **922 s** in the test profile (1891 s in release). Fixed in the follow-up: the
+rule is read once per test binary (`loader_night_rule`, a `OnceLock`); measured 1.87–2.00 s, inside
+the old file's spread on the same machine. No value changed.
+
 ### 5e. What it says, and what is left for the decision
 
 The binary rule left about **a quarter of the dark time with open stomata** (§0), and closing it takes
@@ -198,6 +206,8 @@ through the room's warmth.
 The real figure lies between run 0 and this.
 
 **Owed to an adoption, if taken:** (1) the open field and weather-lit builds need φ = 1 supplied (as the
-scratch build did) or a per-build choice; (2) the minute water path (lab) fails under the switch and
-would need the lit share recorded or a refusal; (3) the unfreeze ceremony for the 2 station goldens and
+scratch build did) or a per-build choice; (2) the minute water path (lab) fails under the switch — *measured* in the scratch
+worktree: `minute_transpiration.rs`'s one-day run stops at its first fast step with *"a plant flow on the
+fast step reads "lit_fraction", which is not in its recorded window"* — and would need the lit share
+recorded or an explicit refusal; (3) the unfreeze ceremony for the 2 station goldens and
 their manifest rows; (4) the soil's 42 kg traced before it is described as the watering trigger's.

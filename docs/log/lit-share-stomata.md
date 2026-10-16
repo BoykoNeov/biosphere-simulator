@@ -36,5 +36,10 @@ a dense TM canopy), L9 partly.
 * **Instant closure is an upper bound** (a side note the user relayed): the hours this changes are the
   ones beside the switch, where stomata lag most. Carried into the decision, not modelled.
 
+**A runtime regression, fixed the same day:** the commit's by-hand TM helper read the loader on every
+step, taking `scorecard_tm102788` from under 3 s to 922 s; the follow-up reads it once (1.9 s). A
+loader call inside a per-step closure is a cost no gate times.
+
 **Owed to an adoption:** φ for the open field and weather-lit builds (φ = 1, or per build); the minute
-water path (lab) fails under the switch; the unfreeze ceremony for 2 goldens; the soil's 42 kg traced.
+water path (lab) fails under the switch (measured: it names the missing `lit_fraction`); the unfreeze
+ceremony for 2 goldens; the soil's 42 kg traced.

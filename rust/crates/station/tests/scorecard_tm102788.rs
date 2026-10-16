@@ -463,6 +463,7 @@ fn w1_by_hand(ra: f64, rs: f64, rn_scale: f64) -> f64 {
 /// `w1_by_hand` under a named night rule. The constant-resistance checks (A1, R1) name `Open`: the
 /// constant form's flow has no canopy, so the model never applies the night rule there.
 fn w1_by_hand_at(ra: f64, rs: f64, rn_scale: f64, night: NightStomata) -> f64 {
+    let rule = loader_night_rule();
     mean(W1_DAYS.map(|d| {
         let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
         (first..first + STEPS_PER_DAY as u64)
@@ -470,16 +471,35 @@ fn w1_by_hand_at(ra: f64, rs: f64, rn_scale: f64, night: NightStomata) -> f64 {
                 let t = temp(n, BIO_DT);
                 let rn = rn_scale * lamp_net_radiation(par_on(n)) * lit(n, BIO_DT);
                 let vpd = saturation_vapor_pressure(t) * (1.0 - RH);
-                step_water(rn, lit(n, BIO_DT), vpd, t, ra, rs, night)
+                step_water(rn, lit(n, BIO_DT), vpd, t, ra, rs, night, rule)
             })
             .sum::<f64>()
     }))
 }
 
-/// One step's by-hand crop water (kg m⁻² per step) under `night` and the loader's night rule —
-/// the lit share is read only under the lab `NightRule::LitShare`, as the model reads it.
-fn step_water(rn: f64, lit: f64, vpd: f64, t: f64, ra: f64, rs: f64, night: NightStomata) -> f64 {
-    let lit = (params::biosphere().transp.night_rule == NightRule::LitShare).then_some(lit);
+/// The loader's night rule, read once per test binary: the loader parses every param file, and the
+/// by-hand sums are called hundreds of times by the bisections (read per step, it took this file
+/// from under 3 s to 922 s).
+fn loader_night_rule() -> NightRule {
+    static RULE: std::sync::OnceLock<NightRule> = std::sync::OnceLock::new();
+    *RULE.get_or_init(|| params::biosphere().transp.night_rule)
+}
+
+/// One step's by-hand crop water (kg m⁻² per step) under `night` and the night rule `rule` (the
+/// loader's, [`loader_night_rule`]) — the lit share is read only under the lab
+/// `NightRule::LitShare`, as the model reads it.
+#[allow(clippy::too_many_arguments)]
+fn step_water(
+    rn: f64,
+    lit: f64,
+    vpd: f64,
+    t: f64,
+    ra: f64,
+    rs: f64,
+    night: NightStomata,
+    rule: NightRule,
+) -> f64 {
+    let lit = (rule == NightRule::LitShare).then_some(lit);
     science::step_crop_transpiration(rn, 1.0, lit, vpd, t, ra, rs, night).expect("a valid step")
         * BIO_DT
 }
@@ -795,7 +815,7 @@ const SET_POINTS: Forcing = Forcing {
 /// `w1_by_hand` with the forcings as arguments; `SET_POINTS` reproduces it, the loader's night rule
 /// included.
 fn w1_by_hand_with(ra: f64, rs: f64, f: Forcing) -> f64 {
-    let night = params::biosphere().transp.night_stomata;
+    let (night, rule) = (params::biosphere().transp.night_stomata, loader_night_rule());
     mean(W1_DAYS.map(|d| {
         let first = ((d - TM_DAY0) * STEPS_PER_DAY) as u64;
         (first..first + STEPS_PER_DAY as u64)
@@ -811,7 +831,7 @@ fn w1_by_hand_with(ra: f64, rs: f64, f: Forcing) -> f64 {
                 };
                 let rn = f.rn_scale * lamp_net_radiation(par_on(n)) * l;
                 let vpd = saturation_vapor_pressure(t) * (1.0 - rh);
-                step_water(rn, l, vpd, t, ra, rs, night)
+                step_water(rn, l, vpd, t, ra, rs, night, rule)
             })
             .sum::<f64>()
     }))
