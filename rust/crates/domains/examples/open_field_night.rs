@@ -12,7 +12,12 @@
 //!
 //! ```text
 //! cargo run --release -q -p domains --example open_field_night
+//! cargo run --release -q -p domains --example open_field_night -- --sealed-ra 50
 //! ```
+//!
+//! `--sealed-ra <s/m>` substitutes the sealed builds' air resistance
+//! (`chamber_aerodynamic_resistance`, through the value-switch harness) — the experiment for
+//! whether the jars' larger drop is their 7.5 s/m.
 
 use std::collections::BTreeMap;
 
@@ -43,13 +48,13 @@ struct Run {
 }
 
 fn run(
+    p: &params::BiosphereParams,
     scenario: &SeasonScenario,
     years: usize,
     perennial: bool,
     radiation: WeatherRadiation,
 ) -> Run {
-    let p = params::biosphere();
-    let (state, integrator, _) = season_setup_with(scenario, years, &p).expect("setup");
+    let (state, integrator, _) = season_setup_with(scenario, years, p).expect("setup");
     let resolver = weather_resolver_with(scenario, years, radiation).expect("weather");
     let steps = steps_for_years(years);
     let flow = integrator
@@ -95,7 +100,7 @@ fn run(
             &integrator,
             state,
             scenario,
-            &p,
+            p,
             &resolver,
             BIO_DT,
             steps,
@@ -136,6 +141,23 @@ fn values(s: &State) -> BTreeMap<String, f64> {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let p = match args.iter().position(|a| a == "--sealed-ra") {
+        Some(i) => {
+            let ra: f64 = args[i + 1].parse().expect("--sealed-ra takes a number");
+            println!(
+                "sealed builds' air resistance substituted: {ra} s/m
+"
+            );
+            domains::lab::biosphere_with(&[domains::lab::Substitution::resolve(
+                "chamber_aerodynamic_resistance",
+                ra,
+            )
+            .expect("the field resolves")])
+            .expect("the substitution loads")
+        }
+        None => params::biosphere(),
+    };
     let cases: [(&str, SeasonScenario, usize, bool); 4] = [
         ("open field (season_euler)", DEFAULT_SCENARIO, 1, false),
         (
@@ -158,8 +180,8 @@ fn main() {
         ),
     ];
     for (name, scenario, years, perennial) in cases {
-        let mean = run(&scenario, years, perennial, WeatherRadiation::DailyMean);
-        let sun = run(&scenario, years, perennial, WeatherRadiation::SunPath);
+        let mean = run(&p, &scenario, years, perennial, WeatherRadiation::DailyMean);
+        let sun = run(&p, &scenario, years, perennial, WeatherRadiation::SunPath);
         println!("== {name}, {years} yr ==");
         for (label, r) in [("daily mean", &mean), ("sun path", &sun)] {
             let total = r.lit_draw + r.dark_draw;

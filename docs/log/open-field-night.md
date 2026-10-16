@@ -29,9 +29,11 @@ moved. 5 test claims went red, all on the premise "the open field has no night" 
 that read the open field's step 0 (midnight) as lit.
 
 **Lessons.**
-* **The jars move three times the open field** because their air resistance is 7.5 s/m against 50: the
-  drying-air term, which night closure removes, is a far larger share of their water. A night form is
-  priced per air resistance, not per build.
+* **The jars move two to three times the open field, and the first-written cause was half the story.**
+  It was recorded as "their air resistance, 7.5 s/m against 50" before any run; the experiment removing
+  it (the sealed builds at 50) took back ~75 % of the sealed chamber's excess and only ~40 % of the
+  perennial and consumer chambers'. The rest is not identified (the jars' own-air deficit, the humidity
+  cap, recycling are candidates). A cause written from arithmetic earns its run before it is a lesson.
 * **"Nearly linear" was right about the radiation and silent about the soil.** The soil's potential is
   radiation-only and its daily sum is unchanged, yet it evaporated 8.9 % less: not the top layer's cap
   (the capped evaporation is equal in both), so the rate's timing inside a day — the Stage I / II switch

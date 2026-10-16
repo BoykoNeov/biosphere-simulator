@@ -81,6 +81,13 @@ temperature (checked 2026-10-16: the three NASAPower files in the tree hold TEMP
 the fixture with TMIN/TMAX (a frozen input: the manifest's `weather_sha256` moves), gives the deficit a
 within-day cycle from a cited diurnal temperature form, and feeds it to the water reads only.
 
+⚠ **The re-fetch must not move the existing three columns** (advisor, 2026-10-16). NASA POWER revises its
+archive between versions, so a fresh download of the same 2006–07 days can return different TEMP, IRRAD
+and VAP — and every golden would then move for a reason unrelated to the min/max. Take only the new
+TMIN/TMAX columns, check the three committed columns value for value against the new download, and record
+the service version. Also check how the provider forms the daily TEMP — the mean of min and max, or a 24-h
+mean — since that decides where a within-day curve sits on the existing value.
+
 ## 5. Results (2026-10-16)
 
 **How it was run.** Step 1 in the tree: the form (`system::WeatherRadiation`,
@@ -101,12 +108,25 @@ under both forms from the loader's params. The goldens and the suite were run in
 | consumer chamber, 5 yr | 2094.98 | 1563.43 | **−531.6 (−25.4 %)** | 3.4 % | bit-identical |
 
 "Drawn" is the crop and the soil together, from the root zone. The open field's own sinks: the crop
-502.63 → 445.22 kg (**−11.4 %**), the soil 45.87 → 41.78 kg (**−8.9 %**); it drew 4.6 kg *more*
-irrigation (the watering source −465.7 → −470.2 kg).
+502.63 → 445.22 kg (**−11.4 %**), the soil 45.87 → 41.78 kg (**−8.9 %**). The watering source ends
+4.6 kg lower (−465.7 → −470.2 kg) — a **net**: the deep overflow returns water to it (`DeepOverflow::Recycled`),
+so this is not "more irrigation". The end-of-run soil water (+71 %) is one point in the watering cycle,
+not a season total.
 
-**Why the jars move three times the open field:** their air resistance is the chamber's measured
-7.5 s/m against the open field's 50, so the drying-air term — the part night closure removes — is a far
-larger share of their water. Not separately measured.
+**Why the jars move more than the open field — measured in part.** First written as "their air
+resistance is 7.5 s/m against 50", unmeasured; then tested by substituting 50 for the sealed builds'
+`chamber_aerodynamic_resistance` (the probe's `--sealed-ra 50`, through the value-switch harness):
+
+| build | change at 7.5 s/m (loader) | at 50 s/m | the open field |
+|---|---|---|---|
+| sealed chamber, 3 yr | −32.7 % | −16.6 % | −11.2 % |
+| perennial chamber, 5 yr | −28.4 % | −21.2 % | |
+| consumer chamber, 5 yr | −25.4 % | −19.9 % | |
+
+The air resistance carries **~75 %** of the sealed chamber's excess over the open field and **~40 %** of
+the perennial and consumer chambers'. The rest is something else the jars have and the field does not —
+candidates: they read the deficit from their own air (`VpdRead::Chamber`), which a crop drinking less
+dries further; the humidity cap; recycled water. **Not identified.**
 
 **The soil's −4.1 kg is not the top layer's cap:** the evaporation on steps that emptied the top layer
 is the same in both (10.28 vs 10.31 kg). Radiation-only, the soil's daily potential is unchanged
