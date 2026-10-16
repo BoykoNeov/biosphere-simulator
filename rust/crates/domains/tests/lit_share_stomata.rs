@@ -198,7 +198,12 @@ fn the_switch_reaches_the_flow_and_moves_only_a_partly_lit_step() {
         let NightStomata::Closing(f) = night else {
             unreachable!()
         };
-        let binary_p = with_night_stomata(params::biosphere(), night);
+        // Both rules named, never the loader's: once the loader takes the split, a baseline read
+        // from it would compare the split with itself and pass inertly.
+        let binary_p = with_night_rule(
+            with_night_stomata(params::biosphere(), night),
+            NightRule::NetRadiation,
+        );
         let split_p = with_night_rule(binary_p.clone(), NightRule::LitShare);
         let tp = &split_p.transp;
         let lai = science::leaf_area_index(
