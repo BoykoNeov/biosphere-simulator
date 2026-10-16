@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `lit-share-stomata.md`
+**Re-read against the record's last row:** `open-field-night.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -587,6 +587,13 @@ roughly day 1635 rather than 1590 — later, still past the horizon (a scaling, 
 battery ends 4.8 % fuller). Nothing in §3 is re-proposed. **Adopted the same day** (that log's
 "ADOPTED" block): the 0.87 GJ stands, measured on the adopted tree; the weather's builds take φ = 1 as a
 staging step toward the user's choice of a real day/night share outdoors, filed there as the next item.
+⚠ *Re-read 2026-10-16* (`log/open-field-night.md`, step 1 BUILT lab-only and MEASURED; step 2, the air, owed
+before any adoption): grepped this plan for open field, net radiation, daily mean, diurnal, night and battery. It is
+that staged item, not a §2 item, so nothing is struck and nothing added. It bears on the 2026-10-15 correction
+above ("the biosphere jars read the outdoor daily mean"): under the lab form they do not, and see a night — but
+the battery note is the sealed station's, a lamp-lit build whose golden is byte-identical under the flip, so the
+battery reading still stands. The open-field "light-limited branch" note is untouched: carbon is bit-identical.
+Nothing in §3 is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

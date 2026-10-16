@@ -228,7 +228,9 @@ recommendation of φ = 1 — then, asked how to take it, **stage it** (recommend
   daily cycle as well is that item's first scoping question (a night with daytime air may be a
   half-built form). It is a **biosphere** unfreeze (likely all 7 biosphere goldens and every open-field
   station golden), so it is priced in the lab before any decision. Starting source: ASCE-EWRI's hourly
-  method.
+  method. ⚠ *Opened 2026-10-16* as `post-roadmap-open-field-night.md`: step 1 (the light) built
+  lab-only and measured; the air's day/night cycle is owed before any adoption. The shape there is
+  [E]'s half-sine, not ASCE-EWRI's (which works from measured hourly radiation).
 
 **⚠ §1a was wrong about the minute path** (advisor, 2026-10-16). It said the binary rule is "already
 nearly exact" there. It is not: `water_on_fast_step` reads `WATER_LOSS_WINDOW = [TEMP_VAR, RN_VAR]`,

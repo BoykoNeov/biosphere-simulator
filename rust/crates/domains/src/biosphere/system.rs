@@ -1359,6 +1359,34 @@ fn table_schedule(values: Vec<f64>) -> Schedule {
     Box::new(move |n, dt| values[((n as f64 * dt) as usize).min(last)])
 }
 
+/// The daylit share of each step's window: the astronomical day as an on/off top-hat, centred on
+/// solar noon — the same span [`sine_light_path`] lights, so the two are zero together.
+fn daylight_share_path(daylength_s: Vec<f64>) -> Schedule {
+    let last = daylength_s.len() - 1;
+    Box::new(move |n, dt| {
+        let t = n as f64 * dt;
+        let day = (t as usize).min(last);
+        light_path::top_hat_window_mean(t - t.trunc(), dt, 1.0, daylength_s[day]).unwrap_or(0.0)
+    })
+}
+
+/// How the weather spreads the day's net radiation over its steps
+/// (`docs/plans/post-roadmap-open-field-night.md`).
+///
+/// The fixture holds one daily total; [`weather::net_radiation`](super::weather::net_radiation) is
+/// its 24-h mean, net shortwave only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WeatherRadiation {
+    /// The day's mean on every step, each wholly lit (`lit_fraction = 1`): the reference's. The open
+    /// field never has a night, so its stomata never close.
+    DailyMean,
+    /// **Lab-only.** The sun's path: the day's net radiation on the half-sine PAR already follows
+    /// ([E] Penning de Vries), over the same astronomical day length, so each step's net radiation
+    /// is a fixed multiple of its PAR and the day's total is kept; `lit_fraction` is the step's
+    /// daylit share. A night step reads `Rn = 0` and the night rule closes the stomata.
+    SunPath,
+}
+
 /// The weather forcing table (per-var schedules), tiling the raw facts over `years`.
 ///
 /// Factored out of [`weather_resolver`] so the station lighting / sealed seams can rebuild
@@ -1370,6 +1398,16 @@ pub fn weather_forcings(
     scenario: &SeasonScenario,
     years: usize,
 ) -> Result<HashMap<String, Schedule>, SimError> {
+    weather_forcings_with(scenario, years, WeatherRadiation::DailyMean)
+}
+
+/// [`weather_forcings`] with the net radiation spread as `radiation` says — the open-field night's
+/// lab switch. Only the net radiation and the lit share depend on it.
+pub fn weather_forcings_with(
+    scenario: &SeasonScenario,
+    years: usize,
+    radiation: WeatherRadiation,
+) -> Result<HashMap<String, Schedule>, SimError> {
     let (latitude, rows) = super::weather::weather_facts();
     let f = super::weather::season_forcing(latitude, &rows, years);
     let mut forcings: HashMap<String, Schedule> = HashMap::new();
@@ -1378,14 +1416,39 @@ pub fn weather_forcings(
         PAR_VAR.to_string(),
         sine_light_path(f.par.clone(), f.daylength.clone()),
     );
+    match radiation {
+        WeatherRadiation::DailyMean => {
+            forcings.insert(RN_VAR.to_string(), table_schedule(f.net_radiation));
+            // Every weather step is wholly lit: its net radiation is the day's mean, > 0 on every
+            // step, so the split reads it as today's rule did, bit for bit. ⚠ A STAGING STEP, not a
+            // decision: the user chose a real day/night share here (2026-10-16) —
+            // `WeatherRadiation::SunPath`, lab-only (docs/plans/post-roadmap-open-field-night.md).
+            // The lamp builds replace it with their light's own top-hat.
+            forcings.insert(LIT_FRACTION_VAR.to_string(), constant(1.0)?);
+        }
+        WeatherRadiation::SunPath => {
+            // The daytime mean that keeps the day's total: `Rn_24h · 86400 / D`. A day with no
+            // daylight would have nowhere to put its radiation, so it is refused, not dropped.
+            let mut daytime_mean = Vec::with_capacity(f.net_radiation.len());
+            for (rn, dl) in f.net_radiation.iter().zip(&f.daylength) {
+                if *dl <= 0.0 {
+                    return Err(SimError::Validation(format!(
+                        "the sun's path needs daylight to spread {rn} W/m² over; the day length is {dl} s"
+                    )));
+                }
+                daytime_mean.push(rn * light_path::SECONDS_PER_DAY / dl);
+            }
+            forcings.insert(
+                RN_VAR.to_string(),
+                sine_light_path(daytime_mean, f.daylength.clone()),
+            );
+            forcings.insert(
+                LIT_FRACTION_VAR.to_string(),
+                daylight_share_path(f.daylength.clone()),
+            );
+        }
+    }
     forcings.insert(DAYLENGTH_VAR.to_string(), table_schedule(f.daylength));
-    forcings.insert(RN_VAR.to_string(), table_schedule(f.net_radiation));
-    // Every weather step is wholly lit: its net radiation is the day's mean, > 0 on every step, so
-    // the split reads it as today's rule did, bit for bit. ⚠ A STAGING STEP, not a decision: the
-    // user chose a real day/night share here (2026-10-16), which needs the net radiation shaped
-    // within the day first — the next item (docs/plans/post-roadmap-lit-share-stomata.md §6).
-    // The lamp builds replace it with their light's own top-hat.
-    forcings.insert(LIT_FRACTION_VAR.to_string(), constant(1.0)?);
     forcings.insert(VPD_VAR.to_string(), table_schedule(f.vpd));
     forcings.insert(CI_VAR.to_string(), constant(scenario.ci)?);
     forcings.insert(
@@ -1416,7 +1479,19 @@ pub fn weather_resolver(
     scenario: &SeasonScenario,
     years: usize,
 ) -> Result<SourceResolver, SimError> {
-    SourceResolver::new(weather_forcings(scenario, years)?, weather_shared(scenario))
+    weather_resolver_with(scenario, years, WeatherRadiation::DailyMean)
+}
+
+/// [`weather_resolver`] with the net radiation spread as `radiation` says (lab).
+pub fn weather_resolver_with(
+    scenario: &SeasonScenario,
+    years: usize,
+    radiation: WeatherRadiation,
+) -> Result<SourceResolver, SimError> {
+    SourceResolver::new(
+        weather_forcings_with(scenario, years, radiation)?,
+        weather_shared(scenario),
+    )
 }
 
 /// The annual phenology reset / re-sow (P3.4) — a pure, carbon-conserving transform, for a
