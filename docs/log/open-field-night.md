@@ -102,9 +102,11 @@ crop leg on every state of the run with the air swapped (the light-only side rep
 to the gram, 445.223 kg) splits it exactly: the drying-air share of the daytime water is **0.30, not the
 assumed 0.5**; the dryness ratio is **1.43, not 1.85** — the estimate weighted the afternoon's deficit by
 the sun, but the drying-air term runs on open-stomata time, not light (uniform weight: 1.85 → 1.51), the
-water is carried by the late, drier months (→ 1.48), and 0.05 is the script against the model, not traced;
-the warmer afternoon's Δ is +0.02, upward. **The estimate was wrong, not the model; nothing moved.** §7d's
-first candidate named the wrong mechanism (the canopy's resistance does not enter the share).
+water is carried by the late, drier months (→ 1.48), and 0.05 is the script against the model (0.009 of
+it the step's mean temperature, the rest not traced); the warmer afternoon's Δ is +0.02, upward. **The
+estimate was wrong, not the model; nothing moved.** §7d's first candidate (the canopy's own resistance)
+is a real but minor part: it cancels within a step, but decides which steps carry the season's water —
+under the old constant resistance the share is 0.34, not 0.30.
 
 * **Lesson: weight a term by what it multiplies.** The radiation weight belonged to the radiation term;
   borrowing it for the drying-air one doubled-down on the afternoon and dropped the cool morning.

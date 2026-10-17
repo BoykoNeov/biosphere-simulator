@@ -14,14 +14,15 @@
 //! Night net radiation under the sun's path is 0, never negative, so Penman–Monteith's clamp at zero
 //! cannot bind and `x − x0` is exactly the drying-air term. Before any factor is read: `Σ L` must
 //! reproduce the separate light-only run's crop sink, and `Σ B` this run's. The same on the curve
-//! shifted onto the observed mean, as a sensitivity row.
+//! shifted onto the observed mean, and under the old constant surface resistance (lab), as
+//! sensitivity rows.
 //!
 //! ```text
 //! cargo run --release -q -p domains --example open_field_air_terms
 //! ```
 
 use domains::biosphere::params;
-use domains::biosphere::science::AirTemperatureRead;
+use domains::biosphere::science::{AirTemperatureRead, SurfaceResistanceForm};
 use domains::biosphere::stocks::{
     AIR_TEMP_WITHIN_DAY_VAR, RN_VAR, SOIL_EVAP_SINK, TEMP_VAR, VAPOR_SINK, VPD_VAR,
     VPD_WITHIN_DAY_VAR,
@@ -99,9 +100,10 @@ struct Run {
     end: State,
 }
 
-fn decompose(air: WeatherAir) -> Run {
+fn decompose(air: WeatherAir, rs: SurfaceResistanceForm) -> Run {
     let scenario = DEFAULT_SCENARIO;
-    let p = with_air_temperature(params::biosphere(), AirTemperatureRead::WithinDay);
+    let mut p = with_air_temperature(params::biosphere(), AirTemperatureRead::WithinDay);
+    p.transp.rs_form = rs;
     let (state, integrator, _) = season_setup_with(&scenario, 1, &p).expect("setup");
     let resolver =
         weather_resolver_lab(&scenario, 1, WeatherRadiation::SunPath, air).expect("weather");
@@ -260,39 +262,50 @@ fn report(label: &str, r: &Run, light_only_crop: f64) {
     println!();
 }
 
+/// The separate light-only run's crop sink, the gate's other side.
+fn light_only_crop(rs: SurfaceResistanceForm) -> f64 {
+    let scenario = DEFAULT_SCENARIO;
+    let mut p = with_air_temperature(params::biosphere(), AirTemperatureRead::DailyMean);
+    p.transp.rs_form = rs;
+    let (state, integrator, _) = season_setup_with(&scenario, 1, &p).expect("setup");
+    let resolver = weather_resolver_lab(
+        &scenario,
+        1,
+        WeatherRadiation::SunPath,
+        WeatherAir::DailyMean,
+    )
+    .expect("weather");
+    let (end, _, _) = run_season(
+        &integrator,
+        state,
+        &resolver,
+        BIO_DT,
+        steps_for_years(1),
+        None,
+        &mut |_: &State| {},
+    )
+    .expect("run");
+    end.stocks[VAPOR_SINK].amount
+}
+
 fn main() {
-    // The separate light-only run's crop sink, the gate's other side.
-    let light_only_crop = {
-        let scenario = DEFAULT_SCENARIO;
-        let p = with_air_temperature(params::biosphere(), AirTemperatureRead::DailyMean);
-        let (state, integrator, _) = season_setup_with(&scenario, 1, &p).expect("setup");
-        let resolver = weather_resolver_lab(
-            &scenario,
-            1,
-            WeatherRadiation::SunPath,
-            WeatherAir::DailyMean,
-        )
-        .expect("weather");
-        let (end, _, _) = run_season(
-            &integrator,
-            state,
-            &resolver,
-            BIO_DT,
-            steps_for_years(1),
-            None,
-            &mut |_: &State| {},
-        )
-        .expect("run");
-        end.stocks[VAPOR_SINK].amount
-    };
+    let loader = params::biosphere().transp.rs_form;
+    let light_only = light_only_crop(loader);
     report(
         "open field, light + air (as printed)",
-        &decompose(WeatherAir::WithinDay),
-        light_only_crop,
+        &decompose(WeatherAir::WithinDay, loader),
+        light_only,
     );
     report(
         "open field, light + air (shifted onto the observed mean)",
-        &decompose(WeatherAir::WithinDayShifted),
-        light_only_crop,
+        &decompose(WeatherAir::WithinDayShifted, loader),
+        light_only,
+    );
+    // The canopy's resistance cancels from the share within a step, but it decides which steps carry
+    // the season's water (plan §10b): the same decomposition under the old constant 70 s/m.
+    report(
+        "open field, light + air (as printed), the constant surface resistance (lab)",
+        &decompose(WeatherAir::WithinDay, SurfaceResistanceForm::Constant),
+        light_only_crop(SurfaceResistanceForm::Constant),
     );
 }

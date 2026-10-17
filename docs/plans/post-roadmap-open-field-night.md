@@ -607,16 +607,27 @@ as written, 1.52–2.67 — higher in *every* month, so the season's weighting i
    each month's light-only drying-air water (A_L), give **1.481** — the season's weighting is worth
    0.024 of the drop.
 3. **What is left, 1.481 → 1.430 (0.051), is the script against the model within each month** —
-   the ~0.05 per-month gap above. Candidates, **not traced**: the script's own day-length formula
-   (the model reads the fixture's), its sunrise at `12 − D/2`, and the weight inside a month (the script
-   weights every day alike; the model by each step's coefficient, which grows with the canopy).
+   the ~0.05 per-month gap above. **One candidate checked, and small:** the model reads the deficit
+   at each 1.5-h step's *mean* temperature (`system.rs`, the `vpd_within_day` forcing), and the
+   saturation curve is convex, so a step's deficit reads lower than the script's fine sampling. Re-run
+   with 16 window means a day, each weighted by its lit time (`step2_hand_windows.py` beside the others), the
+   water-weighted ratio is 1.472: worth **0.009**. The other ~0.04 is **not traced**; candidates: the
+   script's own day-length formula (the model reads the fixture's), its sunrise at `12 − D/2`, and the
+   weight inside a month (the script weights every day alike; the model each step by its coefficient,
+   which grows with the canopy).
 
-**And the share is 0.30, not 0.5** — the estimate's "half the daylit water" was never computed. It is
-set by the numerator alone (Penman–Monteith puts the canopy resistance in a denominator both terms
-share), so §7d's first candidate — *"the drying-air share is smaller than half under the canopy's own
-resistance"* — had the right size and the wrong mechanism: r_s does not enter the share at all. The
-share is high early (0.88 in month 1, where the crop's radiation share is small) and 0.27–0.29 in the
-four months that carry the water.
+**And the share is 0.30, not 0.5** — the estimate's "half the daylit water" was never computed. Within
+one step the canopy resistance cancels from the share (Penman–Monteith puts it in a denominator both
+terms share), so a step's share is set by the numerator: the 50 s/m air resistance against Δ·Rn. But the
+season's share is a water-weighted mean of the steps, and the resistance decides which steps carry the
+water. The share is high early (0.88 in month 1, where the crop's radiation share is small) and
+0.27–0.29 in the four months that carry it; the leaf-area resistance (Szeicz–Long), huge at a small leaf
+area, is what keeps the early, drying-air-heavy months light. **Measured** (the instrument's third row,
+the old constant 70 s/m, lab): the season's share is **0.339** against the reference's 0.296. So §7d's
+first candidate — *"the drying-air share is smaller than half under the canopy's own resistance"* — is
+**a real part, 0.04 of the share's 0.20 shortfall**; the main driver is the air resistance against the
+radiation term in the months that carry the water. (Under the constant form the lit multiplier ends
+1.150, the reference's 1.146: a lower ratio, 1.383, offsets the higher share.)
 
 **The Δ candidate is real and small.** The warmer afternoon moves weight to the radiation term (+7.1 %)
 and from the drying-air one (−7.4 %); net on the lit multiplier, **+0.019**. It pushes *up*, not down, so
@@ -649,5 +660,6 @@ sun (the drying-air part runs on time, not light — 1.85 → 1.51 — and the w
 months, where the curve adds least — → 1.48; a last 0.05 is the script against the model, not traced): 1.43, not 1.85. Each factor is measured on the run's own states, the parts
 compose to the measured multiplier exactly, and the light-only side reproduces the separate run to the
 gram. The warmer-afternoon Δ effect is real, +0.02, the other way. **Nothing in the model is implicated;
-no science, golden or manifest moved.** One record corrected: §7d's first candidate named the wrong
-mechanism (the canopy's resistance is not in the share).
+no science, golden or manifest moved.** §7d's first candidate (the canopy's own resistance) is a real
+but minor part of the share — it reweights which steps carry the water, 0.04 of the share; it does not
+enter any one step's share.
