@@ -41,3 +41,34 @@ that read the open field's step 0 (midnight) as lit.
 * **A test's step 0 is a time of day.** Two tests read the open field at step 0 and called it a lit step;
   under a real day step 0 is midnight. A premise the forcing used to make true for every step is now true
   for some.
+
+**STEP 2 BUILT lab-only and MEASURED, 2026-10-17** (plan §7), on the user's *"step 2"*; asked how far
+the air's cycle should reach, the user chose **the open field and the jars** (the jars read their own
+air, so a cycle on the weather file's deficit alone would never reach them). The fixture gained daily
+`TMIN` / `TMAX` from NASA POWER (`ecb418d`, inert: the same download reproduced the three committed
+columns bit for bit). The form (`93eec5a`): Teh (2006) §2.7's temperature curve through the observed
+minimum and maximum, each step its window's exact mean, vapour pressure held at the day's;
+`system::WeatherAir` supplies it, `science::AirTemperatureRead::WithinDay` makes every water reader take
+it (transpiration, soil evaporation, the jar's own deficit, humidity bound and dehumidifier, the soil
+account) while growth — and the roots' capture — keep the daily mean; lamp-lit station rooms build on
+`lighting::room_params`. Tests `domains/tests/open_field_air.rs` (one records every flow's reads; its
+teeth checked). Probe `domains/examples/open_field_air.rs`.
+
+Light + air against the daily mean: water **−2.0 %** in the open field (step 1 alone −11.2 %), **−20 to
+−21 %** in the jars (step 1 −25 to −33 %); **carbon bit-identical everywhere**; the jars condense at
+night. The open field's sign depends on the curve's placement (shifted onto the observed mean: +2.4 %).
+Flipped in a scratch worktree: the same 8 goldens as step 1, water only; station goldens identical; 19
+test reds, none a defect in the form (2 manifests, 6 old-loader pins, 2 step-0, 4 mixed test builds, 4
+held-room test builds, 1 moved drought ratio). **Adoption, and the placement, are the user's.**
+
+**Lessons (step 2).**
+* **A by-hand multiplier needs the weight it multiplies.** The prediction that light + air would end
+  *above* the daily mean took the drying-air term as half the daylit water and multiplied it by the
+  radiation-weighted 1.85×; the model's daylit water rose 1.14×. Missed on sign; the cause is not traced.
+  The air-only row, predicted from the 24-h mean (1.000×), hit.
+* **The flipped tree found a leak no golden could.** A station lab variant rebuilt its soil account from
+  the loader's params, so under the flip it read the outdoor air inside a sealed room — silently, 1.3 g.
+  The fix made the rooms *drop* the outdoor names, so a missed reader now fails instead of reading the
+  outdoors. A guard that turns a silent wrong value into an error is worth more than one more pin.
+* **A placement choice can be larger than the effect it places.** The 4.4-point swing between the curve
+  as printed and the curve shifted onto the observed mean is bigger than the open field's net −2.0 %.

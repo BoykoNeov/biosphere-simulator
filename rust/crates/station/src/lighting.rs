@@ -13,8 +13,8 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
-    DAYLENGTH_VAR, LIT_FRACTION_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER, TEMP_VAR, THERMAL_TIME,
-    VERNALIZATION_DAYS,
+    AIR_TEMP_WITHIN_DAY_VAR, DAYLENGTH_VAR, LIT_FRACTION_VAR, PAR_VAR, RN_VAR, ROOTED_DEPTH,
+    SOIL_WATER, TEMP_VAR, THERMAL_TIME, VERNALIZATION_DAYS, VPD_WITHIN_DAY_VAR,
 };
 use domains::biosphere::system::{
     build_season_with, soil_surface_start, weather_forcings, weather_shared,
@@ -57,6 +57,17 @@ pub fn room_params() -> domains::biosphere::params::BiosphereParams {
     let mut p = domains::biosphere::params::biosphere();
     p.water.air_temperature = domains::biosphere::science::AirTemperatureRead::DailyMean;
     p
+}
+
+/// Drops the weather's within-day air from a ROOM's forcing table: a room's water reads the room's
+/// own temperature ([`room_params`]), so a reader left on the outdoor curve fails at its first step
+/// instead of reading the outdoors (`docs/plans/post-roadmap-open-field-night.md` §7e). A no-op
+/// while the weather supplies no within-day air (the loader's).
+pub fn drop_outdoor_air(
+    forcings: &mut std::collections::HashMap<String, simcore::environment::Schedule>,
+) {
+    forcings.remove(AIR_TEMP_WITHIN_DAY_VAR);
+    forcings.remove(VPD_WITHIN_DAY_VAR);
 }
 
 /// Assemble the lighting station: `(state, bio_registry, power_registry)`.
@@ -221,6 +232,7 @@ pub fn lighting_bio_resolver(
     with_lamp: bool,
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = weather_forcings(&scenario.bio, 1)?;
+    drop_outdoor_air(&mut forcings);
     let par = if with_lamp {
         lamp_par(lamp, scenario)
     } else {

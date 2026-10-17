@@ -319,3 +319,64 @@ swing between the two placements is larger than the net effect, so "light + air 
 "costs a little" are the same measurement under two placements. In the jars it does not (1.7–3.6 points
 against ~20 %). The placement is therefore part of any adoption decision, put to the user, not settled
 in this record (§7b gives the reasons each way).
+
+### 7e. The flipped tree — what adoption would cost (2026-10-17)
+
+A scratch worktree of `93eec5a` with the loader flipped to light + air (`AirTemperatureRead::WithinDay`,
+and `weather_forcings` / `weather_resolver` at `SunPath` + `WeatherAir::WithinDay`), built in its **own**
+target directory (step 1's redirected one broke the Godot tests; this one did not). Outputs kept beside the
+probe's (`step2_flip_*`).
+
+**The goldens (`regen_goldens`): 8 of 20 change — exactly A8's eight**, the same eight as step 1
+(`season_euler`, `sealed_chamber`, `perennial_chamber`, `perennial_long_horizon`, `consumer_chamber`,
+`consumer_long_horizon`, `greenhouse`, `harvest`). Every changed stock amount (30) is a water stock; the
+rest are the soil's water clocks. `lighting_state`, `sealed_station_state` and `drift_summary`
+byte-identical. **A8 HIT.**
+
+**A leak found and fixed in the tree.** One station build did read the outdoor curve: the split-air
+station swaps in its own soil-water account built from the **loader's** params, not the room's, so under
+the flip that account read the outdoor within-day temperature inside a sealed room (its top layer gained
+1.3 g less than the crew's watering delivered; no error). No golden builds that variant, which is why the
+station goldens stayed identical. Fixed in the tree, inert under the loader: the account is built from
+`lighting::room_params()`, and both room resolvers (`lighting`, `sealed`) now **drop** the two within-day
+names (`lighting::drop_outdoor_air`), so any reader left on them fails at its first step instead of
+reading the outdoors. Re-run flipped: that test passes.
+
+**The suite, flipped (`cargo test --no-fail-fast`): 20 red, 19 after the fix; `--ignored` 9 passed.**
+None is a defect in the form:
+
+* **2 manifest writers** (`domains`, `station`) — owed by any adoption.
+* **6 pins of the old loader** — `the_loader_keeps_the_daily_mean` (step 1's),
+  `the_loader_keeps_the_daily_mean_air`, `the_reader_without_the_data_fails`,
+  `the_reader_reaches_the_water_and_only_the_water` (this step's), `the_weather_is_wholly_lit_and_moves_nothing`,
+  `the_open_field_never_sees_a_dark_step`.
+* **2 that read step 0 as lit** (step 1's finding): `closing_reaches_the_flow_on_a_dark_step_by_exactly_the_rule`,
+  `each_lab_form_reaches_the_water_flow_exactly`.
+* **4 test builds that mix a lab radiation resolver or a by-hand value with the loader's air**:
+  step 1's two (`a_night_step_reaches_the_flow_as_a_dark_one`, `a_season_under_the_sun_path_runs_and_moves_the_water`
+  — their resolver has no within-day data, so they fail loudly), the lit-share reach test (its by-hand
+  reads `vpd`/`temp`, the flow the within-day names, at a midnight step whose air is at its dew point), and
+  `atmosphere::the_chamber_vapour_never_exceeds_saturation_and_scales_with_the_room` (it checks the jar's
+  vapour against the target at the daily mean, 16.39 °C; the dehumidifier now holds the target at the
+  step's own temperature, ~16.7 °C at that 09:00–10:30 step — 1.8 % higher, the size of the excess).
+* **4 station tests that build a held room on the loader's params**: `minute_transpiration` ×2 (their raw
+  pair now fails loudly on the missing name — the guard working), and the TM 102788 scorecard ×2 — its
+  held chamber replaces the weather's forcings but not the two new names, so flipped its model read the
+  outdoor curve (`every_weather_forcing_is_the_chambers` caught it by name; the WHAT-IF by-hand row then
+  differed 1.04 vs 3.25). At adoption these move onto the room's temperature, as the station builds did.
+* **1 moved science pin**: the lab deep-water rescue's canopy ratio (`reaching_the_below_root_store_is_what_saves_the_deep_water_crop`,
+  a test-only drought run) 1.0294 → 1.0930. A recorded number in a drought, under different water: an
+  adoption restates it with the measurement, as a moved value, not a broken one.
+
+## 8. What it says, and the decision
+
+With both the light and the air, the open field draws about as much water as with neither (−2.0 %
+unshifted, +2.4 % shifted — the placement decides the sign), and the weather-lit jars about a fifth less
+(−20 to −21 %). Step 1's large saving was mostly the daily-mean air's doing, as §4 argued; in the jars
+two thirds to four fifths of it survives (65, 70, 78 %). Carbon never moves. The jars now condense at night.
+
+**Adoption is the user's.** It would move the same 8 goldens as step 1 (water only), restate 6 pins and the deep-water ratio, regenerate both manifests and
+rewire 10 tests, and needs one choice: **the curve's placement** — as printed through the observed
+minimum and maximum (never above the observed maximum; water's day 0.5 °C cooler than growth's), or
+shifted onto the observed mean (water and growth agree on the day; the curve peaks above the observed
+maximum by up to 2.3 °C).

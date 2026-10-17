@@ -586,6 +586,7 @@ pub fn sealed_bio_resolver(
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = weather_forcings(&scenario.bio, scenario.years)?;
     forcings.remove(TEMP_VAR);
+    crate::lighting::drop_outdoor_air(&mut forcings);
     // The lamp's light, net radiation and day replace the weather's (slice 3b; §21). Since
     // slice 4 they are carried as twins, so the weather's plain values must go too — the
     // sowing clock refuses a plain name beside its twins (which is how this was found).
