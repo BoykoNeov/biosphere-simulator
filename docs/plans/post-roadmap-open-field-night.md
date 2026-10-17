@@ -524,3 +524,130 @@ event watering refills the root zone whatever the depth, so the deep-water test'
 deep store still raises the grain — holds only under the old forms it pins. Recorded, not acted on.
 
 Nothing built; no science, golden or manifest moved.
+
+## 10. Why A4 missed — the open field's daytime water, taken apart (2026-10-18)
+
+The open question §7d left: light + air was predicted to end the open field's water **+10 to +35 %**
+above the daily mean and ended at **−2.0 %**. Read off the saved probe (`step2_probe.txt`), the miss sits
+almost wholly in the **lit** steps: the prediction's arithmetic (lit × ~1.4, dark × ~0.3 on step 1's
+466.9 / 20.1 kg) gives 660 kg; the run drew lit 532.7 kg (**× 1.141**) and dark 4.97 kg (× 0.248, about
+1 kg short of × 0.3). So the subject is the lit multiplier, 1.14 against ~1.4.
+
+**The instrument** (`domains/examples/open_field_air_terms.rs`, new; the step-2 probe is left byte for
+byte as saved). It runs the open field under light + air and, on every state of that run, evaluates the
+real `Transpiration` flow's **crop leg** (to `vapor_sink`; the soil's leg reported apart, its stages and
+floor are not linear in the air's dryness) five ways, the light and the lit share always the run's own:
+
+| | temperature the water reads | dryness |
+|---|---|---|
+| B | within-day | within-day (the run itself) |
+| B0 | within-day | 0 (the radiation term alone) |
+| L | daily mean | daily mean (light only, on this state) |
+| L0 | daily mean | 0 |
+| M | daily mean | within-day (the dryness alone, Δ held) |
+
+Night net radiation under the sun's path is exactly 0, never negative, so the Penman–Monteith clamp at
+zero cannot bind and the split into a radiation term (`·0`) and a drying-air term (the rest) is exact
+on every step, the lit share's two-part steps included (each part is a Penman–Monteith in the same
+dryness). The same five on the shifted curve's run, as a sensitivity row.
+
+**The gate before any factor is read:** Σ L over the run's states must reproduce the separate
+light-only run's crop sink, **445.223 kg**, within a few tenths of a percent, and Σ B the run's own,
+492.210 kg. If L misses, the two runs differ by their water state, and a same-state decomposition does not
+explain them.
+
+### 10a. Predictions (written before the instrument was run)
+
+| | prediction | confidence |
+|---|---|---|
+| D1 | Σ B = 492.210 kg to rounding; Σ L within ±0.3 % of 445.223 kg (carbon is identical between the runs and the open field's lowest FTSW, 0.448, keeps the stress factor at 1, so the crop leg should not see the water state) | high / medium-high |
+| D2 | the drying-air term's share of light-only lit crop water, A_L / L, is **0.25–0.40**, not the estimate's 0.5: at r_a = 50 s/m the numerator's drying-air part ρc_p·VPD/r_a is ≈ 24 per Pa of deficit (≈ 12 000 at 0.5 kPa) against Δ·Rn ≈ 25 000–35 000 (W m⁻² · Pa K⁻¹) on a lit spring step | medium |
+| D3 | the dryness ratio weighted by the drying-air term's own per-step coefficient, A_M / A_L, is **1.5–1.9** — at or below the estimate's 1.85, which weighted every fixture day (winter included) by a sine of the day alone | low-medium |
+| D4 | the warmer afternoon's Δ: the radiation term R_B / R_L rises **+2 to +6 %**; the drying-air term A_B / A_M falls **−2 to −6 %** (a larger Δ in the denominator) | low-medium |
+| D5 | the factors compose to the measured × 1.141 (an identity, a check on the arithmetic) | high |
+| D6 | of the 0.26 the prediction overshot (1.40 − 1.141), most is D2's share, not D3's ratio | medium-low |
+| D7 | shifted: the same share; a higher ratio and Δ, both by a few % | medium |
+
+### 10b. Results (2026-10-18)
+
+Output kept at `W:\Claude_projects\space-station\sources\temp-evidence\open-field-night\step2_terms.txt`
+(git-ignored, local), with the by-hand check beside it (`step2_hand_by_month.py` / `.txt`). Rationed 0 and
+no events in both runs.
+
+**The gate holds exactly.** Σ B = 492.210 kg, the run's crop sink; Σ L = **445.223 kg, the separate
+light-only run's, to the gram** (+0.000 %). The crop leg does not see the water state between the two
+runs, so the same-state decomposition *is* the two runs' difference.
+
+Lit crop water, light only (L) → light + air (B), as printed:
+
+| factor | value | what it is |
+|---|---|---|
+| drying-air share of light-only water, A_L / L | **0.296** | the radiation term carries 70 % |
+| dryness ratio, Δ held, A_M / A_L | **1.430** | the curve's deficit against the daily mean, weighted by the drying-air term's own per-step coefficient |
+| radiation term, B0 / L0 | **1.071** | the warmer afternoon's Δ |
+| drying-air term, A_B / A_M | **0.927** | the same Δ in the denominator |
+| composed | **1.1460** | = B / L measured, 1.1460 |
+
+The dark steps: B / L = 0.248 (all drying-air; the night is cooler and damper). Shifted onto the observed
+mean: the share the same, ratio 1.581, B0 / L0 1.087, A_B / A_M 0.916, B / L 1.194.
+
+**Why the ratio is 1.43, not 1.85 — two errors in the estimate, and a remainder.** By month of the season
+(30-day bins, from sowing on 2006-10-01) the model's dryness ratio runs 1.18–2.14 and the by-hand script's,
+as written, 1.52–2.67 — higher in *every* month, so the season's weighting is not the whole story.
+
+1. **The estimate weighted the deficit by the sun; the drying-air term is not.** Its numerator,
+   ρc_p·VPD/r_a, has no radiation in it: it runs on every open-stomata hour alike. The script weighted
+   each daylit instant by `sin(π(t − t_sr)/D)` — the radiation term's weight — which all but drops the
+   cool, damp early morning. Re-run with a uniform daylit weight (the script's only change), its ratio
+   falls **1.845 → 1.505**, and month by month it then sits 0.00–0.06 above the model's in ten of eleven
+   months (1.766 vs 1.721, …, 1.340 vs 1.287, 1.239 vs 1.179; month 5, 2.232 vs 2.139).
+2. **The water is carried by the season's last months, where the curve gains least.** Months 7–10
+   (April–July) hold 377 of the lit 425 kg, and their ratios are the season's lowest (1.29–1.60): a drier
+   daily mean leaves the afternoon less to add. The script's uniform-weight monthly ratios, weighted by
+   each month's light-only drying-air water (A_L), give **1.481** — the season's weighting is worth
+   0.024 of the drop.
+3. **What is left, 1.481 → 1.430 (0.051), is the script against the model within each month** —
+   the ~0.05 per-month gap above. Candidates, **not traced**: the script's own day-length formula
+   (the model reads the fixture's), its sunrise at `12 − D/2`, and the weight inside a month (the script
+   weights every day alike; the model by each step's coefficient, which grows with the canopy).
+
+**And the share is 0.30, not 0.5** — the estimate's "half the daylit water" was never computed. It is
+set by the numerator alone (Penman–Monteith puts the canopy resistance in a denominator both terms
+share), so §7d's first candidate — *"the drying-air share is smaller than half under the canopy's own
+resistance"* — had the right size and the wrong mechanism: r_s does not enter the share at all. The
+share is high early (0.88 in month 1, where the crop's radiation share is small) and 0.27–0.29 in the
+four months that carry the water.
+
+**The Δ candidate is real and small.** The warmer afternoon moves weight to the radiation term (+7.1 %)
+and from the drying-air one (−7.4 %); net on the lit multiplier, **+0.019**. It pushes *up*, not down, so
+it did not cause the miss. **The 0.5 °C candidate** (the as-printed curve's cooler mean) is the shifted
+row: it lifts B / L from 1.146 to 1.194 — a part of the multiplier, and still the open field ends only
++2.4 % over the daily mean, nowhere near +10 to +35 %.
+
+**How the 0.28 overshoot splits** (the estimate's own lit multiplier, 0.5 + 0.5 × 1.845 = 1.42, against
+1.146): the share and the ratio *multiply*, so their parts depend on the order they are corrected in —
+share first: −0.172 then −0.123; ratio first: −0.207 then −0.088; Δ +0.019 either way. Neither alone
+closes it: the share alone leaves 1.25, the ratio alone 1.21.
+
+**Graded:**
+
+| | | |
+|---|---|---|
+| D1 | Σ B to rounding; Σ L within ±0.3 % | **HIT** — both exact |
+| D2 | share 0.25–0.40 | **HIT** (0.296) |
+| D3 | ratio 1.5–1.9 | **MISSED, low** (1.430) — the sine weighting was not seen when the prediction was written; "at or below 1.85" held |
+| D4 | radiation +2 to +6 %; drying-air −2 to −6 % | **MISSED, both larger** (+7.1 %, −7.4 %); the sign of each held |
+| D5 | the factors compose to the measured multiplier | **HIT** (1.1460 = 1.1460) |
+| D6 | most of the overshoot is the share | **NOT DECIDABLE as written** — the two multiply; share first it is 0.17 of 0.28, ratio first 0.09 |
+| D7 | shifted: the same share, ratio and Δ up a few % | **HIT on the share and the sign; the ratio's rise is larger** (+10.6 %) |
+
+## 11. What it says
+
+**A4 missed because the estimate was wrong twice, not because the model is.** The by-hand guess assumed
+the drying-air part was half the daytime water (it is 30 %) and weighted the afternoon's dryness by the
+sun (the drying-air part runs on time, not light — 1.85 → 1.51 — and the water is carried by the late, drier
+months, where the curve adds least — → 1.48; a last 0.05 is the script against the model, not traced): 1.43, not 1.85. Each factor is measured on the run's own states, the parts
+compose to the measured multiplier exactly, and the light-only side reproduces the separate run to the
+gram. The warmer-afternoon Δ effect is real, +0.02, the other way. **Nothing in the model is implicated;
+no science, golden or manifest moved.** One record corrected: §7d's first candidate named the wrong
+mechanism (the canopy's resistance is not in the share).

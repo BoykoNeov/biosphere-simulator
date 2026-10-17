@@ -94,3 +94,19 @@ book's daily VPD peaks at 1.82, the afternoon at 2.03–2.10). The rule cannot f
 * **Lesson: a flipped tree can be the prediction.** Measured in a scratch worktree before the decision,
   the adoption's golden diff was then reproduced line for line — the ceremony's "predict the diff" was a
   `cmp`, not an estimate.
+
+**A4's miss traced, 2026-10-18** (plan §10–11; `domains/examples/open_field_air_terms.rs`). The
+open field's light + air was predicted to end +10 to +35 % over the daily mean and ended −2.0 %; the miss
+sits in the lit steps' crop multiplier, 1.146 against the estimate's ~1.42. Evaluating the real flow's
+crop leg on every state of the run with the air swapped (the light-only side reproduces the separate run
+to the gram, 445.223 kg) splits it exactly: the drying-air share of the daytime water is **0.30, not the
+assumed 0.5**; the dryness ratio is **1.43, not 1.85** — the estimate weighted the afternoon's deficit by
+the sun, but the drying-air term runs on open-stomata time, not light (uniform weight: 1.85 → 1.51), the
+water is carried by the late, drier months (→ 1.48), and 0.05 is the script against the model, not traced;
+the warmer afternoon's Δ is +0.02, upward. **The estimate was wrong, not the model; nothing moved.** §7d's
+first candidate named the wrong mechanism (the canopy's resistance does not enter the share).
+
+* **Lesson: weight a term by what it multiplies.** The radiation weight belonged to the radiation term;
+  borrowing it for the drying-air one doubled-down on the afternoon and dropped the cool morning.
+* **Lesson: a same-state decomposition earns its reading only after it reproduces the separate run.**
+  Here it did exactly — because the crop leg never sees the two runs' different soil water.
