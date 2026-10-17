@@ -37,7 +37,8 @@
 //! `docs/biosphere-reference.md`.
 
 use super::science::{
-    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, NightRule, NightStomata,
+    AirTemperatureRead, Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm,
+    NightRule, NightStomata,
     O2Form, SoilEvaporationForm, SoilSupply, SurfaceResistanceForm, VpdRead, WateringForm,
     NIGHT_CONDUCTANCE_RATIO_BOOTING,
 };
@@ -467,6 +468,10 @@ pub struct WaterCycleParams {
     /// `docs/plans/post-roadmap-chamber-dryness.md`); [`VpdRead::Weather`] is the retired
     /// reading, kept runnable through `domains::lab`.
     pub vpd_read: VpdRead,
+    /// Which air temperature the water reads ([`AirTemperatureRead`]). Never loaded from the file;
+    /// the loader keeps [`AirTemperatureRead::DailyMean`], the within-day air is lab-only
+    /// (`docs/plans/post-roadmap-open-field-night.md` §7).
+    pub air_temperature: AirTemperatureRead,
     /// How the root zone is watered ([`WateringForm`]). Never loaded from the file: the loader sets
     /// [`WateringForm::Fao56Trigger`] since the water-forms adoption (2026-10-10); continuous
     /// watering is lab-only (`docs/plans/post-roadmap-soil-evaporation.md` §7, §16).
@@ -1346,6 +1351,7 @@ pub fn water_cycle_from_bounded(
         // CHAMBER since the Step 3b freeze (2026-10-01): this line moved 9 goldens, water
         // stocks only (docs/plans/post-roadmap-chamber-dryness.md §4.6).
         vpd_read: VpdRead::Chamber,
+        air_temperature: AirTemperatureRead::DailyMean,
         // Watering in EVENTS, new roots credited with the deep store's actual wetness, the deep
         // overflow recycled — since the water-forms adoption (2026-10-10), with the two lines in
         // `transpiration_from_bounded` (docs/plans/post-roadmap-soil-evaporation.md §16).

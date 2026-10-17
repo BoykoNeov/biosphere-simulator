@@ -452,7 +452,7 @@ fn build_atmosphere(
             id: "biosphere.condensation".to_string(),
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
-            temp_var: TEMP_VAR.to_string(),
+            temp_var: water_temp_var(p).to_string(),
             air_capacity_mol: scenario.chamber_air_capacity_mol,
             humidity_setpoint: p.water.humidity_setpoint,
         })];
@@ -906,6 +906,15 @@ fn build_plants(
     Ok(CompartmentBuild { stocks, flows, aux })
 }
 
+/// The air temperature the water flows read ([`science::AirTemperatureRead`]); growth reads
+/// [`TEMP_VAR`] whatever this says.
+fn water_temp_var(p: &params::BiosphereParams) -> &'static str {
+    match p.water.air_temperature {
+        science::AirTemperatureRead::DailyMean => TEMP_VAR,
+        science::AirTemperatureRead::WithinDay => AIR_TEMP_WITHIN_DAY_VAR,
+    }
+}
+
 /// Is the lab soil-evaporation form on (`docs/plans/post-roadmap-soil-evaporation.md`)?
 fn soil_evaporates(p: &params::BiosphereParams) -> bool {
     p.transp.soil_evap != science::SoilEvaporationForm::Off
@@ -923,8 +932,14 @@ fn transpiration_flow(
         soil_water: SOIL_WATER.to_string(),
         vapor_sink: wiring.vapor_target.clone(),
         rn_var: RN_VAR.to_string(),
-        vpd_var: VPD_VAR.to_string(),
-        temp_var: TEMP_VAR.to_string(),
+        // The weather's daily-mean air, or its within-day air under the lab reader (plan §7 of
+        // docs/plans/post-roadmap-open-field-night.md): every water reader takes the same one.
+        vpd_var: match p.water.air_temperature {
+            science::AirTemperatureRead::DailyMean => VPD_VAR,
+            science::AirTemperatureRead::WithinDay => VPD_WITHIN_DAY_VAR,
+        }
+        .to_string(),
+        temp_var: water_temp_var(p).to_string(),
         // A sealed room's air resistance is the chamber's measured 7.5 s/m, the open field's the
         // uncited 50 (docs/plans/post-roadmap-chamber-air-resistance-adopted.md).
         aerodynamic_resistance: p.transp.aerodynamic_resistance_for(scenario.sealed),
@@ -1387,6 +1402,48 @@ pub enum WeatherRadiation {
     SunPath,
 }
 
+/// Whether the weather supplies the air's within-day cycle
+/// (`docs/plans/post-roadmap-open-field-night.md` §7). Data only: the water reads it only under
+/// [`science::AirTemperatureRead::WithinDay`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WeatherAir {
+    /// No within-day air: the reference's.
+    DailyMean,
+    /// **Lab-only.** Teh's (2006, §2.7) curve through the day's observed minimum and maximum
+    /// ([`air_temperature_window_mean`](super::weather::air_temperature_window_mean)), as printed,
+    /// each step its window's mean; the deficit `max(0, e_s(T) − e_a)` with `e_a` the day's.
+    WithinDay,
+    /// **Lab-only, a sensitivity row.** The same curve shifted onto the day's observed mean, so
+    /// water and growth read the same daily mean — at the price of peaking above the observed maximum.
+    WithinDayShifted,
+}
+
+/// The within-day air (temperature) forcing: Teh's curve, its window mean on each step, shifted by
+/// the day's `offset`.
+fn air_temperature_path(
+    tmin: Vec<f64>,
+    tmax: Vec<f64>,
+    daylength_s: Vec<f64>,
+    offset: Vec<f64>,
+) -> Schedule {
+    let last = tmin.len() - 1;
+    Box::new(move |n, dt| {
+        let t = n as f64 * dt;
+        let day = (t as usize).min(last);
+        // The window is inside one day while the step divides the day, and the day length was
+        // checked when the schedule was built; a NaN here would be a broken invariant for the
+        // conservation check to surface, not a value to clamp.
+        super::weather::air_temperature_window_mean(
+            t - t.trunc(),
+            dt,
+            tmin[day],
+            tmax[day],
+            daylength_s[day],
+        )
+        .map_or(f64::NAN, |mean| mean + offset[day])
+    })
+}
+
 /// The weather forcing table (per-var schedules), tiling the raw facts over `years`.
 ///
 /// Factored out of [`weather_resolver`] so the station lighting / sealed seams can rebuild
@@ -1408,10 +1465,22 @@ pub fn weather_forcings_with(
     years: usize,
     radiation: WeatherRadiation,
 ) -> Result<HashMap<String, Schedule>, SimError> {
+    weather_forcings_lab(scenario, years, radiation, WeatherAir::DailyMean)
+}
+
+/// [`weather_forcings_with`] plus, under `air`, the air's within-day temperature and the open
+/// field's deficit from it (`AIR_TEMP_WITHIN_DAY_VAR`, `VPD_WITHIN_DAY_VAR`) — the open-field
+/// night's step 2, lab-only. Every other forcing is untouched.
+pub fn weather_forcings_lab(
+    scenario: &SeasonScenario,
+    years: usize,
+    radiation: WeatherRadiation,
+    air: WeatherAir,
+) -> Result<HashMap<String, Schedule>, SimError> {
     let (latitude, rows) = super::weather::weather_facts();
     let f = super::weather::season_forcing(latitude, &rows, years);
     let mut forcings: HashMap<String, Schedule> = HashMap::new();
-    forcings.insert(TEMP_VAR.to_string(), table_schedule(f.temp));
+    forcings.insert(TEMP_VAR.to_string(), table_schedule(f.temp.clone()));
     forcings.insert(
         PAR_VAR.to_string(),
         sine_light_path(f.par.clone(), f.daylength.clone()),
@@ -1447,6 +1516,44 @@ pub fn weather_forcings_with(
                 daylight_share_path(f.daylength.clone()),
             );
         }
+    }
+    if air != WeatherAir::DailyMean {
+        let mut offset = Vec::with_capacity(f.temp.len());
+        for (i, dl) in f.daylength.iter().enumerate() {
+            let curve_mean = super::weather::air_temperature_day_mean(f.tmin[i], f.tmax[i], *dl)
+                .ok_or_else(|| {
+                    SimError::Validation(format!(
+                        "the air's within-day curve needs a day of at least {} s; day {i} is                          {dl} s",
+                        super::weather::AIR_CURVE_MIN_DAYLENGTH_S
+                    ))
+                })?;
+            offset.push(match air {
+                WeatherAir::WithinDayShifted => f.temp[i] - curve_mean,
+                _ => 0.0,
+            });
+        }
+        let temperature = std::rc::Rc::new(air_temperature_path(
+            f.tmin.clone(),
+            f.tmax.clone(),
+            f.daylength.clone(),
+            offset,
+        ));
+        let reads = std::rc::Rc::clone(&temperature);
+        let vapour_pa = f.vapour_pa.clone();
+        let last = vapour_pa.len() - 1;
+        forcings.insert(
+            AIR_TEMP_WITHIN_DAY_VAR.to_string(),
+            Box::new(move |n, dt| temperature(n, dt)),
+        );
+        // The day's vapour pressure held through it (plan §7b: FAO-56's dew-point e_a, not Teh's
+        // constant relative humidity); the deficit is read at the window's mean temperature.
+        forcings.insert(
+            VPD_WITHIN_DAY_VAR.to_string(),
+            Box::new(move |n, dt| {
+                let day = ((n as f64 * dt) as usize).min(last);
+                (super::weather::saturation_vapor_pressure(reads(n, dt)) - vapour_pa[day]).max(0.0)
+            }),
+        );
     }
     forcings.insert(DAYLENGTH_VAR.to_string(), table_schedule(f.daylength));
     forcings.insert(VPD_VAR.to_string(), table_schedule(f.vpd));
@@ -1488,8 +1595,18 @@ pub fn weather_resolver_with(
     years: usize,
     radiation: WeatherRadiation,
 ) -> Result<SourceResolver, SimError> {
+    weather_resolver_lab(scenario, years, radiation, WeatherAir::DailyMean)
+}
+
+/// [`weather_resolver_with`] with the air's within-day data as `air` says (lab, plan §7).
+pub fn weather_resolver_lab(
+    scenario: &SeasonScenario,
+    years: usize,
+    radiation: WeatherRadiation,
+    air: WeatherAir,
+) -> Result<SourceResolver, SimError> {
     SourceResolver::new(
-        weather_forcings_with(scenario, years, radiation)?,
+        weather_forcings_lab(scenario, years, radiation, air)?,
         weather_shared(scenario),
     )
 }

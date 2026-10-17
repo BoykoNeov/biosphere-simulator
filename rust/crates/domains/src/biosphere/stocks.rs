@@ -84,6 +84,12 @@ pub const RN_VAR: &str = "net_radiation";
 /// (`docs/plans/post-roadmap-lit-share-stomata.md` §6).
 pub const LIT_FRACTION_VAR: &str = "lit_fraction";
 pub const VPD_VAR: &str = "vpd";
+/// The air's within-day temperature (°C) and the open field's deficit (Pa) from it — supplied only
+/// by the weather's lab `WeatherAir::WithinDay` data, read only by the water flows under
+/// `AirTemperatureRead::WithinDay` (`docs/plans/post-roadmap-open-field-night.md` §7). Growth reads
+/// [`TEMP_VAR`] either way.
+pub const AIR_TEMP_WITHIN_DAY_VAR: &str = "air_temp_within_day";
+pub const VPD_WITHIN_DAY_VAR: &str = "vpd_within_day";
 pub const IRRIGATION_VAR: &str = "irrigation";
 pub const FERTILIZATION_VAR: &str = "fertilization";
 pub const SOIL_WATER_VAR: &str = "soil_water";

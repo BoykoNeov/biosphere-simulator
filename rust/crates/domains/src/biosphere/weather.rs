@@ -58,13 +58,18 @@ pub const SVP_B: f64 = 17.27;
 /// Tetens/FAO-56 SVP exponent denominator offset (°C).
 pub const SVP_C: f64 = 237.3;
 
-/// One raw daily weather fact (day-of-year + the three NASAPower observations).
+/// One raw daily weather fact (day-of-year + the NASAPower observations).
 #[derive(Debug, Clone, Copy)]
 pub struct WeatherRow {
     pub day_of_year: i64,
     pub temp_c: f64,
     pub irrad_j_m2_day: f64,
     pub vap_hpa: f64,
+    /// The day's minimum and maximum air temperature (°C), added 2026-10-17 for the air's
+    /// within-day cycle (`docs/plans/post-roadmap-open-field-night.md` §7a). `temp_c` is POWER's
+    /// 24-h mean, not their midpoint.
+    pub tmin_c: f64,
+    pub tmax_c: f64,
 }
 
 /// Parse the embedded weather fixture into `(latitude, rows)`.
@@ -102,7 +107,16 @@ pub fn read_weather_facts(text: &str) -> Result<(f64, Vec<WeatherRow>), ConfigEr
             temp_c: row.get("TEMP", &at)?.as_f64("TEMP")?,
             irrad_j_m2_day: row.get("IRRAD", &at)?.as_f64("IRRAD")?,
             vap_hpa: row.get("VAP", &at)?.as_f64("VAP")?,
+            tmin_c: row.get("TMIN", &at)?.as_f64("TMIN")?,
+            tmax_c: row.get("TMAX", &at)?.as_f64("TMAX")?,
         });
+        let last = &rows[index];
+        if !(last.tmin_c <= last.temp_c && last.temp_c <= last.tmax_c) {
+            return Err(ConfigError::new(format!(
+                "{at}: the day's mean {} °C lies outside its range [{}, {}] °C",
+                last.temp_c, last.tmin_c, last.tmax_c
+            )));
+        }
     }
     if rows.is_empty() {
         return Err(ConfigError::new("the weather fixture has no rows"));
@@ -163,6 +177,11 @@ pub fn vapor_pressure_deficit(temp_c: f64, vap_hpa: f64) -> f64 {
 #[derive(Debug, Clone)]
 pub struct ForcingTables {
     pub temp: Vec<f64>,
+    /// The day's minimum / maximum air temperature (°C) and its vapour pressure (Pa) — the air's
+    /// within-day cycle reads them (`air_temperature_window_mean`); nothing else does.
+    pub tmin: Vec<f64>,
+    pub tmax: Vec<f64>,
+    pub vapour_pa: Vec<f64>,
     pub par: Vec<f64>,
     pub daylength: Vec<f64>,
     pub net_radiation: Vec<f64>,
@@ -176,6 +195,9 @@ pub fn season_forcing(latitude: f64, rows: &[WeatherRow], years: usize) -> Forci
     let mut daylength = Vec::with_capacity(rows.len() * years);
     let mut rn = Vec::with_capacity(rows.len() * years);
     let mut vpd = Vec::with_capacity(rows.len() * years);
+    let mut tmin = Vec::with_capacity(rows.len() * years);
+    let mut tmax = Vec::with_capacity(rows.len() * years);
+    let mut vapour_pa = Vec::with_capacity(rows.len() * years);
     // Convert once per row, then tile — identical to Python's convert-of-tiled-rows since
     // each conversion is a pure function of the row (and the shared latitude).
     let mut base_temp = Vec::with_capacity(rows.len());
@@ -197,6 +219,11 @@ pub fn season_forcing(latitude: f64, rows: &[WeatherRow], years: usize) -> Forci
         daylength.extend_from_slice(&base_dl);
         rn.extend_from_slice(&base_rn);
         vpd.extend_from_slice(&base_vpd);
+        for row in rows {
+            tmin.push(row.tmin_c);
+            tmax.push(row.tmax_c);
+            vapour_pa.push(row.vap_hpa * 100.0);
+        }
     }
     ForcingTables {
         temp,
@@ -204,7 +231,86 @@ pub fn season_forcing(latitude: f64, rows: &[WeatherRow], years: usize) -> Forci
         daylength,
         net_radiation: rn,
         vpd,
+        tmin,
+        tmax,
+        vapour_pa,
     }
+}
+
+/// The shortest day the within-day air curve takes (s): its maximum, 1.5 h after solar noon, must
+/// fall before sunset. Unreachable at the fixture's 52° N (its shortest day is ~7.7 h).
+pub const AIR_CURVE_MIN_DAYLENGTH_S: f64 = 3.0 * 3600.0;
+
+/// The hours after sunrise and after solar noon at which the air reaches its minimum and maximum —
+/// Teh (2006) §2.7's assumption ("1.5 hours after sunrise and solar noon, respectively").
+const AIR_CURVE_LAG_H: f64 = 1.5;
+
+/// The air temperature's integral (°C·h) from midnight to hour `t` ∈ [0, 24] of a day with minimum
+/// `tmin`, maximum `tmax` and day length `daylength_h` — Teh (2006), *Introduction to Mathematical
+/// Modeling of Crop Growth*, §2.7, Eqs. 2.41–2.47 as printed:
+///
+/// * from `sunrise + 1.5 h` to sunset, a half sine (Eq. 2.41): `tmin + (tmax − tmin)·sin(π·x / D)`,
+///   `x = t − sunrise − 1.5`, so `tmin` at `sunrise + 1.5` and `tmax` at solar noon + 1.5;
+/// * after sunset, a straight line to the minimum at the next `sunrise + 1.5` (Eq. 2.43), its slope
+///   from the same day's sunrise and minimum (Eq. 2.45, Teh's approximation for "the next day");
+/// * before `sunrise + 1.5`, the same line continued (Eq. 2.46), so the day closes on itself at
+///   midnight.
+///
+/// Sunrise and sunset are `12 ∓ D/2`, solar noon at noon — the span PAR is lit over.
+fn air_temperature_integral(t: f64, tmin: f64, tmax: f64, daylength_h: f64) -> f64 {
+    let sunrise = 12.0 - 0.5 * daylength_h;
+    let sunset = 12.0 + 0.5 * daylength_h;
+    let coldest = sunrise + AIR_CURVE_LAG_H;
+    let amplitude = tmax - tmin;
+    let at_sunset = tmin + amplitude * (PI * (sunset - coldest) / daylength_h).sin();
+    let slope = (tmin - at_sunset) / (coldest + 24.0 - sunset);
+    // Section I, [0, coldest): T = at_sunset + slope·(24 + t − sunset).
+    let night_before = |u: f64| at_sunset * u + slope * ((24.0 - sunset) * u + 0.5 * u * u);
+    if t <= coldest {
+        return night_before(t);
+    }
+    // Section II, [coldest, sunset]: the half sine.
+    let day = |u: f64| {
+        let x = u - coldest;
+        tmin * x + amplitude * daylength_h / PI * (1.0 - (PI * x / daylength_h).cos())
+    };
+    if t <= sunset {
+        return night_before(coldest) + day(t);
+    }
+    // Section III, (sunset, 24]: T = at_sunset + slope·(t − sunset).
+    let x = t - sunset;
+    night_before(coldest) + day(sunset) + at_sunset * x + 0.5 * slope * x * x
+}
+
+/// The mean air temperature (°C) over the window `[t0, t0 + dt)` of one day (both in days, `t0` the
+/// fraction of the day elapsed) on Teh's curve ([`air_temperature_integral`]), exact from its
+/// integral. `None` for a window that leaves the day or a day shorter than
+/// [`AIR_CURVE_MIN_DAYLENGTH_S`].
+pub fn air_temperature_window_mean(
+    t0: f64,
+    dt: f64,
+    tmin: f64,
+    tmax: f64,
+    daylength_s: f64,
+) -> Option<f64> {
+    // A NaN day length is refused as a short one.
+    let short_day = daylength_s.is_nan() || daylength_s < AIR_CURVE_MIN_DAYLENGTH_S;
+    if short_day || dt <= 0.0 || t0 < 0.0 || t0 + dt > 1.0 + 1e-12 {
+        return None;
+    }
+    let dl_h = daylength_s / 3600.0;
+    let (a, b) = (24.0 * t0, (24.0 * (t0 + dt)).min(24.0));
+    Some(
+        (air_temperature_integral(b, tmin, tmax, dl_h)
+            - air_temperature_integral(a, tmin, tmax, dl_h))
+            / (b - a),
+    )
+}
+
+/// The 24-h mean (°C) of Teh's curve for a day — **not** the day's observed mean: on the fixture's
+/// days it runs 0.44 °C below it on average (plan §7b), which is why the shifted variant exists.
+pub fn air_temperature_day_mean(tmin: f64, tmax: f64, daylength_s: f64) -> Option<f64> {
+    air_temperature_window_mean(0.0, 1.0, tmin, tmax, daylength_s)
 }
 
 #[cfg(test)]
@@ -244,12 +350,15 @@ mod tests {
             r#"{"provenance": {"latitude": 52.0}}"#,
             r#"{"provenance": {"latitude": 52.0}, "weather": [{"day": "2006-10-01", "TEMP": 1.0, "IRRAD": 2.0}]}"#,
             r#"{"provenance": {"latitude": 52.0}, "weather": [{"day": "2006-13-01", "TEMP": 1.0, "IRRAD": 2.0, "VAP": 3.0}]}"#,
-            r#"{"provenance": {"latitude": "52.0"}, "weather": [{"day": "2006-10-01", "TEMP": 1.0, "IRRAD": 2.0, "VAP": 3.0}]}"#,
+            r#"{"provenance": {"latitude": "52.0"}, "weather": [{"day": "2006-10-01", "TEMP": 1.0, "IRRAD": 2.0, "VAP": 3.0, "TMIN": 0.0, "TMAX": 2.0}]}"#,
+            // no maximum; a mean outside its own range
+            r#"{"provenance": {"latitude": 52.0}, "weather": [{"day": "2006-10-01", "TEMP": 1.0, "IRRAD": 2.0, "VAP": 3.0, "TMIN": 0.0}]}"#,
+            r#"{"provenance": {"latitude": 52.0}, "weather": [{"day": "2006-10-01", "TEMP": 3.0, "IRRAD": 2.0, "VAP": 3.0, "TMIN": 0.0, "TMAX": 2.0}]}"#,
         ] {
             assert!(read_weather_facts(bad).is_err(), "should not parse: {bad}");
         }
         let good = r#"{"provenance": {"latitude": 52.0},
-                       "weather": [{"IRRAD": 2.0, "TEMP": 1.0, "VAP": 3.0, "day": "2006-10-01"}]}"#;
+                       "weather": [{"IRRAD": 2.0, "TEMP": 1.0, "TMAX": 2.0, "TMIN": 0.5, "VAP": 3.0, "day": "2006-10-01"}]}"#;
         let (lat, rows) = read_weather_facts(good).expect("parses");
         assert_eq!(lat, 52.0);
         assert_eq!(rows.len(), 1);
@@ -257,6 +366,7 @@ mod tests {
         assert_eq!(rows[0].temp_c, 1.0);
         assert_eq!(rows[0].irrad_j_m2_day, 2.0);
         assert_eq!(rows[0].vap_hpa, 3.0);
+        assert_eq!((rows[0].tmin_c, rows[0].tmax_c), (0.5, 2.0));
     }
 
     #[test]

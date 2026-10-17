@@ -263,3 +263,59 @@ weights the dry afternoon.
 | A6 | carbon: the jars bit-identical (isolation-limited, no water stress). The open field **may** move: if the watering trigger falls behind a doubled afternoon draw, stress binds between events. Grain within ±3 %; if any carbon moves, it is reported as moving | low |
 | A7 | shifted vs unshifted: the shifted runs ~0.5 °C warmer on the water days, so a few % more water | medium |
 | A8 | flipped (scratch worktree, loader at `WithinDay` + the weather's within-day data): the 8 weather goldens of §5b move, plus `drift_summary` if A6's carbon moves; `lighting_state` and `sealed_station_state` **byte-identical** (each room answers with its own temperature) | medium-high |
+
+### 7d. Results (2026-10-17)
+
+**How it was run.** The form in the tree (lab-only: `science::AirTemperatureRead`, `system::WeatherAir`,
+`weather::air_temperature_window_mean`, the station rooms on `lighting::room_params`) and 6 tests
+(`domains/tests/open_field_air.rs`), green. One of them records which forcing names each flow and aux
+process asks for: every flow with a water leg reads the within-day air and never `temp` — **except the
+roots' capture** (`biosphere.root_zone_capture`: its water is what new roots reach, its pace is
+growth's, so it stays on the daily mean, by design) — and so does the soil's water account
+(`biosphere.soil_surface`); nothing else asks for either within-day name. Its teeth were checked:
+pointing the dehumidifier back at `temp` reddens exactly that test. The probe
+`domains/examples/open_field_air.rs` runs each weather-lit biosphere golden's build from the loader's
+params under five settings; its output is kept at
+`W:\Claude_projects\space-station\sources\temp-evidence\open-field-night\step2_probe.txt` (git-ignored,
+local), with the by-hand estimate and the POWER download and checks beside it. Rationed 0 and no events
+in every run.
+
+Water drawn from the root zone (crop and soil), against the daily mean:
+
+| build | light only (step 1) | air only | **light + air** | light + air, shifted |
+|---|---|---|---|---|
+| open field, 1 season | −11.2 % | −3.7 % | **−2.0 %** | +2.4 % |
+| sealed chamber, 3 yr | −32.7 % | −6.9 % | **−21.3 %** | −19.4 % |
+| perennial chamber, 5 yr | −28.4 % | −1.7 % | **−19.8 %** | −18.1 % |
+| consumer chamber, 5 yr | −25.4 % | −1.3 % | **−19.8 %** | −16.3 % |
+
+Against step 1 alone, adding the air raises the water by +10.4 % (open field), +17.0 % (sealed),
++11.9 % (perennial), +7.5 % (consumer). The open field's crop sink: 502.6 kg (daily mean) → 445.2
+(light) → 492.2 (both); its soil 45.9 → 41.8 → 45.5.
+
+**Carbon: bit-identical in every build under every setting.** The only non-stock values that move are
+the soil's water clocks (`soil_dry_days`, `soil_evap_today`, `soil_potential_today`, `top_soil_water`).
+
+**The jars condense at night now.** The dehumidifier's draw on dark steps: 0 (daily mean, no dark steps)
+→ 7.0 / 12.4 / 24.8 kg (light only) → 24.9 / 47.7 / 93.5 kg (both), sealed / perennial / consumer; on
+lit steps it rises too (7.0 → 40.3 kg in the sealed chamber), because a cooling afternoon lowers the
+cap the morning's vapour was held to. The jars end each run at midnight, so their end-of-run air holds
+less vapour (0.250 → 0.181 kg sealed): a point on the day's cycle, not a season total.
+
+**Graded:**
+
+| | | |
+|---|---|---|
+| A1 | the data commit and the form move no golden | **HIT** (20 of 20 identical after each; `cargo test` 1408 passed, `--ignored` 9 passed, clippy clean) |
+| A2 | the curve's shape: tiles its day, TMIN / TMAX at their hours, continuous, in range; the shifted mean is `TEMP` | **HIT** (tests, every day of the fixture) |
+| A3 | air only within ±5 % (open field) | **HIT** (−3.7 %) |
+| A4 | light + air ends above the daily mean, +10 to +35 % | **MISSED** — **−2.0 %**: step 1's saving mostly does not survive (−11.2 → −2.0), but the water does not overshoot. The by-hand estimate took the drying-air term as half the daylit water and the radiation-weighted 1.85× as its multiplier; the model's daylit water rose 1.14×, not ~1.4×. Candidates, **not traced**: the drying-air share is smaller than half under the canopy's own resistance; the warmer afternoon raises Δ, which moves weight from the drying-air term to the radiation term; the unshifted curve is 0.5 °C cooler on average (air alone: −3.7 %) |
+| A5 | the jars +5 to +25 % over step 1; less than the open field; more night condensation | **HIT on the range and the condensation** (+7.5 to +17.0 %); **missed on "less than the open field"** for the sealed chamber (+17.0 % vs +10.4 %) |
+| A6 | carbon: jars bit-identical; open field may move | **HIT, and stronger**: bit-identical everywhere, the open field included (its watering kept up) |
+| A7 | shifted: a few % more water | **HIT** (+1.7 to +4.4 points) |
+
+⚠ **In the open field the placement decides the sign.** Unshifted −2.0 %, shifted +2.4 %: the 4.4-point
+swing between the two placements is larger than the net effect, so "light + air saves a little water" and
+"costs a little" are the same measurement under two placements. In the jars it does not (1.7–3.6 points
+against ~20 %). The placement is therefore part of any adoption decision, put to the user, not settled
+in this record (§7b gives the reasons each way).

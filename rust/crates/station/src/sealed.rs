@@ -26,7 +26,7 @@ use domains::biosphere::stocks::{
 use domains::biosphere::params::PhenologyParams;
 use domains::biosphere::science;
 use domains::biosphere::system::{
-    annual_reset_with, build_season, soil_surface_start, weather_forcings, weather_shared,
+    annual_reset_with, build_season_with, soil_surface_start, weather_forcings, weather_shared,
 };
 use domains::crew::{
     CrewParams, WaterBalance, FECAL_WASTE, FOOD_INTAKE_VAR, FOOD_STORE, WATER_BALANCE,
@@ -271,7 +271,8 @@ pub fn build_sealed_station_unread(
     surroundings: ChamberSurroundings,
 ) -> Result<(State, Registry, Registry), SimError> {
     // --- biosphere (slow) — build_season verbatim ---
-    let (bio_state, bio_reg) = build_season(&scenario.bio)?;
+    // The room's params: its water reads the chamber's temperature (`lighting::room_params`).
+    let (bio_state, bio_reg) = build_season_with(&scenario.bio, &crate::lighting::room_params())?;
     let bio_stocks = bio_state.stocks.clone();
 
     // --- fast-domain stocks (cabin + crew + Power/Thermal), biosphere-disjoint ---
@@ -806,7 +807,7 @@ pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
     // `params::biosphere()`): identical to `annual_reset` on every frozen build, and it also
     // re-sows the lab forms' state values, which the plain reset refuses
     // (`docs/plans/post-roadmap-soil-evaporation.md` §10).
-    let params = domains::biosphere::params::biosphere();
+    let params = crate::lighting::room_params();
     Box::new(
         move |_n: u64, current: &State| -> Result<Option<State>, SimError> {
             if is_mature(current, &pheno)? {

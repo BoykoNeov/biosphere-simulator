@@ -41,7 +41,8 @@
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
 use crate::biosphere::science::{
-    Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm, NightRule, NightStomata,
+    AirTemperatureRead, Co2Read, DeepOverflow, DeepSoilCredit, KineticsForm, LeafAreaForm,
+    NightRule, NightStomata,
     O2Form, SoilEvaporationForm, SurfaceResistanceForm, VpdRead, WateringForm,
 };
 use config::{with_override, ConfigError, ParamFile};
@@ -248,6 +249,19 @@ pub fn with_night_stomata(mut p: BiosphereParams, form: NightStomata) -> Biosphe
 /// [`NightRule::LitShare`] is the loader's since 2026-10-16; `NetRadiation` is the lab's.
 pub fn with_night_rule(mut p: BiosphereParams, rule: NightRule) -> BiosphereParams {
     p.transp.night_rule = rule;
+    p
+}
+
+/// `p` with the water reading the weather's within-day air, or its daily mean
+/// ([`AirTemperatureRead`], `docs/plans/post-roadmap-open-field-night.md` §7). Under
+/// [`AirTemperatureRead::WithinDay`] the build must supply the within-day forcings
+/// (`system::weather_forcings_lab` with a `WeatherAir::WithinDay*`), or it fails at its first step.
+///
+/// # ⚠ A switch, not an endorsement of the form switched to
+///
+/// [`AirTemperatureRead::DailyMean`] is the loader's; `WithinDay` is lab-only.
+pub fn with_air_temperature(mut p: BiosphereParams, read: AirTemperatureRead) -> BiosphereParams {
+    p.water.air_temperature = read;
     p
 }
 

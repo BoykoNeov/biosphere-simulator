@@ -286,6 +286,22 @@ pub enum VpdRead {
     Chamber,
 }
 
+/// **Which air temperature the water reads** (`docs/plans/post-roadmap-open-field-night.md` §7).
+///
+/// Never loaded from a param file — it selects a form. The loader's is
+/// [`AirTemperatureRead::DailyMean`]. Deliberately **no `Default`**, for [`Co2Read`]'s reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AirTemperatureRead {
+    /// The day's mean (`temp`) on every step, as growth reads it. The reference's.
+    DailyMean,
+    /// **Lab-only.** The weather's within-day air (`air_temp_within_day`, Teh 2006 §2.7), read by
+    /// every water reader and nothing else: the crop's and the soil's Penman Δ, a sealed jar's own
+    /// deficit and humidity bound, its dehumidifier; the open field's deficit is `vpd_within_day`.
+    /// A build without those forcings fails. A room with its own temperature (the station's) does
+    /// not take it — its builder keeps `DailyMean`.
+    WithinDay,
+}
+
 /// The water vapour (**kg**) a sealed chamber's condenser holds the air at: the humidity
 /// setting times saturation, `setpoint · e_s(T)/P_std · n_ref`.
 ///

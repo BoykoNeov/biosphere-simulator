@@ -17,7 +17,7 @@ use domains::biosphere::stocks::{
     VERNALIZATION_DAYS,
 };
 use domains::biosphere::system::{
-    build_season, soil_surface_start, weather_forcings, weather_shared,
+    build_season_with, soil_surface_start, weather_forcings, weather_shared,
 };
 use domains::biosphere::{light_path, weather};
 use domains::power::{battery_stock, BATTERY, WASTE_HEAT};
@@ -49,6 +49,16 @@ pub fn lamp_average_power(scenario: &LightingScenario) -> f64 {
     scenario.lamp_power_w * scenario.photoperiod_hours as f64 / 24.0
 }
 
+/// The loader's biosphere params for a lamp-lit ROOM: its water reads the room's own temperature
+/// (`temp`, the habitat's or the chamber's), never the weather's within-day air — a room is not
+/// outdoors (`docs/plans/post-roadmap-open-field-night.md` §7b). Identical to the loader's while
+/// the loader keeps `AirTemperatureRead::DailyMean`; it holds the room there if the loader moves.
+pub fn room_params() -> domains::biosphere::params::BiosphereParams {
+    let mut p = domains::biosphere::params::biosphere();
+    p.water.air_temperature = domains::biosphere::science::AirTemperatureRead::DailyMean;
+    p
+}
+
 /// Assemble the lighting station: `(state, bio_registry, power_registry)`.
 ///
 /// The biosphere registry is `build_season`'s output verbatim; the Power registry is the
@@ -60,7 +70,7 @@ pub fn build_lighting(
     scenario: &LightingScenario,
     with_lamp: bool,
 ) -> Result<(State, Registry, Registry), SimError> {
-    let (bio_state, bio_registry) = build_season(&scenario.bio)?;
+    let (bio_state, bio_registry) = build_season_with(&scenario.bio, &room_params())?;
     let mut stocks = bio_state.stocks.clone();
 
     let power_seq = [
