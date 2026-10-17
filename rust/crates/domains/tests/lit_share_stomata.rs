@@ -13,9 +13,9 @@ use domains::biosphere::science::{
     NIGHT_CONDUCTANCE_RATIO_HEADING,
 };
 use domains::biosphere::stocks::{
-    LEAF_C, LIT_FRACTION_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER, TEMP_VAR, VPD_VAR,
+    LEAF_C, LIT_FRACTION_VAR, RN_VAR, ROOTED_DEPTH, SOIL_WATER,
 };
-use domains::biosphere::system::{build_season_with, SeasonScenario, DEFAULT_SCENARIO};
+use domains::biosphere::system::{build_season_with, water_air_vars, SeasonScenario, DEFAULT_SCENARIO};
 use domains::biosphere::{season_setup_composed, BIO_DT, STEPS_PER_DAY};
 use domains::lab::{with_night_rule, with_night_stomata};
 use simcore::environment::{Environment, SourceResolver};
@@ -203,7 +203,9 @@ fn the_switch_reaches_the_flow_and_moves_only_a_partly_lit_step() {
     let s = DEFAULT_SCENARIO;
     let (state0, integrator, resolver) = setup(&s, &params::biosphere());
     let mut state = state0;
-    for _ in 0..200 * STEPS_PER_DAY {
+    // Grown to NOON of day 200: once the weather has a night, the midnight air can sit at its dew
+    // point, with no deficit for the dark-time drop to show (open-field-night plan §7e).
+    for _ in 0..200 * STEPS_PER_DAY + STEPS_PER_DAY / 2 {
         state = integrator
             .step_report(&state, &resolver, BIO_DT)
             .expect("step")
@@ -233,7 +235,9 @@ fn the_switch_reaches_the_flow_and_moves_only_a_partly_lit_step() {
     };
 
     let env = resolver.bind(&state, BIO_DT);
-    let (vpd, temp) = (env.get(VPD_VAR).unwrap(), env.get(TEMP_VAR).unwrap());
+    // The names the water reads (the daily mean, or the within-day air).
+    let (temp_var, vpd_var) = water_air_vars(&params::biosphere());
+    let (vpd, temp) = (env.get(vpd_var).unwrap(), env.get(temp_var).unwrap());
     for night in CLOSING {
         let NightStomata::Closing(f) = night else {
             unreachable!()

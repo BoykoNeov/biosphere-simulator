@@ -10,8 +10,8 @@ use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::science::{
     self, NightStomata, NIGHT_CONDUCTANCE_RATIO_BOOTING, NIGHT_CONDUCTANCE_RATIO_HEADING,
 };
-use domains::biosphere::stocks::{LEAF_C, RN_VAR, ROOTED_DEPTH, SOIL_WATER, TEMP_VAR, VPD_VAR};
-use domains::biosphere::system::{build_season_with, SeasonScenario, DEFAULT_SCENARIO};
+use domains::biosphere::stocks::{LEAF_C, RN_VAR, ROOTED_DEPTH, SOIL_WATER};
+use domains::biosphere::system::{build_season_with, water_air_vars, SeasonScenario, DEFAULT_SCENARIO};
 use domains::biosphere::{season_setup_composed, steps_for_years, BIO_DT, STEPS_PER_DAY};
 use domains::lab::with_night_stomata;
 use simcore::environment::{Environment, SourceResolver};
@@ -116,7 +116,9 @@ fn closing_reaches_the_flow_on_a_dark_step_by_exactly_the_rule() {
     let s = DEFAULT_SCENARIO;
     let (state0, integrator, resolver) = setup(&s, &params::biosphere());
     let mut state = state0;
-    for _ in 0..200 * STEPS_PER_DAY {
+    // Grown to NOON of day 200: under a weather with a real night step 0 of a day is midnight, which
+    // is not the lit step the "moved a lit step" check needs (open-field-night plan §7e).
+    for _ in 0..200 * STEPS_PER_DAY + STEPS_PER_DAY / 2 {
         state = integrator
             .step_report(&state, &resolver, BIO_DT)
             .expect("step")
@@ -150,7 +152,9 @@ fn closing_reaches_the_flow_on_a_dark_step_by_exactly_the_rule() {
     let frozen = params_with(NightStomata::Open);
     let tp = frozen.transp;
     let env = resolver.bind(&state, BIO_DT);
-    let (vpd, temp) = (env.get(VPD_VAR).unwrap(), env.get(TEMP_VAR).unwrap());
+    // The names the water reads (the daily mean, or the within-day air).
+    let (temp_var, vpd_var) = water_air_vars(&frozen);
+    let (vpd, temp) = (env.get(vpd_var).unwrap(), env.get(temp_var).unwrap());
     let lai = science::leaf_area_index(
         state.stocks[LEAF_C].amount,
         frozen.canopy.sla_per_mol_c,

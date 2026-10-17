@@ -79,11 +79,12 @@ fn chamber_c(state: &State) -> f64 {
     state.stocks[CHAMBER].amount / station_params::chamber().heat_capacity - 273.15
 }
 
-/// The water-loss pair as `build_season` makes it — the raw flows, NOT wrapped to read the
-/// chamber, so a test can hand them a temperature. The same flows the split build starts from
-/// (its base is `build_season` of the resized scenario).
+/// The water-loss pair as the room's season makes it (`build_season_with` on
+/// `lighting::room_params`, so the water reads the room's `temp`) — the raw flows, NOT wrapped to
+/// read the chamber, so a test can hand them a temperature. The same flows the split build starts
+/// from.
 fn raw_plant_registry(scenario: &SealedStationScenario) -> Registry {
-    domains::biosphere::system::build_season(&scenario.bio)
+    domains::biosphere::system::build_season_with(&scenario.bio, &station::lighting::room_params())
         .expect("build_season")
         .1
 }

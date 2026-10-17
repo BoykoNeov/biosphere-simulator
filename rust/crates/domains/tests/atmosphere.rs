@@ -346,7 +346,7 @@ fn the_dry_chamber_never_leaves_reference_pressure() {
 #[test]
 fn the_chamber_vapour_never_exceeds_saturation_and_scales_with_the_room() {
     use domains::biosphere::science::humidity_target_kg;
-    use domains::biosphere::{weather, STEPS_PER_DAY};
+    use domains::biosphere::STEPS_PER_DAY;
     let dt = 1.0 / STEPS_PER_DAY as f64;
     let mut peak_vapour: Vec<(&str, f64, f64)> = Vec::new();
     for (name, scenario, years, perennial) in chambers() {
@@ -357,19 +357,21 @@ fn the_chamber_vapour_never_exceeds_saturation_and_scales_with_the_room() {
             setpoint < 1.0,
             "{name}: the setting is saturation, so this bound is not tight"
         );
-        let (latitude, rows) = weather::weather_facts();
-        let temp = weather::season_forcing(latitude, &rows, years).temp;
+        // The temperature the dehumidifier reads at step `n`: the day's mean, or the air's
+        // within-day curve once the water reads it (open-field-night plan §7e) — the run's own
+        // forcing, under the name the run's water reads.
+        let forcings = domains::biosphere::system::weather_forcings(&scenario, years).unwrap();
+        let temp_of = &forcings[domains::biosphere::system::water_air_vars(&t.params).0];
         let v = &t.water_vapor_kg;
         assert!(v.iter().any(|kg| *kg > 0.0), "{name}: no vapour — the bound is untested");
         for n in 0..v.len() - 1 {
-            let day = ((n as f64 * dt) as usize).min(temp.len() - 1);
-            let target = humidity_target_kg(temp[day], capacity, setpoint);
+            let temp = temp_of(n as u64, dt);
+            let target = humidity_target_kg(temp, capacity, setpoint);
             assert!(
                 v[n + 1] <= target * (1.0 + 1.0e-12),
                 "{name}: step {n} ended with {} kg of vapour above the humidity target \
-                 {target} kg at {} °C",
+                 {target} kg at {temp} °C",
                 v[n + 1],
-                temp[day]
             );
         }
         let peak = v.iter().copied().fold(f64::NEG_INFINITY, f64::max);

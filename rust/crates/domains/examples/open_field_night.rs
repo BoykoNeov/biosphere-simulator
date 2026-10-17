@@ -158,6 +158,12 @@ fn main() {
         }
         None => params::biosphere(),
     };
+    // Step 1 is measured under the daily-mean air, named rather than the loader's, so this probe's
+    // output does not move when the loader takes the within-day air (plan Â§7).
+    let p = domains::lab::with_air_temperature(
+        p,
+        domains::biosphere::science::AirTemperatureRead::DailyMean,
+    );
     let cases: [(&str, SeasonScenario, usize, bool); 4] = [
         ("open field (season_euler)", DEFAULT_SCENARIO, 1, false),
         (

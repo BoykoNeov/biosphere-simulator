@@ -13,12 +13,11 @@ use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::perturbations::window_override;
 use domains::biosphere::science::{self, SurfaceResistanceForm};
 use domains::biosphere::stocks::{
-    IRRIGATION_VAR, LEAF_C, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C, TEMP_VAR,
-    VPD_VAR,
+    IRRIGATION_VAR, LEAF_C, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C,
 };
 use domains::biosphere::system::{
     build_season_with, consumer_chamber_scenario, perennial_chamber_scenario,
-    sealed_chamber_scenario, SeasonScenario, DEFAULT_SCENARIO,
+    sealed_chamber_scenario, water_air_vars, SeasonScenario, DEFAULT_SCENARIO,
 };
 use domains::biosphere::{season_setup_composed, steps_for_years, BIO_DT, STEPS_PER_DAY};
 use domains::lab::biosphere_with_rs_form;
@@ -154,7 +153,10 @@ fn the_loaders_form_through_the_switch_is_the_reference_run() {
 /// condensate, but whose root-zone leg is the same flux). ⚠ With the soil's evaporation switched
 /// OFF for the flow under test: the by-hand formula has no soil–crop energy split, and the claim is
 /// the resistance's reach, not the split's (that one is `soil_evaporation.rs`'s S3). Restated at the
-/// water-forms adoption (2026-10-10, plan §16), when the loader turned the soil on.
+/// water-forms adoption (2026-10-10, plan §16), when the loader turned the soil on. ⚠ And with the
+/// stomata held OPEN at night, for the same reason: the by-hand formula has no night rule, and once
+/// the open field has a night (`docs/plans/post-roadmap-open-field-night.md` §7) a reference state can
+/// be a dark step. The temperature and deficit are the names the water reads (`water_air_vars`).
 #[test]
 fn each_lab_form_reaches_the_water_flow_exactly() {
     let p0 = params::biosphere();
@@ -163,6 +165,8 @@ fn each_lab_form_reaches_the_water_flow_exactly() {
         for form in [SurfaceResistanceForm::FaoFullCover, SurfaceResistanceForm::SzeiczLong] {
             let mut p = params_for(form);
             p.transp.soil_evap = science::SoilEvaporationForm::Off;
+            p.transp.night_stomata = science::NightStomata::Open;
+            let (temp_var, vpd_var) = water_air_vars(&p);
             let (_, registry): (State, Registry) = build_season_with(&s, &p).expect("build");
             let flow = registry
                 .flows()
@@ -176,7 +180,7 @@ fn each_lab_form_reaches_the_water_flow_exactly() {
                 let env = resolver.bind(st, BIO_DT);
                 let leg = flow.evaluate(st, &env, BIO_DT).expect("flow").legs;
                 let got = -leg.iter().find(|l| l.stock == SOIL_WATER).map_or(0.0, |l| l.amount);
-                let temp = env.get(TEMP_VAR).unwrap();
+                let temp = env.get(temp_var).unwrap();
                 let vpd = if s.sealed {
                     science::chamber_vpd_pa(
                         temp,
@@ -184,7 +188,7 @@ fn each_lab_form_reaches_the_water_flow_exactly() {
                         s.chamber_air_capacity_mol,
                     )
                 } else {
-                    env.get(VPD_VAR).unwrap()
+                    env.get(vpd_var).unwrap()
                 };
                 let rs = science::canopy_surface_resistance(
                     form,

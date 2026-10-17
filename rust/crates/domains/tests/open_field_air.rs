@@ -157,11 +157,17 @@ fn run(
     Ok(state)
 }
 
+/// The weather's daily mean, light and air both named — never the loader's, so the comparisons
+/// below stay comparisons whichever form the loader takes.
+fn daily_mean(s: &SeasonScenario) -> HashMap<String, Schedule> {
+    weather_forcings_lab(s, 1, WeatherRadiation::DailyMean, WeatherAir::DailyMean).expect("weather")
+}
+
 /// The reader without the data is an error at the first step, not a silent daily mean.
 #[test]
 fn the_reader_without_the_data_fails() {
     for s in [DEFAULT_SCENARIO, sealed_chamber_scenario()] {
-        let daily = weather_forcings(&s, 1).expect("weather");
+        let daily = daily_mean(&s);
         assert!(run(&s, AirTemperatureRead::WithinDay, daily, 1).is_err());
     }
 }
@@ -173,17 +179,12 @@ fn the_reader_without_the_data_fails() {
 #[test]
 fn the_reader_reaches_the_water_and_only_the_water() {
     for s in [DEFAULT_SCENARIO, sealed_chamber_scenario()] {
-        let reference = run(
-            &s,
-            AirTemperatureRead::DailyMean,
-            weather_forcings(&s, 1).unwrap(),
-            30,
-        )
-        .expect("reference");
+        let reference =
+            run(&s, AirTemperatureRead::DailyMean, daily_mean(&s), 30).expect("reference");
         let mut aliased =
             weather_forcings_lab(&s, 1, WeatherRadiation::DailyMean, WeatherAir::WithinDay)
                 .unwrap();
-        let mut daily = weather_forcings(&s, 1).unwrap();
+        let mut daily = daily_mean(&s);
         aliased.insert(
             AIR_TEMP_WITHIN_DAY_VAR.to_string(),
             daily.remove(TEMP_VAR).unwrap(),
@@ -239,7 +240,7 @@ impl simcore::environment::Environment for Recording<'_> {
 #[test]
 fn the_water_reads_the_within_day_air_and_nothing_else_does() {
     for s in [DEFAULT_SCENARIO, sealed_chamber_scenario()] {
-        let state = run(&s, AirTemperatureRead::DailyMean, weather_forcings(&s, 1).unwrap(), 150)
+        let state = run(&s, AirTemperatureRead::DailyMean, daily_mean(&s), 150)
             .expect("grown");
         let p = with_air_temperature(params::biosphere(), AirTemperatureRead::WithinDay);
         let (_, integrator, _) =

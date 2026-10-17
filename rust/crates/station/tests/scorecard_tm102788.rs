@@ -36,7 +36,7 @@ use domains::biosphere::stocks::{
     CI_VAR, CO2_ATMOS, CO2_RESP, DAYLENGTH_VAR, FERTILIZATION_VAR, IRRIGATION_VAR, LEAF_C,
     LIT_FRACTION_VAR, PAR_VAR,
     PLANT_N, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C,
-    LITTER_SINK, TEMP_VAR, VPD_VAR,
+    LITTER_SINK, TEMP_VAR, VPD_VAR, AIR_TEMP_WITHIN_DAY_VAR, VPD_WITHIN_DAY_VAR,
 };
 use domains::biosphere::system::{build_season, build_season_with, weather_forcings, weather_shared};
 use domains::biosphere::weather::{self, saturation_vapor_pressure};
@@ -136,6 +136,21 @@ fn chamber_resolver(s: &SeasonScenario, rn_scale: f64) -> (SourceResolver, Vec<S
     let mut keys = Vec::new();
     for (k, f) in replaced {
         assert!(forcings.insert(k.to_string(), f).is_some(), "{k} was not a weather forcing");
+        keys.push(k.to_string());
+    }
+    // The water's within-day air (docs/plans/post-roadmap-open-field-night.md §7): the held chamber
+    // answers it with its own temperature and deficit, so the water reads the room whichever air the
+    // loader's water reads. Inserted whether or not the weather supplies the names, so
+    // `every_weather_forcing_is_the_chambers` still sees any other weather key left unreplaced.
+    let room: Vec<(&str, Schedule)> = vec![
+        (AIR_TEMP_WITHIN_DAY_VAR, Box::new(temp)),
+        (
+            VPD_WITHIN_DAY_VAR,
+            Box::new(|n, dt| saturation_vapor_pressure(temp(n, dt)) * (1.0 - RH)),
+        ),
+    ];
+    for (k, f) in room {
+        forcings.insert(k.to_string(), f);
         keys.push(k.to_string());
     }
     let resolver = SourceResolver::new(forcings, weather_shared(s)).expect("resolver");

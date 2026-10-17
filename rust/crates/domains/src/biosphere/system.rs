@@ -906,13 +906,19 @@ fn build_plants(
     Ok(CompartmentBuild { stocks, flows, aux })
 }
 
-/// The air temperature the water flows read ([`science::AirTemperatureRead`]); growth reads
-/// [`TEMP_VAR`] whatever this says.
-fn water_temp_var(p: &params::BiosphereParams) -> &'static str {
+/// The forcing names the water reads, `(temperature, open-field deficit)`, under `p`'s
+/// [`science::AirTemperatureRead`]; growth reads [`TEMP_VAR`] whatever this says. Public so a test's
+/// by-hand value reads the names the flow reads (`docs/plans/post-roadmap-open-field-night.md` §7).
+pub fn water_air_vars(p: &params::BiosphereParams) -> (&'static str, &'static str) {
     match p.water.air_temperature {
-        science::AirTemperatureRead::DailyMean => TEMP_VAR,
-        science::AirTemperatureRead::WithinDay => AIR_TEMP_WITHIN_DAY_VAR,
+        science::AirTemperatureRead::DailyMean => (TEMP_VAR, VPD_VAR),
+        science::AirTemperatureRead::WithinDay => (AIR_TEMP_WITHIN_DAY_VAR, VPD_WITHIN_DAY_VAR),
     }
+}
+
+/// The air temperature the water flows read ([`water_air_vars`]).
+fn water_temp_var(p: &params::BiosphereParams) -> &'static str {
+    water_air_vars(p).0
 }
 
 /// Is the lab soil-evaporation form on (`docs/plans/post-roadmap-soil-evaporation.md`)?
@@ -934,11 +940,7 @@ fn transpiration_flow(
         rn_var: RN_VAR.to_string(),
         // The weather's daily-mean air, or its within-day air under the lab reader (plan §7 of
         // docs/plans/post-roadmap-open-field-night.md): every water reader takes the same one.
-        vpd_var: match p.water.air_temperature {
-            science::AirTemperatureRead::DailyMean => VPD_VAR,
-            science::AirTemperatureRead::WithinDay => VPD_WITHIN_DAY_VAR,
-        }
-        .to_string(),
+        vpd_var: water_air_vars(p).1.to_string(),
         temp_var: water_temp_var(p).to_string(),
         // A sealed room's air resistance is the chamber's measured 7.5 s/m, the open field's the
         // uncited 50 (docs/plans/post-roadmap-chamber-air-resistance-adopted.md).

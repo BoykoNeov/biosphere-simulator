@@ -100,9 +100,13 @@ fn the_sun_path_keeps_each_days_net_radiation_and_lights_with_par() {
 
 fn setup(radiation: WeatherRadiation) -> (State, EulerIntegrator, SourceResolver) {
     let s = DEFAULT_SCENARIO;
+    // Step 1's form under the daily-mean air it was measured with, named rather than the loader's.
+    let p = domains::lab::with_air_temperature(
+        params::biosphere(),
+        domains::biosphere::science::AirTemperatureRead::DailyMean,
+    );
     let (state, integrator, _) =
-        season_setup_composed(&s, 1, &params::biosphere(), &|s, p| build_season_with(s, p))
-            .expect("setup");
+        season_setup_composed(&s, 1, &p, &|s, p| build_season_with(s, p)).expect("setup");
     (
         state,
         integrator,
