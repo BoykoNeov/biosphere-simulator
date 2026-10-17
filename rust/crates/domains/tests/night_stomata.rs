@@ -2,9 +2,10 @@
 //!
 //! Plan: `docs/plans/post-roadmap-night-stomata.md`. `Closing` at McAusland et al. (2023)'s booting
 //! ratio is the loader's since 2026-10-15 (§7); [`NightStomata::Open`] and the heading ratio are
-//! lab-only. This file asserts the rule, the loader's choice, that the open field cannot see it
-//! (its net radiation is a daily mean, never dark — §2a), and that it reaches `Transpiration` on a
-//! dark step by exactly the rule.
+//! lab-only. This file asserts the rule, the loader's choice, that the open field under the
+//! daily-mean weather cannot see it (its net radiation never dark — §2a; the loader's weather until
+//! 2026-10-17, named since — the loader's open field now has a night), and that it reaches
+//! `Transpiration` on a dark step by exactly the rule.
 
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::science::{

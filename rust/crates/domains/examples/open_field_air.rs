@@ -1,10 +1,10 @@
 //! **The open field gets a night, step 2: the air** — the probe
 //! (`docs/plans/post-roadmap-open-field-night.md` §7).
 //!
-//! Runs every weather-lit biosphere golden's build, from the loader's params, under five settings:
-//! the daily mean (the reference), the sun's path alone (step 1), the within-day air alone, both
-//! (the measurement asked for), and both with the curve shifted onto the day's observed mean (a
-//! sensitivity row). For each it prints the water the `Transpiration` flow drew from the root zone,
+//! Runs every weather-lit biosphere golden's build, from the loader's params with the air read named,
+//! under five settings: the daily mean (the reference until 2026-10-17), the sun's path alone (step
+//! 1), the within-day air alone, both (the measurement asked for; the loader's since 2026-10-17, plan
+//! §9), and both with the curve shifted onto the day's observed mean (a sensitivity row). For each it prints the water the `Transpiration` flow drew from the root zone,
 //! split by lit and dark steps (net radiation > 0 or not); the dehumidifier's draw (sealed builds),
 //! split the same way; the open field's own crop / soil sinks; rationing and events; and every final
 //! value that moved against the daily mean, grouped water / not water.

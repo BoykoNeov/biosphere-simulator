@@ -18,12 +18,12 @@ use domains::biosphere::science::{
 };
 use domains::biosphere::stocks::{
     IRRIGATION_VAR, LEAF_C, RN_VAR, ROOTED_DEPTH, ROOT_C, SOIL_DRY_DAYS, SOIL_EVAP_TODAY,
-    SOIL_POTENTIAL_TODAY, SOIL_SHADE_LAI, SOIL_WATER, STEM_C, STORAGE_C, TEMP_VAR, THERMAL_TIME,
+    SOIL_POTENTIAL_TODAY, SOIL_SHADE_LAI, SOIL_WATER, STEM_C, STORAGE_C, THERMAL_TIME,
     TOP_SOIL_WATER, WATER_VAPOR,
 };
 use domains::biosphere::system::{
     annual_reset_with, consumer_chamber_scenario, perennial_chamber_scenario,
-    sealed_chamber_scenario, SeasonScenario, DEFAULT_SCENARIO,
+    sealed_chamber_scenario, water_air_vars, SeasonScenario, DEFAULT_SCENARIO,
 };
 use domains::biosphere::{
     season_setup_composed, season_setup_with, season_steps, steps_for_years, BIO_DT,
@@ -218,7 +218,8 @@ fn soil_and_crop_together_stay_inside_the_net_radiation() {
         if rn <= 0.0 {
             continue;
         }
-        let t = env.get(TEMP_VAR).unwrap();
+        // The temperature the soil reads (the within-day air since 2026-10-17).
+        let t = env.get(water_air_vars(&p).0).unwrap();
         let (c, tp) = (p.transp.soil, &p.transp);
         let soil = science::soil_evaporation_potential(
             rn,

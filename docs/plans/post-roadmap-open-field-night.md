@@ -435,3 +435,25 @@ chosen.
 
 Final: `cargo test` 1410 passed, `--ignored` 9 passed, clippy clean, `regen_goldens` 0 of 20 pending,
 pytest 8 passed.
+
+### 9c. The reach after adoption — who holds `temp` without the water (2026-10-17, final advisor review)
+
+Before the adoption, anything that held, replaced or perturbed `temp` also reached the water; now the
+water reads `air_temp_within_day`, so a path that moves `temp` alone would move growth and leave the
+water on the outdoor curve, silently. Every insert, removal, hold and by-hand read of `temp` / `vpd`
+in `src`, `tests`, `examples` and `lab/` was checked:
+
+* **Held rooms** — the station's lighting / sealed resolvers (room params, outdoor names dropped), the
+  TM scorecard (answers both names with its chamber's air), `minute_transpiration` (room params): done
+  in `d79b99a` / `628ada0`.
+* **Growth subjects, correct on `temp`** — the thermal-time hold (`system.rs` test), the allocation hold
+  (`station/tests/gas_exchange.rs`), shedding (`lab/shedding.rs`, `tests/shedding_form.rs`), the chamber
+  walls' outdoor temperature.
+* **By-hand reads that read the wrong name, fixed** (still green, but no longer checking what the flow
+  does): the condensation premise in `system.rs`'s tests, the soil-and-crop energy bound in
+  `tests/soil_evaporation.rs`, and the Step 3b instrument `examples/chamber_dryness.rs` — each now reads
+  `water_air_vars`.
+* **The perturbation suite** perturbs irrigation, leaks and wall health, never `temp` or `vpd`: nothing
+  to move.
+
+No held room or weather perturbation was found reading the outdoor curve.

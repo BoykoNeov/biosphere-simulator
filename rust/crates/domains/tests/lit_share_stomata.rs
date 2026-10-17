@@ -4,8 +4,9 @@
 //! lit step into its lit and dark time — the loader's since 2026-10-16 (§6);
 //! [`NightRule::NetRadiation`] (a partly lit step counts as day) is lab-only. This file asserts the
 //! form (§1), that it reaches `Transpiration` and moves only a partly lit step, that a build without
-//! the `lit_fraction` forcing fails rather than falling back, that the weather's builds are today's
-//! rule to the bit, and the loader's choice.
+//! the `lit_fraction` forcing fails rather than falling back, that the daily-mean weather's builds
+//! (the loader's until 2026-10-17, named since) are the binary rule to the bit, and the loader's
+//! choice.
 
 use domains::biosphere::params::{self, BiosphereParams};
 use domains::biosphere::science::{

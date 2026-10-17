@@ -9,11 +9,11 @@
 //! From `rust/`: `cargo run --release -q -p domains --example chamber_dryness`
 
 use domains::biosphere::science::{self, VpdRead};
-use domains::biosphere::stocks::{RN_VAR, TEMP_VAR, VPD_VAR};
+use domains::biosphere::stocks::RN_VAR;
 use domains::biosphere::stocks::{ROOTED_DEPTH, SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR};
 use domains::biosphere::system::{
     consumer_chamber_scenario, perennial_chamber_scenario, run_perennial_with, run_season,
-    sealed_chamber_scenario, SeasonScenario, CONSUMER_CHAMBER_YEARS, PERENNIAL_CHAMBER_YEARS,
+    sealed_chamber_scenario, water_air_vars, SeasonScenario, CONSUMER_CHAMBER_YEARS, PERENNIAL_CHAMBER_YEARS,
     SEALED_CHAMBER_YEARS,
 };
 use domains::biosphere::{season_setup_with, steps_for_years, BIO_DT};
@@ -50,10 +50,12 @@ fn run(scn: &SeasonScenario, years: usize, perennial: bool, read: VpdRead) -> Ta
     // The observer sees each step's starting state — what that step's flows read.
     let mut observe = |s: &State| {
         let env = resolver.bind(s, BIO_DT);
+        // The names the water reads (the within-day air since 2026-10-17).
+        let (temp_var, vpd_var) = water_air_vars(&p);
         let (rn, temp, weather_vpd) = (
             env.get(RN_VAR).unwrap(),
-            env.get(TEMP_VAR).unwrap(),
-            env.get(VPD_VAR).unwrap(),
+            env.get(temp_var).unwrap(),
+            env.get(vpd_var).unwrap(),
         );
         let vapour = s.stocks[WATER_VAPOR].amount;
         let chamber_vpd = science::chamber_vpd_pa(temp, vapour, n_ref);

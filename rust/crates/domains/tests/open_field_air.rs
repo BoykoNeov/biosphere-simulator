@@ -1,11 +1,12 @@
-//! **The open field gets a night, step 2: the air** — the lab form's own checks.
+//! **The open field gets a night, step 2: the air** — the form's own checks.
 //!
-//! Plan: `docs/plans/post-roadmap-open-field-night.md` §7. [`WeatherAir::WithinDay`] puts the air
+//! Plan: `docs/plans/post-roadmap-open-field-night.md` §7, §9. [`WeatherAir::WithinDay`] puts the air
 //! temperature on Teh's (2006, §2.7) curve through the day's observed minimum and maximum, and the
 //! open field's deficit on it; [`AirTemperatureRead::WithinDay`] makes every water reader take it and
-//! nothing else. This file asserts the loader is untouched (A1), the curve's own shape (A2), and that
-//! the reader reaches the water: a build whose within-day data is the daily mean runs to the bit as
-//! the reference does.
+//! nothing else — both the loader's since 2026-10-17. This file pins the loader to the curve as
+//! printed, asserts the curve's own shape (A2), and that the reader reaches the water and only the
+//! water: a build whose within-day data is the daily mean runs to the bit as the daily-mean form does,
+//! and every flow's reads are recorded.
 
 use domains::biosphere::params;
 use domains::biosphere::science::AirTemperatureRead;

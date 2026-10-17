@@ -1,10 +1,12 @@
-//! **The open field gets a night** — the lab form's own checks.
+//! **The open field gets a night** — the form's own checks.
 //!
 //! Plan: `docs/plans/post-roadmap-open-field-night.md`. [`WeatherRadiation::SunPath`] spreads the
 //! weather's daily net radiation over the sun's half-sine, as PAR already is, and supplies the step's
-//! daylit share; [`WeatherRadiation::DailyMean`] (the day's mean on every step, wholly lit) is the
-//! loader's. This file asserts the loader is untouched (N1), the sun's path keeps each day's total and
-//! lights exactly when PAR does (N2, N3), and that a night step reaches the flow as a dark one.
+//! daylit share — the loader's since 2026-10-17 (§9); [`WeatherRadiation::DailyMean`] (the day's
+//! mean on every step, wholly lit) was the loader's until then and is the lab's now. This file pins
+//! the loader to the sun's path and keeps the daily mean's own rule, asserts the sun's path keeps each
+//! day's total and lights exactly when PAR does (N2, N3), and that a night step reaches the flow as a
+//! dark one (under the daily-mean air step 1 was measured with, named).
 
 use domains::biosphere::params;
 use domains::biosphere::stocks::{LIT_FRACTION_VAR, PAR_VAR, RN_VAR, SOIL_WATER, VAPOR_SINK};

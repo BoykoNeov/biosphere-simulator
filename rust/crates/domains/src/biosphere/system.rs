@@ -1467,7 +1467,9 @@ pub fn weather_forcings(
 }
 
 /// [`weather_forcings`] with the net radiation spread as `radiation` says — the open-field night's
-/// lab switch. Only the net radiation and the lit share depend on it.
+/// lab switch, with the DAILY-MEAN air (`WeatherAir::DailyMean`: no within-day names) — so
+/// `weather_forcings_with(SunPath)` is not the loader's weather since 2026-10-17; that is
+/// [`weather_forcings_lab`] at `SunPath` + `WeatherAir::WithinDay`.
 pub fn weather_forcings_with(
     scenario: &SeasonScenario,
     years: usize,
@@ -1478,7 +1480,8 @@ pub fn weather_forcings_with(
 
 /// [`weather_forcings_with`] plus, under `air`, the air's within-day temperature and the open
 /// field's deficit from it (`AIR_TEMP_WITHIN_DAY_VAR`, `VPD_WITHIN_DAY_VAR`) — the open-field
-/// night's step 2, lab-only. Every other forcing is untouched.
+/// night's step 2 (the loader's at `SunPath` + `WithinDay` since 2026-10-17, plan §9). Every other
+/// forcing is untouched.
 pub fn weather_forcings_lab(
     scenario: &SeasonScenario,
     years: usize,
@@ -1597,7 +1600,8 @@ pub fn weather_resolver(
     weather_resolver_lab(scenario, years, WeatherRadiation::SunPath, WeatherAir::WithinDay)
 }
 
-/// [`weather_resolver`] with the net radiation spread as `radiation` says (lab).
+/// [`weather_resolver`] with the net radiation spread as `radiation` says, and the daily-mean air
+/// (lab: see [`weather_forcings_with`]).
 pub fn weather_resolver_with(
     scenario: &SeasonScenario,
     years: usize,
@@ -1606,7 +1610,8 @@ pub fn weather_resolver_with(
     weather_resolver_lab(scenario, years, radiation, WeatherAir::DailyMean)
 }
 
-/// [`weather_resolver_with`] with the air's within-day data as `air` says (lab, plan §7).
+/// [`weather_resolver_with`] with the air's within-day data as `air` says (plan §7; the loader's at
+/// `SunPath` + `WithinDay` since 2026-10-17, plan §9).
 pub fn weather_resolver_lab(
     scenario: &SeasonScenario,
     years: usize,
@@ -3557,7 +3562,11 @@ mod tests {
         // flows: `Condensation` is evaluated at a second state whose vapour sits ABOVE the
         // target (0.9 of saturation), where it draws the excess.
         let resolver = super::super::weather_resolver(&scenario, 1).expect("resolver");
-        let temp = resolver.bind(&base, 1.0).get(TEMP_VAR).expect("temp");
+        // The temperature the jar's water reads (the within-day air since 2026-10-17).
+        let temp = resolver
+            .bind(&base, 1.0)
+            .get(water_air_vars(&params::biosphere()).0)
+            .expect("temp");
         let cap = science::saturation_vapour_kg(temp, scenario.chamber_air_capacity_mol);
         let mut stocks = base.stocks.clone();
         for (id, amount) in [
