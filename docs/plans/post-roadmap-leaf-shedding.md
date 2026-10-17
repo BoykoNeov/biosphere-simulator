@@ -484,5 +484,7 @@ re-pinned (0.678 explicit, 0.382 under C); the claim census +2.
 
 **Gaps recorded, not acted on:** (1) no sourced drought-driven leaf death (Van Keulen 1982 a lead);
 (2) crop-blind water use — transpiration does not read the canopy, so a seedling dries the soil as
-a full canopy would; (3) the after-anthesis form, disputed between the sources, waits for slice 4.
+a full canopy would (⚠ **CLOSED for the crop 2026-10-10** by the Szeicz–Long leaf-area resistance,
+`post-roadmap-soil-evaporation.md` §16; still true under `pre_adoption_params()`, which the deep-water
+tests pin — re-measured 2026-10-17, `post-roadmap-open-field-night.md` §9e); (3) the after-anthesis form, disputed between the sources, waits for slice 4.
 

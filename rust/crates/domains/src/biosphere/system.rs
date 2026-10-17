@@ -961,8 +961,9 @@ fn transpiration_flow(
             humidity_setpoint: p.water.humidity_setpoint,
             vpd_read: p.water.vpd_read,
         }),
-        // A lab surface-resistance form only (docs/plans/post-roadmap-canopy-resistance.md);
-        // every frozen build keeps `None` and reads the file constant exactly as before.
+        // The leaf-area surface resistance (docs/plans/post-roadmap-canopy-resistance.md): the
+        // reference's since the water-forms adoption (2026-10-10, Szeicz–Long); `None` only under the
+        // lab's `Constant` form, which reads the file constant.
         canopy: (p.transp.rs_form != science::SurfaceResistanceForm::Constant).then(|| {
             CanopyRead {
                 form: p.transp.rs_form,
@@ -3462,10 +3463,14 @@ mod tests {
         // 10.260 (1.2199x, was 7.74x); at MATURITY 10.09 vs 6.35 (1.59x, was 8.7x). Whether the
         // old collapse was realistic is NOT shown either way: no cited drought leaf death fires
         // here (the only one on the shelf, Sinclair & Amir's termination, needs VPD > 2.20 kPa, or
-        // > 1.75 with FTSW below zero; this weather peaks at 0.75 — corrected 2026-10-17), and the drought itself is the model's — soil water is
-        // crop-blind (identical under both forms), so an October seedling dries the soil as a
-        // full canopy would. Two gaps, recorded in the note. What survives is the DIRECTION:
-        // the deep store still raises the grain; the canopy reaches its cap either way.
+        // > 1.75 with FTSW below zero; this weather peaks at 0.75 — corrected 2026-10-17), and the drought itself is the model's — under
+        // the old forms this test pins, soil water is crop-blind (identical under both forms), so an
+        // October seedling dries the soil as a full canopy would. Two gaps, recorded in the note.
+        // What survives is the DIRECTION: the deep store still raises the grain; the canopy reaches
+        // its cap either way. ⚠ Scoped 2026-10-17: the crop-blind gap CLOSED for the reference on
+        // 2026-10-10 (Szeicz–Long reads leaf area), and under the reference forms this rescue is
+        // exactly 1.0000x — event watering refills the root zone whatever the depth — so the
+        // direction holds only under the old forms (docs/plans/post-roadmap-open-field-night.md §9e).
         //
         // ⚠ RE-STATED 2026-10-17 — the open field's night adopted, light + air (docs/plans/post-
         // roadmap-open-field-night.md §9): the water now reads the afternoon's dryness while the

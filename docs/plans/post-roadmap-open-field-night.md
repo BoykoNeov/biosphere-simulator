@@ -490,5 +490,37 @@ and `<` written `≤`. §9b and the log then carried "1.75 kPa, now within reach
 the leaf-shedding plan's table, §9b, the log record and index row, the `biosphere-reference.md` entry,
 two comments in `system.rs`'s deep-water test. ⚠ And the item was first offered to the user as plants
 "cutting water loss" when the air gets dry; it is a **crop-death** rule, and the deep-water drought it
-would act on is partly the model's own (soil water is crop-blind: a seedling dries the soil as a full
-canopy would — leaf-shedding plan §12's second gap).
+would act on is partly the model's own (under the old water forms that test pins, soil water is
+crop-blind: a seedling dries the soil as a full canopy would — leaf-shedding plan §12's second gap;
+⚠ that gap was already CLOSED for the reference on 2026-10-10, see §9e).
+
+### 9e. The seedling-water gap was already closed (2026-10-17, the same day)
+
+The user then picked the leaf-shedding plan's second gap: "a seedling dries the soil as a full canopy
+would". **It was closed nine days earlier.** The water-forms adoption (2026-10-10,
+`post-roadmap-soil-evaporation.md` §16) made Szeicz–Long the loader's surface resistance —
+`100 / min(LAI, 2.0)` s/m (`science.rs`), read through `CanopyRead` in `transpiration_flow` — and every
+station room builds through the same `build_season(_with)` on the loader's params (`room_params`
+overrides only the air temperature). The gap survives only under `pre_adoption_params()`, the old
+forms the deep-water tests pin on purpose. Records written after 2026-10-10 (§9d above, the leaf-shedding
+plan's gap list, a `system.rs` comment) repeated it as current; scoped in place.
+
+Re-measured, `canopy_resistance.rs`'s printed `measurement()` (release, `--ignored --nocapture`), water the
+crop transpires while its leaf area is below 0.5, the old constant 70 s/m → the reference:
+
+| Scenario | Constant | Szeicz–Long | Change |
+|---|---|---|---|
+| open field | 86.30 kg | 38.78 kg | −55 % |
+| sealed chamber | 291.10 | 95.22 | −67 % |
+| perennial chamber | 438.96 | 99.31 | −77 % |
+| consumer chamber | 582.69 | 120.77 | −79 % |
+
+Carbon at the season's end is bit-identical across the forms in every row (the water never binds there).
+Two of that instrument's columns read nothing: "drained" and "irrigated" are 0.00 everywhere because it
+tallies flows by type name and the event watering is not named `Irrigation` — not evidence; left as found.
+The open field's lowest FTSW, 0.448, is the event watering's trigger (p = 0.55), not a soil that stays
+wet on its own. **Under the reference forms the deep-water rescue is exactly 1.0000×** (canopy and grain):
+event watering refills the root zone whatever the depth, so the deep-water test's surviving claim — the
+deep store still raises the grain — holds only under the old forms it pins. Recorded, not acted on.
+
+Nothing built; no science, golden or manifest moved.
