@@ -417,8 +417,10 @@ water-limited model): drought slows leaf expansion (WSFL — refused here 2026-0
 own reason: it applies to a node-driven branch this canopy does not have, and would double-count
 WSFG) and growth (WSFG, built), hastens development (WSFD, built), and **kills no leaf before seed
 growth even under drought**; the only drought kill is crop TERMINATION after Sinclair & Amir
-(1996), their Table 15.4 (FTSW < 0.10 with VPD > 2.20 kPa for 3 days; FTSW < 0.02 with VPD > 1.75
-for 1; FTSW ≤ 0 with VPD > 2.20 for 1). Penning de Vries §4.3.4 p. 141 names Van Keulen (1982):
+(1996), their Table 15.4 (FTSW < 0.10 with VPD > 2.20 kPa for 3 days; FTSW < 0.02 with VPD > 2.20
+for 1; FTSW < 0.00 with VPD > 1.75 for 1). ⚠ CORRECTED 2026-10-17 from the rendered page (p. 199): this
+line had swapped the last two rows' VPDs and written `<` as `≤` — the text extract had jumbled the table
+(`docs/plans/post-roadmap-open-field-night.md` §9d). Penning de Vries §4.3.4 p. 141 names Van Keulen (1982):
 biomass reduced 0.1–0.2 d⁻¹ "when water stress exceeds a certain level" — not on the shelf, a
 LEAD. Teh: nothing.
 
@@ -434,7 +436,8 @@ agreed half, each with and without the deep store):
 | max VPD over the season | 0.75 kPa | 0.75 | 0.75 | 0.75 |
 
 * **Termination can never fire here:** the Dutch weather's VPD never passes 0.75 kPa; the rule
-  needs 1.75–2.20.
+  needs 1.75–2.20. ⚠ (2026-10-17: the conclusion stands, the reason was half wrong — the 1.75 row needs
+  FTSW below zero, so the rule needs 2.20 in practice; see `post-roadmap-open-field-night.md` §9d.)
 * **The soil water does not depend on the crop.** FTSW and VPD are IDENTICAL between the two
   forms, though the crops differ ~20× in leaf: transpiration does not read the canopy (§21 of the
   room-temperature plan, and slice 3b's water-ring finding). So the control's drought from day 11

@@ -961,7 +961,8 @@ the top of this doc, which are live claims, are kept current.
   1.0294 → 1.0930 (a test-only drought; the droughted control feels the dry afternoons), grain ratio
   1.2199 → 1.2127. **Science gates:** none moves. ⚠ **Opened, not built:** the within-day air peaks at
   2.03 kPa on this weather (the daily mean at 0.75), so Sinclair & Amir's 1.75 kPa drought termination
-  is now within reach; and water's day is ~0.5 °C cooler than growth's (the placement chosen).
+  is now within reach ⚠ (WITHDRAWN the same day — a misread table: the 1.75 row needs FTSW below zero, the
+  others VPD > 2.20, which no reading of this weather reaches; `docs/plans/post-roadmap-open-field-night.md` §9d); and water's day is ~0.5 °C cooler than growth's (the placement chosen).
 - **2026-10-17 — the weather fixture gains two columns, `TMIN` and `TMAX` (`ecb418d`). An unfreeze by
   the manifest's rule (its `weather_sha256` names these bytes), with no value moved: all 20 goldens
   byte-identical, and `weather_sha256` regenerated as the git-visible record.** The open field's night,

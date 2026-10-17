@@ -3461,8 +3461,8 @@ mod tests {
         // peak leaf 9.836 vs 9.555 (1.0294x, was 11.83x); grain at the season's end 12.515 vs
         // 10.260 (1.2199x, was 7.74x); at MATURITY 10.09 vs 6.35 (1.59x, was 8.7x). Whether the
         // old collapse was realistic is NOT shown either way: no cited drought leaf death fires
-        // here (the only one on the shelf, Sinclair & Amir's termination, needs VPD > 1.75 kPa;
-        // this weather peaks at 0.75), and the drought itself is the model's — soil water is
+        // here (the only one on the shelf, Sinclair & Amir's termination, needs VPD > 2.20 kPa, or
+        // > 1.75 with FTSW below zero; this weather peaks at 0.75 — corrected 2026-10-17), and the drought itself is the model's — soil water is
         // crop-blind (identical under both forms), so an October seedling dries the soil as a
         // full canopy would. Two gaps, recorded in the note. What survives is the DIRECTION:
         // the deep store still raises the grain; the canopy reaches its cap either way.
@@ -3472,9 +3472,10 @@ mod tests {
         // stomata are open, and this droughted control feels it. Measured: peak leaf 9.836 vs 8.999
         // (1.0930x, was 1.0294x — the subject's own peak unchanged to 4 digits, the control's
         // lower); grain at the season's end 11.975 vs 9.874 (1.2127x, was 1.2199x). A moved value,
-        // not a broken one. ⚠ And the sentence above is dated: the within-day air peaks at
-        // 2.03 kPa on this weather (the daily mean at 0.75), so Sinclair & Amir's 1.75 kPa
-        // termination is now within reach — recorded, not built.
+        // not a broken one. The within-day air now peaks at 2.03 kPa (the daily mean at 0.75),
+        // and the termination is STILL out of reach: its 2.20 kPa rows are unreached by any reading
+        // of this weather, and its 1.75 row needs FTSW below zero (docs/plans/post-roadmap-open-
+        // field-night.md §9d — this comment said "within reach" for a day, on a misread table).
         assert!(
             (1.06..1.13).contains(&leaf_ratio),
             "the canopy ratio moved: {leaf_ratio} (measured 1.0930)"

@@ -81,7 +81,15 @@ the flipped tree's**; both probes reproduce their saved runs; the lamp-lit rooms
 TM 102788 scorecard unchanged; 5 pins restated (the retired forms keep theirs by name); the room guard
 pinned (`station/tests/room_air.rs`); the deep-water drought ratio 1.0294 → 1.0930 recorded as moved.
 **Opened:** the afternoon air reaches 2.03 kPa, so Sinclair & Amir's 1.75 kPa drought termination is now
-within reach on this weather.
+within reach on this weather. ⚠ **WITHDRAWN the same day** (plan §9d): the table had been misread on
+2026-10-06 — on the page, 1.75 kPa pairs with FTSW < 0.00 (a state neither the book's program nor this
+model can hold) and the other two rows need VPD > 2.20, which no reading of this weather reaches (the
+book's daily VPD peaks at 1.82, the afternoon at 2.03–2.10). The rule cannot fire here; nothing was built.
+
+* **Lesson: read a table off the PAGE, not a text extract.** The extract had run the rows together, the
+  2026-10-06 transcription paired the wrong VPD with each FTSW, and two records then carried it — a
+  second error rode on it (an afternoon peak compared with a threshold the book defines on a daily
+  weighted VPD).
 
 * **Lesson: a flipped tree can be the prediction.** Measured in a scratch worktree before the decision,
   the adoption's golden diff was then reproduced line for line — the ceremony's "predict the diff" was a

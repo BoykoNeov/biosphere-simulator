@@ -430,7 +430,8 @@ own peak unchanged, the droughted control's lower), grain 11.975 vs 9.874 (1.212
 
 **Opened, not built.** The within-day air peaks at **2.03 kPa** on this weather (the daily mean never
 passed 0.75), so Sinclair & Amir's drought termination (VPD > 1.75 kPa), recorded on 2026-10-06 as
-unreachable here, is now within reach. And water's day is ~0.5 °C cooler than growth's, by the placement
+unreachable here, is now within reach. ⚠ **WITHDRAWN the same day (§9d): a misread table; the rule is
+still unreachable on this weather.** And water's day is ~0.5 °C cooler than growth's, by the placement
 chosen.
 
 Final: `cargo test` 1410 passed, `--ignored` 9 passed, clippy clean, `regen_goldens` 0 of 20 pending,
@@ -457,3 +458,37 @@ in `src`, `tests`, `examples` and `lab/` was checked:
   to move.
 
 No held room or weather perturbation was found reading the outdoor curve.
+
+### 9d. The drought termination is NOT within reach — a misread table (2026-10-17, the same day)
+
+Taken as the next item on the user's call, and stopped at the source before anything was built. Read
+off the **rendered page** of Soltani & Sinclair (2012), Table 15.4, p. 199 (after Sinclair & Amir
+1996) — the crop dies outright on any of:
+
+| FTSW | VPD (kPa) | days |
+|---|---|---|
+| < 0.10 | > 2.20 | 3 |
+| < 0.02 | > 2.20 | 1 |
+| < 0.00 | > 1.75 | 1 |
+
+The 2026-10-06 record (`post-roadmap-leaf-shedding.md` §12) had transcribed it from the text extract,
+which runs the rows together, as *"< 0.02 with > 1.75; ≤ 0 with > 2.20"* — the last two VPDs swapped
+and `<` written `≤`. §9b and the log then carried "1.75 kPa, now within reach" forward. Three checks:
+
+* **The 1.75 row needs FTSW below zero.** The book's own program clamps it (Box 14.1:
+  `If ATSW < 0 Then ATSW = 0`), and this model's soil water is a stock, never negative. The row cannot
+  fire in either; whether Sinclair & Amir's original allowed it is not on the shelf.
+* **The VPD the table means is a daily weighted one,** the book's Eq. 14.21,
+  `VPD = VPDF × (es(Tmax) − es(Tmin))` with VPDF 0.65–0.75 (Tanner & Sinclair 1983) — not an afternoon
+  peak. §9b compared the model's afternoon peak (2.03) with it: a second error, riding on the first.
+* **No reading of this weather passes 2.20** (computed from the fixture, 305 days): Eq. 14.21 at
+  VPDF 0.75 peaks at 1.82 kPa (one day over 1.75, 2007-07-15); `es(Tmax) − VAP` at 2.10 (5 days over
+  1.75); the daily mean at 0.75; the model's within-day curve at 2.03. `winter_wheat_weather.json` is
+  the only weather in the tree; the sealed rooms set their own humidity, far below.
+
+**So the rule cannot fire on this weather, and nothing was built.** Corrected in place, each marked:
+the leaf-shedding plan's table, §9b, the log record and index row, the `biosphere-reference.md` entry,
+two comments in `system.rs`'s deep-water test. ⚠ And the item was first offered to the user as plants
+"cutting water loss" when the air gets dry; it is a **crop-death** rule, and the deep-water drought it
+would act on is partly the model's own (soil water is crop-blind: a seedling dries the soil as a full
+canopy would — leaf-shedding plan §12's second gap).
