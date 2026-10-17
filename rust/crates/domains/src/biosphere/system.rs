@@ -1394,10 +1394,12 @@ fn daylight_share_path(daylength_s: Vec<f64>) -> Schedule {
 /// its 24-h mean, net shortwave only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WeatherRadiation {
-    /// The day's mean on every step, each wholly lit (`lit_fraction = 1`): the reference's. The open
-    /// field never has a night, so its stomata never close.
+    /// **Lab-only since 2026-10-17** (the reference's until the open field's night was adopted, plan
+    /// §9). The day's mean on every step, each wholly lit (`lit_fraction = 1`): the open field never
+    /// has a night, so its stomata never close.
     DailyMean,
-    /// **Lab-only.** The sun's path: the day's net radiation on the half-sine PAR already follows
+    /// **The reference's since 2026-10-17** (plan §9). The sun's path: the day's net radiation on the
+    /// half-sine PAR already follows
     /// ([E] Penning de Vries), over the same astronomical day length, so each step's net radiation
     /// is a fixed multiple of its PAR and the day's total is kept; `lit_fraction` is the step's
     /// daylit share. A night step reads `Rn = 0` and the night rule closes the stomata.
@@ -1409,9 +1411,10 @@ pub enum WeatherRadiation {
 /// [`science::AirTemperatureRead::WithinDay`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WeatherAir {
-    /// No within-day air: the reference's.
+    /// No within-day air. **Lab-only since 2026-10-17** (the reference's until then).
     DailyMean,
-    /// **Lab-only.** Teh's (2006, §2.7) curve through the day's observed minimum and maximum
+    /// **The reference's since 2026-10-17** (plan §9, the user's "curve as printed"). Teh's (2006,
+    /// §2.7) curve through the day's observed minimum and maximum
     /// ([`air_temperature_window_mean`](super::weather::air_temperature_window_mean)), as printed,
     /// each step its window's mean; the deficit `max(0, e_s(T) − e_a)` with `e_a` the day's.
     WithinDay,
@@ -1446,7 +1449,10 @@ fn air_temperature_path(
     })
 }
 
-/// The weather forcing table (per-var schedules), tiling the raw facts over `years`.
+/// The weather forcing table (per-var schedules), tiling the raw facts over `years` — since
+/// 2026-10-17 the sun's path and the air's within-day cycle (the open field's night, adopted:
+/// `docs/plans/post-roadmap-open-field-night.md` §9). A room with its own temperature drops the
+/// within-day air (`station::lighting::drop_outdoor_air`).
 ///
 /// Factored out of [`weather_resolver`] so the station lighting / sealed seams can rebuild
 /// the resolver with `PAR`/`daylength` overridden by the lamp (a built `SourceResolver`'s
@@ -1457,7 +1463,7 @@ pub fn weather_forcings(
     scenario: &SeasonScenario,
     years: usize,
 ) -> Result<HashMap<String, Schedule>, SimError> {
-    weather_forcings_with(scenario, years, WeatherRadiation::DailyMean)
+    weather_forcings_lab(scenario, years, WeatherRadiation::SunPath, WeatherAir::WithinDay)
 }
 
 /// [`weather_forcings`] with the net radiation spread as `radiation` says — the open-field night's
@@ -1491,10 +1497,10 @@ pub fn weather_forcings_lab(
         WeatherRadiation::DailyMean => {
             forcings.insert(RN_VAR.to_string(), table_schedule(f.net_radiation));
             // Every weather step is wholly lit: its net radiation is the day's mean, > 0 on every
-            // step, so the split reads it as today's rule did, bit for bit. ⚠ A STAGING STEP, not a
-            // decision: the user chose a real day/night share here (2026-10-16) —
-            // `WeatherRadiation::SunPath`, lab-only (docs/plans/post-roadmap-open-field-night.md).
-            // The lamp builds replace it with their light's own top-hat.
+            // step, so the split reads it as the binary rule does, bit for bit. The staging step of
+            // 2026-10-16, retired to the lab when the sun's path was adopted (2026-10-17,
+            // docs/plans/post-roadmap-open-field-night.md §9). The lamp builds replace the lit share
+            // with their light's own top-hat either way.
             forcings.insert(LIT_FRACTION_VAR.to_string(), constant(1.0)?);
         }
         WeatherRadiation::SunPath => {
@@ -1588,7 +1594,7 @@ pub fn weather_resolver(
     scenario: &SeasonScenario,
     years: usize,
 ) -> Result<SourceResolver, SimError> {
-    weather_resolver_with(scenario, years, WeatherRadiation::DailyMean)
+    weather_resolver_lab(scenario, years, WeatherRadiation::SunPath, WeatherAir::WithinDay)
 }
 
 /// [`weather_resolver`] with the net radiation spread as `radiation` says (lab).
@@ -3455,13 +3461,22 @@ mod tests {
         // crop-blind (identical under both forms), so an October seedling dries the soil as a
         // full canopy would. Two gaps, recorded in the note. What survives is the DIRECTION:
         // the deep store still raises the grain; the canopy reaches its cap either way.
+        //
+        // ⚠ RE-STATED 2026-10-17 — the open field's night adopted, light + air (docs/plans/post-
+        // roadmap-open-field-night.md §9): the water now reads the afternoon's dryness while the
+        // stomata are open, and this droughted control feels it. Measured: peak leaf 9.836 vs 8.999
+        // (1.0930x, was 1.0294x — the subject's own peak unchanged to 4 digits, the control's
+        // lower); grain at the season's end 11.975 vs 9.874 (1.2127x, was 1.2199x). A moved value,
+        // not a broken one. ⚠ And the sentence above is dated: the within-day air peaks at
+        // 2.03 kPa on this weather (the daily mean at 0.75), so Sinclair & Amir's 1.75 kPa
+        // termination is now within reach — recorded, not built.
         assert!(
-            (1.0..1.06).contains(&leaf_ratio),
-            "the canopy ratio moved: {leaf_ratio} (measured 1.0294)"
+            (1.06..1.13).contains(&leaf_ratio),
+            "the canopy ratio moved: {leaf_ratio} (measured 1.0930)"
         );
         assert!(
             (1.17..1.27).contains(&grain_ratio),
-            "the grain rescue moved: {grain_ratio} (measured 1.2199)"
+            "the grain rescue moved: {grain_ratio} (measured 1.2127)"
         );
         assert!(
             subject.last().unwrap().stocks[STORAGE_C].amount > 2.5,

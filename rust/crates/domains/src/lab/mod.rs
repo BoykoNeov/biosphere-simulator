@@ -259,7 +259,7 @@ pub fn with_night_rule(mut p: BiosphereParams, rule: NightRule) -> BiospherePara
 ///
 /// # ⚠ A switch, not an endorsement of the form switched to
 ///
-/// [`AirTemperatureRead::DailyMean`] is the loader's; `WithinDay` is lab-only.
+/// [`AirTemperatureRead::WithinDay`] is the loader's since 2026-10-17; `DailyMean` is the lab's.
 pub fn with_air_temperature(mut p: BiosphereParams, read: AirTemperatureRead) -> BiosphereParams {
     p.water.air_temperature = read;
     p

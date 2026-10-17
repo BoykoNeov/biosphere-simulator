@@ -72,3 +72,17 @@ held-room test builds, 1 moved drought ratio). **Adoption, and the placement, ar
   outdoors. A guard that turns a silent wrong value into an error is worth more than one more pin.
 * **A placement choice can be larger than the effect it places.** The 4.4-point swing between the curve
   as printed and the curve shifted onto the observed mean is bigger than the open field's net −2.0 %.
+
+**ADOPTED 2026-10-17** (plan §9), on the user's *"Adopt, curve as printed"*: the loader takes the sun's
+path and the within-day air for every water read. Inert plumbing first (`d79b99a`: every comparison
+names its forms; held-room test builds read their room; reach tests read the crop at noon), then the
+loader lines. 8 goldens (6 biosphere, 2 station — `greenhouse`, `harvest`), water only, **byte for byte
+the flipped tree's**; both probes reproduce their saved runs; the lamp-lit rooms, `drift_summary` and the
+TM 102788 scorecard unchanged; 5 pins restated (the retired forms keep theirs by name); the room guard
+pinned (`station/tests/room_air.rs`); the deep-water drought ratio 1.0294 → 1.0930 recorded as moved.
+**Opened:** the afternoon air reaches 2.03 kPa, so Sinclair & Amir's 1.75 kPa drought termination is now
+within reach on this weather.
+
+* **Lesson: a flipped tree can be the prediction.** Measured in a scratch worktree before the decision,
+  the adoption's golden diff was then reproduced line for line — the ceremony's "predict the diff" was a
+  `cmp`, not an estimate.

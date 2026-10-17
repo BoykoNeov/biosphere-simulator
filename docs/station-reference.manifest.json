@@ -149,12 +149,12 @@
     },
     "greenhouse": {
       "golden": "greenhouse_state.json",
-      "golden_sha256": "90adc98910a8e791a6d760ccf676354548638f560e7b59350fcb8d4fff244eaa",
+      "golden_sha256": "7032c7a013e66c5c58ed0317981090d2c4b1c675e0228acda285bfcdadae4956",
       "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
     },
     "harvest": {
       "golden": "harvest_state.json",
-      "golden_sha256": "5a474cc427f64eec4333056897437aff66029b22bf656d6c80019f73ee499962",
+      "golden_sha256": "1a54a0f50e551ea59a3d9496684115f1a310da4f782a0033f6a72357b16a3999",
       "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
     },
     "lighting": {

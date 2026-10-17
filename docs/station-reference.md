@@ -58,7 +58,11 @@ temperature-dependent science stays the
 biosphere's; which temperature it reads is this contract's. The chamber's walls still read the
 weather file's daily temperature (the outdoors they face). `greenhouse` and `harvest` still feed
 their plants the weather's temperature; `lighting` the weather's, or its scenario's
-`habitat_temp_c` constant when set (`lighting_bio_resolver`).
+`habitat_temp_c` constant when set (`lighting_bio_resolver`). Since 2026-10-17 the weather also
+supplies the air's within-day cycle for the **water** reads (the biosphere entry of that date):
+`greenhouse` and `harvest`, outdoor weather builds, take it; the lamp-lit rooms (`lighting`,
+`sealed`) do not — their params are `lighting::room_params` (the water reads the room's `temp`) and
+their resolvers drop the two outdoor names (`lighting::drop_outdoor_air`; `tests/room_air.rs`).
 
 **Why whole-assembly, not station-layer-only** (advisor-reviewed, user-confirmed). A
 station-layer-only freeze (owning just the four seams + three params) would leave the
@@ -368,6 +372,18 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-17 — the biosphere's open-field night adopted, delegated: 2 station goldens move
+  (`greenhouse`, `harvest` — the outdoor weather builds) and their 2 `golden_sha256` rows follow; the
+  lamp-lit rooms do not move.** The weather's net radiation follows the sun and the water reads the air's
+  within-day cycle (the biosphere entry of this date; plan `docs/plans/post-roadmap-open-field-night.md`
+  §9). Water values only. `lighting_state`, `sealed_station_state`, `sealed_energy_drift_summary` and the
+  other station goldens byte-identical, as the flipped tree predicted. **Station-side, landed ahead of
+  the loader line (inert then, load-bearing now):** the lamp-lit rooms build on `lighting::room_params`
+  (their water reads the room's `temp`), and their resolvers drop the two within-day names
+  (`lighting::drop_outdoor_air`), so a reader left on them fails rather than reading the outdoors —
+  added after the flipped tree found the split-air station's soil account silently reading the outdoor
+  curve inside a sealed room (1.3 g; no golden builds that variant). Pinned by `tests/room_air.rs`. The
+  TM 102788 scorecard's held chamber answers the two names with its own air: its numbers bit-identical.
 - **2026-10-16 — the biosphere's lit-share split adopted, delegated: 2 station goldens move
   (`lighting`, `sealed_station`) and their 2 `golden_sha256` rows follow. No station flow, param or seam
   changed; three station-side edits ride along.** A plant step the lamp is on for part of now closes its

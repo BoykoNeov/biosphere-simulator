@@ -289,12 +289,14 @@ pub enum VpdRead {
 /// **Which air temperature the water reads** (`docs/plans/post-roadmap-open-field-night.md` §7).
 ///
 /// Never loaded from a param file — it selects a form. The loader's is
-/// [`AirTemperatureRead::DailyMean`]. Deliberately **no `Default`**, for [`Co2Read`]'s reason.
+/// [`AirTemperatureRead::WithinDay`] since 2026-10-17 (plan §9). Deliberately **no `Default`**, for
+/// [`Co2Read`]'s reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AirTemperatureRead {
-    /// The day's mean (`temp`) on every step, as growth reads it. The reference's.
+    /// The day's mean (`temp`) on every step, as growth reads it. The reference's until 2026-10-17;
+    /// still what a room with its own temperature reads (`station::lighting::room_params`).
     DailyMean,
-    /// **Lab-only.** The weather's within-day air (`air_temp_within_day`, Teh 2006 §2.7), read by
+    /// **The reference's since 2026-10-17.** The weather's within-day air (`air_temp_within_day`, Teh 2006 §2.7), read by
     /// every water reader and nothing else: the crop's and the soil's Penman Δ, a sealed jar's own
     /// deficit and humidity bound, its dehumidifier; the open field's deficit is `vpd_within_day`.
     /// A build without those forcings fails. A room with its own temperature (the station's) does
@@ -1084,7 +1086,8 @@ pub enum NightRule {
     NetRadiation,
     /// A partly lit step is its lit share `φ` of lit time and `1 − φ` of dark time
     /// ([`step_crop_transpiration`]); `φ` is the `lit_fraction` forcing every build supplies — a
-    /// lamp-lit one from its light's top-hat, the weather's as 1 (its light is a daily mean).
+    /// lamp-lit one from its light's top-hat, the weather's as the sun's daylit share (since
+    /// 2026-10-17; as 1, the daily-mean light, before).
     LitShare,
 }
 

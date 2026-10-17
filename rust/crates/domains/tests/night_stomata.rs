@@ -13,7 +13,9 @@ use domains::biosphere::science::{
 use domains::biosphere::stocks::{LEAF_C, RN_VAR, ROOTED_DEPTH, SOIL_WATER};
 use domains::biosphere::system::{build_season_with, water_air_vars, SeasonScenario, DEFAULT_SCENARIO};
 use domains::biosphere::{season_setup_composed, steps_for_years, BIO_DT, STEPS_PER_DAY};
-use domains::lab::with_night_stomata;
+use domains::biosphere::science::AirTemperatureRead;
+use domains::biosphere::system::{weather_resolver_lab, WeatherAir, WeatherRadiation};
+use domains::lab::{with_air_temperature, with_night_stomata};
 use simcore::environment::{Environment, SourceResolver};
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
@@ -71,14 +73,23 @@ fn the_loader_closes_the_stomata_at_the_booting_ratio() {
     );
 }
 
-/// P2's open-field half: the open season never has a dark step (its net radiation is the weather's
-/// daily mean, and the file's lowest IRRAD is above zero), so closing moves nothing, to the bit, on
-/// every step.
+/// P2's open-field half, under the DAILY-MEAN weather: the open season never has a dark step (its net
+/// radiation is the weather's daily mean, and the file's lowest IRRAD is above zero), so closing moves
+/// nothing, to the bit, on every step. ⚠ The loader's weather until 2026-10-17; since the open field's
+/// night was adopted (`docs/plans/post-roadmap-open-field-night.md` §9) it is a lab form, named here.
 #[test]
-fn the_open_field_never_sees_a_dark_step() {
+fn the_daily_mean_open_field_never_sees_a_dark_step() {
     let s = DEFAULT_SCENARIO;
+    let daily = |p: BiosphereParams| {
+        let (state0, integrator, _) =
+            setup(&s, &with_air_temperature(p, AirTemperatureRead::DailyMean));
+        let resolver =
+            weather_resolver_lab(&s, 1, WeatherRadiation::DailyMean, WeatherAir::DailyMean)
+                .expect("the daily-mean weather");
+        (state0, integrator, resolver)
+    };
     // The baseline is named OPEN, not taken from the loader, so the check survives an adoption.
-    let (state0, integrator, resolver) = setup(&s, &params_with(NightStomata::Open));
+    let (state0, integrator, resolver) = daily(params_with(NightStomata::Open));
     let mut frozen = vec![state0.clone()];
     let mut state = state0;
     for _ in 0..steps_for_years(1) {
@@ -94,7 +105,7 @@ fn the_open_field_never_sees_a_dark_step() {
         frozen.push(state.clone());
     }
     for form in CLOSING {
-        let (state0, integrator, resolver) = setup(&s, &params_with(form));
+        let (state0, integrator, resolver) = daily(params_with(form));
         let mut state = state0;
         assert_eq!(state, frozen[0]);
         for (n, want) in frozen.iter().enumerate().skip(1) {

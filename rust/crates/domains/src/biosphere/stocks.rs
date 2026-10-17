@@ -79,15 +79,16 @@ pub const TEMP_VAR: &str = "temp";
 pub const DAYLENGTH_VAR: &str = "daylength_s";
 pub const RN_VAR: &str = "net_radiation";
 /// The share of a plant step that is lit, `[0, 1]` — supplied by every lamp-lit station build from
-/// the same top-hat that shapes its light, and by the weather as 1 (a staging step: its net
-/// radiation is a daily mean); read by the loader's `NightRule::LitShare` since 2026-10-16
+/// the same top-hat that shapes its light, and by the weather as the sun's daylit share (since
+/// 2026-10-17, `docs/plans/post-roadmap-open-field-night.md` §9; as 1, a staging step, from
+/// 2026-10-16); read by the loader's `NightRule::LitShare` since 2026-10-16
 /// (`docs/plans/post-roadmap-lit-share-stomata.md` §6).
 pub const LIT_FRACTION_VAR: &str = "lit_fraction";
 pub const VPD_VAR: &str = "vpd";
-/// The air's within-day temperature (°C) and the open field's deficit (Pa) from it — supplied only
-/// by the weather's lab `WeatherAir::WithinDay` data, read only by the water flows under
-/// `AirTemperatureRead::WithinDay` (`docs/plans/post-roadmap-open-field-night.md` §7). Growth reads
-/// [`TEMP_VAR`] either way.
+/// The air's within-day temperature (°C) and the open field's deficit (Pa) from it — supplied by the
+/// weather (the loader's `WeatherAir::WithinDay` since 2026-10-17), read only by the water flows under
+/// `AirTemperatureRead::WithinDay`, dropped by every room with its own temperature
+/// (`docs/plans/post-roadmap-open-field-night.md` §9). Growth reads [`TEMP_VAR`] either way.
 pub const AIR_TEMP_WITHIN_DAY_VAR: &str = "air_temp_within_day";
 pub const VPD_WITHIN_DAY_VAR: &str = "vpd_within_day";
 pub const IRRIGATION_VAR: &str = "irrigation";

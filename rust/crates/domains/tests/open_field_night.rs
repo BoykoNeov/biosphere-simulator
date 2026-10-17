@@ -20,29 +20,38 @@ use simcore::state::State;
 
 const SEASON_STEPS: u64 = (SEASON_DAYS * STEPS_PER_DAY) as u64;
 
-/// N1: the loader's weather is the daily mean, wholly lit — the forcing before this item, to the bit.
+/// The loader's weather is the sun's path, to the bit (adopted 2026-10-17, plan §9 — until then N1,
+/// "the loader keeps the daily mean"); the retired daily-mean form keeps its own rule: the day's mean
+/// on every step, wholly lit.
 #[test]
-fn the_loader_keeps_the_daily_mean() {
+fn the_loader_is_the_sun_path_and_the_daily_mean_form_is_kept() {
     let s = DEFAULT_SCENARIO;
     let loader = weather_forcings(&s, 1).expect("loader");
+    let sun = weather_forcings_with(&s, 1, WeatherRadiation::SunPath).expect("sun");
     let daily = weather_forcings_with(&s, 1, WeatherRadiation::DailyMean).expect("daily");
     let (_, rows) = weather_facts();
+    let mut dark = 0;
     for n in 0..SEASON_STEPS {
+        for var in [RN_VAR, LIT_FRACTION_VAR] {
+            assert_eq!(
+                loader[var](n, BIO_DT).to_bits(),
+                sun[var](n, BIO_DT).to_bits(),
+                "{var}, step {n}"
+            );
+        }
+        if loader[RN_VAR](n, BIO_DT) <= 0.0 {
+            dark += 1;
+        }
         let day = (n as f64 * BIO_DT) as usize;
         let want = net_radiation(rows[day].irrad_j_m2_day);
-        assert_eq!(
-            loader[RN_VAR](n, BIO_DT).to_bits(),
-            want.to_bits(),
-            "step {n}"
-        );
         assert_eq!(
             daily[RN_VAR](n, BIO_DT).to_bits(),
             want.to_bits(),
             "step {n}"
         );
-        assert_eq!(loader[LIT_FRACTION_VAR](n, BIO_DT), 1.0, "step {n}");
         assert_eq!(daily[LIT_FRACTION_VAR](n, BIO_DT), 1.0, "step {n}");
     }
+    assert!(dark > 0, "the loader's open field has no night");
 }
 
 /// N2, N3: under the sun's path every day keeps its net radiation, and the net radiation, PAR and the

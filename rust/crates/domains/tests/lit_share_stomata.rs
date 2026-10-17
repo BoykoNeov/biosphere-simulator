@@ -17,7 +17,9 @@ use domains::biosphere::stocks::{
 };
 use domains::biosphere::system::{build_season_with, water_air_vars, SeasonScenario, DEFAULT_SCENARIO};
 use domains::biosphere::{season_setup_composed, BIO_DT, STEPS_PER_DAY};
-use domains::lab::{with_night_rule, with_night_stomata};
+use domains::biosphere::science::AirTemperatureRead;
+use domains::biosphere::system::{weather_resolver_lab, WeatherAir, WeatherRadiation};
+use domains::lab::{with_air_temperature, with_night_rule, with_night_stomata};
 use simcore::environment::{Environment, SourceResolver};
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
@@ -163,15 +165,24 @@ fn a_build_without_the_lit_share_fails_under_the_split() {
     );
 }
 
-/// The weather's φ = 1 is today's rule to the bit (plan §6, the staging step): the open field run
-/// 30 days under the split and under the binary rule ends in the same state, every stock and aux.
-/// (Its net radiation is a daily mean, > 0 on every step, so neither rule ever sees a dark step.)
+/// The DAILY-MEAN weather's φ = 1 is the binary rule to the bit (plan §6, the staging step): the open
+/// field run 30 days under the split and under the binary rule ends in the same state, every stock and
+/// aux. (Its net radiation is a daily mean, > 0 on every step, so neither rule ever sees a dark step.)
+/// ⚠ The loader's weather until 2026-10-17; since the open field's night was adopted it is a lab form,
+/// named here (`docs/plans/post-roadmap-open-field-night.md` §9) — the loader's own is pinned in
+/// `open_field_air.rs`.
 #[test]
-fn the_weather_is_wholly_lit_and_moves_nothing() {
+fn the_daily_mean_weather_is_wholly_lit_and_moves_nothing() {
     let s = DEFAULT_SCENARIO;
     let run = |rule: NightRule| -> State {
-        let p = with_night_rule(params::biosphere(), rule);
-        let (mut state, integrator, resolver) = setup(&s, &p);
+        let p = with_air_temperature(
+            with_night_rule(params::biosphere(), rule),
+            AirTemperatureRead::DailyMean,
+        );
+        let (mut state, integrator, _) = setup(&s, &p);
+        let resolver =
+            weather_resolver_lab(&s, 1, WeatherRadiation::DailyMean, WeatherAir::DailyMean)
+                .expect("the daily-mean weather");
         for _ in 0..30 * STEPS_PER_DAY {
             state = integrator
                 .step_report(&state, &resolver, BIO_DT)

@@ -469,8 +469,8 @@ pub struct WaterCycleParams {
     /// reading, kept runnable through `domains::lab`.
     pub vpd_read: VpdRead,
     /// Which air temperature the water reads ([`AirTemperatureRead`]). Never loaded from the file;
-    /// the loader keeps [`AirTemperatureRead::DailyMean`], the within-day air is lab-only
-    /// (`docs/plans/post-roadmap-open-field-night.md` §7).
+    /// the loader sets [`AirTemperatureRead::WithinDay`] since 2026-10-17, the daily mean is the lab's
+    /// (and a station room's) (`docs/plans/post-roadmap-open-field-night.md` §9).
     pub air_temperature: AirTemperatureRead,
     /// How the root zone is watered ([`WateringForm`]). Never loaded from the file: the loader sets
     /// [`WateringForm::Fao56Trigger`] since the water-forms adoption (2026-10-10); continuous
@@ -1351,7 +1351,9 @@ pub fn water_cycle_from_bounded(
         // CHAMBER since the Step 3b freeze (2026-10-01): this line moved 9 goldens, water
         // stocks only (docs/plans/post-roadmap-chamber-dryness.md §4.6).
         vpd_read: VpdRead::Chamber,
-        air_temperature: AirTemperatureRead::DailyMean,
+        // The air's within-day cycle for the water reads, since the open field's night was adopted
+        // with its light (2026-10-17, docs/plans/post-roadmap-open-field-night.md §9).
+        air_temperature: AirTemperatureRead::WithinDay,
         // Watering in EVENTS, new roots credited with the deep store's actual wetness, the deep
         // overflow recycled — since the water-forms adoption (2026-10-10), with the two lines in
         // `transpiration_from_bounded` (docs/plans/post-roadmap-soil-evaporation.md §16).

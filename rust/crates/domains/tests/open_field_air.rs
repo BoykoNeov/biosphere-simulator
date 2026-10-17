@@ -27,16 +27,38 @@ use simcore::environment::{Schedule, SourceResolver};
 use simcore::state::State;
 use std::collections::HashMap;
 
-/// A1: the loader's weather carries no within-day air, and the loader's water reads the daily mean.
+/// The loader's water reads the within-day air, and its weather supplies it as Teh's curve AS PRINTED
+/// (not shifted), with the sun's path, to the bit — adopted 2026-10-17 (plan §9; until then A1, "the
+/// loader keeps the daily-mean air"). The retired daily-mean form supplies neither name.
 #[test]
-fn the_loader_keeps_the_daily_mean_air() {
-    let loader = weather_forcings(&DEFAULT_SCENARIO, 1).expect("loader");
-    assert!(!loader.contains_key(AIR_TEMP_WITHIN_DAY_VAR));
-    assert!(!loader.contains_key(VPD_WITHIN_DAY_VAR));
+fn the_loader_reads_the_within_day_air_as_printed() {
+    let s = DEFAULT_SCENARIO;
     assert_eq!(
         params::biosphere().water.air_temperature,
-        AirTemperatureRead::DailyMean
+        AirTemperatureRead::WithinDay
     );
+    let loader = weather_forcings(&s, 1).expect("loader");
+    let adopted =
+        weather_forcings_lab(&s, 1, WeatherRadiation::SunPath, WeatherAir::WithinDay).unwrap();
+    let shifted =
+        weather_forcings_lab(&s, 1, WeatherRadiation::SunPath, WeatherAir::WithinDayShifted)
+            .unwrap();
+    let mut differs_from_shifted = false;
+    for n in 0..(domains::biosphere::SEASON_DAYS * STEPS_PER_DAY) as u64 {
+        for var in [AIR_TEMP_WITHIN_DAY_VAR, VPD_WITHIN_DAY_VAR] {
+            assert_eq!(
+                loader[var](n, BIO_DT).to_bits(),
+                adopted[var](n, BIO_DT).to_bits(),
+                "{var}, step {n}"
+            );
+        }
+        differs_from_shifted |= loader[AIR_TEMP_WITHIN_DAY_VAR](n, BIO_DT)
+            != shifted[AIR_TEMP_WITHIN_DAY_VAR](n, BIO_DT);
+    }
+    assert!(differs_from_shifted, "the pin cannot tell the printed curve from the shifted one");
+    let daily = daily_mean(&s);
+    assert!(!daily.contains_key(AIR_TEMP_WITHIN_DAY_VAR));
+    assert!(!daily.contains_key(VPD_WITHIN_DAY_VAR));
 }
 
 /// A2: on every day of the fixture, the step windows tile the day to the curve's own 24-h mean; the

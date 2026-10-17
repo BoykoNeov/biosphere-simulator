@@ -181,13 +181,13 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "d68306c4cc2bba4ace2b6ff530eec429576c56a033b8d60e4a2b61e155769d67",
+      "golden_sha256": "5958ca70490f2b86a6e1ba6f6e489b42063fc8cc64387ba5b4df4f6adf102ed5",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "93e605467a226cbe46296bc9af90275d492a269853b949f6ae399151c603d33f",
+      "golden_sha256": "1c247cc2e55e215a5dbcdd0597381c030f6065b1e45ed25019c80457f66d4cba",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
@@ -199,25 +199,25 @@
     },
     "open_season": {
       "golden": "season_euler_state.json",
-      "golden_sha256": "6fd54061542cf143f7d067f3ffcc66f2de856bc764320a30ae52b685da4e4320",
+      "golden_sha256": "ff718bab30bde2ea8ed2f9332af7b81da51c941622224683213195d006a1ffa4",
       "scenario": "DEFAULT_SCENARIO (open field)",
       "years": 1
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "1bc9db9b155cc04136cfeff8aedfeee469a8c7df9e7bb0acb9a7fa2ad13b8b51",
+      "golden_sha256": "b2bd900c1581d59ab38d711949fe79dfb736fc91fc1ee685fd7b3bcfc88aedc3",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "eec66da990907a728c0a9e2ab39e49c048a5324e2d96a08fc758eb7d29618576",
+      "golden_sha256": "4d69aa9c3ee0f512f349838390c7b825c33516b9b31541c6f31896704b1bac5a",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "0285d37ccf78b2ac94c36bd2e461f33234f2d6dc64d07a0f3e79f111fa319911",
+      "golden_sha256": "89a368cd610f7e73e5d6a3d3f8cbc6293421cdcf3212e9da8f7ead497d5f2fdb",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

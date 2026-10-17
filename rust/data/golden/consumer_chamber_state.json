@@ -1,9 +1,9 @@
 {
   "aux": {
     "rooted_depth": "0x1.4cddfc9ff92d6p+0",
-    "soil_dry_days": "0x1.7e00000000000p+3",
-    "soil_evap_today": "0x1.346d9000625a3p-1",
-    "soil_potential_today": "0x1.59d7beb4bca80p+2",
+    "soil_dry_days": "0x1.ea00000000000p+4",
+    "soil_evap_today": "0x1.8a9508a32adbdp-2",
+    "soil_potential_today": "0x1.6843e9f9aa87cp+2",
     "soil_shade_lai": "0x1.218bf97897012p-1",
     "thermal_time": "0x1.fb177a57ff154p+10",
     "top_soil_water": "0x0.0p+0",
@@ -40,7 +40,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.ec42f7ef27e5ap+5",
+      "amount": "0x1.35c8a3633350ap+6",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -209,7 +209,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.abef1af6ee799p+6",
+      "amount": "0x1.6ce73643f5d9dp+6",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -261,7 +261,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.9fb9bd1021848p+4",
+      "amount": "0x1.9f748e9ec065cp+4",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -274,7 +274,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.007ce6ba9e137p-1",
+      "amount": "0x1.7302b126cc0aap-2",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },

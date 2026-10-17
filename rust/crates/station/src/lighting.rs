@@ -51,8 +51,8 @@ pub fn lamp_average_power(scenario: &LightingScenario) -> f64 {
 
 /// The loader's biosphere params for a lamp-lit ROOM: its water reads the room's own temperature
 /// (`temp`, the habitat's or the chamber's), never the weather's within-day air — a room is not
-/// outdoors (`docs/plans/post-roadmap-open-field-night.md` §7b). Identical to the loader's while
-/// the loader keeps `AirTemperatureRead::DailyMean`; it holds the room there if the loader moves.
+/// outdoors (`docs/plans/post-roadmap-open-field-night.md` §7b, §9). Differs from the loader's in
+/// that one field since the loader took the within-day air (2026-10-17); `tests/room_air.rs` pins it.
 pub fn room_params() -> domains::biosphere::params::BiosphereParams {
     let mut p = domains::biosphere::params::biosphere();
     p.water.air_temperature = domains::biosphere::science::AirTemperatureRead::DailyMean;
@@ -61,8 +61,8 @@ pub fn room_params() -> domains::biosphere::params::BiosphereParams {
 
 /// Drops the weather's within-day air from a ROOM's forcing table: a room's water reads the room's
 /// own temperature ([`room_params`]), so a reader left on the outdoor curve fails at its first step
-/// instead of reading the outdoors (`docs/plans/post-roadmap-open-field-night.md` §7e). A no-op
-/// while the weather supplies no within-day air (the loader's).
+/// instead of reading the outdoors (`docs/plans/post-roadmap-open-field-night.md` §7e). Load-bearing
+/// since the loader's weather supplies the names (2026-10-17); `tests/room_air.rs` pins it.
 pub fn drop_outdoor_air(
     forcings: &mut std::collections::HashMap<String, simcore::environment::Schedule>,
 ) {

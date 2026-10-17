@@ -386,3 +386,52 @@ rewire 10 tests, and needs one choice: **the curve's placement** — as printed 
 minimum and maximum (never above the observed maximum; water's day 0.5 °C cooler than growth's), or
 shifted onto the observed mean (water and growth agree on the day; the curve peaks above the observed
 maximum by up to 2.3 °C).
+
+## 9. Adoption (2026-10-17)
+
+**The user adopted light + air, the curve as printed** (*"Adopt, curve as printed"*), on §8's options.
+The house pattern: inert plumbing first (`d79b99a` — every comparison names its forms, the held-room
+test builds read their room, step 0 read at noon; 1408 passed, no golden moved), then the loader lines.
+
+### 9a. Predictions (written before the loader lines; the flipped tree of §7e measured them)
+
+| | prediction |
+|---|---|
+| P1 | the 8 goldens' new bytes equal the golden hunks of `step2_flip_golden_diff.patch` **exactly** (`628ada0`–`d79b99a` touched no build those goldens use) |
+| P2 | `lighting_state`, `sealed_station_state`, `drift_summary` and the other 9 goldens byte-identical |
+| P3 | the reds are only the old loader's pins: `the_loader_keeps_the_daily_mean`, `the_loader_keeps_the_daily_mean_air`, `the_weather_is_wholly_lit_and_moves_nothing`, `the_open_field_never_sees_a_dark_step`, the deep-water ratio (1.0294 → 1.0930), and the 2 manifest writers — §7e's other 12 were rewired in `d79b99a` |
+| P4 | both probes' output byte-identical to their saved runs (they name every form) |
+| P5 | the TM 102788 scorecard bit-identical (its held chamber answers the new names with its own air) |
+| P6 | no science gate moves |
+
+### 9b. Adopted — graded
+
+The loader lines: `params.rs` `air_temperature: WithinDay`; `weather_forcings` / `weather_resolver` at
+`SunPath` + `WithinDay`. Goldens and both manifests regenerated (6 biosphere + 2 station hashes, nothing
+else in either manifest).
+
+| | | |
+|---|---|---|
+| P1 | the 8 goldens equal the flipped tree's bytes | **HIT** — the same 8 files, every changed line identical |
+| P2 | the other 12 byte-identical | **HIT** |
+| P3 | the reds only the old loader's pins | **HIT** — exactly 5 (the 2 manifests were regenerated first): `the_loader_keeps_the_daily_mean`, `the_loader_keeps_the_daily_mean_air`, `the_weather_is_wholly_lit_and_moves_nothing`, `the_open_field_never_sees_a_dark_step`, the deep-water ratio |
+| P4 | both probes byte-identical to their saved runs | **HIT** (`cmp`, both) |
+| P5 | the TM 102788 scorecard bit-identical | **HIT** (its pinned values pass unchanged) |
+| P6 | no science gate moves | **HIT** |
+
+**Restated, not deleted.** The two loader pins now pin the new loader to the bit (the sun's path; the
+within-day air as printed, told apart from the shifted variant); the retired daily-mean forms keep their
+pins under their own names (`the_daily_mean_weather_is_wholly_lit_and_moves_nothing`,
+`the_daily_mean_open_field_never_sees_a_dark_step`); the station's room guard is pinned
+(`station/tests/room_air.rs`: the loader supplies the names, neither room resolver passes them on, and
+`room_params` differs from the loader in exactly the air read). The deep-water rescue, a test-only
+drought, re-stated as a moved value: peak leaf 9.836 vs 8.999 (1.0930×, was 1.0294×; the subject's
+own peak unchanged, the droughted control's lower), grain 11.975 vs 9.874 (1.2127×, was 1.2199×).
+
+**Opened, not built.** The within-day air peaks at **2.03 kPa** on this weather (the daily mean never
+passed 0.75), so Sinclair & Amir's drought termination (VPD > 1.75 kPa), recorded on 2026-10-06 as
+unreachable here, is now within reach. And water's day is ~0.5 °C cooler than growth's, by the placement
+chosen.
+
+Final: `cargo test` 1410 passed, `--ignored` 9 passed, clippy clean, `regen_goldens` 0 of 20 pending,
+pytest 8 passed.

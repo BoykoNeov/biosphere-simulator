@@ -546,11 +546,24 @@ via PCSE). It sat in `tests/oracle/` until Stage-3 slice S1 (2026-08-18) moved i
 crate that compiles it in; a pure rename, and the manifest records its **basename**, so no
 value moved.
 Tiling it `Y×` gives the multi-year horizons. Recorded in the manifest under `forcing`.
+Since 2026-10-17 it carries the day's `TMIN` / `TMAX` beside `TEMP`, `IRRAD`, `VAP` (unfreeze log).
+
+#### ⚠ UNFROZEN 2026-10-17: the open field has a night — its net radiation and its water's air vary within the day
+
+The weather's net radiation follows the sun's path (the half-sine PAR follows, the day's total
+kept), with the step's daylit share as `lit_fraction`, so a night step is dark and the night rule
+closes the stomata. Every **water** reader (transpiration, soil evaporation, a weather-lit jar's own
+deficit, humidity bound and dehumidifier, the soil account) reads the air on Teh's (2006, §2.7)
+within-day curve through the day's observed minimum and maximum, as printed, with the day's vapour
+pressure held (`air_temp_within_day`, `vpd_within_day`); **growth reads the daily mean** (`temp`), and so
+does the roots' capture. A lamp-lit station room reads its own temperature and drops the outdoor names.
+⚠ The curve's 24-h mean runs ~0.5 °C below the observed daily mean, so water's day is that much cooler
+than growth's (the user's choice of placement; plan `docs/plans/post-roadmap-open-field-night.md` §8–9).
 
 #### ⚠ UNFROZEN 2026-10-01: a sealed crop no longer reads the fixture's air dryness
 
-The fixture's vapour pressure (`vap_hpa`, through the `vpd` forcing) now drives transpiration
-in the **open field only**. A sealed build's crop takes its deficit from the chamber's own
+The fixture's vapour pressure (`vap_hpa`, through the `vpd` forcing — `vpd_within_day` since
+2026-10-17) now drives transpiration in the **open field only**. A sealed build's crop takes its deficit from the chamber's own
 vapour store (`science::VpdRead::Chamber`; unfreeze log, 2026-10-01). The fixture and its hash
 are unchanged; temperature and radiation still reach sealed builds from it, including the
 energy term of transpiration.
@@ -927,6 +940,28 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-17 — THE OPEN FIELD HAS A NIGHT: the loader adopts the sun's path for the weather's net
+  radiation (`WeatherRadiation::SunPath`, step 1) and the air's within-day cycle for every water read
+  (`WeatherAir::WithinDay`, `AirTemperatureRead::WithinDay`, step 2; Teh 2006 §2.7's curve through the
+  observed TMIN / TMAX, as printed). 6 biosphere goldens move (`season_euler`, `sealed_chamber`,
+  `perennial_chamber`, `perennial_long_horizon`, `consumer_chamber`, `consumer_long_horizon`) and their
+  6 `golden_sha256` rows follow; 2 station goldens move (the station entry of this date).** The user's
+  call (*"Adopt, curve as printed"*) on the lab build's measurements (plan
+  `docs/plans/post-roadmap-open-field-night.md` §5, §7, §9). **Every changed value is water** (30 water
+  stock amounts across the 8 goldens, plus the soil's water clocks); no carbon, nitrogen, thermal-time or
+  rooted-depth value moved, and `drift_summary` is byte-identical. The 8 goldens' new bytes equal the
+  flipped tree's (§7e) **line for line** — the prediction was the measurement. Over the runs: water
+  drawn −2.0 % in the open field, −20 to −21 % in the weather-lit jars, against the daily mean; the jars
+  now condense at night. **No YAML key, flow, aux or param set changed** — the switches are forms set in
+  code, and the manifest's `forcing` block hashes the fixture and the light path, not the forcing set,
+  so **no automatic gate can see this unfreeze**: its pins are `open_field_night::the_loader_is_the_sun_path_and_the_daily_mean_form_is_kept`,
+  `open_field_air::the_loader_reads_the_within_day_air_as_printed`, `open_field_air::the_water_reads_the_within_day_air_and_nothing_else_does`
+  and the station's `room_air.rs`, and this entry is the ceremony's record. The retired daily-mean
+  forms keep their pins under their own names. **Restated:** the deep-water rescue's canopy ratio
+  1.0294 → 1.0930 (a test-only drought; the droughted control feels the dry afternoons), grain ratio
+  1.2199 → 1.2127. **Science gates:** none moves. ⚠ **Opened, not built:** the within-day air peaks at
+  2.03 kPa on this weather (the daily mean at 0.75), so Sinclair & Amir's 1.75 kPa drought termination
+  is now within reach; and water's day is ~0.5 °C cooler than growth's (the placement chosen).
 - **2026-10-17 — the weather fixture gains two columns, `TMIN` and `TMAX` (`ecb418d`). An unfreeze by
   the manifest's rule (its `weather_sha256` names these bytes), with no value moved: all 20 goldens
   byte-identical, and `weather_sha256` regenerated as the git-visible record.** The open field's night,
