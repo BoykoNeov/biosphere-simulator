@@ -927,6 +927,18 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-17 — the weather fixture gains two columns, `TMIN` and `TMAX` (`ecb418d`). An unfreeze by
+  the manifest's rule (its `weather_sha256` names these bytes), with no value moved: all 20 goldens
+  byte-identical, and `weather_sha256` regenerated as the git-visible record.** The open field's night,
+  step 2 (`docs/plans/post-roadmap-open-field-night.md` §7a), needs the day's minimum and maximum air
+  temperature. They came from NASA POWER's daily point API (v2.10.0, `time_standard` LST), at the same
+  point and days; the same download reproduced the three committed columns **bit for bit on all 305
+  days** (`TEMP = T2M`, a 24-h mean; `IRRAD = ALLSKY_SFC_SW_DWN · 1e6`; `VAP = (0.6108 · exp(17.27·Td /
+  (Td + 237.3))) · 10`, in that order), so only the two new columns were added and the file re-serialises
+  byte for byte. The provenance records how (`tmin_tmax_added`); `tests/oracle/runner.py` does not
+  capture them and says so. The reader now requires both and refuses a day whose mean lies outside its
+  own range. Nothing reads them on the loader's path: the within-day air built on them is lab-only
+  (`93eec5a`), and its adoption, if the user takes it, is a biosphere unfreeze of its own.
 - **2026-10-16 — A PARTLY LIT STEP CLOSES FOR ITS DARK TIME: the loader sets `night_rule:
   NightRule::LitShare`, and `weather_forcings` supplies `lit_fraction = 1`. A step the lamp is on for
   part of is its lit share φ of lit time (open stomata, at `Rn / φ`) and `1 − φ` of dark time (closed,

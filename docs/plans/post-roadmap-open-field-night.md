@@ -241,14 +241,16 @@ Every golden byte-identical; the manifest's `weather_sha256` regenerated.
   in the weather builder adds the two within-day forcings only when asked. The reader switch without
   the data is an error (a missing forcing), not a silent fallback.
 * **The station's rooms answer for themselves.** A lamp-lit room has its own temperature (the habitat
-  constant, or the chamber's heat store), not the weather's. Under the reader switch, `lighting` and
-  `sealed` must answer the within-day temperature with **their own** — the lamp-net-radiation lesson,
-  a forcing swapped for a room must swap every reader. Wired with this item, so a flipped tree can
-  price them.
+  constant, or the chamber's heat store), not the weather's — the lamp-net-radiation lesson, a forcing
+  swapped for a room must swap every reader. *As first written:* `lighting` and `sealed` would answer
+  the within-day temperature with their own. **As built:** a room's water stays on the room's `temp`
+  (`lighting::room_params` holds `DailyMean` there), and the room resolvers *drop* the two within-day
+  names (`lighting::drop_outdoor_air`, added after the flipped tree found a leak, §7e), so a reader left
+  on them fails at its first step instead of reading the outdoors.
 
 ### 7c. Predictions
 
-By hand (`estimate.py`, the season's days, the unshifted curve): the radiation-weighted daylit
+By hand (`sources/temp-evidence/open-field-night/step2_estimate_by_hand.py`, local; the season's days, the unshifted curve): the radiation-weighted daylit
 deficit is **1.85×** the daily-mean one, the dark deficit **0.31×**; the 24-h mean, April–July,
 **1.000×**. So the air alone moves little; it is the air **with** the night's closed stomata that
 weights the dry afternoon.
@@ -358,7 +360,11 @@ None is a defect in the form:
   reads `vpd`/`temp`, the flow the within-day names, at a midnight step whose air is at its dew point), and
   `atmosphere::the_chamber_vapour_never_exceeds_saturation_and_scales_with_the_room` (it checks the jar's
   vapour against the target at the daily mean, 16.39 °C; the dehumidifier now holds the target at the
-  step's own temperature, ~16.7 °C at that 09:00–10:30 step — 1.8 % higher, the size of the excess).
+  step's own temperature, ~16.7 °C at that 09:00–10:30 step by hand. **Measured** in the tree (a
+  throwaway run, light + air, the lab switches): the jar's vapour ends **no** step above the target at
+  that step's own within-day temperature — 0 of 14 640 steps (sealed), 0 of 24 400 (perennial), 0 of
+  24 400 (consumer). So the red is the premise (the target read at the daily mean), not a leak in the
+  jar's books).
 * **4 station tests that build a held room on the loader's params**: `minute_transpiration` ×2 (their raw
   pair now fails loudly on the missing name — the guard working), and the TM 102788 scorecard ×2 — its
   held chamber replaces the weather's forcings but not the two new names, so flipped its model read the
