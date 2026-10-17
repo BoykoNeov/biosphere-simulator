@@ -186,3 +186,80 @@ deficit rather than the afternoon's — the water above is **likely low, so the 
 (argued, §4, not measured), not the answer. **Next: step 2, the air** — re-fetch the fixture with TMIN/TMAX (a frozen input), choose a
 cited within-day temperature form, feed its deficit to the water reads, and measure the two steps
 together before any adoption. The user's to open.
+
+## 7. Step 2, the air — design and predictions (2026-10-17, written before any run)
+
+Opened on the user's *"step 2"*. Asked how far the air's cycle should reach, the user chose
+**the open field and the jars** (2026-10-17): the jars read their dryness from their own air
+(`VpdRead::Chamber`, at the step's temperature), so a cycle on the weather file's deficit alone would
+never reach them — their −25 to −33 % (§5a) would stay as overstated as it is. (A side note raised the
+same point the same day.)
+
+### 7a. The data (commit 1, inert)
+
+The fixture gains `TMIN` / `TMAX`, from NASA POWER's daily point API (v2.10.0, community AG, sources
+SYN1DEG / MERRA2 / POWER, `time_standard` LST), at the same point and days. **The same download
+reproduces the three committed columns bit for bit on all 305 days**: `TEMP = T2M` (so TEMP is POWER's
+24-h mean, **not** `(TMIN + TMAX)/2`: their gap is −0.07 °C on average, −1.4 to +1.3 on a day),
+`IRRAD = ALLSKY_SFC_SW_DWN · 1e6`, `VAP = (0.6108 · exp(17.27·Td/(Td + 237.3))) · 10` in that order (a
+different order, `6.108 · exp(…)`, misses on 132 days by an ulp). Only the two new columns were added;
+the file re-serialises byte for byte under the runner's own `json.dumps(…, indent=2, sort_keys=True)`.
+The provenance records how (`tmin_tmax_added`); `tests/oracle/runner.py` does not capture them, and says so.
+Every golden byte-identical; the manifest's `weather_sha256` regenerated.
+
+### 7b. The form
+
+* **The temperature curve: Teh (2006) §2.7, Eqs. 2.41–2.47, as printed** — the day's minimum 1.5 h
+  after sunrise, its maximum 1.5 h after solar noon, a half sine between; after sunset a straight line to
+  the minimum, using the same day's sunrise and minimum for "the next day" (his Eq. 2.45
+  approximation), and the early morning the same line continued (Eq. 2.46). So each day's curve
+  closes on itself at midnight, and each day is driven by its own observed `TMIN` / `TMAX`. Sunrise and
+  sunset are the model's own (the day length row `D`, centred on solar noon — PAR's span).
+* **The step reads the curve's mean over its window** (exact, from the curve's antiderivative), as the
+  light forcings do. A day with `D ≤ 3 h` is refused (the maximum would fall after sunset); unreachable
+  at 52° N.
+* **Vapour pressure is held at the day's `VAP`** through the day; the open field's deficit is
+  `max(0, e_s(T(t)) − VAP)`. ⚠ Teh's own §2.5 holds the **relative humidity** constant instead "due to
+  lack of further data" — which would make the vapour pressure swing with temperature — while his text
+  above it says vapour pressure has only a weak daily course (his Fig. 2.13). We have the day's dew
+  point, and FAO-56 forms `e_a` from it for the whole day; Teh is cited for the **temperature** only.
+* **Where the curve sits: unshifted** (the advisor first leaned to shifting it onto `TEMP`, then
+  reversed on the measured gap). The curve's own 24-h mean is **below** `TEMP` by 0.44 °C on average
+  (−0.55 to +2.28 on a day; radiation-weighted 0.50, April–July 0.48), so a curve shifted onto `TEMP`
+  would peak above the day's observed maximum. Unshifted, it stays inside the observed range — and the
+  water reads a day 0.5 °C cooler on average than growth does. The shifted placement is built as a
+  second lab variant and measured beside it (a sensitivity row, not a candidate the record argues for).
+  ⚠ **Locus:** Teh checks the form against one day at 3° N (~12 h days); at 52° N the long linear
+  night of winter is where it is least tested.
+* **Who reads it — every water reader, nothing else.** `science::AirTemperatureRead { DailyMean,
+  WithinDay }` in `p.water` (never loaded; the loader keeps `DailyMean`). Under `WithinDay`:
+  `Transpiration` reads the within-day temperature (Penman–Monteith's Δ, the soil evaporation's Δ, the
+  sealed air's own deficit, its humidity bound) and the open field's within-day deficit;
+  `Condensation` (the dehumidifier) reads the same temperature, so a jar's books hold together.
+  Growth (photosynthesis, respiration, development, roots) keeps the daily mean.
+* **The data is separate from the reader:** `WeatherAir { DailyMean, WithinDay, WithinDayShifted }`
+  in the weather builder adds the two within-day forcings only when asked. The reader switch without
+  the data is an error (a missing forcing), not a silent fallback.
+* **The station's rooms answer for themselves.** A lamp-lit room has its own temperature (the habitat
+  constant, or the chamber's heat store), not the weather's. Under the reader switch, `lighting` and
+  `sealed` must answer the within-day temperature with **their own** — the lamp-net-radiation lesson,
+  a forcing swapped for a room must swap every reader. Wired with this item, so a flipped tree can
+  price them.
+
+### 7c. Predictions
+
+By hand (`estimate.py`, the season's days, the unshifted curve): the radiation-weighted daylit
+deficit is **1.85×** the daily-mean one, the dark deficit **0.31×**; the 24-h mean, April–July,
+**1.000×**. So the air alone moves little; it is the air **with** the night's closed stomata that
+weights the dry afternoon.
+
+| | prediction | confidence |
+|---|---|---|
+| A1 | the data commit and the form move **no golden** (the reader and the data both default off) | high |
+| A2 | the curve: window means tile each day to its own 24-h mean; `TMIN` at sunrise + 1.5 h and `TMAX` at noon + 1.5 h exactly; continuous within a day; the shifted variant's 24-h mean equals `TEMP` | high |
+| A3 | air only (daily-mean light, stomata open around the clock): open-field crop water within **±5 %** of the daily mean — the curve's April–July 24-h mean deficit is **1.000×** the daily-mean one (the convexity gain and the 0.5 °C cooler mean cancel, by hand); what is left is Δ's own timing. (First written as "+15 to +40 %" and corrected by hand before any run: the 1.85× is a DAYLIT figure, and without a night nothing weights the day) | medium |
+| A4 | light + air (the measurement asked for): open-field crop water ends **above** the daily-mean baseline, **+10 to +35 %** (step 1's lit water × ~1.4, its dark water × ~0.3) — i.e. step 1's −11 % saving does not survive | medium-low |
+| A5 | the jars rise less than the open field relative to step 1, **+5 to +25 %**: at a held humidity their deficit scales with e_s(T), not e_s − e_a. Night condensation (the `condensate` store's inflow) rises as the cap falls with the cooling air | medium-low |
+| A6 | carbon: the jars bit-identical (isolation-limited, no water stress). The open field **may** move: if the watering trigger falls behind a doubled afternoon draw, stress binds between events. Grain within ±3 %; if any carbon moves, it is reported as moving | low |
+| A7 | shifted vs unshifted: the shifted runs ~0.5 °C warmer on the water days, so a few % more water | medium |
+| A8 | flipped (scratch worktree, loader at `WithinDay` + the weather's within-day data): the 8 weather goldens of §5b move, plus `drift_summary` if A6's carbon moves; `lighting_state` and `sealed_station_state` **byte-identical** (each room answers with its own temperature) | medium-high |

@@ -41,6 +41,10 @@ WEATHER_FIXTURE_PATH = WINTER_WHEAT_WEATHER
 # TEMP/°C daily mean, IRRAD/J m⁻² day⁻¹ shortwave, VAP/hPa vapour pressure). These
 # are FACTS; our clean-room conversions to flow drivers live in src/domains/biosphere/
 # weather.py. Daylength is derived (latitude + day-of-year), not dumped.
+# ⚠ The committed fixture also carries TMIN/TMAX (2026-10-17), added by a direct NASA
+# POWER API call, NOT by this capture (its provenance `tmin_tmax_added` records how).
+# Re-running `write_weather_fixture` would drop them, and the air's within-day cycle is
+# built on them (docs/plans/post-roadmap-open-field-night.md §7).
 WEATHER_VARIABLES = ("TEMP", "IRRAD", "VAP")
 
 # --- forcing definition (also recorded verbatim in the fixture provenance) ----

@@ -114,7 +114,7 @@
   "forcing": {
     "light_path": "a84d3aa287eb8a0760500b9c7eb7cb13ed5ba61d77c829d3f389bb419fff8d80",
     "weather_fixture": "winter_wheat_weather.json",
-    "weather_sha256": "cd61457e61d2b1ccce7d2468f94355c7e9636cfaf627dd84b1c58531a9373e80"
+    "weather_sha256": "1bfabb1644b0d93f67ac59389472c18f267e328fc7956f899ef5d665dbc5fa8b"
   },
   "frozen_at_phase": 4,
   "integrator": "EulerIntegrator",
