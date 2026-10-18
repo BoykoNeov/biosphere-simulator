@@ -377,6 +377,14 @@ fn run_multirate(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
     })
 }
 
+/// The fast step a bed's committed state is reported at: `day_start + fast_done`, except that a
+/// plant step before the run's first fast step is step 1, not 0 — step 0 is the initial state, which
+/// the error text reads as a wiring error (a crossing there means the file starts the stock above
+/// its target; one made by the first plant step does not).
+fn bed_step(day_start: u64, fast_done: u64) -> u64 {
+    (day_start + fast_done).max(1)
+}
+
 /// Drive a bed file one day at a time through the station's day driver
 /// ([`station::driver::advance_one_master_day`] — the function the sealed station and its
 /// caller-driven session both step through): the re-sow hook consulted at each day's start, the
@@ -408,7 +416,14 @@ fn run_bed(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
             bed.plant_dt,
             built.dt,
             Some(&*bed.reset),
-            &mut |fast_done, s| watch_state(&watch, s, day_start + fast_done, &mut first_reversal),
+            &mut |fast_done, s| {
+                watch_state(
+                    &watch,
+                    s,
+                    bed_step(day_start, fast_done),
+                    &mut first_reversal,
+                )
+            },
         )?;
         state = next;
         total_rationed += rationed;
@@ -476,4 +491,20 @@ fn step_rk4(
         events,
         first_reversal,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_bed_state_is_never_reported_as_the_initial_one() {
+        // The run's first plant step precedes any fast step (`fast_done == 0` on day 0); naming it
+        // step 0 would read as a wiring error. Every other state keeps its fast step.
+        assert_eq!(bed_step(0, 0), 1);
+        assert_eq!(bed_step(0, 1), 1);
+        assert_eq!(bed_step(0, 90), 90);
+        assert_eq!(bed_step(1440, 0), 1440);
+        assert_eq!(bed_step(1440, 7), 1447);
+    }
 }

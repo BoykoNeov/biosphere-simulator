@@ -322,7 +322,8 @@ leftovers"*). The bullets are left as written.
 ## 12. The plant step: the lamp's window capped, any step the driver can interleave (2026-10-18)
 
 **What the overshoot was, measured before anything changed** (an arithmetic probe over the
-lamp-window function, 12 to 1440 steps a day, 100 years):
+lamp-window function, 12 to 1440 steps a day, 100 years; kept, with its output, at
+`sources/temp-evidence/lamp-probe/` — git-ignored, local, like the rest of `sources/`):
 
 * **Time does not slip.** `(n · dt).trunc()` named the right day on every step at every count tried,
   and the time of day was never more than 6e-12 of a day (half a microsecond) off the exact one. The
@@ -342,8 +343,11 @@ branches return the value the old line did, bit for bit — `regen_goldens` repo
 change**. The bed's power-of-two refusal is lifted: any count the day driver can interleave with the
 fast steps runs (it refuses a count sharing no factor with them); 0 is refused. Pinned:
 `light_path`'s `a_wholly_lit_window_is_the_lamp_exactly_at_any_step` and `bed.rs`'s
-`any_plant_step_the_driver_can_interleave_runs` (8, 12, 24, 32, 48, and 24 under a lamp that never
-goes off). **Both go red with the old line restored** (checked).
+`any_plant_step_the_driver_can_interleave_runs` (8, 12, 24, 32 and 48). **Both go red with the old
+line restored** (checked). ⚠ A case "24 under a lamp that never goes off" was in the first commit and
+was removed (advisor's review): the fixture's three days run on the cold program, whose day length
+is `cold.photoperiod_hours`, which the bed's `photoperiod_hours` does not set — so it was the plain
+24 run again. The wholly lit window is pinned by the unit test alone.
 
 Not validated: the plant science is measured at 16 steps a day only.
 
@@ -361,6 +365,12 @@ step count against the fast total.
 regulator on the bed's air and no crew. The plants' daytime O₂ lifts the pool past the regulator's
 target inside the lit day, and by midnight it is back under it. With the check restored to the day's
 end the test goes red ("the gate did not see it"; checked).
+
+**Found in review and fixed the same day:** the run's first plant step comes before any fast step, so
+it was reported as step 0, which the error text reads as "the file starts the stock above the
+setpoint — a wiring error". It is now step 1 (`run::bed_step`, unit-pinned). Unreachable by any file
+today — under the cold program the first plant step is dark, so the plants draw O₂ down — but a
+wrong diagnosis waiting for a lit first step.
 
 ## 14. The three that are left — each a formal change, priced, not built
 

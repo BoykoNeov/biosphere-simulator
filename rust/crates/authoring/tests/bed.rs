@@ -131,8 +131,9 @@ fn a_bed_file_runs_clean_repeats_and_its_plants_grow() {
 
 /// The direction gate judges every state a bed's day commits, not its end (plan §13). An O₂
 /// regulator on the bed's air with no crew: the plants' daytime O₂ lifts the pool past the
-/// regulator's target, so it runs backwards inside the day — and by midnight, four hours into the
-/// dark, the pool is back under it. Until 2026-10-18 the gate looked only at midnight and passed.
+/// regulator's target, so it runs backwards inside the day — and by midnight, eight hours into the
+/// dark (the cold program's lamp is on 08:00–16:00), the pool is back under it. Until 2026-10-18 the
+/// gate looked only at midnight and passed.
 #[test]
 fn the_direction_gate_sees_a_midday_excursion_a_day_end_check_misses() {
     let yaml = format!(
@@ -157,8 +158,8 @@ fn the_direction_gate_sees_a_midday_excursion_a_day_end_check_misses() {
     assert_eq!(seen.stock_id, "biosphere.o2_pool");
     let minute_of_day = seen.step % 1440;
     assert!(
-        (240..1200).contains(&minute_of_day),
-        "seen at fast step {} — inside the lit day (04:00–20:00), not at a day's end",
+        (480..960).contains(&minute_of_day),
+        "seen at fast step {} — inside the cold program's lit hours (08:00–16:00), not at a day's end",
         seen.step
     );
     // A day-end check would have passed: the pool is under the target at the last midnight.
@@ -201,27 +202,19 @@ fn the_resow_calendar_fires_when_it_says() {
 }
 
 /// The author declares the plant step (the user's answer): powers of two and not — 8, 12, 24, 32
-/// and 48 pinned beside the fixture's 16, and 24 again under a lamp that never goes off, so every
-/// plant step is a wholly lit window. Not validated: the science is measured at 16 only. ⚠ 24 was
-/// refused until 2026-10-18 — the lamp's lit share over a 1/24-day step rounded to
+/// and 48 pinned beside the fixture's 16. Not validated: the science is measured at 16 only. ⚠ 24
+/// was refused until 2026-10-18 — the lamp's lit share over a 1/24-day step rounded to
 /// 1.0000000000000004 and the station's guard stopped the run at the first lit step (plan §12).
+/// The wholly lit window itself is pinned in `light_path`'s own tests; these three days run on the
+/// cold program, whose day length the bed's `photoperiod_hours` does not set.
 /// 0 is refused; a count sharing no factor with the day's 1440 fast steps is the driver's refusal.
 #[test]
 fn any_plant_step_the_driver_can_interleave_runs() {
-    let runs = [8u64, 12, 24, 32, 48].map(|k| {
-        (
-            k,
-            edited(
-                "plant_steps_per_day: 16",
-                &format!("plant_steps_per_day: {k}"),
-            ),
-        )
-    });
-    let always_lit = edited(
-        "plant_steps_per_day: 16",
-        "plant_steps_per_day: 24\n  photoperiod_hours: 24",
-    );
-    for (k, yaml) in runs.into_iter().chain([(24, always_lit)]) {
+    for k in [8u64, 12, 24, 32, 48] {
+        let yaml = edited(
+            "plant_steps_per_day: 16",
+            &format!("plant_steps_per_day: {k}"),
+        );
         let result = run_scenario(build(&yaml).unwrap()).expect("runs clean");
         assert_eq!(result.final_state.n, 3 * k, "three days of {k} plant steps");
         assert_eq!(result.total_rationed, 0);
