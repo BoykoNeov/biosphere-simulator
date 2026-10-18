@@ -226,3 +226,30 @@ fn a_regulator_on_the_beds_air_must_declare_the_beds_air() {
     let built = build(&with_regulator("9500.0")).expect("the bed's own air builds");
     assert_eq!(built.demand_controlled.len(), 1);
 }
+
+/// The example greenhouse (`scenarios/lamp_greenhouse.yaml`) over 300 days: the authored bed
+/// reaches maturity and re-sows itself, clean. Slow (~50 s), so `--ignored`; the content test
+/// runs the file's own 14 days on every suite.
+///
+/// Measured 2026-10-18: rationed 0, no reversal, last sowing at plant step 4480 (day 280) — the
+/// sealed station's own re-sows fall on days 139 and 278.
+#[test]
+#[ignore = "slow: a 300-day bed run"]
+fn the_example_greenhouse_matures_and_resows_over_a_season() {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../scenarios/lamp_greenhouse.yaml");
+    let text = std::fs::read_to_string(path).expect("read the example");
+    assert!(
+        text.contains("steps: 20160 "),
+        "the example's horizon line moved"
+    );
+    let result = run_scenario(build(&text.replace("steps: 20160 ", "steps: 432000")).unwrap())
+        .expect("a season runs clean");
+    assert_eq!(result.total_rationed, 0);
+    assert!(result.first_reversal.is_none());
+    let sown = result.final_state.aux[station::sowing::SOWN_STEP];
+    assert!(
+        sown >= 139.0 * 16.0,
+        "the crop was never re-sown at maturity (last sowing at step {sown})"
+    );
+}

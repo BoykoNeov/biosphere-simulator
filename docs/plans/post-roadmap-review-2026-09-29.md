@@ -447,7 +447,8 @@ after Steps 1 and 3.
 
 **TAKEN 2026-10-18** on the user's *"1 and 2"*: `post-roadmap-authored-plants.md`. 7a BUILT; its
 first run found the bioregenerative habitat BROKEN since the 2026-09-06 setpoint move, not merely
-stale, and it was re-sized. 7b designed, its questions put to the user. The text below is left as
+stale, and it was re-sized. 7b BUILT the same day on the user's five answers (five slices; the O₂ target
+became a share of each cabin's air; `bed:` builds the station's lamp-lit chamber into an authored file). The text below is left as
 written.
 
 ### The problem

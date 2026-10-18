@@ -62,3 +62,13 @@ rule (`maturity`, `never`, `{every_days: N}`) are required. An authoring unfreez
 `plant_chamber`, 0 of 20 goldens. Pinned: the bed's starting state equals the sealed station's, stock
 for stock. Found: a re-sow needs grain from the old crop, so a calendar can be refused by the science.
 A layering edge `authoring → station` was added to the purity gate, with its reason, and flagged.
+
+**SLICE 5 BUILT 2026-10-18 — STEP 7 COMPLETE.** `scenarios/lamp_greenhouse.yaml`, the first authored
+habitat with plants: a crew of one breathing a lamp-lit wheat bed's own air, with a scrubber, an O₂
+regulator on the bed's 9500 mol, solar power and a radiator. 14 days clean (CO₂ and O₂ at the hand
+arithmetic's values); 300 days clean with a maturity re-sow (`--ignored`).
+
+* **Lesson: an assumption made explicit finds its own casualties.** Requiring the cabin's air exposed two
+  more files the 2026-09-06 setpoint move had broken in meaning; running the content found the third.
+* **Lesson: a layering gate is a question, not a wall.** The bed needed `authoring → station`; the gate
+  called any new edge a decision, so it was taken in the open, with its reason in the rule.

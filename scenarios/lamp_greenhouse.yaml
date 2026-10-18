@@ -1,0 +1,150 @@
+# lamp_greenhouse — a crew of one breathing the air of a lamp-lit wheat bed (2026-10-18, slice 5
+# of docs/plans/post-roadmap-authored-plants.md). The first authored habitat with PLANTS in it.
+#
+# THE BED IS THE REFERENCE'S CHAMBER. `bed:` builds the sealed station's lamp-lit plant chamber
+# with the station's own builder: the wheat, its soil and water, the chamber's 9500 mol of air,
+# its heat store, the lamp on its cold program (eight weeks at 4 °C after each sowing, to vernalize
+# the wheat), the walls facing the weather. Nothing of the plant science is written here; this file
+# chooses the bed's allowed fields and wires the habitat around it.
+#
+# THE LOOP. The crew (eclss.crew_metabolism, forced at the standalone ECLSS scenario's rates)
+# breathes the BED's own air: it takes O2 from `biosphere.o2_pool` and adds CO2 to
+# `biosphere.carbon_pool` and water to `biosphere.water_vapor` — the stocks the plants
+# photosynthesise from and transpire into. The CDRA-style scrubber holds the shared CO2 near its
+# steady state; the O2 regulator holds the shared O2 at 21 % of the bed's air, so it must declare
+# that air (cabin_air_mol: 9500.0 — the platform refuses any other value on the bed's O2). A
+# solar array charges the battery the lamp and the chamber's heater draw on; the chamber's cooler
+# and the solar waste heat land on a thermal node, which radiates to space.
+#
+# COMPOSITION. The bed's carbon pool carries {carbon: 1, oxygen: 2} and its O2 pool {oxygen: 2},
+# so every boundary stock a flow pairs with them carries the same composition, leg for leg — that
+# is what makes each flow balance in BOTH carbon and oxygen.
+#
+# THE HORIZON is 14 days, inside the cold period: the content test runs every file in scenarios/
+# twice to its own horizon (~0.23 s per bed day), so a full season (~140 days to maturity, then a
+# re-sow) is run by a slow test instead (`authoring/tests/bed.rs`, --ignored).
+#
+# ⚠ AUTHORED, NOT VALIDATED. One crew member against one square metre of wheat is not a habitat
+# anyone has checked; the platform promises conservation, no rationing and repeatability.
+
+name: lamp_greenhouse
+integrator: euler
+dt: 60.0                  # the fast step: the station's minute
+steps: 20160              # 14 days of 1440 minutes
+
+bed:
+  crop: wheat
+  plant_steps_per_day: 16 # the plant step the science is measured at
+  surroundings: outdoor
+  power: power.battery
+  heat_sink: thermal.node
+  resow: maturity
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 2.0e+10       # J — the sealed station's provisioned battery
+  - id: thermal.node
+    domain: thermal
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9        # J, referenced to T_space
+  - id: boundary.solar_source
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+  - id: boundary.space
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+  # The crew's metabolic boundaries, composed like the bed pools they pair with.
+  - id: boundary.metabolic_o2_sink
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+    composition:
+      oxygen: 2.0
+  - id: boundary.metabolic_co2_source
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+    composition:
+      carbon: 1.0
+      oxygen: 2.0
+  - id: boundary.metabolic_h2o_source
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+  - id: boundary.co2_removed
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+    composition:
+      carbon: 1.0
+      oxygen: 2.0
+  - id: boundary.o2_supply
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+    composition:
+      oxygen: 2.0
+
+flows:
+  - id: eclss.crew_metabolism
+    type: eclss.crew_metabolism
+    wiring:
+      cabin_o2: biosphere.o2_pool
+      cabin_co2: biosphere.carbon_pool
+      cabin_h2o: biosphere.water_vapor
+      metabolic_o2_sink: boundary.metabolic_o2_sink
+      metabolic_co2_source: boundary.metabolic_co2_source
+      metabolic_h2o_source: boundary.metabolic_h2o_source
+  - id: eclss.co2_scrubber
+    type: eclss.co2_scrubber
+    wiring:
+      cabin_co2: biosphere.carbon_pool
+      co2_removed: boundary.co2_removed
+    params: eclss
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    wiring:
+      o2_supply: boundary.o2_supply
+      cabin_o2: biosphere.o2_pool
+    params: eclss
+    cabin_air_mol: 9500.0  # the bed's air — required, and the only value the platform accepts here
+  - id: power.solar_charge
+    type: power.solar_charge
+    wiring:
+      solar_source: boundary.solar_source
+      battery: power.battery
+      waste_heat: thermal.node
+    params: charge
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    wiring:
+      node: thermal.node
+      space: boundary.space
+    params: thermal
+
+forcings:
+  o2_consumption:          # mol/s — the standalone ECLSS scenario's crew
+    const: 0.004
+  co2_production:          # mol/s
+    const: 0.003
+  h2o_production:          # kg/s
+    const: 2.0e-5
+  solar_power:             # W — about the lamp's daily average, so the battery holds roughly level
+    const: 150.0

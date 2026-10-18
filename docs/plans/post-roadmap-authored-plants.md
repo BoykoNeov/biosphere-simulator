@@ -281,3 +281,22 @@ refused; the godot bridge's notes call that the inversion) — and closes no cyc
 moving the station's chamber machinery (chamber heat, lamp, sowing clock, gas exchange, latent heat)
 down into `domains`, is far larger and riskier. The rule's comment records why; the user was told and
 may veto.
+
+## 10. Slice 5 BUILT 2026-10-18 — the example greenhouse
+
+`scenarios/lamp_greenhouse.yaml`: a crew of one (`eclss.crew_metabolism`) breathing the air of a
+lamp-lit wheat bed — the first authored habitat with plants in it. The crew takes O₂ from the bed's
+`biosphere.o2_pool` and adds CO₂ and water to its `carbon_pool` and `water_vapor`; the scrubber and the
+O₂ regulator (declaring the bed's 9500 mol) hold the shared air; a solar array charges the battery the
+lamp draws on; the chamber's cooler and the solar waste heat land on a node that radiates to space.
+Every boundary paired with a bed pool carries that pool's composition, so each flow balances in carbon
+and oxygen.
+
+**Measured.** 14 days (the file's horizon, inside the cold period): rationed 0, no reversal, CO₂ held at
+3.000 mol (the scrubber's `P/k` = 0.003/1e-3) and O₂ at 1993.0 (`0.21·9500 − 0.004/2e-3`) — both the
+hand arithmetic. 300 days (`bed.rs`, `--ignored`, ~50 s release / ~170 s test build): rationed 0, no
+reversal, the crop matures and is re-sown; last sowing at day 280 (the sealed station re-sows on days
+139 and 278). The content test now runs three habitats in ~12 s.
+
+**Step 7 is complete:** 7a (run what is authored) and 7b (a crop bed as one block), on the user's five
+answers.

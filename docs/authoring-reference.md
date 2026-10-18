@@ -808,6 +808,9 @@ bed:
 * **The non-outdoor `surroundings` are the lab's forms, unvalidated** (`space`'s ε* is WHAT-IF).
 * **Authored is still not validated.** A bed composes calibrated science into arrangements no one has
   checked.
+* **The worked example** is `scenarios/lamp_greenhouse.yaml`: a crew breathing the bed's own air, a
+  scrubber, an O₂ regulator on the bed's 9500 mol, solar power and a radiator. Its boundaries carry the
+  composition of the bed pool each pairs with, so every flow balances in carbon and oxygen.
 
 ### Templates — the boundary's arithmetic (decision A, as amended)
 
