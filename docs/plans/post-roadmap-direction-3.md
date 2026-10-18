@@ -680,8 +680,12 @@ chose the follow-on explicitly: **"ok A now, but immediately after that (next se
   ~~Still the user's call; unblocked, not scheduled.~~ **TAKEN 2026-10-01** as the review
   proposal's Step 3b: built behind a switch and measured (+20.55 %, no stress, water only);
   **frozen 2026-10-01** on the user's *"freeze it"*. `log/chamber-dryness.md`.
-* **The `o2_setpoint` mole-fraction conversion (B's slice 4), now BLOCKED behind an authoring
-  decision.** It is bit-neutral (`0.21 × 9500.0 == 1995.0` exactly, verified both directions)
+* ~~**The `o2_setpoint` mole-fraction conversion (B's slice 4), now BLOCKED behind an authoring
+  decision.**~~ **DONE 2026-10-18** (`log/authored-plants.md`, slices 1–2): `eclss.yaml` stores
+  `o2_fraction` 0.21 and every authored regulator declares its cabin's air, no default.
+  ⚠ **Still open, found doing it:** `humidity_setpoint` (1.7863 kg) hides the same 9500 mol — BVAD's
+  40 % RH in the station's cabin — and an authored cabin of another size inherits it the same way.
+  The struck item as it stood: It is bit-neutral (`0.21 × 9500.0 == 1995.0` exactly, verified both directions)
   but cannot ship as designed: the frozen params reach every authored `eclss.o2_makeup`, so
   putting the cabin capacity there hands 9500 to a habitat that is not 9500 — relocating the
   silent default rather than closing it. The honest version is an **authoring grammar change**,

@@ -157,6 +157,27 @@ fn the_resow_calendar_fires_when_it_says() {
     assert_eq!(result.final_state.aux[station::sowing::SOWN_STEP], 0.0);
 }
 
+/// The author declares the plant step (the user's answer): any power of two runs clean — 8 and
+/// 32 pinned beside the fixture's 16. Not validated: the science is measured at 16 only. 24 is
+/// refused at build — measured 2026-10-18, the lamp's lit share over a 1/24-day step rounds to
+/// 1.0000000000000004 and the station's guard stops the run at the first lit step.
+#[test]
+fn another_power_of_two_plant_step_runs_and_24_is_refused() {
+    for k in [8u64, 32] {
+        let yaml = edited(
+            "plant_steps_per_day: 16",
+            &format!("plant_steps_per_day: {k}"),
+        );
+        let result = run_scenario(build(&yaml).unwrap()).expect("runs clean");
+        assert_eq!(result.final_state.n, 3 * k, "three days of {k} plant steps");
+        assert_eq!(result.total_rationed, 0);
+    }
+    refused(
+        &edited("plant_steps_per_day: 16", "plant_steps_per_day: 24"),
+        "power of two",
+    );
+}
+
 #[test]
 fn every_named_refusal_fires() {
     refused(&edited("crop: wheat", "crop: potato"), "not a crop");

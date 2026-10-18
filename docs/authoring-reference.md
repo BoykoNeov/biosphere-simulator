@@ -802,7 +802,10 @@ bed:
   back-to-back re-sows need a new crop's grain each time.
 * **It runs on the station's day driver** (`advance_one_master_day`): the plants on their step, the
   author's flows and the chamber's on `dt`, the re-sow hook at each day's start, conservation asserted
-  after every fast sub-step, the direction gate at each day's end. Euler only; `n_sub` and
+  after every fast sub-step, the direction gate at each day's end (⚠ weaker than the single-rate
+  path's every-step check: a regulator pushed past its target by midday photosynthesis and back by
+  evening is not seen). The plant step must be a power of two (at 24 the lamp's lit share rounds past
+  1 and the chamber's guard stops the run; measured). Euler only; `n_sub` and
   `rate_class: slow` are refused. `BuiltScenario.registry` is empty for a bed file (there is no
   single-rate view of a two-rate graph); the Godot bridge refuses a bed file by name.
 * **The non-outdoor `surroundings` are the lab's forms, unvalidated** (`space`'s ε* is WHAT-IF).

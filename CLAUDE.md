@@ -139,7 +139,7 @@ own gates, so they run first. ⚠ A **mutation battery must pass `--no-fail-fast
 stops at the first failing test *binary*, so a truncated run reports **fewer** reds — which
 reads as "the new tests are inert", not as a broken instrument.
 ⚠ **No CI job runs the reference's tests** (deleted 2026-10-10, the user's call), so before
-calling work done also run `cargo test -- --ignored`, the only run of the six slow tests.
+calling work done also run `cargo test -- --ignored`, the only run of the slow tests.
 
 What is left of Python is the opt-in oracle and its eight committed-fixture tests —
 **12 tests, under a second.** ⚠ Do not reach for it as a check on the simulation: it is a

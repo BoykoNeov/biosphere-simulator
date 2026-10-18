@@ -300,3 +300,18 @@ reversal, the crop matures and is re-sown; last sowing at day 280 (the sealed st
 
 **Step 7 is complete:** 7a (run what is authored) and 7b (a crop bed as one block), on the user's five
 answers.
+
+## 11. Checked after the build (advisor's end-of-work review, 2026-10-18)
+
+* **The author-declared plant step, tried.** 8 and 32 steps a day run clean; **24 does not** — the
+  lamp's lit share over a 1/24-day step rounds to 1.0000000000000004 and the station's own guard stops
+  the run at the first lit step. The bed now refuses a plant step that is not a power of two (a day
+  split into a power of two is exact). Pinned in `bed.rs`. **Owed, the user's call:** the real fix is
+  in the station's lamp program (`lighting::lamp_light_path`), which every reference build reads — its
+  own item, with the goldens' ceremony.
+* **The direction gate is daily in a bed file** (`run::run_bed`), where the single-rate path checks
+  every step: a regulator pushed past its target by midday photosynthesis and back by evening is not
+  seen. Stated in the content test's header and the reference doc. The example is far from it (the
+  crew draws ~345 mol O₂ a day against the bed's few).
+* **Open, recorded:** `humidity_setpoint` hides the station's 9500 mol (in the third direction plan as
+  well); crops other than wheat; a bed air other than 9500.

@@ -146,7 +146,8 @@ const AUTHORITY: [(&str, &str, &str); 17] = [
 const GRAMMAR_NOTE: &str = "The grammar is bounded and closed, and DELIBERATELY INCOMPLETE (decision D): bare division, the rest of the function set (exp ln pow sqrt abs min max clamp), bounded conditionals and a named-constant surface are all deferred until a real frozen flow forces each semantic choice. Freezing this subset does NOT imply completeness; adding an op is a deliberate unfreeze. 'monod' (S/(S+K)) landed post-roadmap as exactly such an unfreeze — forced by the frozen biosphere.chamber.oxygen_limitation_factor, whose kernel it mirrors (including denom<=0 -> 0, which makes it total). It guards its own denominator, so it resolved x/0 INTERNALLY and bare '/' stays deferred. There is no 'dt' token by construction (RK4-order-safety is structural). Precedence + associativity are enforced by parse_vectors.txt, not recorded here.";
 
 
-/// The nine keys the reference produces — **one derivation, read by the dump and by the
+/// The eleven keys the reference produces (nine until the crop bed added `bed_crops` and
+/// `bed_stocks`, 2026-10-18) — **one derivation, read by the dump and by the
 /// writer**. See the header on why that sharing is deliberate.
 ///
 /// Tier-0 sanity on the program itself, on the axes where an empty answer would be a false
