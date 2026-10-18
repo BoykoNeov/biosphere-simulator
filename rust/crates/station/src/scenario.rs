@@ -512,6 +512,28 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
 }
 
 #[cfg(test)]
+mod cabin_start_tests {
+    use super::*;
+
+    /// The cabin starts AT its regulators' targets (the `cabin_o2_0` rule), and both starts are
+    /// hand-written copies of a computed target — reused by the greenhouse, harvest and sealed
+    /// builds. A move of `eclss.yaml`'s fractions or pressure turns this red here, rather than
+    /// as an unexplained start-up transient in a golden diff.
+    #[test]
+    fn the_cabin_starts_at_its_targets() {
+        let p = domains::params::eclss();
+        assert_eq!(
+            CABIN_GAS_SCENARIO.cabin_h2o_0,
+            p.humidity_setpoint_kg(STATION_CABIN_AIR_MOL)
+        );
+        assert_eq!(
+            CABIN_GAS_SCENARIO.cabin_o2_0,
+            p.o2_setpoint_mol(STATION_CABIN_AIR_MOL)
+        );
+    }
+}
+
+#[cfg(test)]
 mod cold_clock_tests {
     use super::*;
 

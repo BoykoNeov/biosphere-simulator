@@ -458,3 +458,24 @@ last-bit moves. The shift argument holds exactly: start and target moved togethe
 ran the same bits. Manifests: the station's diff is `eclss.yaml`'s two fingerprints and the six
 `golden_sha256` rows; the biosphere and authoring manifests unchanged (the authoring manifest names no
 param-set keys, so the `eclss` set's rename does not reach it).
+
+**Follow-up (advisor's end review).** `CABIN_GAS_SCENARIO`'s two cabin starts are hand-written copies of
+computed targets, reused by the greenhouse, harvest and sealed builds; now pinned to them
+(`scenario.rs`'s `the_cabin_starts_at_its_targets`), so a target move goes red there, not as a start-up
+jolt in a golden diff.
+
+### 15b. Slice B's question, measured before it is asked (2026-10-18)
+
+A throwaway probe (deleted) built the two 47.6-mol files with their condenser on that air and their
+cabin starting at its target. The condenser behaves exactly as before — the vapour it holds above its
+target is unchanged, 2.838710e-2 kg (multi-rate) and 4.000000e-2 kg (thermal) — because only the excess
+drives it. What changes is the air: saturation in 47.6 mol at 22 °C is 0.022385 kg, so the cabins end at
+**1.668× and 2.187× saturation**, where at 9500 mol they end at 0.406× and 0.409×. Nothing in the model
+reads the sum against saturation. The crew's water output is sized for a real cabin; 47.6 mol is about
+one cubic metre. The three options put to the user:
+
+* **(a) 47.6 mol for both regulators** — one cabin size per file, the pinned behaviour kept, the air
+  supersaturated (unchecked).
+* **(b) 9500 mol for the condenser** — the water exactly as today; the file declares two cabin sizes.
+* **(c) 9500 mol for both** — one consistent, realistic cabin; the files' O₂ story (10 → 8 mol) becomes
+  1995 → 1993, which their headers and a pinned offset describe.
