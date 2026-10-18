@@ -500,7 +500,7 @@ one cubic metre. The three options put to the user:
 `flow_types["eclss.condenser"].needs_cabin_air` false → true; the biosphere and station manifests and all
 20 goldens are unchanged (no golden is authored). Every file's water runs the same bits (9500 is the air
 the condenser was already built on). In the two re-sized files the O₂ regulator's deviation from its
-target runs the same bits (matched start), so the condenser's pinned excess (2.8387096774195486e-2) holds
+target runs the same (matched start; ⚠ NOT bit-for-bit, see the measurement below), so the condenser's pinned excess (2.8387096774195486e-2) holds
 and every authored-content check stays green.
 
 **Measured (slice B BUILT 2026-10-18).** The authoring manifest moved by exactly the one predicted value
@@ -508,5 +508,14 @@ and every authored-content check stays green.
 unchanged; `regen_goldens` 0 of 20 would change. The authoring tests pass, the multi-rate anchor's pinned
 condenser excess included, with the two re-sized files. New tests: a condenser with no, zero or negative
 air is refused; a 950-mol cabin settles at a tenth of the station's target plus the crew's `P/k`.
+**Measured after the advisor's end review — the thermal file was covered by no test.**
+`authored_content.rs` sweeps `scenarios/`, not `rust/data/scenarios/`, and only the multi-rate file is
+loaded by a test; so a throwaway probe ran both re-sized files, new and as the old 10-mol O₂ design. Both
+pass `run_scenario`'s gates (no rationing, no reversal); `cabin_o2` ends at 1993.000000000001; the water
+is bit-identical to the old design (excess 2.8387096774195486e-2 and 3.999999999999648e-2). The O₂
+deviation from its target differs from the old design's by **9.0e-13** — the prediction's "same bits" was
+wrong: 10 → 1995 crosses several powers of two, so `setpoint − cabin_o2` rounds on a coarser grid. Agreement
+to rounding, as expected of the shift, not bit equality. **The thermal file still has no permanent test** —
+recorded, not added.
 **§15 is complete**, and with it §14's third item; the second (a bed air other than 9500 mol) is now
 unblocked and still the user's call.
