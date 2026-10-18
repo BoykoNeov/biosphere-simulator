@@ -85,6 +85,13 @@ pub fn half_sine_window_mean(
 ///
 /// The photoperiod is the **shape** of the day rather than a multiplier on its total, so
 /// the lamp's dark hours are hours the crop respires through. Dose conserved exactly.
+///
+/// A window wholly inside the lit span is `on_par` exactly, and a partly lit one never exceeds it.
+/// ⚠ Until 2026-10-18 both could read a rounding step off at a step that is not a power of two of
+/// a day (at 1/24, `(t0 + dt) − t0` is not `dt`): above `on_par`, which the lit-share guard in
+/// [`step_crop_transpiration`](super::science::step_crop_transpiration) refused, or below it. At a
+/// power of two the quotient is exact, so neither branch changes a value and no reference value
+/// moved (`docs/plans/post-roadmap-authored-plants.md` §12).
 pub fn top_hat_window_mean(
     t0: f64,
     dt: f64,
@@ -103,7 +110,10 @@ pub fn top_hat_window_mean(
     if hi <= lo {
         return Ok(0.0);
     }
-    Ok(on_par * (hi - lo) / dt)
+    if lo == t0 && hi == t0 + dt {
+        return Ok(on_par);
+    }
+    Ok((on_par * (hi - lo) / dt).min(on_par))
 }
 
 #[cfg(test)]
@@ -146,6 +156,24 @@ mod tests {
             0.0
         );
         assert!(half_sine_window_mean(0.375, 0.125, 400.0, daylength_s).unwrap() > 0.0);
+    }
+
+    #[test]
+    fn a_wholly_lit_window_is_the_lamp_exactly_at_any_step() {
+        // At 1/24 a day, `(t0 + dt) − t0` exceeds `dt` by a rounding step on most windows; the
+        // mean read 1.0000000000000004 of the lamp until the cap (2026-10-18). Under a lamp that
+        // never goes off every window is wholly lit, so every one must be the lamp exactly.
+        for steps_per_day in [3u64, 12, 16, 24, 48, 96] {
+            let dt = 1.0 / steps_per_day as f64;
+            for n in 0..30 * steps_per_day {
+                let t = n as f64 * dt;
+                assert_eq!(
+                    top_hat_window_mean(t - t.trunc(), dt, 1.0, SECONDS_PER_DAY).unwrap(),
+                    1.0,
+                    "{steps_per_day} steps a day, step {n}"
+                );
+            }
+        }
     }
 
     #[test]

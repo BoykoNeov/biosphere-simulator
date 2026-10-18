@@ -315,3 +315,69 @@ answers.
   crew draws ~345 mol O₂ a day against the bed's few).
 * **Open, recorded:** `humidity_setpoint` hides the station's 9500 mol (in the third direction plan as
   well); crops other than wheat; a bed air other than 9500.
+
+⚠ **Superseded 2026-10-18 by §12 and §13** (the first two bullets above, on the user's *"work on the
+leftovers"*). The bullets are left as written.
+
+## 12. The plant step: the lamp's window capped, any step the driver can interleave (2026-10-18)
+
+**What the overshoot was, measured before anything changed** (an arithmetic probe over the
+lamp-window function, 12 to 1440 steps a day, 100 years):
+
+* **Time does not slip.** `(n · dt).trunc()` named the right day on every step at every count tried,
+  and the time of day was never more than 6e-12 of a day (half a microsecond) off the exact one. The
+  advisor's worry — that a step at midnight would read as the previous day's end and a 24-hour lamp
+  would go dark there with no guard firing — **does not occur**: a 24-hour lamp read full light at
+  every midnight.
+* **The window's mean does.** At every count that is not a power of two, a wholly lit window read
+  one rounding step off the lamp: above it (1.0000000000000004 at 24 — what the transpiration's
+  lit-share guard refused) or below it (0.9999999999999998 at 3). At 16 and 32, never.
+* **A reach limit, recorded, not built:** at 1440 plant steps a day (a plant step of one minute) the
+  window check (`t0 + dt ≤ 1 + 1e-12`) starts failing after about 33 years, and the lamp program
+  reads such a step as dark. No authored bed comes near it.
+
+**The fix** (`domains::biosphere::light_path::top_hat_window_mean`): a window wholly inside the lit
+span returns the lamp's value exactly, and a partly lit one is capped at it. At a power of two both
+branches return the value the old line did, bit for bit — `regen_goldens` reports **0 of 20 would
+change**. The bed's power-of-two refusal is lifted: any count the day driver can interleave with the
+fast steps runs (it refuses a count sharing no factor with them); 0 is refused. Pinned:
+`light_path`'s `a_wholly_lit_window_is_the_lamp_exactly_at_any_step` and `bed.rs`'s
+`any_plant_step_the_driver_can_interleave_runs` (8, 12, 24, 32, 48, and 24 under a lamp that never
+goes off). **Both go red with the old line restored** (checked).
+
+Not validated: the plant science is measured at 16 steps a day only.
+
+## 13. The direction gate on every state a bed's day commits (2026-10-18)
+
+`station::driver::advance_one_master_day_observed` shows a caller every state the day commits —
+after each plant step and each fast sub-step — and does nothing else; `advance_one_master_day` is it
+with an observer that does nothing, so every station run is the same operation for operation (and
+`regen_goldens` reads 0 of 20). `run::run_bed` now judges each of those states and names the **fast**
+step it was seen at — the same unit as the error's "of N steps", where until now it named the plant
+step count against the fast total.
+
+**Pinned by a case the old check passed** (`bed.rs`,
+`the_direction_gate_sees_a_midday_excursion_a_day_end_check_misses`): the fixture with an O₂
+regulator on the bed's air and no crew. The plants' daytime O₂ lifts the pool past the regulator's
+target inside the lit day, and by midnight it is back under it. With the check restored to the day's
+end the test goes red ("the gate did not see it"; checked).
+
+## 14. The three that are left — each a formal change, priced, not built
+
+Each touches a frozen contract, so each waits for the user.
+
+* **Another crop (potato).** The potato's parameters load (`params::potato()`), but the chamber
+  builds its plants from the wheat's (`lighting::room_params`), and the chamber's cold program — eight
+  weeks at 4 °C after each sowing — exists to vernalize wheat, which a potato does not need. So it is
+  three pieces: the station's builders take the crop's parameters (no value moves for wheat), the cold
+  program becomes the crop's, and `bed_crops` grows (an authoring-manifest regeneration). The potato
+  itself is authored, not validated (its canopy reads 2.79× low, `docs/log/potato-crop.md`).
+  **Medium.**
+* **A bed air other than 9500 mol.** It cannot come first: the condenser's `humidity_setpoint`
+  (1.7863 kg) is 40 % humidity of exactly 9500 mol at 22 °C, so a smaller room would be held wetter
+  (75 % at about 5070 mol, saturated at about 3800), a larger one drier. It needs the next item, then an `air_mol` field on the bed (an
+  authoring unfreeze) and the O₂ regulator's `cabin_air_mol` check reading it.
+* **`humidity_setpoint` as a relative humidity.** Store 0.40 and derive the kilograms from the room's
+  air and temperature, as the O₂ target became a share (slices 1–2). The derived 1.78632 kg is not the
+  written 1.7863, so the station goldens that read the condenser would move (expected water only, in
+  the fifth figure — not measured), with the station's unfreeze ceremony. **Small to medium, and it unblocks the air volume.**

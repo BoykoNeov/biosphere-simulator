@@ -780,7 +780,7 @@ dt: 60.0                 # the FAST step (s); must divide a day
 steps: 4320              # fast steps; must be whole days
 bed:
   crop: wheat            # bed_crops: wheat only (the chamber's plants are built from wheat params)
-  plant_steps_per_day: 16   # the plant step — measured at 16 only; other values unexamined
+  plant_steps_per_day: 16   # the plant step — the science is measured at 16 only; others run, unexamined
   lamp_power_w: 200.0    # optional; the reference's 200
   photoperiod_hours: 16  # optional; the reference's 16
   surroundings: outdoor  # REQUIRED: outdoor | structure | {space: ε*} | {cabin: T_K}
@@ -802,10 +802,12 @@ bed:
   back-to-back re-sows need a new crop's grain each time.
 * **It runs on the station's day driver** (`advance_one_master_day`): the plants on their step, the
   author's flows and the chamber's on `dt`, the re-sow hook at each day's start, conservation asserted
-  after every fast sub-step, the direction gate at each day's end (⚠ weaker than the single-rate
-  path's every-step check: a regulator pushed past its target by midday photosynthesis and back by
-  evening is not seen). The plant step must be a power of two (at 24 the lamp's lit share rounds past
-  1 and the chamber's guard stops the run; measured). Euler only; `n_sub` and
+  after every fast sub-step, the direction gate on every state the day commits — each plant step and
+  each fast sub-step — naming the fast step it was seen at (at each day's end only until 2026-10-18,
+  when a midday excursion was not seen). The plant step is any count the day driver can interleave
+  with the fast steps (it refuses a count sharing no factor with them); a power of two only until
+  2026-10-18, when at 24 the lamp's lit share rounded past 1 (`post-roadmap-authored-plants.md`
+  §12). Euler only; `n_sub` and
   `rate_class: slow` are refused. `BuiltScenario.registry` is empty for a bed file (there is no
   single-rate view of a two-rate graph); the Godot bridge refuses a bed file by name.
 * **The non-outdoor `surroundings` are the lab's forms, unvalidated** (`space`'s ε* is WHAT-IF).

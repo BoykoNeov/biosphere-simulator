@@ -12,7 +12,9 @@ use std::path::{Path, PathBuf};
 
 use authoring::schema::ScenarioSpec;
 use authoring::yaml::parse_document;
-use authoring::{interpret, load_scenario, run_scenario, BuiltScenario};
+use authoring::{
+    interpret, load_scenario, run_scenario, run_scenario_allowing_rationing, BuiltScenario,
+};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios/crop_bed.yaml")
@@ -127,6 +129,47 @@ fn a_bed_file_runs_clean_repeats_and_its_plants_grow() {
     assert!(battery < 2.0e10, "the lamp never drew on power.battery");
 }
 
+/// The direction gate judges every state a bed's day commits, not its end (plan §13). An O₂
+/// regulator on the bed's air with no crew: the plants' daytime O₂ lifts the pool past the
+/// regulator's target, so it runs backwards inside the day — and by midnight, four hours into the
+/// dark, the pool is back under it. Until 2026-10-18 the gate looked only at midnight and passed.
+#[test]
+fn the_direction_gate_sees_a_midday_excursion_a_day_end_check_misses() {
+    let yaml = format!(
+        "{}{}",
+        edited(
+            "  - id: boundary.space\n",
+            "  - id: boundary.o2_supply\n    domain: boundary\n    quantity: oxygen\n    kind: \
+             boundary\n    amount: 0.0\n    unclamped: true\n    composition:\n      oxygen: \
+             2.0\n  - id: boundary.space\n",
+        ),
+        "  - id: eclss.o2_makeup\n    type: eclss.o2_makeup\n    wiring:\n      o2_supply: \
+         boundary.o2_supply\n      cabin_o2: biosphere.o2_pool\n    params: eclss\n    \
+         cabin_air_mol: 9500.0\n",
+    );
+    let err = match run_scenario(build(&yaml).unwrap()) {
+        Ok(_) => panic!("the regulator ran backwards and the gate did not see it"),
+        Err(e) => e,
+    };
+    assert_eq!(err.kind, authoring::ErrorKind::Reversed, "{}", err.message);
+    let result = run_scenario_allowing_rationing(build(&yaml).unwrap()).unwrap();
+    let seen = result.first_reversal.expect("a reversal is recorded");
+    assert_eq!(seen.stock_id, "biosphere.o2_pool");
+    let minute_of_day = seen.step % 1440;
+    assert!(
+        (240..1200).contains(&minute_of_day),
+        "seen at fast step {} — inside the lit day (04:00–20:00), not at a day's end",
+        seen.step
+    );
+    // A day-end check would have passed: the pool is under the target at the last midnight.
+    let end = result.final_state.stocks["biosphere.o2_pool"].amount;
+    assert!(
+        end <= seen.setpoint,
+        "{end} at the last midnight vs {}",
+        seen.setpoint
+    );
+}
+
 #[test]
 fn the_resow_calendar_fires_when_it_says() {
     // A re-sow draws its seed from the old crop's grain (`annual_reset`), so a calendar that
@@ -157,24 +200,40 @@ fn the_resow_calendar_fires_when_it_says() {
     assert_eq!(result.final_state.aux[station::sowing::SOWN_STEP], 0.0);
 }
 
-/// The author declares the plant step (the user's answer): any power of two runs clean — 8 and
-/// 32 pinned beside the fixture's 16. Not validated: the science is measured at 16 only. 24 is
-/// refused at build — measured 2026-10-18, the lamp's lit share over a 1/24-day step rounds to
-/// 1.0000000000000004 and the station's guard stops the run at the first lit step.
+/// The author declares the plant step (the user's answer): powers of two and not — 8, 12, 24, 32
+/// and 48 pinned beside the fixture's 16, and 24 again under a lamp that never goes off, so every
+/// plant step is a wholly lit window. Not validated: the science is measured at 16 only. ⚠ 24 was
+/// refused until 2026-10-18 — the lamp's lit share over a 1/24-day step rounded to
+/// 1.0000000000000004 and the station's guard stopped the run at the first lit step (plan §12).
+/// 0 is refused; a count sharing no factor with the day's 1440 fast steps is the driver's refusal.
 #[test]
-fn another_power_of_two_plant_step_runs_and_24_is_refused() {
-    for k in [8u64, 32] {
-        let yaml = edited(
-            "plant_steps_per_day: 16",
-            &format!("plant_steps_per_day: {k}"),
-        );
+fn any_plant_step_the_driver_can_interleave_runs() {
+    let runs = [8u64, 12, 24, 32, 48].map(|k| {
+        (
+            k,
+            edited(
+                "plant_steps_per_day: 16",
+                &format!("plant_steps_per_day: {k}"),
+            ),
+        )
+    });
+    let always_lit = edited(
+        "plant_steps_per_day: 16",
+        "plant_steps_per_day: 24\n  photoperiod_hours: 24",
+    );
+    for (k, yaml) in runs.into_iter().chain([(24, always_lit)]) {
         let result = run_scenario(build(&yaml).unwrap()).expect("runs clean");
         assert_eq!(result.final_state.n, 3 * k, "three days of {k} plant steps");
         assert_eq!(result.total_rationed, 0);
     }
     refused(
-        &edited("plant_steps_per_day: 16", "plant_steps_per_day: 24"),
-        "power of two",
+        &edited("plant_steps_per_day: 16", "plant_steps_per_day: 0"),
+        "at least 1",
+    );
+    let coprime = edited("plant_steps_per_day: 16", "plant_steps_per_day: 7");
+    assert!(
+        build(&coprime).and_then(run_scenario).is_err(),
+        "7 plant steps share no factor with 1440 fast steps"
     );
 }
 

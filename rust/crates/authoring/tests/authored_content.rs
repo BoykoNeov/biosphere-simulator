@@ -6,9 +6,9 @@
 //!
 //! * it **builds** (the schema, the interpreter, the build-time `k·h < 1` precondition);
 //! * it **runs** under [`run_scenario`]'s gates — conservation every step, no rationing, no
-//!   demand-controlled flow found pointing backwards. ⚠ For a file with a crop bed that last
-//!   check is made at each DAY's end, not each step (`run::run_bed`): a regulator pushed past its
-//!   target by midday photosynthesis and back by evening would not be seen;
+//!   demand-controlled flow found pointing backwards. For a file with a crop bed that last check
+//!   is made on every plant step and every fast sub-step (`run::run_bed`; at each day's end only
+//!   until 2026-10-18);
 //! * it is **repeatable** — two runs end bit-identical.
 //!
 //! **Not a golden and not a manifest entry.** "Authored is not validated" stays true: these

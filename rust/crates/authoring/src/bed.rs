@@ -104,17 +104,16 @@ pub fn bed_scenario(
         )));
     }
     let days = steps / steps_per_day;
-    // ⚠ A power of two, measured 2026-10-18: at 24 steps a day the lamp's lit share over a step
-    // rounds to 1.0000000000000004 (1/24 of a day is not exact in binary) and the station's own
-    // guard stops the run at the first lit step; 8, 16 and 32 run clean. A day split into a power
-    // of two is exact. Lifting this is a fix in the station's lamp program, not here.
-    if !bed.plant_steps_per_day.is_power_of_two() {
-        return Err(AuthoringError::new(format!(
-            "bed.plant_steps_per_day must be a power of two (1, 2, 4, 8, 16, 32, …), got {}: at \
-             other values the lamp's lit share over a step rounds past 1 and the chamber's guard \
-             stops the run. 16 is the step the plant science is measured at",
-            bed.plant_steps_per_day
-        )));
+    // Any count the day driver can interleave with the fast steps (it refuses the rest). ⚠ Until
+    // 2026-10-18 a power of two only: at 24 the lamp's lit share over a step rounded to
+    // 1.0000000000000004 and the station's guard stopped the run; the lamp window is capped at its
+    // on value since (`docs/plans/post-roadmap-authored-plants.md` §12).
+    if bed.plant_steps_per_day == 0 {
+        return Err(AuthoringError::new(
+            "bed.plant_steps_per_day must be at least 1. 16 is the step the plant science is \
+             measured at"
+                .to_string(),
+        ));
     }
     let mut scenario = station::scenario::sealed_station_scenario();
     if let Some(w) = bed.lamp_power_w {

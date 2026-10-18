@@ -72,3 +72,19 @@ arithmetic's values); 300 days clean with a maturity re-sow (`--ignored`).
   more files the 2026-09-06 setpoint move had broken in meaning; running the content found the third.
 * **Lesson: a layering gate is a question, not a wall.** The bed needed `authoring → station`; the gate
   called any new edge a decision, so it was taken in the open, with its reason in the rule.
+
+**TWO LEFTOVERS FIXED 2026-10-18** (plan §12–§14, on the user's *"work on the leftovers"*). The lamp's
+window mean is now the lamp exactly when the window is wholly lit and capped at it when partly lit: at
+a step that is not a power of two of a day it had read a rounding step off, which the transpiration's
+lit-share guard refused at 24. An arithmetic probe first showed the time itself does not slip (right
+day on every step, 100 years, 12 to 1440 steps a day). Bit-identical at a power of two (0 of 20
+goldens); the bed's power-of-two refusal lifted. And the bed's direction gate now judges every state
+the day commits, through an observer on the station's day driver, where it judged each day's end:
+pinned by a regulator that runs backwards at midday and is back under its target by midnight. The
+other three (another crop, another air volume, the humidity setpoint as a share) are priced and wait
+for the user.
+
+* **Lesson: probe the arithmetic before choosing between "clamp" and "constraint".** The advisor's
+  case for keeping the power-of-two rule — time slipping across midnight — was a real risk and a
+  wrong prediction; seconds of arithmetic told the two apart, and the cap then fixed a case the guard
+  never saw (a window reading *under* the lamp).

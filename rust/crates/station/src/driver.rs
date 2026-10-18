@@ -74,7 +74,42 @@ pub fn advance_one_master_day(
     fast_dt: f64,
     slow_reset: Option<ResetHook<'_>>,
 ) -> Result<(State, u64, Vec<Event>), SimError> {
+    advance_one_master_day_observed(
+        slow_integrator,
+        fast_integrator,
+        state,
+        slow_resolver,
+        fast_resolver,
+        steps_per_day,
+        slow_steps_per_day,
+        slow_dt,
+        fast_dt,
+        slow_reset,
+        &mut |_, _| {},
+    )
+}
+
+/// [`advance_one_master_day`] with `observe` shown every state the day commits: after each slow
+/// step and after each fast sub-step, with the count of fast sub-steps the day has run so far.
+/// It only looks — the day is the same operation for operation. For a caller whose check is
+/// per-step (the authored bed's direction gate, `docs/plans/post-roadmap-authored-plants.md`
+/// §13), where a day's end would miss a midday excursion.
+#[allow(clippy::too_many_arguments)]
+pub fn advance_one_master_day_observed(
+    slow_integrator: &EulerIntegrator,
+    fast_integrator: &EulerIntegrator,
+    state: &State,
+    slow_resolver: &SourceResolver,
+    fast_resolver: &SourceResolver,
+    steps_per_day: u64,
+    slow_steps_per_day: u64,
+    slow_dt: f64,
+    fast_dt: f64,
+    slow_reset: Option<ResetHook<'_>>,
+    observe: &mut dyn FnMut(u64, &State),
+) -> Result<(State, u64, Vec<Event>), SimError> {
     let mut state = state.clone();
+    let mut fast_done = 0u64;
     let mut total_rationed = 0u64;
     let mut events: Vec<Event> = Vec::new();
     // Scheduled slow-domain reset (re-sow), applied once per master day at a slow-step
@@ -94,6 +129,7 @@ pub fn advance_one_master_day(
             state = slow_report.state;
             total_rationed += slow_report.rationed;
             events.extend(slow_report.events);
+            observe(fast_done, &state);
         }
         // Fast operator: this group's share of the day at fast_dt (n kept). substep skips
         // the conservation assert, so we own it here — after each sub-step, over the full
@@ -105,6 +141,8 @@ pub fn advance_one_master_day(
             assert_conserved_default(&before, &state)?;
             total_rationed += fast_report.rationed;
             events.extend(fast_report.events);
+            fast_done += 1;
+            observe(fast_done, &state);
         }
     }
     Ok((state, total_rationed, events))

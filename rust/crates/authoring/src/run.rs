@@ -381,7 +381,10 @@ fn run_multirate(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
 /// ([`station::driver::advance_one_master_day`] — the function the sealed station and its
 /// caller-driven session both step through): the re-sow hook consulted at each day's start, the
 /// plants on their step, the fast side on `dt` with conservation asserted after every fast
-/// sub-step. The direction gate judges each day's end (a day is this path's committed state).
+/// sub-step. The direction gate judges every state the day commits — each plant step and each fast
+/// sub-step — reporting the fast step it was seen at. ⚠ Until 2026-10-18 it judged each day's end
+/// only, so a regulator pushed past its target by midday photosynthesis and back by evening was
+/// not seen (`docs/plans/post-roadmap-authored-plants.md` §13).
 fn run_bed(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
     let bed = built.bed.expect("run_bed is called with a bed");
     let plant = EulerIntegrator::new(built.slow_registry);
@@ -392,8 +395,9 @@ fn run_bed(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
     let mut events: Vec<Event> = Vec::new();
     let mut first_reversal = None;
     watch_state(&watch, &state, 0, &mut first_reversal);
-    for _ in 0..bed.days {
-        let (next, rationed, day_events) = station::driver::advance_one_master_day(
+    for day in 0..bed.days {
+        let day_start = day * bed.steps_per_day;
+        let (next, rationed, day_events) = station::driver::advance_one_master_day_observed(
             &plant,
             &fast,
             &state,
@@ -404,11 +408,11 @@ fn run_bed(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
             bed.plant_dt,
             built.dt,
             Some(&*bed.reset),
+            &mut |fast_done, s| watch_state(&watch, s, day_start + fast_done, &mut first_reversal),
         )?;
         state = next;
         total_rationed += rationed;
         events.extend(day_events);
-        watch_state(&watch, &state, state.n, &mut first_reversal);
     }
     Ok(RunResult {
         final_state: state,
