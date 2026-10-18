@@ -11,7 +11,7 @@
 #
 # Donor-controlled — the load-bearing distinction from charge/load (the honest part).
 #   SolarCharge and LoadDraw are FORCED (they read env power, not a stock), so the SOC is
-#   a restoring-force-free accumulator (see scenario.py). SelfDischarge is FIRST-ORDER IN
+#   a restoring-force-free accumulator (see rust/crates/domains/src/power.rs). SelfDischarge is FIRST-ORDER IN
 #   THE BATTERY (leak ∝ battery), the Decomposition/Grazing donor-controlled idiom lifted
 #   into the Power domain. Two consequences it EARNS ITS KEEP by:
 #     (1) positivity is STRUCTURAL, not sizing: the draw ∝ the donor's own start-of-step
@@ -21,11 +21,11 @@
 #     (2) it is the Power domain's FIRST restoring force (the −k·battery term): the SOC
 #         gains a genuine attractor, so two runs from different initial SOC CONVERGE —
 #         their difference contracts exactly, d_n = d_0·(1 − k·dt)^n (proved forcing-
-#         independently by the two-run contraction test, test_power_self_discharge.py).
+#         independently by the two-run contraction test, rust/crates/domains/tests/power_self_discharge.rs).
 #         The two forced flows alone leave that difference constant. Reading a stock also
 #         breaks the forced-only RK4 ≡ Euler bit-identity (now a tolerance-agreement).
 #
-# Units discipline (P4 / config/units.py): a first-order rate (1/s) is NOT a conserved-
+# Units discipline (P4; now rust/crates/config/src/params.rs): a first-order rate (1/s) is NOT a conserved-
 #   Quantity canonical unit, so it is a schema-validated, bound-checked float carrying a
 #   declared unit (exact-string guarded at the loader, like the biosphere's per-day
 #   decomposition_rate / herbivory rates — here per-SECOND, Power's natural time unit).
@@ -55,7 +55,7 @@
 #   bends, so the attractor/restoring-force property is proved EXACTLY by the two-run
 #   contraction test (magnitude-independent), NOT by a visible convergence. Inflating k to
 #   force a visible bend would be dishonest; the contraction test earns the keep at the
-#   real value. See test_power_self_discharge.py.
+#   real value. See rust/crates/domains/tests/power_self_discharge.rs.
 #
 # Clean-room: value from cited primary literature ONLY (battery self-discharge is
 #   textbook).
