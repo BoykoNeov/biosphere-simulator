@@ -1040,8 +1040,8 @@ fn the_multirate_eclss_anchor_runs_its_condenser() {
     )
     .expect("load the multi-rate anchor");
     let result = run_scenario(built).expect("run the multi-rate anchor");
-    let setpoint = domains::params::eclss()
-        .humidity_setpoint_kg(authoring::flow_registry::IMPLICIT_CONDENSER_AIR_MOL);
+    // The file's declared air: one 9500-mol cabin for both regulators since 2026-10-18 (§15c).
+    let setpoint = domains::params::eclss().humidity_setpoint_kg(9500.0);
     let excess = result.final_state.stocks["eclss.cabin_h2o"].amount - setpoint;
     assert!(excess > 0.0, "the condenser never ran: excess {excess}");
     // Measured 2026-10-03 at 2.8387096774195486e-2 — the header's "~2.84e-02 above its
@@ -1060,18 +1060,27 @@ fn the_multirate_eclss_anchor_runs_its_condenser() {
 // and the direction gate judged every cabin against it.
 // ---------------------------------------------------------------------------------
 
-/// The anchor with its declared air replaced (or removed, for `None`).
-fn eclss_anchor_with_air(air: Option<&str>) -> String {
-    let text = eclss_anchor_yaml_at("60.0", "4");
+/// `text` with the declared air of the first flow of `type_name` replaced (or removed, for
+/// `None`) — that flow's only: since §15c the anchor declares the same cabin twice (condenser
+/// and regulator), and a file-wide replace would edit both.
+fn with_air_on(text: &str, type_name: &str, air: Option<&str>) -> String {
     let from = "    cabin_air_mol: 9500.0\n";
-    assert!(
-        text.contains(from),
-        "the anchor's cabin_air_mol line moved — this helper is silently a no-op now"
-    );
-    match air {
-        Some(a) => text.replace(from, &format!("    cabin_air_mol: {a}\n")),
-        None => text.replace(from, ""),
-    }
+    let block = text
+        .find(&format!("    type: {type_name}\n"))
+        .unwrap_or_else(|| panic!("the anchor has no {type_name} — this helper is a no-op now"));
+    let at = block
+        + text[block..]
+            .find(from)
+            .unwrap_or_else(|| panic!("{type_name}'s cabin_air_mol line moved"));
+    let next_flow = text[block..].find("\n  - id: ").map_or(text.len(), |i| block + i);
+    assert!(at < next_flow, "{type_name} declares no cabin_air_mol of its own");
+    let replacement = air.map_or(String::new(), |a| format!("    cabin_air_mol: {a}\n"));
+    format!("{}{replacement}{}", &text[..at], &text[at + from.len()..])
+}
+
+/// The anchor with its O₂ regulator's declared air replaced (or removed, for `None`).
+fn eclss_anchor_with_air(air: Option<&str>) -> String {
+    with_air_on(&eclss_anchor_yaml_at("60.0", "4"), "eclss.o2_makeup", air)
 }
 
 fn refused(yaml: &str) -> authoring::AuthoringError {
@@ -1141,4 +1150,43 @@ fn the_cabin_air_may_be_a_template_expression() {
     };
     let built = interpret_str(&yaml).expect("a parameter-driven cabin air builds");
     assert!(run_scenario(built).is_ok());
+}
+
+// ---------------------------------------------------------------------------------
+// The condenser's air, declared (2026-10-18, §15c of docs/plans/post-roadmap-authored-plants.md).
+//
+// `eclss.condenser` holds `eclss.yaml`'s `humidity_fraction` of the saturation of the air the
+// author declares — required, no default. Until §15 every authored condenser held the station's
+// 1.7863 kg whatever its cabin held.
+// ---------------------------------------------------------------------------------
+
+#[test]
+fn a_condenser_without_its_cabin_air_is_refused() {
+    let text = eclss_anchor_yaml_at("60.0", "4");
+    let err = refused(&with_air_on(&text, "eclss.condenser", None));
+    assert!(err.message.contains("cabin_air_mol"), "{}", err.message);
+    assert!(err.message.contains("humidity_fraction"), "{}", err.message);
+    for bad in ["0.0", "-5.0"] {
+        let err = refused(&with_air_on(&text, "eclss.condenser", Some(bad)));
+        assert!(err.message.contains("cabin_air_mol must be"), "{}", err.message);
+    }
+}
+
+/// A tenth of the air holds a tenth of the vapour: the anchor's cabin settles at its own
+/// target plus the crew's `P/k` (0.04 kg) — at 950 mol a tenth of the station's target, where
+/// at 9500 it is the station's.
+#[test]
+fn the_condenser_holds_a_share_of_its_own_air() {
+    let p = domains::params::eclss();
+    let text = eclss_anchor_yaml_at("60.0", "900");
+    for air in [9500.0, 950.0] {
+        let yaml = with_air_on(&text, "eclss.condenser", Some(&format!("{air:?}")));
+        let result = run_scenario(interpret_str(&yaml).expect("builds")).expect("runs");
+        let end = result.final_state.stocks["eclss.cabin_h2o"].amount;
+        let expected = p.humidity_setpoint_kg(air) + 2.0e-5 / p.condense_rate;
+        assert!(
+            (end - expected).abs() < 1e-9,
+            "air {air}: cabin vapour {end} vs target + P/k = {expected}"
+        );
+    }
 }

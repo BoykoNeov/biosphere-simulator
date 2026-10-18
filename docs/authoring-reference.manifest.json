@@ -167,7 +167,7 @@
     "eclss.condenser": {
       "cls": "Condenser",
       "demand_controlled": null,
-      "needs_cabin_air": false,
+      "needs_cabin_air": true,
       "param_set": "eclss",
       "rate_params": [
         "condense_rate"

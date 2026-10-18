@@ -253,7 +253,8 @@ pub(crate) fn build_session_from_file(
     // here.** Silently taking the single-rate path would run the graph at the *master*
     // cadence the author chose precisely because it is unsafe un-sub-stepped (measured on
     // `eclss_thermal_habitat`: master `dt=3600` single-rate ends at `cabin_o2 = 72.0`
-    // against a truth of 8.0 — diverged, not drifted), i.e. the same file would mean
+    // against a truth of 8.0 — diverged, not drifted; measured on the 10-mol cabin that file had
+    // until 2026-10-18, not re-measured on its 9500-mol one), i.e. the same file would mean
     // different things on the two ports. Note this refusal is NOT the precondition: the
     // hatch above deliberately admits an unsafe *single-rate* file, which is the case the
     // player is meant to watch.

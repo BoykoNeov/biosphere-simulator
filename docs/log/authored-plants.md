@@ -104,3 +104,14 @@ keeps a named temporary 9500 until slice B, which waits on a user question (two 
   platform" (the check that would catch it was deleted with the Linux job). Stored as the pressure at
   22 °C, the target is multiply and divide; the temperature was a constant either way. Check
   `rust/data/tiers.json` before adding a transcendental anywhere a Tier-1 golden builds.
+
+**SLICE B BUILT 2026-10-18** (plan §15b–§15c). Asked first, measured before asking: the two test files
+that declared a 47.6-mol cabin for their O₂ regulator would keep a working condenser on that air, but
+their air would end 1.7× and 2.2× past saturation. The user chose one realistic 9500-mol cabin for both
+regulators. `eclss.condenser` now requires `cabin_air_mol`, no default; the temporary 9500 is deleted.
+Authoring manifest: `needs_cabin_air` on the condenser, nothing else; 0 of 20 goldens.
+
+* **Lesson: measure a question's premise before putting it to the user.** The first framing ("a small
+  air overturns how the files were designed") was wrong — the condenser only acts on the excess, so its
+  behaviour survived; the real cost was supersaturated air nothing checks, and that is what the user
+  decided on.

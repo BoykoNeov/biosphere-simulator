@@ -61,7 +61,7 @@
 #     90 % of the bound for no gain in what this file proves.
 #   * steps = 48 master steps at dt = 1800 = 86400 s = 1 day = ~43 tau of the slowest loop,
 #     so every pool is at its steady state by the end and none of them is where it started
-#     (cabin_o2 10.0 -> 8.0; cabin_co2 0.0 -> 3.0; cabin_h2o 1.786315428255099 -> ~1.786315428255099 + 0.028). A DEAD ANCHOR
+#     (cabin_o2 1995.0 -> 1993.0 — 10.0 -> 8.0 until 2026-10-18; cabin_co2 0.0 -> 3.0; cabin_h2o 1.786315428255099 -> ~1.786315428255099 + 0.028). A DEAD ANCHOR
 #     IS TRIVIALLY BIT-EXACT — the monod_dsl.yaml lesson, applied deliberately here.
 #
 # NO GOLDEN, and not for want of trying: no frozen scenario runs ECLSS multi-rate, so there
@@ -88,13 +88,13 @@ rng_seed: 0
 
 stocks:
   # The three cabin-air POOLs. cabin_o2 starts AT the setpoint (the regulator idles) and the
-  # crew draw pulls it down to o2_eq = 8.0; CO2/H2O start at 0 (a clean cabin). No
+  # crew draw pulls it down to o2_eq = 1993.0 (8.0 until 2026-10-18); CO2/H2O start at 0 (a clean cabin). No
   # `composition` — see the header.
   - id: eclss.cabin_o2
     domain: eclss
     quantity: oxygen
     kind: pool
-    amount: 10.0          # == the frozen o2_setpoint
+    amount: 1995.0        # == the regulator's target, 0.21 x 9500 (10.0 until 2026-10-18's §15c)
   - id: eclss.cabin_co2
     domain: eclss
     quantity: carbon
@@ -196,8 +196,10 @@ flows:
       o2_supply: boundary.o2_supply
       cabin_o2: eclss.cabin_o2
     params: eclss
-    # The cabin's air (mol), declared 2026-10-18: 0.21 x this == 10.0 exactly, the setpoint this anchor was designed around (o2_eq = 8.0). From 2026-09-06 until then it was silently judged against the station's 1995.0.
-    cabin_air_mol: 47.61904761904762
+    # The cabin's air (mol): the station's 9500, so the target is 0.21 x 9500 = 1995.0 and o2_eq = 1993.0.
+    # It was 47.61904761904762 (a 10.0 target) from 2026-10-18 until the same day's §15c, when the
+    # condenser had to declare the same cabin: at 47.6 mol the air ended 1.7-2.2x past saturation.
+    cabin_air_mol: 9500.0
 
   # --------------------------------------------------------------------------------
   # THE SLOW SET — one flow, and the whole reason this file exists. See the header: this
@@ -216,6 +218,9 @@ flows:
       cabin_h2o: eclss.cabin_h2o
       humidity_condensate: boundary.humidity_condensate
     params: eclss
+    # The cabin's air (mol), declared 2026-10-18 (§15c of docs/plans/post-roadmap-authored-plants.md):
+    # the condenser holds 40 % RH of it, 1.786315428255099 kg at 9500. No default.
+    cabin_air_mol: 9500.0
 
 forcings:
   # The forced constant crew metabolic rates (EclssScenario). Keys are the frozen hardcoded

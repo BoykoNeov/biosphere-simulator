@@ -635,7 +635,7 @@ pub(crate) fn build_flow(
     let air = cabin_air(spec, params)?;
     if air.is_some() && !type_spec.needs_cabin_air {
         return Err(AuthoringError::new(format!(
-            "flow {:?} ({type_name}): this flow type takes no 'cabin_air_mol' (only              eclss.o2_makeup, whose target is a fraction of its cabin's air)",
+            "flow {:?} ({type_name}): this flow type takes no 'cabin_air_mol' (only              eclss.o2_makeup and eclss.condenser, whose targets are a share of their              cabin's air)",
             spec.id
         )));
     }

@@ -198,7 +198,7 @@ key is a schema error, not a silent drop. The manifest freezes each model's fiel
 | `BundleSpec` | a reusable domain/species bundle: `parameters`/`stocks`/`flows`/`forcings` — **no run config, no nested `includes`** (both rejected by `extra="forbid"`) |
 | `IncludeSpec` | the `{bundle, prefix}` namespaced include form |
 | `StockSpec` | one stock: id/domain/quantity/kind/amount + optional `composition`/`unclamped`/`extinction_threshold` |
-| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params`/`rate_class`, + `cabin_air_mol` (required on `eclss.o2_makeup`, refused elsewhere; 2026-10-18) |
+| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params`/`rate_class`, + `cabin_air_mol` (required on `eclss.o2_makeup` and `eclss.condenser`, refused elsewhere; 2026-10-18) |
 | `KineticsSpec` | `rate` (the grammar above) × `stoichiometry` |
 | `ForcingSpec` | `const` — **constant forcings only** |
 | `ParamPackRef` | `{pack: …}` — an alternate param file read by the *same* frozen loader |
@@ -283,7 +283,7 @@ how positivity holds, and whether the flow is multi-instanceable:
 | `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** | — (`τ ≫ dt` is not a predicate) |
 | `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) | — (state-dependent) |
 | `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor (`k_scrub·cabin_co2`) | `co2_scrub_rate` |
-| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor, one-sided (`k_cond·max(0, cabin_h2o − setpoint)`, since 2026-10-03; the setpoint is `humidity_fraction` of the cabin air's saturation since 2026-10-18, that air the station's 9500 mol until slice B of `post-roadmap-authored-plants.md` §15) | `condense_rate` |
+| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor, one-sided (`k_cond·max(0, cabin_h2o − setpoint)`, since 2026-10-03; the setpoint is `humidity_fraction` of the saturation of the flow's declared `cabin_air_mol` since 2026-10-18, `post-roadmap-authored-plants.md` §15) | `condense_rate` |
 | `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) | `o2_makeup_gain` |
 
 **`rate_params` names the first-order rate constants** — the `k` in a `dx/dt = k·x` or
@@ -1098,6 +1098,18 @@ vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — an authored condenser declares its cabin's air (§15c of
+  `docs/plans/post-roadmap-authored-plants.md`, the user's "9500 for both").** `eclss.condenser`'s
+  `needs_cabin_air` becomes true: `cabin_air_mol` is required on it, no default, and it holds
+  `humidity_fraction` of that air's saturation; `flow_registry::IMPLICIT_CONDENSER_AIR_MOL` is deleted.
+  The two test cabins that declared 47.6 mol for their O₂ regulator (a 10-mol target) now declare the
+  station's 9500 for both regulators, their `cabin_o2` starting at 1995.0 — measured first (§15b): the
+  same small air for the condenser left it working but the air 1.7–2.2× past saturation, which nothing
+  checks. **Manifest diff, predicted and measured: `flow_types["eclss.condenser"].needs_cabin_air`
+  false → true, nothing else; the biosphere and station manifests and all 20 goldens unchanged.** New
+  tests in `authoring/tests/scenario_files.rs`: a condenser with no, zero or negative air is refused
+  (naming `humidity_fraction`); a 950-mol cabin settles at a tenth of the station's target plus the
+  crew's `P/k`.
 - **2026-10-18 — the `eclss` kinetics param set carries `humidity_fraction` (0.40) and
   `saturation_vapour_pressure` (2643.93… Pa) in place of `humidity_setpoint` (1.7863 kg) — the station
   half of §15 of `docs/plans/post-roadmap-authored-plants.md` (the station entry of this date). No

@@ -479,3 +479,34 @@ one cubic metre. The three options put to the user:
 * **(b) 9500 mol for the condenser** — the water exactly as today; the file declares two cabin sizes.
 * **(c) 9500 mol for both** — one consistent, realistic cabin; the files' O₂ story (10 → 8 mol) becomes
   1995 → 1993, which their headers and a pinned offset describe.
+
+### 15c. Slice B — the user's answer and the build (2026-10-18)
+
+**The user's answer: (c), 9500 mol for both** — one realistic cabin per file. So:
+
+* `eclss.condenser` requires `cabin_air_mol` (its spec's `needs_cabin_air` becomes true), no default, and
+  aims at `humidity_fraction` of that air's saturation; `IMPLICIT_CONDENSER_AIR_MOL` is deleted. The
+  refusal of the field on other types names both types. The error for a missing air says which target
+  is a share of it.
+* Every authored condenser declares its air: `eclss_cabin.yaml` and `scenarios/bioregenerative_station.yaml`
+  9500 (as their regulators); `eclss_multirate_cabin.yaml` and `eclss_thermal_habitat.yaml` 9500 for both
+  regulators, their `cabin_o2` start moving 10.0 → 1995.0 (matched start); the inline fixture in
+  `authoring/tests/multirate.rs` 9500.
+* The two files' headers re-state their O₂ story (setpoint 1995, `o2_eq` 1993). Their prose figures for
+  other cadences (a single-rate run exporting 0.0 mol, a master-step run ending at 72.0) were measured
+  on the 10-mol design and are labelled so, not re-measured.
+
+**Predicted before running.** The authoring manifest moves by exactly one value,
+`flow_types["eclss.condenser"].needs_cabin_air` false → true; the biosphere and station manifests and all
+20 goldens are unchanged (no golden is authored). Every file's water runs the same bits (9500 is the air
+the condenser was already built on). In the two re-sized files the O₂ regulator's deviation from its
+target runs the same bits (matched start), so the condenser's pinned excess (2.8387096774195486e-2) holds
+and every authored-content check stays green.
+
+**Measured (slice B BUILT 2026-10-18).** The authoring manifest moved by exactly the one predicted value
+(`flow_types["eclss.condenser"].needs_cabin_air` false → true); the biosphere and station manifests
+unchanged; `regen_goldens` 0 of 20 would change. The authoring tests pass, the multi-rate anchor's pinned
+condenser excess included, with the two re-sized files. New tests: a condenser with no, zero or negative
+air is refused; a 950-mol cabin settles at a tenth of the station's target plus the crew's `P/k`.
+**§15 is complete**, and with it §14's third item; the second (a bed air other than 9500 mol) is now
+unblocked and still the user's call.

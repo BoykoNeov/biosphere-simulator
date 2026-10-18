@@ -64,10 +64,11 @@
 #     proves nothing (thermal_node.yaml's own warning).
 #   * ECLSS's effective sub-step is dt/n_sub = 3600/60 = 60 s, exactly eclss_cabin.yaml's
 #     load-bearing dt: k_scrub*60 = 0.06, k_cond*60 = 0.03, k_makeup*60 = 0.12, all << 1.
-#     Its o2 tau = 1/k_makeup = 500 s, so the cabin reaches o2_eq = 8.0 inside the FIRST
+#     Its o2 tau = 1/k_makeup = 500 s, so the cabin reaches o2_eq = 1993.0 inside the FIRST
 #     master hour (3600 s = 7.2 tau) and holds -- which is the export-fidelity point stated
-#     as a trajectory: a neighbour sampling this file hourly sees 8.0, not the 0.0 mol a
-#     single-rate dt=1800 run exports.
+#     as a trajectory: a neighbour sampling this file hourly sees the equilibrium, not what a
+#     single-rate dt=1800 run exports (0.0 mol, MEASURED on the 10-mol cabin this file had
+#     until 2026-10-18; not re-measured on the 9500-mol cabin it has since).
 #
 # THE SLOW SET STEPS AT dt/2 = 1800 s, NOT dt -- Strang runs it as two half-steps around the
 # fast block. That is SAFER for Thermal (tau ~ 130 half-steps), never worse, so the frozen
@@ -90,7 +91,7 @@ stocks:
   # ---------------------------------------------------------------------------
   # ECLSS -- the FAST side. Three cabin-air POOLs across three quantities.
   # cabin_o2 starts AT the setpoint (the regulator idles) and the crew draw pulls it to
-  # o2_eq = 8.0; CO2/H2O start at 0 (a clean cabin). No `composition`: the cabin pools are
+  # o2_eq = 1993.0 (8.0 until 2026-10-18); CO2/H2O start at 0 (a clean cabin). No `composition`: the cabin pools are
   # SINGLE-QUANTITY, because standalone ECLSS does not tie the crew's atoms together --
   # annotating {carbon: 1, oxygen: 2} here would break OXYGEN balance on crew_metabolism
   # and surface as a runtime ConservationError (there is no build-time stoichiometry check
@@ -100,7 +101,7 @@ stocks:
     domain: eclss
     quantity: oxygen
     kind: pool
-    amount: 10.0          # == the frozen o2_setpoint
+    amount: 1995.0        # == the regulator's target, 0.21 x 9500 (10.0 until 2026-10-18's §15c)
   - id: eclss.cabin_co2
     domain: eclss
     quantity: carbon
@@ -224,6 +225,9 @@ flows:
       cabin_h2o: eclss.cabin_h2o
       humidity_condensate: boundary.humidity_condensate
     params: eclss
+    # The cabin's air (mol), declared 2026-10-18 (§15c of docs/plans/post-roadmap-authored-plants.md):
+    # the condenser holds 40 % RH of it, 1.786315428255099 kg at 9500. No default.
+    cabin_air_mol: 9500.0
 
   # DEMAND-CONTROLLED toward o2_setpoint: S = k_makeup * (o2_setpoint - cabin_o2) * dt.
   # THE ONE RATIONING CANNOT SEE: its draw is proportional to the ERROR, not the stock, so
@@ -238,8 +242,10 @@ flows:
       o2_supply: boundary.o2_supply
       cabin_o2: eclss.cabin_o2
     params: eclss
-    # The cabin's air (mol), declared 2026-10-18: 0.21 x this == 10.0 exactly, the setpoint this anchor was designed around (o2_eq = 8.0). From 2026-09-06 until then it was silently judged against the station's 1995.0.
-    cabin_air_mol: 47.61904761904762
+    # The cabin's air (mol): the station's 9500, so the target is 0.21 x 9500 = 1995.0 and o2_eq = 1993.0.
+    # It was 47.61904761904762 (a 10.0 target) from 2026-10-18 until the same day's §15c, when the
+    # condenser had to declare the same cabin: at 47.6 mol the air ended 1.7-2.2x past saturation.
+    cabin_air_mol: 9500.0
 
   # ---------------------------------------------------------------------------
   # THE SLOW SET -- Thermal. tau ~ 65 steps at the master dt already; sub-stepping it 60x

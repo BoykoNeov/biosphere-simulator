@@ -355,6 +355,9 @@ flows:
       cabin_h2o: cabin.humidity
       humidity_condensate: water.condensate
     params: eclss
+    # The cabin's air (mol), declared 2026-10-18 (§15c of docs/plans/post-roadmap-authored-plants.md):
+    # the condenser holds 40 % RH of it, 1.786315428255099 kg at 9500. No default.
+    cabin_air_mol: 9500.0
 
   # FROZEN, DEMAND-CONTROLLED: S = k_makeup * (o2_setpoint - cabin_o2) * dt, k = 2.0e-3,
   # setpoint 1995.0 mol (k*h = 0.60 — the constraint that fixes n_sub = 12).

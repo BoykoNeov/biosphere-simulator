@@ -49,17 +49,6 @@ use simcore::flow::Flow;
 
 use crate::errors::AuthoringError;
 
-/// The cabin air (mol) every authored `eclss.condenser` is built against — **implicitly**.
-///
-/// ⚠⚠ TEMPORARY, and the defect itself, named. Until 2026-10-18 `eclss.yaml` stored the
-/// condenser's target pre-multiplied by the station's 9500 mol cabin (`humidity_setpoint:
-/// 1.7863` kg), so every authored condenser held 1.7863 kg whatever its cabin held. The file
-/// now stores the relative humidity (`docs/plans/post-roadmap-authored-plants.md` §15, slice
-/// A); this constant keeps the authoring side on the station's cabin until slice B makes the
-/// author DECLARE the cabin's air, with no default — at which point it is deleted, not kept as
-/// a fallback. The `IMPLICIT_CABIN_AIR_MOL` of the O₂ regulator's slice 1, again.
-pub const IMPLICIT_CONDENSER_AIR_MOL: f64 = 9500.0;
-
 /// How one authoring flow-type name lowers to a frozen `Flow` constructor: the exact
 /// set of wiring keyword fields (order-significant — it is the constructor's positional
 /// order) and the frozen param set the flow's constructor needs (or `None`).
@@ -100,8 +89,10 @@ pub struct FlowTypeSpec {
     /// be on the wrong side of.
     pub demand_controlled: Option<(&'static str, &'static str)>,
     /// Whether an authored flow of this type must declare `cabin_air_mol` — the air of the
-    /// cabin it regulates. True for `eclss.o2_makeup` alone: its target is `eclss.yaml`'s
-    /// `o2_fraction` of that air (2026-10-18). Every other type refuses the field.
+    /// cabin it regulates. True for the two whose target is a share of that air:
+    /// `eclss.o2_makeup` (`eclss.yaml`'s `o2_fraction` of it, 2026-10-18) and
+    /// `eclss.condenser` (`humidity_fraction` of its saturation, 2026-10-18,
+    /// `docs/plans/post-roadmap-authored-plants.md` §15). Every other type refuses the field.
     pub needs_cabin_air: bool,
 }
 
@@ -192,7 +183,7 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
             wiring_fields: &["cabin_h2o", "humidity_condensate"],
             param_set: Some("eclss"),
             demand_controlled: None,
-            needs_cabin_air: false,
+            needs_cabin_air: true,
             rate_params: &["condense_rate"],
         }),
         "eclss.o2_makeup" => Some(FlowTypeSpec {
@@ -324,7 +315,7 @@ pub fn build_frozen_flow(
             wire("cabin_h2o")?,
             wire("humidity_condensate")?,
             eclss_params(),
-            IMPLICIT_CONDENSER_AIR_MOL,
+            require_cabin_air(id, type_name, cabin_air_mol)?,
         ))),
         "eclss.o2_makeup" => Ok(Box::new(O2Makeup::new(
             id.to_string(),
@@ -476,9 +467,17 @@ fn require_cabin_air(
         Some(air) => Err(AuthoringError::new(format!(
             "flow {id:?} ({type_name}): cabin_air_mol must be a finite number > 0, got {air}"
         ))),
-        None => Err(AuthoringError::new(format!(
-            "flow {id:?} ({type_name}): declare 'cabin_air_mol' — the air (mol) of the cabin              this regulator serves. Its target is eclss.yaml's o2_fraction of that air; there              is no default, because a default is a cabin size you did not choose (the station's              is 9500.0)"
-        ))),
+        None => {
+            let target = match type_name {
+                "eclss.condenser" => "humidity_fraction of that air's saturation vapour",
+                _ => "o2_fraction of that air",
+            };
+            Err(AuthoringError::new(format!(
+                "flow {id:?} ({type_name}): declare 'cabin_air_mol' — the air (mol) of the cabin \
+                 this flow serves. Its target is eclss.yaml's {target}; there is no default, \
+                 because a default is a cabin size you did not choose (the station's is 9500.0)"
+            )))
+        }
     }
 }
 

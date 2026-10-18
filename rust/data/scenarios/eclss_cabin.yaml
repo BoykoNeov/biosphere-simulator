@@ -147,6 +147,9 @@ flows:
       cabin_h2o: eclss.cabin_h2o
       humidity_condensate: boundary.humidity_condensate
     params: eclss
+    # The cabin's air (mol), declared 2026-10-18 (§15c of docs/plans/post-roadmap-authored-plants.md):
+    # the condenser holds 40 % RH of it, 1.786315428255099 kg at 9500. No default.
+    cabin_air_mol: 9500.0
 
   # DEMAND-CONTROLLED toward o2_setpoint: S = k_makeup * (o2_setpoint - cabin_o2) * dt.
   # NOT clamped -- above the setpoint the frozen law goes negative and the flow reverses.
