@@ -34,7 +34,7 @@
     },
     "param_files/*": {
       "side": "rust",
-      "why": "\u26a0 RE-ANCHORED IN SLICE C8, the same finding as the biosphere's: what moved is the RULE, not the number. All 8 digests here (and all 15 there) are author-neutral \u2014 both sides hash the same file the same way \u2014 so the re-anchoring moved none of them. The CENSUS is now the set the reference LOADS: domains::params::param_files (power \u00d7 2, thermal, eclss, crew) plus station::params::param_files (water_recovery, lamp, harvest), eight compile-time include_str! entries instead of a glob over six Python package directories. \u26a0 NO exclusion rule on this side, unlike the biosphere's 15-of-20 \u2014 these six directories hold nothing but frozen files, and the asymmetry is stated per side so nobody generalises the harder rule. The NORMALIZATION is config::provenance (hand-rolled sha-256 over LF-normalized text; every engine crate is zero-dep by charter). \u26a0 Newly asserted with the re-anchor: every basename is unique across the six directories \u2014 this key is basename-KEYED, so a collision would silently collapse two files into one entry, and nothing had checked it. Prerequisite: slice C1."
+      "why": "\u26a0 STEP 4a (2026-10-18, docs/plans/post-roadmap-meaning-fingerprint.md) CHANGED THE SHAPE, NOT THE CENSUS: each file is now {sources, values}, two sha-256s over the file AS THE LOADERS PARSE IT (config::provenance::param_fingerprints) \u2014 values is the parsed document with every parameter's source: removed, sources is those strings alone. A comment edit moves neither, a citation edit moves only sources, a value or unit edit only values; a scalar counts by its TEXT, so a reformatted number is still a change. The C8 record below is kept as written: its 'digest' is now the text hash those two replaced. \u26a0 RE-ANCHORED IN SLICE C8, the same finding as the biosphere's: what moved is the RULE, not the number. All 8 digests here (and all 15 there) are author-neutral \u2014 both sides hash the same file the same way \u2014 so the re-anchoring moved none of them. The CENSUS is now the set the reference LOADS: domains::params::param_files (power \u00d7 2, thermal, eclss, crew) plus station::params::param_files (water_recovery, lamp, harvest), eight compile-time include_str! entries instead of a glob over six Python package directories. \u26a0 NO exclusion rule on this side, unlike the biosphere's 15-of-20 \u2014 these six directories hold nothing but frozen files, and the asymmetry is stated per side so nobody generalises the harder rule. The NORMALIZATION is config::provenance (hand-rolled sha-256 over LF-normalized text; every engine crate is zero-dep by charter). \u26a0 Newly asserted with the re-anchor: every basename is unique across the six directories \u2014 this key is basename-KEYED, so a collision would silently collapse two files into one entry, and nothing had checked it. Prerequisite: slice C1."
     },
     "reference_doc": {
       "side": "hand",
@@ -119,16 +119,46 @@
   },
   "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/16 day, 16 slow sub-steps per master day, each followed by its sixteenth of the everything-fast dt=60 s sub-steps (90 of them; interleaved since 2026-09-30, slow-first before); Tier-1 energy single-rate dt=3600 s.",
   "param_files": {
-    "chamber.yaml": "ef95930d7baf99e1033559b43bb9074fece8f26c1160fe987eb163e167f79b37",
-    "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
-    "cold_period.yaml": "8a583bc8b85583d4821ba1ce3537942c98acf36323a3cae599a9cb276c112154",
-    "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
-    "eclss.yaml": "6cc9e6eaac805a9d361637773ff4ca15858739342347604dc3614a911fee6c47",
-    "harvest.yaml": "358ae0150f64cf67f5b83b2357af0f786ee657ab88d1cfbb87866ac1eb08ff05",
-    "lamp.yaml": "f4407882cab6cf06ab103a23030cff2d5081af2a86057ef1decf4124145a44eb",
-    "radiator.yaml": "56229679bd3d369b08658e8401ff3579355ffb4fda62038f1e2ca7952a15af81",
-    "self_discharge.yaml": "cce98ed64f911bc339f7466cd2af5eaee50eec1ade9514daef74031a275660cc",
-    "water_recovery.yaml": "782d5178083a1b4fdae0d0966357069774910c78e4a541d6e029153a89b294f7"
+    "chamber.yaml": {
+      "sources": "977d8bd11a365c258320bf382cab6df2972efda4e5ce09b0f378d25de60ce73c",
+      "values": "d613f1ccb4c69661cdfdc44769fea5be4ab47ae1c6ed421f385514ec30ebf10d"
+    },
+    "charge.yaml": {
+      "sources": "c03068d3afe63a9958f7a07d9e3f91475e155f35bc08427391d9f0cc255d4ddb",
+      "values": "8facbc3e120ec26907486f2dd84043d5c272c8b94e7e18edc058a4ec0992592e"
+    },
+    "cold_period.yaml": {
+      "sources": "6e82148d57fce7b8bfb58089b70871a260a14c860e7854e2e5528ff1eec0c57d",
+      "values": "9b7756db609ca44c499c366533045574e4bb0afd49596db5a15427288e692fe7"
+    },
+    "crew.yaml": {
+      "sources": "1d0c7f963da6bf121af3ce0dd01235167be324074468bba5e0a4418d53ac188f",
+      "values": "d58f3aa9e9a72e7d0dd1811f5717d7674aa337bf2131427717c4949b292bef9a"
+    },
+    "eclss.yaml": {
+      "sources": "44b9142807edc5a4dc20313db79e2a6cbf357203477a759eb51234523c0a1d86",
+      "values": "50e30012e99cb7a2a6281f2f125fa501c6256f51cbf9b695f1a1b17783715a10"
+    },
+    "harvest.yaml": {
+      "sources": "3239d1aab1b20eee240ff8402b232b810d96c9d4dce5fe9b46c9c19fd86c15b7",
+      "values": "3e48f049d82318fc43a3cd49ddf9927eadb738a1a26d279c7553f9babc8d6ef8"
+    },
+    "lamp.yaml": {
+      "sources": "9ea0fcd354b5bf9986a58b44f2331822c7f79df64675149de08df5eb2d488cee",
+      "values": "4e30319f3bff8e747fe2386ab9211c839ce418db83f886c8c3d391596ba2a95f"
+    },
+    "radiator.yaml": {
+      "sources": "e832074b34a19222bbf0e76d0234cf744eee4127b065b2131a516c910d579bf8",
+      "values": "b5c803e8302402acd70c54347d60f6686d90e954654aef5c34c28682abccf14c"
+    },
+    "self_discharge.yaml": {
+      "sources": "f697a0b44bdc22077de03008a7e6646a8244163c1018005f38ac64418cffae4b",
+      "values": "1802b7425fc23e0a26e246aeab20242f92d91a5417684d9982a438e4faea2117"
+    },
+    "water_recovery.yaml": {
+      "sources": "a9cfbb5899ee3c78fcb0ddb27db0fd0a6eb88ad27c25c779edb5c7472c1811d1",
+      "values": "49eec590abaa5bd36e00297ba107895d0c4ed06ee16ae04d23b2a8f9a2af06a4"
+    }
   },
   "reference_doc": "docs/station-reference.md",
   "scenarios": {

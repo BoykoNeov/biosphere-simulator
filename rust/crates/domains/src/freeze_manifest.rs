@@ -80,8 +80,9 @@
 //!   which get an explicitly empty list, saying "measured, none") is the manifest's own
 //!   hand-authored scenario set, and the checker still owns it. What moved is the CLAIMS.
 //!
-//! * `param_files` — the frozen param-file census, `filename -> newline-normalized
-//!   sha-256`, from [`domains::biosphere::params::param_files`]. **New in slice C8, and it
+//! * `param_files` — the frozen param-file census, `filename -> {sources, values}`
+//!   (two sha-256s over the parsed file since Step 4a — [`config::provenance::param_fingerprints`];
+//!   a newline-normalized text sha-256 before it), from [`domains::biosphere::params::param_files`]. **New in slice C8, and it
 //!   inverts what this file said for three slices.**
 //!
 //!   ⚠⚠ **What re-anchored is the RULE, not the number.** Both sides digest the same bytes,
@@ -122,7 +123,7 @@ pub fn manifest_text() -> String {
     dumps(&manifest())
 }
 use config::canonical_json::{dumps, Json};
-use config::provenance::{normalized_sha256, sha256_hex};
+use config::provenance::{normalized_sha256, param_files_json, param_fingerprints, sha256_hex};
 use crate::biosphere::light_path::half_sine_window_mean;
 use crate::biosphere::science_gates::{ScienceGate, GATES, LIVENESS_FLOORS, SCIENCE_BANDS};
 use crate::biosphere::system::{
@@ -336,7 +337,11 @@ pub fn dump() {
     );
     for (i, (name, text)) in files.iter().enumerate() {
         let comma = if i + 1 == files.len() { "" } else { "," };
-        println!("    \"{name}\": \"{}\"{comma}", normalized_sha256(text));
+        let fp = param_fingerprints(text, name).expect("a frozen param file parses");
+        println!(
+            "    \"{name}\": {{\"sources\": \"{}\", \"values\": \"{}\"}}{comma}",
+            fp.sources, fp.values
+        );
     }
     println!("  }},");
     println!("  \"liveness_floors\": {},", census(LIVENESS_FLOORS));
@@ -616,7 +621,7 @@ const AUTHORITY: [(&str, &str, &str); 19] = [
     (
         "param_files/*",
         "rust",
-        "⚠ RE-ANCHORED IN SLICE C8, AND WHAT MOVED IS THE RULE, NOT THE NUMBER. The 23 digits across the two manifests are author-neutral by construction — both sides hash the same file with the same rule, which is why re-anchoring moved not one of them (measured first, then done). Two rules did move to the reference. (1) The CENSUS: this is now the set the reference actually LOADS (domains::biosphere::params::param_files, a compile-time include_str! list) rather than a non-recursive glob of a Python package directory minus demo.yaml — so a file wired into no loader drops OUT of the manifest instead of staying in it. The 15-of-20 rule survives with its two different exclusion reasons (four crops/potato overrides by non-recursion, demo.yaml by name), asserted Rust-side against the directory. (2) The NORMALIZATION: config::provenance, a hand-rolled sha-256 (every engine crate is zero-dep by charter) over LF-normalized text. That rule is load-bearing TODAY, not in principle: include_str! embeds the WORKING TREE, and one frozen file (senescence.yaml) is CRLF on the dev box while the git index is LF everywhere — so the un-normalized hash would differ between that box and Linux CI. Python's helpers are retained as conformance checks on the checker. Prerequisite: slice C1, which gave the reference the loaders. ⚠ STAGE-3 SLICE S1 MOVED THE GROUND UNDER THIS KEY WITHOUT MOVING THE KEY: the fifteen files (and demo.yaml, and the four crops/potato overrides) left src/domains/biosphere/params/ for crates/domains/params/biosphere/, so the census now reads a directory the reference owns instead of a Python package scheduled for deletion. Not one hash moved — the manifest is basename-keyed and the normalization is path-independent — and the 15-of-20 rule with its two different exclusions carried over verbatim BECAUSE the whole directory moved, subdirectory included. Had the potato overrides been left behind, a_recursive_walk_reddens_the_census would have gone green-by-vacuity: a control with no test to redden.",
+        "⚠ STEP 4a (2026-10-18, docs/plans/post-roadmap-meaning-fingerprint.md) CHANGED THE SHAPE, NOT THE CENSUS: each file is now {sources, values}, two sha-256s over the file AS THE LOADERS PARSE IT (config::provenance::param_fingerprints) — values is the parsed document with every parameter's source: removed, sources is those strings alone. A comment edit moves neither, a citation edit moves only sources, a value or unit edit only values; a scalar counts by its TEXT, so a reformatted number is still a change. The C8 record below is kept as written: its 'digest' is now the text hash those two replaced. ⚠ RE-ANCHORED IN SLICE C8, AND WHAT MOVED IS THE RULE, NOT THE NUMBER. The 23 digits across the two manifests are author-neutral by construction — both sides hash the same file with the same rule, which is why re-anchoring moved not one of them (measured first, then done). Two rules did move to the reference. (1) The CENSUS: this is now the set the reference actually LOADS (domains::biosphere::params::param_files, a compile-time include_str! list) rather than a non-recursive glob of a Python package directory minus demo.yaml — so a file wired into no loader drops OUT of the manifest instead of staying in it. The 15-of-20 rule survives with its two different exclusion reasons (four crops/potato overrides by non-recursion, demo.yaml by name), asserted Rust-side against the directory. (2) The NORMALIZATION: config::provenance, a hand-rolled sha-256 (every engine crate is zero-dep by charter) over LF-normalized text. That rule is load-bearing TODAY, not in principle: include_str! embeds the WORKING TREE, and one frozen file (senescence.yaml) is CRLF on the dev box while the git index is LF everywhere — so the un-normalized hash would differ between that box and Linux CI. Python's helpers are retained as conformance checks on the checker. Prerequisite: slice C1, which gave the reference the loaders. ⚠ STAGE-3 SLICE S1 MOVED THE GROUND UNDER THIS KEY WITHOUT MOVING THE KEY: the fifteen files (and demo.yaml, and the four crops/potato overrides) left src/domains/biosphere/params/ for crates/domains/params/biosphere/, so the census now reads a directory the reference owns instead of a Python package scheduled for deletion. Not one hash moved — the manifest is basename-keyed and the normalization is path-independent — and the 15-of-20 rule with its two different exclusions carried over verbatim BECAUSE the whole directory moved, subdirectory included. Had the potato overrides been left behind, a_recursive_walk_reddens_the_census would have gone green-by-vacuity: a control with no test to redden.",
     ),
     (
         "reference_doc",
@@ -737,14 +742,7 @@ pub fn manifest() -> Json {
             "long_horizon_years",
             Json::int(horizon("long_horizon_years")),
         ),
-        (
-            "param_files",
-            Json::obj(
-                params
-                    .iter()
-                    .map(|(name, text)| (*name, Json::s(normalized_sha256(text)))),
-            ),
-        ),
+        ("param_files", param_files_json(&params)),
         ("reference_doc", Json::s("docs/biosphere-reference.md")),
         ("scenarios", scenarios),
         ("science_bands", census_json(SCIENCE_BANDS)),

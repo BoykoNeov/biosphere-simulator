@@ -180,8 +180,10 @@ aux on a fast registry is caught.
 `rust/crates/domains/params/{power,thermal,eclss,crew}/*.yaml` + `rust/crates/station/params/*.yaml` (both moved out of the Python packages in Stage-3 slice S1, 2026-08-18; a pure rename — the manifest keys on basenames, so not one hash moved):
 `charge`, `self_discharge` (power); `radiator` (thermal); `eclss` (eclss); `crew` (crew);
 `water_recovery`, `lamp`, `harvest`, `chamber`, `cold_period` (station; `chamber` and `cold_period` added 2026-10-05). Each is clean-room from primary literature
-or illustrative sizing per the frozen-but-illustrative caveat above; the manifest records a
-newline-normalized sha-256 of each as **provenance**. Biosphere param files are **not**
+or illustrative sizing per the frozen-but-illustrative caveat above; the manifest records two
+fingerprints of each as **provenance** — its parsed values and its `source:` strings (since
+Step 4a, 2026-10-18; a newline-normalized text sha-256 before it), so a comment edit moves
+neither. Biosphere param files are **not**
 recorded here (delegated).
 
 ### The 13 scenarios + their goldens
@@ -372,6 +374,10 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — `param_files` fingerprints what a file means, not its text (Step 4a; the
+  biosphere entry of this date carries the rule). The 10 entries become `{sources, values}`;
+  `param_files` and its `_authority` row are the whole manifest diff. No value, golden, set or
+  census moved. A comment edit to a station param file is no longer an unfreeze.**
 - **2026-10-17 — the biosphere's open-field night adopted, delegated: 2 station goldens move
   (`greenhouse`, `harvest` — the outdoor weather builds) and their 2 `golden_sha256` rows follow; the
   lamp-lit rooms do not move.** The weather's net radiation follows the sun and the water reads the air's

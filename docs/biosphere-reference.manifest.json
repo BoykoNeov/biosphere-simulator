@@ -46,7 +46,7 @@
     },
     "param_files/*": {
       "side": "rust",
-      "why": "\u26a0 RE-ANCHORED IN SLICE C8, AND WHAT MOVED IS THE RULE, NOT THE NUMBER. The 23 digits across the two manifests are author-neutral by construction \u2014 both sides hash the same file with the same rule, which is why re-anchoring moved not one of them (measured first, then done). Two rules did move to the reference. (1) The CENSUS: this is now the set the reference actually LOADS (domains::biosphere::params::param_files, a compile-time include_str! list) rather than a non-recursive glob of a Python package directory minus demo.yaml \u2014 so a file wired into no loader drops OUT of the manifest instead of staying in it. The 15-of-20 rule survives with its two different exclusion reasons (four crops/potato overrides by non-recursion, demo.yaml by name), asserted Rust-side against the directory. (2) The NORMALIZATION: config::provenance, a hand-rolled sha-256 (every engine crate is zero-dep by charter) over LF-normalized text. That rule is load-bearing TODAY, not in principle: include_str! embeds the WORKING TREE, and one frozen file (senescence.yaml) is CRLF on the dev box while the git index is LF everywhere \u2014 so the un-normalized hash would differ between that box and Linux CI. Python's helpers are retained as conformance checks on the checker. Prerequisite: slice C1, which gave the reference the loaders. \u26a0 STAGE-3 SLICE S1 MOVED THE GROUND UNDER THIS KEY WITHOUT MOVING THE KEY: the fifteen files (and demo.yaml, and the four crops/potato overrides) left src/domains/biosphere/params/ for crates/domains/params/biosphere/, so the census now reads a directory the reference owns instead of a Python package scheduled for deletion. Not one hash moved \u2014 the manifest is basename-keyed and the normalization is path-independent \u2014 and the 15-of-20 rule with its two different exclusions carried over verbatim BECAUSE the whole directory moved, subdirectory included. Had the potato overrides been left behind, a_recursive_walk_reddens_the_census would have gone green-by-vacuity: a control with no test to redden."
+      "why": "\u26a0 STEP 4a (2026-10-18, docs/plans/post-roadmap-meaning-fingerprint.md) CHANGED THE SHAPE, NOT THE CENSUS: each file is now {sources, values}, two sha-256s over the file AS THE LOADERS PARSE IT (config::provenance::param_fingerprints) \u2014 values is the parsed document with every parameter's source: removed, sources is those strings alone. A comment edit moves neither, a citation edit moves only sources, a value or unit edit only values; a scalar counts by its TEXT, so a reformatted number is still a change. The C8 record below is kept as written: its 'digest' is now the text hash those two replaced. \u26a0 RE-ANCHORED IN SLICE C8, AND WHAT MOVED IS THE RULE, NOT THE NUMBER. The 23 digits across the two manifests are author-neutral by construction \u2014 both sides hash the same file with the same rule, which is why re-anchoring moved not one of them (measured first, then done). Two rules did move to the reference. (1) The CENSUS: this is now the set the reference actually LOADS (domains::biosphere::params::param_files, a compile-time include_str! list) rather than a non-recursive glob of a Python package directory minus demo.yaml \u2014 so a file wired into no loader drops OUT of the manifest instead of staying in it. The 15-of-20 rule survives with its two different exclusion reasons (four crops/potato overrides by non-recursion, demo.yaml by name), asserted Rust-side against the directory. (2) The NORMALIZATION: config::provenance, a hand-rolled sha-256 (every engine crate is zero-dep by charter) over LF-normalized text. That rule is load-bearing TODAY, not in principle: include_str! embeds the WORKING TREE, and one frozen file (senescence.yaml) is CRLF on the dev box while the git index is LF everywhere \u2014 so the un-normalized hash would differ between that box and Linux CI. Python's helpers are retained as conformance checks on the checker. Prerequisite: slice C1, which gave the reference the loaders. \u26a0 STAGE-3 SLICE S1 MOVED THE GROUND UNDER THIS KEY WITHOUT MOVING THE KEY: the fifteen files (and demo.yaml, and the four crops/potato overrides) left src/domains/biosphere/params/ for crates/domains/params/biosphere/, so the census now reads a directory the reference owns instead of a Python package scheduled for deletion. Not one hash moved \u2014 the manifest is basename-keyed and the normalization is path-independent \u2014 and the 15-of-20 rule with its two different exclusions carried over verbatim BECAUSE the whole directory moved, subdirectory included. Had the potato overrides been left behind, a_recursive_walk_reddens_the_census would have gone green-by-vacuity: a control with no test to redden."
     },
     "reference_doc": {
       "side": "hand",
@@ -161,21 +161,66 @@
   },
   "long_horizon_years": 15,
   "param_files": {
-    "allocation.yaml": "b26cc1e6587a99d8b055530f9dc8de02ce8d2536ec465acdd4683d15a97109ea",
-    "canopy.yaml": "5503bf7a8125b3db8ef223366af1a2907c325033067dcc7ff4054dce17b6f54d",
-    "decomposition.yaml": "491f196483f5d131131369b0c15c5dc6f368e60d38be185067484f4c0f34af13",
-    "herbivory.yaml": "33903c12acd162cc377a9fe4536a971cc3d2f4943a959a69aeebc5a989198c1b",
-    "humification.yaml": "327cd89ee455cf0cf20767e4081dbe1344287f2e132760b668cae5a20d6f4b09",
-    "microbial_respiration.yaml": "de5a01c81a5c9ab20229259369511e8e8a9e42b0ef932b99a6bd3d1f1e8f6d8a",
-    "nitrogen.yaml": "f012a5cfad4d40efa29ab917c05c0e9c8d831426cb39415f990a44950abf240a",
-    "phenology.yaml": "534aff0b9a7557a16cbcafc61d87279dd61b96fc5df17b7837fc67e225201d38",
-    "photosynthesis.yaml": "3fc1843072424a20b2df3449e6f040e6986848f6559669b21478ffa557102aa0",
-    "respiration.yaml": "b6ec929a0129f41cb48e6b02b2ab7298eb7a590a6493e40feb57b73375d8e638",
-    "root_depth.yaml": "fefdbcc39e3e5cb1ef88368a30afe467b7be6ac3dd825657574bcdc020b358e7",
-    "senescence.yaml": "02517d8459e63ffb8e591d85cd8135e64de1168de213090c785bb5cd9fb565ca",
-    "stem_reserves.yaml": "65ae25bf8ec5ad213763c41282221837b3d0e6e8de14a70d2c5ed53ed9cbe39e",
-    "transpiration.yaml": "6624897160f07cd6ef42c24de588c5ff0601bf06c7d4066423872960676dacca",
-    "water_cycle.yaml": "6970680ca7b92ac58401532ee3f51700deae7e460e717853d02f1d4b6cc60657"
+    "allocation.yaml": {
+      "sources": "c3ce8d88d621d59052822501f4deeefb1c9d80336cdcffeb5f3a63ead4317d81",
+      "values": "57814365a38951d4eee2b6053383d754e0fce216a3ebb79044079024cf60b2a5"
+    },
+    "canopy.yaml": {
+      "sources": "94f314a42525120c00185ce63e575f27d454b44c434aece39b479a6cd2c737bb",
+      "values": "e3c21d3db0f31d25ee0067ebee30a923fcf2119033ee8763755f73d6ad12a720"
+    },
+    "decomposition.yaml": {
+      "sources": "e966e61e250d9ea11a8dec288da97c767845a1a28a4cdb18eb809a6b48675090",
+      "values": "acc853d3ce1242b343e57c95f952026882cdf84b79a772cde219d29d76dea823"
+    },
+    "herbivory.yaml": {
+      "sources": "be0decb05bdab1e450f93ec9faa492e222e3c740a06ae25967eae947bbe8424d",
+      "values": "653d29870b072acdb42ce9c1260effaf702ae854b132588fece7cda17a56ddef"
+    },
+    "humification.yaml": {
+      "sources": "b74873fd4995909b0b7f70113b7ba7f1a2c30abebcc1d418d73deddef7765c29",
+      "values": "c0c46365424c8a488a24dbb0e993eee232eb2968f2efd0509802fb32e1f4c2fc"
+    },
+    "microbial_respiration.yaml": {
+      "sources": "be13123f57743d1790be488bd3b65c6734a027edefdc5219006ceb7d9a6d9ab8",
+      "values": "2a34595b1a2f53cf4e74f798b9783dce35ed592190e908da4a993178d4339b4e"
+    },
+    "nitrogen.yaml": {
+      "sources": "e5ef98d5ddf392c347929b0a571dfc5adaa175722e1e0501c598ac37bfd35f16",
+      "values": "5d85d72ad9c95e19dd56054062615aaf0978a7aed8d220c6a0b6392aba7750ac"
+    },
+    "phenology.yaml": {
+      "sources": "a1ed13e5386d99d8f34b884060f63dca9480713e6dd2974548d92c080af59686",
+      "values": "457bfcb721625cb582c4cd8b12952cb67a5d35b7300afa93a561c66bccbb8694"
+    },
+    "photosynthesis.yaml": {
+      "sources": "219a1551ec1dff8d8dcb3df09e90c6c900508d660c68be60217da716b3f448d0",
+      "values": "5ba66be67f5ddedaeb89feac90a15916092f4824048681a249db311a54c9f754"
+    },
+    "respiration.yaml": {
+      "sources": "7e7696c399a57def285cb5ead37f0cbec6dbcc20e45107e6eb721c3a4ecddbd7",
+      "values": "33e16595ddf012956db1cc6b0c13e0ff77d30d107d16fc53b7e9a309fd206a45"
+    },
+    "root_depth.yaml": {
+      "sources": "94fb974fd1b11c89cd47f0ced823367771bdd3b3595116db52b94f05aaa2f69f",
+      "values": "1937a1494de0aded46c81999b40ab73a3bc49261fbe6f5f13fdc44a28483351a"
+    },
+    "senescence.yaml": {
+      "sources": "f00a8d52ecfdd64b7cc10ccb0c105a193230602a94944b704c0e15e3daf28121",
+      "values": "dd5034e4c202e724783a04a7c511ec1e345c2a13851ffbcc24c195c6c2154629"
+    },
+    "stem_reserves.yaml": {
+      "sources": "401cbb75caafeede3fcf5f1d8b1bfc52e5d6e3026cdddd9afc54c480b8d7bb5b",
+      "values": "5804a1134f1ae85f825ef414628d81191fb3b65b8292494a9b5e3268cb6fd0c1"
+    },
+    "transpiration.yaml": {
+      "sources": "c084d3792f97f6f6af6ecd783558098a745722ac88d70a45730eca64969855aa",
+      "values": "274829cd4107263828510f20eef60fbd001d296c207eeb09364a8468b91fb291"
+    },
+    "water_cycle.yaml": {
+      "sources": "efb82446fd2cfa5a8b878048a241eed15d47c45812687e3a2c4e854b52162696",
+      "values": "6a645628cbc0034f14b67c98afb8eb0a2fc3cfad756040df953e77d42db3762f"
+    }
   },
   "reference_doc": "docs/biosphere-reference.md",
   "scenarios": {

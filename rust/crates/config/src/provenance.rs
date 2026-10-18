@@ -40,6 +40,17 @@
 //! [`contains_exotic_line_separator`] makes the difference **unreachable** rather than
 //! merely absent: a param file carrying any of those characters is rejected by a gate, so
 //! the two rules cannot silently disagree.
+//!
+//! # ⚠ Since Step 4a the manifests no longer record this hash for param files
+//!
+//! They record [`param_fingerprints`] — one over the parsed values, one over the `source:`
+//! strings — so a comment edit is no longer an unfreeze. [`normalized_sha256`] still
+//! fingerprints the files that are DATA rather than parameters: the weather fixture and
+//! the goldens.
+
+use crate::canonical_json::Json;
+use crate::errors::ConfigError;
+use crate::yaml::{parse_document, YamlValue};
 
 /// The Unicode/ASCII characters Python's `str.splitlines` treats as line breaks and this
 /// module deliberately does not.
@@ -88,8 +99,9 @@ pub fn normalize_newlines(text: &str) -> String {
     out
 }
 
-/// sha-256 of `text` after [`normalize_newlines`], lowercase hex — the value the frozen
-/// manifests record under `param_files`.
+/// sha-256 of `text` after [`normalize_newlines`], lowercase hex — what the frozen manifests
+/// record for a data file (the weather fixture, each golden). Param files recorded it too
+/// until Step 4a; see [`param_fingerprints`].
 pub fn normalized_sha256(text: &str) -> String {
     hex(&sha256(normalize_newlines(text).as_bytes()))
 }
@@ -103,6 +115,149 @@ pub fn normalized_sha256(text: &str) -> String {
 /// through a rule about newlines to say what it means.
 pub fn sha256_hex(message: &[u8]) -> String {
     hex(&sha256(message))
+}
+
+/// The two fingerprints a frozen param file is recorded by since Step 4a of the 2026-09-29
+/// review plan (`docs/plans/post-roadmap-meaning-fingerprint.md`).
+///
+/// # Why two, and why not the text
+///
+/// Until 4a the manifests recorded [`normalized_sha256`] of each file's text, so a
+/// comment-only edit moved a frozen hash and was an unfreeze. Comments known to be false
+/// were therefore left in place for weeks, waiting for "a real reason" to move that file's
+/// entry. Both fingerprints here are taken over the file **as the loaders parse it**
+/// ([`parse_document`]), so comments, blank lines and line endings enter neither:
+///
+/// * `values` — the whole parsed document, every parameter's `source:` taken out;
+/// * `sources` — those `source:` strings, keyed by parameter, in file order.
+///
+/// A value or unit edit moves `values`; a citation edit moves `sources`; a comment edit
+/// moves nothing. Each is still visible, and separately.
+///
+/// # ⚠ What is deliberately still counted as a change
+///
+/// * **A scalar is its TEXT, not its number.** `1.0e7` and `10000000.0` read the same to
+///   [`crate::params::ParamFile::entry`], and here they differ. Normalising numbers would
+///   need this module to decide which scalars are numbers — a decision the schema makes per
+///   field — and a wrong decision is a missed change. A reformatted number costs a ceremony;
+///   a missed one costs the freeze.
+/// * **Key order counts.** Loaders read by key, so a reorder is very likely inert; it is
+///   still kept, for the same reason.
+/// * **Quoting counts** (the scalar's `quoted` flag): the scenario schema reads a quoted
+///   `"1.0"` as a string and a bare `1.0` as a number.
+///
+/// Only a parameter's own `source:` — `parameters.<name>.source`, a scalar — is a
+/// citation. A parameter that were itself *named* `source` sits one level up and stays in
+/// `values`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParamFingerprints {
+    /// sha-256 over the parsed document with every parameter's `source:` removed.
+    pub values: String,
+    /// sha-256 over the `parameter -> source` pairs, in file order.
+    pub sources: String,
+}
+
+/// The [`ParamFingerprints`] of one param file's text. `context` names the file in errors.
+pub fn param_fingerprints(text: &str, context: &str) -> Result<ParamFingerprints, ConfigError> {
+    // `str::lines` folds `\r\n` but not a lone `\r`; the file rule folds both.
+    let doc = parse_document(&normalize_newlines(text))
+        .map_err(|e| ConfigError::new(format!("{context}: {e}")))?;
+    let top = doc.as_mapping(context)?;
+    let mut sources: Vec<(String, YamlValue)> = Vec::new();
+    let values: Vec<(String, YamlValue)> = top
+        .iter()
+        .map(|(key, value)| match (key.as_str(), value) {
+            ("parameters", YamlValue::Mapping(params)) => {
+                let kept = params
+                    .iter()
+                    .map(|(name, param)| (name.clone(), without_source(name, param, &mut sources)))
+                    .collect();
+                (key.clone(), YamlValue::Mapping(kept))
+            }
+            _ => (key.clone(), value.clone()),
+        })
+        .collect();
+    Ok(ParamFingerprints {
+        values: fingerprint(&YamlValue::Mapping(values)),
+        sources: fingerprint(&YamlValue::Mapping(sources)),
+    })
+}
+
+/// The manifests' `param_files` block: `basename -> {sources, values}`, one entry per file.
+///
+/// # Panics
+///
+/// If a file does not parse. Every file passed here is one the reference already loads, so
+/// a failure is a broken census, and an unwritable manifest beats a silently partial one.
+pub fn param_files_json(files: &[(&str, &str)]) -> Json {
+    Json::obj(files.iter().map(|(name, text)| {
+        let fp = param_fingerprints(text, name)
+            .unwrap_or_else(|e| panic!("frozen param file {name} does not parse: {e}"));
+        (
+            *name,
+            Json::obj([
+                ("sources", Json::s(fp.sources)),
+                ("values", Json::s(fp.values)),
+            ]),
+        )
+    }))
+}
+
+/// `param` with its scalar `source:` moved into `sources` under `name`; anything else as-is.
+fn without_source(
+    name: &str,
+    param: &YamlValue,
+    sources: &mut Vec<(String, YamlValue)>,
+) -> YamlValue {
+    let YamlValue::Mapping(fields) = param else {
+        return param.clone();
+    };
+    let mut kept = Vec::with_capacity(fields.len());
+    for (key, value) in fields {
+        if key == "source" && matches!(value, YamlValue::Scalar { .. }) {
+            sources.push((name.to_string(), value.clone()));
+        } else {
+            kept.push((key.clone(), value.clone()));
+        }
+    }
+    YamlValue::Mapping(kept)
+}
+
+/// sha-256 over an unambiguous encoding of a parsed tree: every node is tagged and every
+/// string length-prefixed, so no two distinct trees encode to the same bytes.
+fn fingerprint(value: &YamlValue) -> String {
+    let mut out = Vec::new();
+    encode(value, &mut out);
+    hex(&sha256(&out))
+}
+
+fn encode(value: &YamlValue, out: &mut Vec<u8>) {
+    match value {
+        YamlValue::Scalar { text, quoted } => {
+            out.push(if *quoted { b'Q' } else { b'S' });
+            encode_str(text, out);
+        }
+        YamlValue::Mapping(entries) => {
+            out.extend_from_slice(format!("M{}{{", entries.len()).as_bytes());
+            for (key, item) in entries {
+                encode_str(key, out);
+                encode(item, out);
+            }
+            out.push(b'}');
+        }
+        YamlValue::Sequence(items) => {
+            out.extend_from_slice(format!("L{}[", items.len()).as_bytes());
+            for item in items {
+                encode(item, out);
+            }
+            out.push(b']');
+        }
+    }
+}
+
+fn encode_str(text: &str, out: &mut Vec<u8>) {
+    out.extend_from_slice(format!("{}:", text.len()).as_bytes());
+    out.extend_from_slice(text.as_bytes());
 }
 
 fn hex(digest: &[u8; 32]) -> String {
@@ -255,5 +410,124 @@ mod tests {
             // digest here and Python's `splitlines`-based one WOULD differ on this input.
             assert!(normalize_newlines(&text).contains(c));
         }
+    }
+
+    // --- Step 4a: the meaning fingerprints -------------------------------------------------
+
+    const BASE: &str = "\
+# a header comment
+name: wheat
+process: canopy
+
+parameters:
+  k:
+    value: 0.60
+    unit: dimensionless
+    source: \"Monsi & Saeki 1953\"
+  table:
+    source: \"TODO(cite)\"
+    rows:
+      - dvs: 0.0
+        fl: 0.55
+      - dvs: 1.0
+        fl: 0.30
+";
+
+    fn fp(text: &str) -> ParamFingerprints {
+        param_fingerprints(text, "test").expect("the fixture parses")
+    }
+
+    #[test]
+    fn a_comment_or_layout_edit_moves_neither_fingerprint() {
+        let base = fp(BASE);
+        let commented = BASE
+            .replace(
+                "# a header comment",
+                "# a header comment, REWRITTEN\n# and a second line",
+            )
+            .replace(
+                "unit: dimensionless",
+                "unit: dimensionless   # a trailing comment",
+            )
+            .replace("\nparameters:", "\n\n\nparameters:");
+        assert_ne!(normalized_sha256(&commented), normalized_sha256(BASE));
+        assert_eq!(fp(&commented), base);
+        // Line endings, both spellings.
+        assert_eq!(fp(&BASE.replace('\n', "\r\n")), base);
+        assert_eq!(fp(&BASE.replace('\n', "\r")), base);
+    }
+
+    #[test]
+    fn a_source_edit_moves_only_the_sources_fingerprint() {
+        let base = fp(BASE);
+        for edited in [
+            BASE.replace("Monsi & Saeki 1953", "Monsi & Saeki 1953, p. 22"),
+            // A table's own `source:` is a citation too.
+            BASE.replace("TODO(cite)", "Penning de Vries 1989"),
+        ] {
+            let moved = fp(&edited);
+            assert_eq!(
+                moved.values, base.values,
+                "a citation edit moved the values"
+            );
+            assert_ne!(moved.sources, base.sources, "a citation edit went unseen");
+        }
+    }
+
+    #[test]
+    fn a_value_or_unit_edit_moves_only_the_values_fingerprint() {
+        let base = fp(BASE);
+        for edited in [
+            BASE.replace("value: 0.60", "value: 0.61"),
+            BASE.replace("unit: dimensionless", "unit: 1/day"),
+            BASE.replace("fl: 0.30", "fl: 0.31"),
+            BASE.replace("name: wheat", "name: rice"),
+            // ⚠ Deliberately a change: a scalar is its TEXT (see the type's docs).
+            BASE.replace("value: 0.60", "value: 0.6"),
+            // Quoting changes what the scenario schema reads.
+            BASE.replace("value: 0.60", "value: \"0.60\""),
+            // Key order is kept.
+            BASE.replace(
+                "    value: 0.60\n    unit: dimensionless\n",
+                "    unit: dimensionless\n    value: 0.60\n",
+            ),
+        ] {
+            assert_ne!(edited, BASE, "the edit did not apply");
+            let moved = fp(&edited);
+            assert_ne!(
+                moved.values, base.values,
+                "a value edit went unseen:\n{edited}"
+            );
+            assert_eq!(
+                moved.sources, base.sources,
+                "a value edit moved the sources"
+            );
+        }
+    }
+
+    #[test]
+    fn a_parameter_named_source_is_a_value_not_a_citation() {
+        let text = "name: x\nprocess: y\nparameters:\n  source:\n    value: 1.0\n    unit: W\n    source: \"cite\"\n";
+        let base = fp(text);
+        let moved = fp(&text.replace("value: 1.0", "value: 2.0"));
+        assert_ne!(moved.values, base.values);
+        assert_eq!(moved.sources, base.sources);
+        // And a bare scalar parameter called `source` is not pulled out as a citation.
+        let bare = "name: x\nprocess: y\nparameters:\n  source: 1.0\n";
+        let bare_moved = fp(&bare.replace("1.0", "2.0"));
+        assert_ne!(bare_moved.values, fp(bare).values);
+        assert_eq!(bare_moved.sources, fp(bare).sources);
+    }
+
+    #[test]
+    fn moving_text_between_the_two_halves_is_seen() {
+        // The encoding is length-prefixed and tagged: the same characters split differently
+        // across key and value must not collide.
+        let a = fp("name: ab\nprocess: c\n");
+        let b = fp("name: a\nprocess: bc\n");
+        assert_ne!(a.values, b.values);
+        let seq = fp("name: x\nprocess: y\nparameters:\n  t:\n    - 1\n    - 2\n");
+        let one = fp("name: x\nprocess: y\nparameters:\n  t:\n    - 12\n");
+        assert_ne!(seq.values, one.values);
     }
 }

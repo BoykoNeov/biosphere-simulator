@@ -170,7 +170,15 @@ pyyaml as a **string** and coerced to a float by the schema; only `1.0e+7` resol
 number. Both load identically on both ports — the boundary parses the scalar's text — so
 this is recorded as a hazard to recognise, not a rule to obey.
 
-## ⚠ A param file's LINE ENDINGS are contract-relevant (since 2026-08-17)
+## ⚠ A param file's LINE ENDINGS were contract-relevant (2026-08-17 → 2026-10-18)
+
+> ⚠ **Since Step 4a (2026-10-18) this section is history for the param files.** The manifests
+> now record two sha-256s per file over its **parsed** content (`config::provenance::param_fingerprints`):
+> `values` (everything but the `source:` strings) and `sources` (those strings). Line endings,
+> comments, blank lines and indentation enter neither. What still counts: a value, unit or name
+> edit (`values`), a citation edit (`sources`), a number's **spelling** (`0.60` → `0.6`), key
+> order and quoting. Keep files LF anyway. The text below is kept as the record of why the
+> old text hash needed it.
 
 **Both manifests record a `param_files` sha-256 per file, and since reference-flip slice C8
 the reference produces it** (`rust/crates/config/src/provenance.rs`). The digest is taken
@@ -220,11 +228,14 @@ sweep here is a 191-file diff that reaches into `src/` and the purity invariant.
    the divergence **unreachable**: `config::provenance::EXOTIC_LINE_SEPARATORS` enumerates
    them and a test asserts no frozen param file contains one.
 
-⚠ A digest change with no value change is still an **unfreeze** — and it is the one nothing
+⚠ ~~A digest change with no value change is still an **unfreeze** — and it is the one nothing
 catches, because the recorded `param_files` hashes are never compared to enforce a value (the
 goldens do that). So a whitespace-only or line-ending-only edit needs the honour-system
 ceremony from `CLAUDE.md`: advisor review → regenerate the manifest as the git-visible record
-→ an entry in the reference doc's unfreeze log.
+→ an entry in the reference doc's unfreeze log.~~ **Superseded by Step 4a (2026-10-18):** a
+comment, whitespace or line-ending edit moves no fingerprint and is an ordinary commit. A
+`source:` edit moves `sources` and is still a provenance-only unfreeze, and the manifest goes red
+until it is regenerated.
 
 ## Param-file header template
 
@@ -269,11 +280,12 @@ they feed a deferred per-leg `Flow` dimensional check.
 - [ ] Header present with a `Sources:` block and the clean-room notice.
 - [ ] **Inside the closed YAML subset** — block-style tables, no flow style / anchors /
       tags / block scalars. The Rust reference rejects them; see the section above.
-- [ ] **LF line endings, and no exotic line-break character.** The file's recorded
-      `param_files` sha-256 is taken over newline-normalized text; the two ports' rules are
-      only equal on that alphabet. See "line endings are contract-relevant" above.
-- [ ] **A whitespace-only edit is still an unfreeze.** It moves a recorded hash and reddens
-      nothing — run the honour-system ceremony rather than committing it as a tidy-up.
+- [ ] **LF line endings, and no exotic line-break character.** No longer a fingerprint matter
+      (Step 4a), still the house style.
+- [ ] **A comment-only edit is free; a `source:` or value edit is not.** Since Step 4a the
+      manifests fingerprint the parsed file, so comments and layout move nothing. A citation
+      edit moves `sources`, a value edit `values` — and the manifest gate is red until the
+      ceremony regenerates it.
 - [ ] **Every** value has a `source:` tag resolving to a `Sources:` entry — **or** a
       `DESIGN` tag carrying its rationale (see "Two provenance classes").
 - [ ] **Every cited locus was actually opened.** No page/table/figure reference is

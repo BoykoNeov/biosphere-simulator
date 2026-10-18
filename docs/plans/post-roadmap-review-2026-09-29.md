@@ -316,6 +316,11 @@ builds; 3c as a design note first, decided again once the note exists.
 
 ## Step 4 — cheaper change
 
+**TAKEN AND BUILT 2026-10-18** on the user's *"1 and 2"*: `post-roadmap-meaning-fingerprint.md`. 4a
+BUILT as designed below (two fingerprints per param file over the parsed file; a comment edit is now
+free). 4b decided as option 1 on the user's standing "Linux is not a goal". The text below is left as
+written.
+
 ### The problem
 
 - A comment-only edit in a parameter file changes its fingerprint in the manifest, which makes

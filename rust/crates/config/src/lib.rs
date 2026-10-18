@@ -53,5 +53,8 @@ pub use params::{
     require_closed, require_half_open, require_non_negative, require_positive, with_override,
     Entry, ParamFile,
 };
-pub use provenance::{normalize_newlines, normalized_sha256, sha256_hex};
+pub use provenance::{
+    normalize_newlines, normalized_sha256, param_files_json, param_fingerprints, sha256_hex,
+    ParamFingerprints,
+};
 pub use yaml::{parse_document, YamlValue};

@@ -518,7 +518,9 @@ since option (B), the N return loop too: its legs carry no rate of their own);
 `water_cycle` (Phase-3 water closure); `herbivory` (Phase-3 consumer). Each is clean-room from primary literature
 ([`docs/param-file-conventions.md`](param-file-conventions.md),
 [`docs/reuse-and-licenses.md`](reuse-and-licenses.md)) — **never** the unlicensed WOFOST YAML
-or PCSE source. The manifest records a newline-normalized sha-256 of each as **provenance**.
+or PCSE source. The manifest records two fingerprints of each as **provenance** — one over its
+parsed values, one over its `source:` strings (since Step 4a, 2026-10-18; a newline-normalized
+text sha-256 before it), so a comment edit moves neither.
 
 > **Documented finding (carried, not hidden) — UPDATED by scope (B) increment 1
 > (2026-07-20).** This note read *"phenology lacks vernalization, so the trajectory runs
@@ -766,7 +768,7 @@ the checker's, per key, is in the table below — read it rather than a summary 
 | `long_horizon_years`, `scenarios.*.years` | **Rust** | the reference tree's horizon constants |
 | `scenarios.*.golden_sha256` | **Rust** (all 7 since 2026-09-06) | the golden is the reference's own output |
 | `scenarios.drift_summary.golden_sha256` | **Rust** | ⚠ the last row that dissented, and it dissented for two slices after the flip. It read *"one run, two authors: `drift.py`'s fold of the same 15-yr trajectory whose final state Rust authors"* — true until S6 deleted the Python engine, after which the artifact's stated reference did not exist and nothing could regenerate the file. `domains::goldens::drift_summary` folds it now; the 4 values the ports disagreed on are the reference's own bytes |
-| `param_files` | **Rust** (since slice C8) | ⚠ the *rules* re-anchored, not the digits: the census is now the set the reference LOADS (a compile-time `include_str!` list) and the digest is `config::provenance`. The 15 values are **author-neutral** — both sides hash the same file the same way — so the ceremony moved none of them |
+| `param_files` | **Rust** (since slice C8) | ⚠ the *rules* re-anchored, not the digits: the census is now the set the reference LOADS (a compile-time `include_str!` list) and the digest is `config::provenance`. The 15 values are **author-neutral** — both sides hash the same file the same way — so the ceremony moved none of them. ⚠ **Since Step 4a (2026-10-18) each entry is `{sources, values}`** — two sha-256s over the file as the loaders parse it, so comments and layout enter neither |
 | `forcing.weather_fixture` / `weather_sha256` | **Python** | ⚠ the reason changed in slice C9 (2026-08-17) and the old one is now false: the port no longer reads a file *generated from* this fixture — it reads **this fixture**, with a compile-time `include_str!`. It stays Python's because `include_str!` takes a literal, so the reference knows the fixture's **bytes and not its name**; a Rust-authored filename would be a hand-typed duplicate of the include path, a literal dressed as a derivation. The *bytes* half is now cross-checked anyway — see the `weather_sha256` note below |
 | `science_bands`, `liveness_floors` | **Rust** (since slice C4) | ⚠ the *claims* re-anchored, not the values: all 13 `quantity`/`bound`/`source` strings are byte-identical to the Python census's and every verdict was measured identical on both ports first — only the 13 `locus` strings moved. The **key set** is still this manifest's own hand roster (which scenarios get an entry, and which get an explicitly empty list meaning "measured, none"), and a Rust gate naming a scenario outside it **raises** during regeneration rather than being filtered away. ⚠ Two markers did not move here because they are *station* keys: `crew_mission` and `sealed_station` moved in **slice C4b** (2026-08-18) into `rust/crates/station/src/science_gates.rs`, a second table using this same macro — "the reference does not carry their referents" was the reason given and it was already false, `predicted_equilibrium_temperature` and the folds existed |
 | `integrator`, `dt_days` | **hand** | the two deliberate anti-derived literals (below) |
@@ -803,8 +805,9 @@ gate and is none. It stays enforced by the goldens.
   the integrator/dt, or the weather fixture already moves a committed golden and fails its
   byte-compare. The manifest does **not** re-assert that (it would be redundant, and a raw
   byte hash of hand-edited YAML is not reproducible under `autocrlf`). The manifest's hashes
-  are **provenance only** — a re-derivable, newline-normalized record of *which content* was
-  frozen, regenerated on a deliberate unfreeze.
+  are **provenance only** — a re-derivable record of *which content* was frozen, regenerated
+  on a deliberate unfreeze. Since Step 4a a param file's record is two fingerprints over its
+  *parsed* content (`values`, `sources`), so a comment edit is not an unfreeze.
 - **The manifest gate owns *completeness*** — the one thing the goldens are blind to: a param
   file, flow class, or aux process added to the tree but wired into no golden. The gate asserts
   the frozen *sets* (param files, flow classes, aux classes) against the live tree and the
@@ -940,6 +943,20 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-18 — `param_files` FINGERPRINTS WHAT A FILE MEANS, not its text (Step 4a of the
+  2026-09-29 review plan; `docs/plans/post-roadmap-meaning-fingerprint.md`). A re-anchoring
+  ceremony on this manifest and the station's; no value, golden, set, claim or census moved.**
+  Each of the 15 entries is now `{sources, values}`: two sha-256s over the file as the loaders
+  parse it (`config::provenance::param_fingerprints`) — `values` with every parameter's `source:`
+  removed, `sources` those strings alone. A comment or layout edit moves neither (so it is no
+  longer an unfreeze), a citation edit moves only `sources`, a value or unit edit only `values`.
+  A scalar still counts by its **text** (`0.60` → `0.6` is a change), and key order and quoting
+  count — each a safe-side miss, chosen over a fingerprint that decides which strings are numbers.
+  Measured: the regenerated manifest differs from the old in `param_files` and its `_authority`
+  row only. Controls kept as tests: `config::provenance` (fixture) and
+  `station/tests/param_fingerprints.rs` (all 25 real files: stripping every comment moves
+  nothing; a citation edit moves only `sources`; a value edit only `values`), each shown red by a
+  mutation that stops extracting `source:`.
 - **2026-10-17 — THE OPEN FIELD HAS A NIGHT: the loader adopts the sun's path for the weather's net
   radiation (`WeatherRadiation::SunPath`, step 1) and the air's within-day cycle for every water read
   (`WeatherAir::WithinDay`, `AirTemperatureRead::WithinDay`, step 2; Teh 2006 §2.7's curve through the

@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `open-field-night.md`
+**Re-read against the record's last row:** `meaning-fingerprint.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -330,8 +330,10 @@ against the branch that does not bind.
   `canopy.yaml`'s three stale sentences came out on 2026-09-06.~~ **DONE 2026-10-06 in
   `e9a70da`** (the leaf-shedding unfreeze moved that file's entry for a real reason; the note
   is annotated STALE in place, and the loss is now LIVE at the frozen params).
-* **`self_discharge.yaml`'s pointer is stale**, on the same terms and still waiting for the
-  same kind of occasion.
+* ~~**`self_discharge.yaml`'s pointer is stale**, on the same terms and still waiting for the
+  same kind of occasion.~~ **DONE 2026-10-18** (`log/meaning-fingerprint.md`): the occasion stopped
+  being needed — since Step 4a a comment edit moves no manifest fingerprint — and the three pointers
+  to deleted Python files were corrected with both manifests byte-identical.
 * **`rust/data/tiers.json`'s `drift_summary` evidence string** (`max_rel_dev 0.0`, dated P7.4,
   measured 9.955e-16) is the **native-port** contract with its own ceremony, ruled out of
   scope when the drift work was planned. Still out of scope; listed so it is not lost.
@@ -346,7 +348,8 @@ against the branch that does not bind.
   because the fix belongs with the slice-4 authoring decision above — but note the shape, which
   is new: the *unvalidated* half of the tree can be silently broken by a frozen-side change, and
   the freeze ceremony does not look there.
-* **The eleven transcendental goldens can only be regenerated on Windows/UCRT.** An unfreeze
+* **The eleven transcendental goldens can only be regenerated on Windows/UCRT** (*decided
+  2026-10-18 as "live with it"*, review Step 4b, on the user's "Linux is not a goal"). An unfreeze
   that moves one of them from a Linux box has no regeneration step there. Record it in the
   ceremony; do not `--write` around it.
 * **CI's Rust toolchain is unpinned** (`dtolnay/rust-toolchain@stable`), found 2026-10-04
@@ -594,6 +597,12 @@ above ("the biosphere jars read the outdoor daily mean"): under the lab form the
 the battery note is the sealed station's, a lamp-lit build whose golden is byte-identical under the flip, so the
 battery reading still stands. The open-field "light-limited branch" note is untouched: carbon is bit-identical.
 Nothing in §3 is re-proposed.
+
+⚠ *Re-read 2026-10-18* (`log/meaning-fingerprint.md`, Step 4 of the 2026-09-29 review BUILT): grepped this
+plan for comment edit, provenance-only, hash, transcendental and Windows. Two §3 items change: the stale
+`self_discharge.yaml` pointer is struck (a comment edit is no longer an unfreeze, so it was simply fixed),
+and the Windows-only regeneration item is marked decided. The "provenance-only unfreeze" note (§2) still
+holds — a `source:` edit still moves a fingerprint. Nothing in §3 is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

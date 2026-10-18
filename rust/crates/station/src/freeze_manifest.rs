@@ -37,7 +37,9 @@
 //!   key that does not exist, and adding one widens the frozen surface. That is its own
 //!   unfreeze with its own ceremony, not a rider on this one. Recorded in the manifest's
 //!   `_authority` entry for `numerics_note`.
-//! * `param_files` — the frozen param-file census, `filename -> newline-normalized sha-256`,
+//! * `param_files` — the frozen param-file census, `filename -> {sources, values}` (two sha-256s
+//!   over the parsed file since Step 4a — [`config::provenance::param_fingerprints`]; a
+//!   newline-normalized text sha-256 before it),
 //!   over the **ten** files this contract spans: five from `domains::params` (power × 2,
 //!   thermal, eclss, crew) and five from `station::params` (`chamber.yaml` added 2026-10-05,
 //!   Step 3c slice 2b-i; `cold_period.yaml` the same day, slice 3a). **New in slice C8**, which reverses what this file said for two
@@ -97,7 +99,7 @@ pub fn manifest_text() -> String {
     dumps(&manifest())
 }
 use config::canonical_json::{dumps, Json};
-use config::provenance::normalized_sha256;
+use config::provenance::{normalized_sha256, param_files_json, param_fingerprints};
 use domains::biosphere::science_gates::{ScienceGate, LIVENESS_FLOORS, SCIENCE_BANDS};
 use domains::crew::{build_crew, MISSION_SCENARIO};
 use domains::eclss::{build_eclss, STEADY_STATE_SCENARIO};
@@ -305,7 +307,7 @@ const AUTHORITY: [(&str, &str, &str); 16] = [
     (
         "param_files/*",
         "rust",
-        "⚠ RE-ANCHORED IN SLICE C8, the same finding as the biosphere's: what moved is the RULE, not the number. All 8 digests here (and all 15 there) are author-neutral — both sides hash the same file the same way — so the re-anchoring moved none of them. The CENSUS is now the set the reference LOADS: domains::params::param_files (power × 2, thermal, eclss, crew) plus station::params::param_files (water_recovery, lamp, harvest), eight compile-time include_str! entries instead of a glob over six Python package directories. ⚠ NO exclusion rule on this side, unlike the biosphere's 15-of-20 — these six directories hold nothing but frozen files, and the asymmetry is stated per side so nobody generalises the harder rule. The NORMALIZATION is config::provenance (hand-rolled sha-256 over LF-normalized text; every engine crate is zero-dep by charter). ⚠ Newly asserted with the re-anchor: every basename is unique across the six directories — this key is basename-KEYED, so a collision would silently collapse two files into one entry, and nothing had checked it. Prerequisite: slice C1.",
+        "⚠ STEP 4a (2026-10-18, docs/plans/post-roadmap-meaning-fingerprint.md) CHANGED THE SHAPE, NOT THE CENSUS: each file is now {sources, values}, two sha-256s over the file AS THE LOADERS PARSE IT (config::provenance::param_fingerprints) — values is the parsed document with every parameter's source: removed, sources is those strings alone. A comment edit moves neither, a citation edit moves only sources, a value or unit edit only values; a scalar counts by its TEXT, so a reformatted number is still a change. The C8 record below is kept as written: its 'digest' is now the text hash those two replaced. ⚠ RE-ANCHORED IN SLICE C8, the same finding as the biosphere's: what moved is the RULE, not the number. All 8 digests here (and all 15 there) are author-neutral — both sides hash the same file the same way — so the re-anchoring moved none of them. The CENSUS is now the set the reference LOADS: domains::params::param_files (power × 2, thermal, eclss, crew) plus station::params::param_files (water_recovery, lamp, harvest), eight compile-time include_str! entries instead of a glob over six Python package directories. ⚠ NO exclusion rule on this side, unlike the biosphere's 15-of-20 — these six directories hold nothing but frozen files, and the asymmetry is stated per side so nobody generalises the harder rule. The NORMALIZATION is config::provenance (hand-rolled sha-256 over LF-normalized text; every engine crate is zero-dep by charter). ⚠ Newly asserted with the re-anchor: every basename is unique across the six directories — this key is basename-KEYED, so a collision would silently collapse two files into one entry, and nothing had checked it. Prerequisite: slice C1.",
     ),
     (
         "reference_doc",
@@ -492,7 +494,11 @@ pub fn dump() {
     println!("  \"param_files\": {{");
     for (i, (name, text)) in files.iter().enumerate() {
         let comma = if i + 1 == files.len() { "" } else { "," };
-        println!("    \"{name}\": \"{}\"{comma}", normalized_sha256(text));
+        let fp = param_fingerprints(text, name).expect("a frozen param file parses");
+        println!(
+            "    \"{name}\": {{\"sources\": \"{}\", \"values\": \"{}\"}}{comma}",
+            fp.sources, fp.values
+        );
     }
     println!("  }},");
     println!("  \"science_bands\": {}", census(SCIENCE_BANDS));
@@ -666,14 +672,7 @@ pub fn manifest() -> Json {
         // ⚠⚠ TEXT, and read the writer header before touching it. This crate owns all
         // three steps this sentence names, and splicing two of them is byte-invisible.
         ("numerics_note", Json::s(NUMERICS_NOTE)),
-        (
-            "param_files",
-            Json::obj(
-                files
-                    .iter()
-                    .map(|(name, text)| (*name, Json::s(normalized_sha256(text)))),
-            ),
-        ),
+        ("param_files", param_files_json(&files)),
         ("reference_doc", Json::s("docs/station-reference.md")),
         ("scenarios", scenarios),
         ("science_bands", census_json(SCIENCE_BANDS)),

@@ -37,9 +37,9 @@ each doc spells out the ceremony. The three manifests have a paired gate
 `science_gates.rs`) that owns **completeness** (something added but exercised by nothing);
 the goldens own **values**.
 
-**A provenance-only edit is an unfreeze, and since C7 it FORCES a regeneration.** The
-per-file sha-256 is still never compared as a *value*, so editing a param's `source:`
-asserts nothing new — but the reference now writes each manifest from the files it compiles
+**A provenance-only edit is an unfreeze, and since C7 it FORCES a regeneration.** Each
+param file's two fingerprints (`values`, `sources` — over the *parsed* file since Step 4a, so a
+comment edit is free) are never compared as a *value*, so editing a `source:` asserts nothing new — but the reference now writes each manifest from the files it compiles
 in, and each crate's `tests/manifest_writer.rs` compares the committed file byte for byte.
 So a `source:`-only edit leaves the manifest **stale and red** until it is regenerated.
 ⚠ This paragraph said *"NOTHING CATCHES"* until 2026-08-18; C7 falsified it and nothing was
