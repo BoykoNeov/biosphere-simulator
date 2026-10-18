@@ -39,3 +39,10 @@ default. The station passes its 9500 mol; the authoring side a named, temporary 
 Predicted and measured bit-neutral: 0 of 20 goldens move, the station manifest's `eclss.yaml` entry
 is the whole manifest diff. Found: `humidity_setpoint` hides the same 9500 mol (recorded, not changed —
 outside the user's answer); two fixtures still start at the long-gone 10.0.
+
+**SLICE 2 BUILT 2026-10-18 — an authored O₂ regulator declares its cabin's air.** `cabin_air_mol`,
+required on `eclss.o2_makeup`, refused elsewhere, no default; the direction gate reads the same
+per-flow setpoint. The temporary 9500 is deleted. An authoring unfreeze: the manifest gained the field
+and each flow type's `needs_cabin_air`, as predicted. Declaring it exposed two more fixtures the
+2026-09-06 move had broken in meaning (`eclss_multirate_cabin`, `eclss_thermal_habitat`, designed
+around a 10-mol target): they declare 47.61904761904762 mol, for which 0.21 × air is exactly 10.0.

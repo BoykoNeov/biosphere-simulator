@@ -72,10 +72,11 @@ flows:
     params: thermal
 
   # `eclss` — the four-param set. Anchors: co2_scrub_rate, condense_rate, o2_makeup_gain,
-  # o2_setpoint. The sum is dominated by o2_setpoint (10.0 mol).
+  # o2_fraction (0.21; `o2_setpoint` in mol until 2026-10-18, when the target became a
+  # fraction of each cabin's air and a kinetics rate, which has no cabin, lost it).
   - id: dsl.eclss_set
     kinetics:
-      rate: '(param("co2_scrub_rate") + param("condense_rate") + param("o2_makeup_gain") + param("o2_setpoint")) * 1.0e-12 * stock("power.battery")'
+      rate: '(param("co2_scrub_rate") + param("condense_rate") + param("o2_makeup_gain") + param("o2_fraction")) * 1.0e-12 * stock("power.battery")'
       stoichiometry:
         power.battery: -1
         boundary.waste_heat: 1

@@ -157,6 +157,8 @@ flows:
       o2_supply: boundary.o2_supply
       cabin_o2: eclss.cabin_o2
     params: eclss
+    # The cabin's air (mol): the station's. The regulator aims at 0.21 x 9500 = 1995.0 (2026-10-18).
+    cabin_air_mol: 9500.0
 
 forcings:
   # The forced constant crew metabolic rates (EclssScenario). Keys are the frozen

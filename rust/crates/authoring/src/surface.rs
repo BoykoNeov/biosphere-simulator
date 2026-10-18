@@ -204,6 +204,8 @@ pub struct FlowTypeSurface {
     pub rate_params: Vec<&'static str>,
     /// `(regulated wiring field, setpoint param)` if the type is demand-controlled.
     pub demand_controlled: Option<(&'static str, &'static str)>,
+    /// Whether an authored flow of this type must declare `cabin_air_mol` (2026-10-18).
+    pub needs_cabin_air: bool,
 }
 
 /// The author-selectable frozen-flow surface — the manifest's `flow_types`.
@@ -228,7 +230,9 @@ pub fn flow_types() -> BTreeMap<&'static str, FlowTypeSurface> {
             .iter()
             .map(|f| ((*f).to_string(), (*f).to_string()))
             .collect();
-        let flow = build_frozen_flow(name, "surface.probe", 0, &wiring).unwrap_or_else(|e| {
+        // A probe air for the one type that requires it; only construction happens here.
+        let air = spec.needs_cabin_air.then_some(1.0);
+        let flow = build_frozen_flow(name, "surface.probe", 0, &wiring, air).unwrap_or_else(|e| {
             panic!("flow_type() resolves {name:?} but build_frozen_flow() refuses it: {e}")
         });
         let mut wiring_fields: Vec<&'static str> = spec.wiring_fields.to_vec();
@@ -243,6 +247,7 @@ pub fn flow_types() -> BTreeMap<&'static str, FlowTypeSurface> {
                 param_set: spec.param_set,
                 rate_params,
                 demand_controlled: spec.demand_controlled,
+                needs_cabin_air: spec.needs_cabin_air,
             },
         );
     }

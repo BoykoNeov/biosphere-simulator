@@ -198,7 +198,7 @@ key is a schema error, not a silent drop. The manifest freezes each model's fiel
 | `BundleSpec` | a reusable domain/species bundle: `parameters`/`stocks`/`flows`/`forcings` — **no run config, no nested `includes`** (both rejected by `extra="forbid"`) |
 | `IncludeSpec` | the `{bundle, prefix}` namespaced include form |
 | `StockSpec` | one stock: id/domain/quantity/kind/amount + optional `composition`/`unclamped`/`extinction_threshold` |
-| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params`/`rate_class` |
+| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params`/`rate_class`, + `cabin_air_mol` (required on `eclss.o2_makeup`, refused elsewhere; 2026-10-18) |
 | `KineticsSpec` | `rate` (the grammar above) × `stoichiometry` |
 | `ForcingSpec` | `const` — **constant forcings only** |
 | `ParamPackRef` | `{pack: …}` — an alternate param file read by the *same* frozen loader |
@@ -524,6 +524,13 @@ would run it at the master cadence the author chose *because* it is unsafe un-su
 The alternative to refusing was never honouring it; it was a silent cross-port divergence.
 
 ### `eclss.o2_makeup` — the hazard rationing cannot see (post-roadmap, measured)
+
+> ⚠ **Since 2026-10-18 the setpoint is the author's, not a frozen 10.0 or 1995.0 mol.** Every
+> `eclss.o2_makeup` must declare `cabin_air_mol` — its cabin's air at reference pressure — and
+> aims at `eclss.yaml`'s `o2_fraction` (0.21) of it; the direction gate judges the cabin against
+> that same per-flow setpoint. The text below was written against a fixed setpoint and is kept
+> as the record; its mechanism (a linear, unclamped controller that reverses above its target)
+> is unchanged.
 
 The same scoping bites `eclss.o2_makeup`, and **not mildly**. This section used to call it
 mild; measuring it (`tests/test_authoring_export_fidelity.py`) showed otherwise, and the
@@ -1042,6 +1049,20 @@ vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — an authored O₂ regulator declares its cabin's air (slice 2 of
+  `docs/plans/post-roadmap-authored-plants.md`, the user's "a share of the author's own cabin
+  air").** `FlowSpec` gains `cabin_air_mol` (a number or a template expression), **required** on
+  `eclss.o2_makeup` and refused on every other flow, kinetics included; no default. The flow aims
+  at `o2_fraction · cabin_air_mol` and the direction gate reads the same value
+  (`flow_registry::demand_setpoint`), where it used to read the station's frozen 1995 mol for
+  every cabin. Each `flow_types` entry gains `needs_cabin_air` (true for `eclss.o2_makeup` alone).
+  The `eclss` kinetics param set carries `o2_fraction` in place of `o2_setpoint` (a kinetics rate
+  has no cabin). **Manifest diff, predicted and measured: `schema_fields.FlowSpec` +`cabin_air_mol`,
+  every `flow_types` entry +`needs_cabin_air`; nothing else.** Files: `eclss_cabin.yaml` and
+  `scenarios/bioregenerative_station.yaml` declare 9500; `eclss_multirate_cabin.yaml` and
+  `eclss_thermal_habitat.yaml` declare 47.61904761904762, which puts their target at exactly 10.0 —
+  the design their own text describes, judged against 1995 from 2026-09-06 until now;
+  `param_sets_dsl.yaml` reads `o2_fraction`.
 - **2026-10-03 — the condenser holds a humidity setpoint (delegated from the station
   unfreeze of the same day; `docs/station-reference.md` is the record).** `eclss.yaml` gained
   `humidity_setpoint` (BVAD Table 4-1's nominal 40 % RH, derived to 1.7863 kg) and the

@@ -1050,3 +1050,94 @@ fn the_multirate_eclss_anchor_runs_its_condenser() {
         "the slow-declared condenser's offset moved: {excess:e}"
     );
 }
+
+// ---------------------------------------------------------------------------------
+// The cabin's air, declared (2026-10-18, slice 2 of docs/plans/post-roadmap-authored-plants.md).
+//
+// `eclss.o2_makeup` aims at `eclss.yaml`'s `o2_fraction` of the air the author declares —
+// required, no default. Until this, every authored regulator aimed at the station's 1995 mol,
+// and the direction gate judged every cabin against it.
+// ---------------------------------------------------------------------------------
+
+/// The anchor with its declared air replaced (or removed, for `None`).
+fn eclss_anchor_with_air(air: Option<&str>) -> String {
+    let text = eclss_anchor_yaml_at("60.0", "4");
+    let from = "    cabin_air_mol: 9500.0\n";
+    assert!(
+        text.contains(from),
+        "the anchor's cabin_air_mol line moved — this helper is silently a no-op now"
+    );
+    match air {
+        Some(a) => text.replace(from, &format!("    cabin_air_mol: {a}\n")),
+        None => text.replace(from, ""),
+    }
+}
+
+fn refused(yaml: &str) -> authoring::AuthoringError {
+    match interpret_str(yaml) {
+        Ok(_) => panic!("this file must be refused at build"),
+        Err(e) => e,
+    }
+}
+
+#[test]
+fn a_regulator_without_its_cabin_air_is_refused() {
+    let err = refused(&eclss_anchor_with_air(None));
+    assert!(err.message.contains("cabin_air_mol"), "{}", err.message);
+    for bad in ["0.0", "-5.0"] {
+        let err = refused(&eclss_anchor_with_air(Some(bad)));
+        assert!(err.message.contains("cabin_air_mol must be"), "{}", err.message);
+    }
+}
+
+#[test]
+fn cabin_air_on_any_other_flow_is_refused() {
+    // On a frozen type that does not regulate a cabin.
+    let text = eclss_anchor_yaml_at("60.0", "4");
+    let scrubber = "    type: eclss.co2_scrubber\n";
+    assert!(text.contains(scrubber), "the anchor's scrubber moved");
+    let err = refused(&text.replacen(
+        scrubber,
+        &format!("{scrubber}    cabin_air_mol: 9500.0\n"),
+        1,
+    ));
+    assert!(err.message.contains("takes no 'cabin_air_mol'"), "{}", err.message);
+    // On an authored kinetics flow.
+    let yaml = self_discharge_inline("euler").replacen(
+        "    kinetics:\n",
+        "    cabin_air_mol: 9500.0\n    kinetics:\n",
+        1,
+    );
+    assert!(yaml.contains("cabin_air_mol"), "the inline fixture moved");
+    let err = refused(&yaml);
+    assert!(err.message.contains("'kinetics' flow"), "{}", err.message);
+}
+
+#[test]
+fn the_direction_gate_judges_a_cabin_against_its_own_air() {
+    // A 100-mol cabin: its target is 0.21 x 100 = 21 mol. The anchor's cabin starts at
+    // 1995 mol, far ABOVE that, so the flow reverses at once — and the gate must say so,
+    // with this cabin's setpoint, not the station's 1995.
+    let built = interpret_str(&eclss_anchor_with_air(Some("100.0"))).expect("builds");
+    let result = run_scenario_allowing_rationing(built).expect("study path returns");
+    let reversal = result
+        .first_reversal
+        .expect("a 1995-mol cabin with a 21-mol target reverses");
+    assert_eq!(reversal.step, 0);
+    assert_eq!(reversal.setpoint, 0.21 * 100.0);
+    // And the station's air leaves the anchor exactly where it was: AT its setpoint.
+    let built = interpret_str(&eclss_anchor_with_air(Some("9500.0"))).expect("builds");
+    assert!(run_scenario(built).is_ok());
+}
+
+#[test]
+fn the_cabin_air_may_be_a_template_expression() {
+    let text = eclss_anchor_with_air(Some("\"param('cabin_mol') * 1.0\""));
+    let yaml = if text.contains("\nparameters:\n") {
+        text.replacen("\nparameters:\n", "\nparameters:\n  cabin_mol: 9500.0\n", 1)
+    } else {
+        text.replacen("\nstocks:\n", "\nparameters:\n  cabin_mol: 9500.0\nstocks:\n", 1)
+    };
+    let built = interpret_str(&yaml).expect("a parameter-driven cabin air builds");
+    assert!(run_scenario(built).is_ok());
+}

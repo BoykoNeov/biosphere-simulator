@@ -180,6 +180,7 @@ fn reference_keys() -> Vec<(&'static str, Json)> {
                                 None => Json::Null,
                             },
                         ),
+                        ("needs_cabin_air", Json::Bool(spec.needs_cabin_air)),
                         (
                             "param_set",
                             match spec.param_set {

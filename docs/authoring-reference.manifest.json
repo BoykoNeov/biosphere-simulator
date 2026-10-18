@@ -82,6 +82,7 @@
     "crew.food_metabolism": {
       "cls": "FoodMetabolism",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": "crew",
       "rate_params": [],
       "wiring_fields": [
@@ -93,6 +94,7 @@
     "crew.oxygen_consumption": {
       "cls": "OxygenConsumption",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": null,
       "rate_params": [],
       "wiring_fields": [
@@ -103,6 +105,7 @@
     "crew.water_balance": {
       "cls": "WaterBalance",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": "crew",
       "rate_params": [],
       "wiring_fields": [
@@ -114,6 +117,7 @@
     "eclss.co2_scrubber": {
       "cls": "CO2Scrubber",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": "eclss",
       "rate_params": [
         "co2_scrub_rate"
@@ -126,6 +130,7 @@
     "eclss.condenser": {
       "cls": "Condenser",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": "eclss",
       "rate_params": [
         "condense_rate"
@@ -138,6 +143,7 @@
     "eclss.crew_metabolism": {
       "cls": "CrewMetabolism",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": null,
       "rate_params": [],
       "wiring_fields": [
@@ -155,6 +161,7 @@
         "cabin_o2",
         "o2_setpoint"
       ],
+      "needs_cabin_air": true,
       "param_set": "eclss",
       "rate_params": [
         "o2_makeup_gain"
@@ -167,6 +174,7 @@
     "power.load_draw": {
       "cls": "LoadDraw",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": null,
       "rate_params": [],
       "wiring_fields": [
@@ -177,6 +185,7 @@
     "power.self_discharge": {
       "cls": "SelfDischarge",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": "self_discharge",
       "rate_params": [
         "self_discharge_rate"
@@ -189,6 +198,7 @@
     "power.solar_charge": {
       "cls": "SolarCharge",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": "charge",
       "rate_params": [],
       "wiring_fields": [
@@ -200,6 +210,7 @@
     "thermal.heat_input": {
       "cls": "HeatInput",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": null,
       "rate_params": [],
       "wiring_fields": [
@@ -210,6 +221,7 @@
     "thermal.radiator_reject": {
       "cls": "RadiatorReject",
       "demand_controlled": null,
+      "needs_cabin_air": false,
       "param_set": "thermal",
       "rate_params": [],
       "wiring_fields": [
@@ -253,6 +265,7 @@
       "stocks"
     ],
     "FlowSpec": [
+      "cabin_air_mol",
       "id",
       "kinetics",
       "params",

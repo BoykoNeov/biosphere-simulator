@@ -270,6 +270,8 @@ fn namespace_flow(flow: &FlowSpec, prefix: &str) -> Result<FlowSpec, AuthoringEr
         // rewrite surface right here that silently mis-fires the moment someone forgets
         // it.
         rate_class: flow.rate_class.clone(),
+        // A property, not an id reference — carried verbatim like a stock's `amount`.
+        cabin_air_mol: flow.cabin_air_mol.clone(),
     })
 }
 

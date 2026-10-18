@@ -196,6 +196,8 @@ flows:
       o2_supply: boundary.o2_supply
       cabin_o2: eclss.cabin_o2
     params: eclss
+    # The cabin's air (mol), declared 2026-10-18: 0.21 x this == 10.0 exactly, the setpoint this anchor was designed around (o2_eq = 8.0). From 2026-09-06 until then it was silently judged against the station's 1995.0.
+    cabin_air_mol: 47.61904761904762
 
   # --------------------------------------------------------------------------------
   # THE SLOW SET — one flow, and the whole reason this file exists. See the header: this

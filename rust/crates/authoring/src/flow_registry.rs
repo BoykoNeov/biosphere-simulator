@@ -49,16 +49,6 @@ use simcore::flow::Flow;
 
 use crate::errors::AuthoringError;
 
-/// The cabin air (mol) every authored `eclss.o2_makeup` is built against — **implicitly**.
-///
-/// ⚠⚠ TEMPORARY, and the defect itself, named. Until 2026-10-18 `eclss.yaml` stored the
-/// regulator's target pre-multiplied by the station's 9500 mol cabin, so every authored
-/// regulator aimed at 1995.0 mol whatever its cabin held. The file now stores the fraction
-/// (slice 1 of `docs/plans/post-roadmap-authored-plants.md`); this constant keeps the
-/// authoring side bit-identical until slice 2 makes the author DECLARE the cabin's air, with
-/// no default — at which point it is deleted, not kept as a fallback.
-pub const IMPLICIT_CABIN_AIR_MOL: f64 = 9500.0;
-
 /// How one authoring flow-type name lowers to a frozen `Flow` constructor: the exact
 /// set of wiring keyword fields (order-significant — it is the constructor's positional
 /// order) and the frozen param set the flow's constructor needs (or `None`).
@@ -98,6 +88,10 @@ pub struct FlowTypeSpec {
     /// is self-limiting at 0 and cannot change sign, and a forced flow has no setpoint to
     /// be on the wrong side of.
     pub demand_controlled: Option<(&'static str, &'static str)>,
+    /// Whether an authored flow of this type must declare `cabin_air_mol` — the air of the
+    /// cabin it regulates. True for `eclss.o2_makeup` alone: its target is `eclss.yaml`'s
+    /// `o2_fraction` of that air (2026-10-18). Every other type refuses the field.
+    pub needs_cabin_air: bool,
 }
 
 /// Look up a frozen flow type by its authoring name (the `FLOW_TYPES` dict analogue).
@@ -107,18 +101,21 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
             wiring_fields: &["o2_store", "o2_consumed"],
             param_set: None,
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         "crew.food_metabolism" => Some(FlowTypeSpec {
             wiring_fields: &["food_store", "exhaled_co2", "fecal_waste"],
             param_set: Some("crew"),
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         "crew.water_balance" => Some(FlowTypeSpec {
             wiring_fields: &["water_store", "crew_humidity", "urine"],
             param_set: Some("crew"),
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         // --- Tier 1: Power ---
@@ -126,18 +123,21 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
             wiring_fields: &["solar_source", "battery", "waste_heat"],
             param_set: Some("charge"),
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         "power.load_draw" => Some(FlowTypeSpec {
             wiring_fields: &["battery", "waste_heat"],
             param_set: None,
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         "power.self_discharge" => Some(FlowTypeSpec {
             wiring_fields: &["battery", "waste_heat"],
             param_set: Some("self_discharge"),
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &["self_discharge_rate"],
         }),
         // --- Tier 1: Thermal ---
@@ -145,12 +145,14 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
             wiring_fields: &["heat_source", "node"],
             param_set: None,
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         "thermal.radiator_reject" => Some(FlowTypeSpec {
             wiring_fields: &["node", "space"],
             param_set: Some("thermal"),
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         // --- Tier 1: ECLSS ---
@@ -165,18 +167,21 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
             ],
             param_set: None,
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &[],
         }),
         "eclss.co2_scrubber" => Some(FlowTypeSpec {
             wiring_fields: &["cabin_co2", "co2_removed"],
             param_set: Some("eclss"),
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &["co2_scrub_rate"],
         }),
         "eclss.condenser" => Some(FlowTypeSpec {
             wiring_fields: &["cabin_h2o", "humidity_condensate"],
             param_set: Some("eclss"),
             demand_controlled: None,
+            needs_cabin_air: false,
             rate_params: &["condense_rate"],
         }),
         "eclss.o2_makeup" => Some(FlowTypeSpec {
@@ -185,6 +190,7 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
             // The ONLY demand-controlled type in the registry, hence the only one that
             // can reverse. See `run_scenario`'s direction check.
             demand_controlled: Some(("cabin_o2", "o2_setpoint")),
+            needs_cabin_air: true,
             rate_params: &["o2_makeup_gain"],
         }),
         _ => None,
@@ -225,6 +231,7 @@ pub fn build_frozen_flow(
     id: &str,
     _priority: i64,
     wiring: &BTreeMap<String, String>,
+    cabin_air_mol: Option<f64>,
 ) -> Result<Box<dyn Flow>, AuthoringError> {
     // Helper: fetch a wired stock id by field name (guaranteed present by the caller's
     // exact-match wiring check, but surface a clear error rather than panic).
@@ -312,7 +319,7 @@ pub fn build_frozen_flow(
             wire("o2_supply")?,
             wire("cabin_o2")?,
             eclss_params(),
-            IMPLICIT_CABIN_AIR_MOL,
+            require_cabin_air(id, type_name, cabin_air_mol)?,
         ))),
         _ => Err(AuthoringError::new(format!(
             "flow {id:?}: unknown flow type {type_name:?} (known: {FLOW_TYPE_NAMES:?})"
@@ -389,10 +396,9 @@ pub fn kinetics_param_map(param_set: &str) -> Result<BTreeMap<String, f64>, Auth
             map.insert("condense_rate".to_string(), p.condense_rate);
             map.insert("humidity_setpoint".to_string(), p.humidity_setpoint);
             map.insert("o2_makeup_gain".to_string(), p.o2_makeup_gain);
-            map.insert(
-                "o2_setpoint".to_string(),
-                p.o2_setpoint_mol(IMPLICIT_CABIN_AIR_MOL),
-            );
+            // The stored param, not a target in mol: that depends on a cabin, and a
+            // kinetics rate has none (`o2_setpoint` until 2026-10-18).
+            map.insert("o2_fraction".to_string(), p.o2_fraction);
         }
         _ => {
             return Err(AuthoringError::new(format!(
@@ -441,22 +447,42 @@ pub fn frozen_rate_value(param_set: &str, param: &str) -> Result<f64, AuthoringE
     })
 }
 
-/// Read a frozen **setpoint** (not a rate) out of a named param set — the direction
-/// gate's input.
+/// The declared `cabin_air_mol`, or a loud error naming the flow — no default, on purpose.
+fn require_cabin_air(
+    id: &str,
+    type_name: &str,
+    cabin_air_mol: Option<f64>,
+) -> Result<f64, AuthoringError> {
+    match cabin_air_mol {
+        Some(air) if air.is_finite() && air > 0.0 => Ok(air),
+        Some(air) => Err(AuthoringError::new(format!(
+            "flow {id:?} ({type_name}): cabin_air_mol must be a finite number > 0, got {air}"
+        ))),
+        None => Err(AuthoringError::new(format!(
+            "flow {id:?} ({type_name}): declare 'cabin_air_mol' — the air (mol) of the cabin              this regulator serves. Its target is eclss.yaml's o2_fraction of that air; there              is no default, because a default is a cabin size you did not choose (the station's              is 9500.0)"
+        ))),
+    }
+}
+
+/// The target a **demand-controlled** flow drives its stock toward — the direction gate's
+/// input, computed from the same declared air the built flow aims at, so the gate and the
+/// flow cannot disagree about where the setpoint is.
 ///
-/// Deliberately a sibling of [`frozen_rate_value`] rather than a reuse of it: the two
-/// read the same flattened map, but a function named `..._rate_value` returning a mol
-/// inventory is the kind of name-vs-meaning drift this repo has logged more than once.
-/// Same failure mode on a miss — loud, because an unreadable setpoint must never degrade
-/// to "assume it points the right way".
-pub fn frozen_setpoint_value(param_set: &str, param: &str) -> Result<f64, AuthoringError> {
-    let map = kinetics_param_map(param_set)?;
-    map.get(param).copied().ok_or_else(|| {
-        AuthoringError::new(format!(
-            "flow-type registry is inconsistent: setpoint param {param:?} is not in              frozen param set {param_set:?} (available: {:?})",
-            map.keys().collect::<Vec<_>>()
-        ))
-    })
+/// ⚠ Until 2026-10-18 this read a frozen `o2_setpoint` (1995.0 mol) out of the param set,
+/// which judged every authored cabin against the station's — whatever its size.
+pub fn demand_setpoint(
+    type_name: &str,
+    id: &str,
+    cabin_air_mol: Option<f64>,
+) -> Result<f64, AuthoringError> {
+    match type_name {
+        "eclss.o2_makeup" => {
+            Ok(eclss_params().o2_setpoint_mol(require_cabin_air(id, type_name, cabin_air_mol)?))
+        }
+        other => Err(AuthoringError::new(format!(
+            "flow-type registry is inconsistent: {other:?} declares demand_controlled but              demand_setpoint has no rule for it"
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -477,8 +503,14 @@ mod tests {
                 .iter()
                 .map(|f| ((*f).to_string(), format!("stock.{f}")))
                 .collect();
-            build_frozen_flow(name, "test.flow", 0, &wiring)
-                .unwrap_or_else(|e| panic!("{name} failed to build: {e:?}"));
+            build_frozen_flow(
+                name,
+                "test.flow",
+                0,
+                &wiring,
+                spec.needs_cabin_air.then_some(9500.0),
+            )
+            .unwrap_or_else(|e| panic!("{name} failed to build: {e:?}"));
         }
     }
 
@@ -551,7 +583,7 @@ mod tests {
         .into_iter()
         .collect();
         let authored =
-            build_frozen_flow("thermal.radiator_reject", "thermal.r", 0, &wiring).expect("builds");
+            build_frozen_flow("thermal.radiator_reject", "thermal.r", 0, &wiring, None).expect("builds");
         let reference = RadiatorReject::new(
             "thermal.r".to_string(),
             "thermal.node".to_string(),

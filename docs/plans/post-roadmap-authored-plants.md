@@ -177,3 +177,29 @@ not in the user's answer (which named the O₂ target), so it is recorded here, 
 (`eclss_multirate_cabin.yaml`, `eclss_thermal_habitat.yaml`, "== the frozen o2_setpoint"), and one
 reads `param("o2_setpoint")` inside an authored rate (`param_sets_dsl.yaml`) — so the authoring
 param map's key is part of what slice 2 decides.
+
+## 6. Slice 2 BUILT 2026-10-18 — the O₂ target as a share, the authoring half
+
+`FlowSpec` gains `cabin_air_mol` (number or template expression). Required on `eclss.o2_makeup`,
+refused on every other flow (frozen or kinetics), no default; a non-positive or non-finite value is
+refused. The flow aims at `o2_fraction · cabin_air_mol`, and the direction gate reads the same value
+(`flow_registry::demand_setpoint`) — it used to read the station's 1995 mol for every cabin.
+`flow_registry::IMPLICIT_CABIN_AIR_MOL` is deleted. Each flow type's spec carries `needs_cabin_air`,
+and the authoring manifest records it. The `eclss` kinetics param set exposes `o2_fraction` in place
+of `o2_setpoint` (a kinetics rate has no cabin to take a fraction of).
+
+**Files.** `eclss_cabin.yaml` and `scenarios/bioregenerative_station.yaml` declare 9500 (both already
+sat at 1995, so they run as before). `eclss_multirate_cabin.yaml` and `eclss_thermal_habitat.yaml`
+declare **47.61904761904762**, for which `0.21 × air == 10.0` exactly: the setpoint both files' own
+text was designed around ("10.0 → o2_eq 8.0"). From 2026-09-06 until now they had been silently
+judged against 1995 — a second and third authored file the frozen move had broken in meaning, found
+by making the assumption explicit. `param_sets_dsl.yaml` reads `o2_fraction`.
+
+**Predicted:** the authoring manifest moves by `schema_fields.FlowSpec` (+`cabin_air_mol`) and every
+`flow_types` entry (+`needs_cabin_air`); no other manifest; no golden (no golden is authored).
+**Measured:** exactly that diff.
+
+**Tests added** (`authoring/tests/scenario_files.rs`): a regulator with no air, zero air or negative
+air is refused at build; the field on a scrubber or a kinetics flow is refused; the direction gate
+judges a 100-mol cabin against 21 mol (and reports that setpoint), while the station's air leaves the
+anchor at its setpoint; a `param(...)` expression for the air builds and runs.

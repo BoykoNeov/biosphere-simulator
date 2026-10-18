@@ -389,6 +389,8 @@ flows:
       o2_supply: store.o2_tank
       cabin_o2: cabin.o2
     params: eclss
+    # The cabin's air (mol), required since 2026-10-18: an ISS-like cabin. The regulator aims at 0.21 x 9500 = 1995.0, which is where cabin.o2 above is sized.
+    cabin_air_mol: 9500.0
 
   # =========================================================================================
   # THE SLOW SET (h = dt/2 = 1800 s by Strang, NOT dt/n_sub) — the biology, the water

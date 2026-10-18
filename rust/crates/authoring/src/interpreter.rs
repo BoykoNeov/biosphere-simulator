@@ -28,7 +28,7 @@ use crate::compose::apply_includes;
 use crate::errors::AuthoringError;
 use crate::expr_parser::parse_rate_expr;
 use crate::flow_registry::{
-    build_frozen_flow, flow_type, frozen_rate_value, frozen_setpoint_value, kinetics_param_map,
+    build_frozen_flow, demand_setpoint, flow_type, frozen_rate_value, kinetics_param_map,
     FLOW_TYPE_NAMES,
 };
 use crate::schema::{FlowSpec, ParamsSpec, ScenarioSpec, StockSpec};
@@ -217,7 +217,7 @@ fn interpret_inner(
 
     let mut flows: Vec<Box<dyn Flow>> = Vec::new();
     for flow_spec in &spec.flows {
-        flows.push(build_flow(flow_spec, &stocks)?);
+        flows.push(build_flow(flow_spec, &stocks, &params)?);
     }
     let registry = Registry::flows_only(flows, &stocks)?;
 
@@ -251,7 +251,7 @@ fn interpret_inner(
     let mut slow_flows: Vec<Box<dyn Flow>> = Vec::new();
     let mut fast_flows: Vec<Box<dyn Flow>> = Vec::new();
     for flow_spec in &spec.flows {
-        let flow = build_flow(flow_spec, &stocks)?;
+        let flow = build_flow(flow_spec, &stocks, &params)?;
         if slow_ids.contains(&flow_spec.id) {
             slow_flows.push(flow);
         } else {
@@ -270,7 +270,7 @@ fn interpret_inner(
     let resolver = SourceResolver::new(forcings, HashMap::new())?;
 
     let has_authored_kinetics = spec.flows.iter().any(|f| f.kinetics.is_some());
-    let demand_controlled = resolve_demand_controlled(&spec)?;
+    let demand_controlled = resolve_demand_controlled(&spec, &params)?;
 
     Ok(BuiltScenario {
         name: spec.name.clone(),
@@ -441,7 +441,10 @@ fn rate_precondition_message(v: &RateViolation<'_>) -> String {
 /// declaring the shape but no param set is a **registry bug, not authored input**, and is
 /// raised loudly for [`check_rate_preconditions`]'s reason: a pair that cannot be read
 /// must never degrade to "assume it points the right way".
-fn resolve_demand_controlled(spec: &ScenarioSpec) -> Result<Vec<(String, f64)>, AuthoringError> {
+fn resolve_demand_controlled(
+    spec: &ScenarioSpec,
+    params: &BTreeMap<String, f64>,
+) -> Result<Vec<(String, f64)>, AuthoringError> {
     let mut pairs = Vec::new();
     for flow_spec in &spec.flows {
         let Some(type_name) = flow_spec.type_.as_deref() else {
@@ -456,13 +459,13 @@ fn resolve_demand_controlled(spec: &ScenarioSpec) -> Result<Vec<(String, f64)>, 
         let Some((stock_field, setpoint_param)) = type_spec.demand_controlled else {
             continue;
         };
-        let Some(param_set) = type_spec.param_set else {
+        if type_spec.param_set.is_none() {
             return Err(AuthoringError::new(format!(
                 "flow {:?} ({type_name}): declares demand_controlled {:?} but no param                  set; the flow-type registry is inconsistent",
                 flow_spec.id,
                 (stock_field, setpoint_param)
             )));
-        };
+        }
         let wired = flow_spec
             .wiring
             .iter()
@@ -474,7 +477,10 @@ fn resolve_demand_controlled(spec: &ScenarioSpec) -> Result<Vec<(String, f64)>, 
                 flow_spec.id
             )));
         };
-        let setpoint = frozen_setpoint_value(param_set, setpoint_param)?;
+        // The SAME declared air the built flow aims at (`build_flow`), so the gate judges
+        // the cabin against its own setpoint, not the station's.
+        let air = cabin_air(flow_spec, params)?;
+        let setpoint = demand_setpoint(type_name, &flow_spec.id, air)?;
         pairs.push((stock_id.clone(), setpoint));
     }
     Ok(pairs)
@@ -595,8 +601,15 @@ fn build_stock(spec: &StockSpec, params: &BTreeMap<String, f64>) -> Result<Stock
 fn build_flow(
     spec: &FlowSpec,
     stocks: &BTreeMap<String, Stock>,
+    params: &BTreeMap<String, f64>,
 ) -> Result<Box<dyn Flow>, AuthoringError> {
     if spec.kinetics.is_some() {
+        if spec.cabin_air_mol.is_some() {
+            return Err(AuthoringError::new(format!(
+                "flow {:?}: 'cabin_air_mol' belongs to a frozen eclss.o2_makeup; an authored                  'kinetics' flow writes its own rate and takes none",
+                spec.id
+            )));
+        }
         return build_declarative_flow(spec, stocks);
     }
     let type_name = spec.type_.as_deref().expect("schema: type xor kinetics");
@@ -606,6 +619,13 @@ fn build_flow(
             spec.id
         ))
     })?;
+    let air = cabin_air(spec, params)?;
+    if air.is_some() && !type_spec.needs_cabin_air {
+        return Err(AuthoringError::new(format!(
+            "flow {:?} ({type_name}): this flow type takes no 'cabin_air_mol' (only              eclss.o2_makeup, whose target is a fraction of its cabin's air)",
+            spec.id
+        )));
+    }
 
     // The frozen crew flow constructors carry no priority field (they are shared with
     // the station callers, which construct them at the trait-default priority), so the
@@ -676,7 +696,22 @@ fn build_flow(
         }
     }
 
-    build_frozen_flow(type_name, &spec.id, spec.priority, &wiring)
+    build_frozen_flow(type_name, &spec.id, spec.priority, &wiring, air)
+}
+
+/// A flow's declared `cabin_air_mol`, evaluated against the scenario's `parameters` (a
+/// number or a template expression, like a stock's `amount`). `None` when not declared —
+/// whether that is allowed is the flow type's to say ([`build_frozen_flow`]).
+fn cabin_air(
+    spec: &FlowSpec,
+    params: &BTreeMap<String, f64>,
+) -> Result<Option<f64>, AuthoringError> {
+    spec.cabin_air_mol
+        .as_ref()
+        .map(|field| {
+            eval_numeric_field(field, params, &format!("flow {:?} cabin_air_mol", spec.id))
+        })
+        .transpose()
 }
 
 /// Lower a `kinetics` [`FlowSpec`] to a [`DeclarativeFlow`] (the

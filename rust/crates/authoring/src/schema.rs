@@ -78,6 +78,7 @@ pub const FLOW_KEYS: &[&str] = &[
     "kinetics",
     "params",
     "rate_class",
+    "cabin_air_mol",
 ];
 
 /// `KineticsSpec` — an authored rate law.
@@ -156,6 +157,15 @@ pub struct FlowSpec {
     /// **Spelled `rate_class`, not `rate`**: [`KineticsSpec::rate`] — the rate *law*, one
     /// nesting level down on the same flow — already owns that key.
     pub rate_class: String,
+    /// The air (mol, at reference pressure) of the cabin this flow regulates — **required on
+    /// `eclss.o2_makeup` and refused on every other flow** (the interpreter checks both).
+    /// The regulator aims at `eclss.yaml`'s `o2_fraction` of it. A number or a template
+    /// expression over the scenario's `parameters`, like a stock's `amount`.
+    ///
+    /// ⚠ No default, on purpose (2026-10-18, `docs/plans/post-roadmap-authored-plants.md`):
+    /// until then every authored regulator silently aimed at the station's 1995 mol, and an
+    /// authored 8-mol habitat drained its O₂ tank every hour for six weeks.
+    pub cabin_air_mol: Option<NumericField>,
 }
 
 /// A constant forcing schedule (mirrors `ForcingSpec`; Step-0 constants only).
@@ -445,6 +455,10 @@ fn parse_flow(value: &YamlValue) -> Result<FlowSpec, AuthoringError> {
         None => None,
         Some(v) => Some(parse_params(v, &ctx)?),
     };
+    let cabin_air_mol = match field(entries, "cabin_air_mol") {
+        None => None,
+        Some(_) => Some(require_numeric(entries, "cabin_air_mol", &ctx)?),
+    };
 
     // The `type`-xor-`kinetics` exclusivity + no-wiring-on-kinetics validation
     // (mirrors `FlowSpec._check_type_xor_kinetics`).
@@ -469,6 +483,7 @@ fn parse_flow(value: &YamlValue) -> Result<FlowSpec, AuthoringError> {
         kinetics,
         params,
         rate_class,
+        cabin_air_mol,
     })
 }
 
