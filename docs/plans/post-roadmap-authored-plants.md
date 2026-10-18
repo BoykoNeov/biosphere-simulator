@@ -87,3 +87,22 @@ authoring grammar change and an unfreeze of its own.
 
 **This is an authoring unfreeze** (the block list grows, the grammar may), so it is built only on
 the user's answers.
+
+## 3. The user's answers (2026-10-18)
+
+Asked in plain words with a recommendation each; the user took the **most author freedom** on the
+first three and the recommendation on the fourth:
+
+1. **Re-sow: the author writes it.** The file declares its own sowing calendar; the runner carries
+   the plants' counters and applies the author's re-sows. (Not the recommendation, which was to reuse
+   the station's day driver.)
+2. **Wiring: every stock.** An author may connect any of a bed's stocks — air, water, soil, litter,
+   plants — to their own. (Not the recommendation, "air and water only".) ⚠ This lets an author build
+   arrangements the science was never checked against; "authored is not validated" is what covers it,
+   and the authored-content test's promises (conservation, no rationing, repeatable) still apply.
+3. **Step sizes: the author declares them**, checked against the existing build-time safety limits.
+   (Not the recommendation, "fixed, inherited".)
+4. **O₂ target: a share of the author's own cabin air.** The author declares the cabin's air; the
+   regulator aims at 21 % of it. A separate authoring unfreeze, built with the crop bed.
+
+The slices and the ceremony follow in §4, written before anything is built.
