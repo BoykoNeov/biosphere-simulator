@@ -76,7 +76,8 @@ validation.
 **not** claim it is calibrated — only that changing it is a documented, reviewed,
 re-captured event. Several frozen coefficients are deliberately **illustrative**, carried
 as such, not hidden:
-- The **ECLSS** rate-constants (`k_scrub` / `k_cond` / `k_makeup`, `o2_setpoint`) and the
+- The **ECLSS** rate-constants (`k_scrub` / `k_cond` / `k_makeup`; the O₂ target was here until it
+  was cited on 2026-09-06, and is stored as `o2_fraction` = 0.21 since 2026-10-18) and the
   **station** `harvest_rate` / `recovery_rate` / `recovery_efficiency` / `photon_efficacy`
   are illustrative sizing — BVAD publishes no first-order τ, only steady-state throughput
   (which the closure checks validate). Step 9 explicitly kept them illustrative.
@@ -375,6 +376,16 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — the O₂ regulator's target is stored as a mole fraction, `o2_fraction: 0.21`, not
+  as `o2_setpoint: 1995.0 mol` (slice 1 of `docs/plans/post-roadmap-authored-plants.md`). Bit-neutral:
+  0 of 20 goldens move; the manifest's `eclss.yaml` entry (both fingerprints) is the whole diff.** The
+  cited quantity was always the fraction (BVAD's 21 %); the file had pre-multiplied it by the
+  station's 9500 mol, and its own TRIGGER said it must become a fraction if an ECLSS were wired to
+  a cabin of another size — true from the day it was written (an authored 8-mol habitat drained its
+  O₂ tank hourly for six weeks). `EclssParams::o2_setpoint_mol(air)` builds the target where the
+  cabin is known; every station build passes `station::scenario::STATION_CABIN_AIR_MOL` (9500), and
+  `0.21 * 9500.0 == 1995.0` exactly (asserted in the loader's test). The authoring side keeps a
+  named, temporary 9500 until slice 2 makes an author declare the cabin's air.
 - **2026-10-18 — `param_files` fingerprints what a file means, not its text (Step 4a; the
   biosphere entry of this date carries the rule). The 10 entries become `{sources, values}`;
   `param_files` and its `_authority` row are the whole manifest diff. No value, golden, set or

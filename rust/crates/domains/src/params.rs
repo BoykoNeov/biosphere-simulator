@@ -114,7 +114,7 @@ fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
             ("condense_rate", "1/s"),
             ("humidity_setpoint", "kg"),
             ("o2_makeup_gain", "1/s"),
-            ("o2_setpoint", "mol"),
+            ("o2_fraction", "dimensionless"),
         ],
         name,
     )?;
@@ -123,7 +123,7 @@ fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
         condense_rate: require_positive(v[1], "condense_rate", name)?,
         humidity_setpoint: require_positive(v[2], "humidity_setpoint", name)?,
         o2_makeup_gain: require_positive(v[3], "o2_makeup_gain", name)?,
-        o2_setpoint: require_positive(v[4], "o2_setpoint", name)?,
+        o2_fraction: require_half_open(v[4], 0.0, 1.0, "o2_fraction", name)?,
     })
 }
 
@@ -394,7 +394,7 @@ mod tests {
             block("condense_rate", condense.0, condense.1),
             block("humidity_setpoint", humidity.0, humidity.1),
             block("o2_makeup_gain", makeup.0, makeup.1),
-            block("o2_setpoint", setpoint.0, setpoint.1),
+            block("o2_fraction", setpoint.0, setpoint.1),
         )
     }
 
@@ -662,7 +662,7 @@ mod tests {
             ("5.0e-4", "1/s"),
             ("1.7863", "kg"),
             ("2.0e-3", "1/s"),
-            ("10.0", "mol"),
+            ("0.21", "dimensionless"),
         )
     }
 
@@ -673,7 +673,10 @@ mod tests {
         assert_eq!(p.condense_rate, 5.0e-4);
         assert_eq!(p.humidity_setpoint, 1.7863);
         assert_eq!(p.o2_makeup_gain, 2.0e-3);
-        assert_eq!(p.o2_setpoint, 1995.0);
+        assert_eq!(p.o2_fraction, 0.21);
+        // The station's 9500 mol cabin gives the pre-2026-10-18 frozen setpoint EXACTLY: the
+        // move from `o2_setpoint: 1995.0 mol` to the fraction is bit-neutral by this line.
+        assert_eq!(p.o2_setpoint_mol(9500.0), 1995.0);
     }
 
     /// ⚠ **An M-bound site, and the one `bounds_match_the_loaders` never covered at all.**
@@ -685,22 +688,33 @@ mod tests {
             ("5.0e-4", "1/s"),
             ("1.7863", "kg"),
             ("2.0e-3", "1/s"),
-            ("10.0", "mol"),
+            ("0.21", "dimensionless"),
         );
         rejected(eclss_from(&bad, "eclss.yaml"), "co2_scrub_rate must be > 0");
         assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
     }
 
     #[test]
-    fn eclss_loader_rejects_a_nonpositive_setpoint() {
+    fn eclss_loader_rejects_an_o2_fraction_outside_0_1() {
         let bad = eclss_yaml(
             ("1.0e-3", "1/s"),
             ("5.0e-4", "1/s"),
             ("1.7863", "kg"),
             ("2.0e-3", "1/s"),
-            ("-1.0", "mol"),
+            ("0.0", "dimensionless"),
         );
-        rejected(eclss_from(&bad, "eclss.yaml"), "o2_setpoint must be > 0");
+        rejected(eclss_from(&bad, "eclss.yaml"), "o2_fraction must be in (0, 1]");
+        let above_one = eclss_yaml(
+            ("1.0e-3", "1/s"),
+            ("5.0e-4", "1/s"),
+            ("1.7863", "kg"),
+            ("2.0e-3", "1/s"),
+            ("1.5", "dimensionless"),
+        );
+        rejected(
+            eclss_from(&above_one, "eclss.yaml"),
+            "o2_fraction must be in (0, 1]",
+        );
         assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
     }
 
@@ -712,7 +726,7 @@ mod tests {
             ("5.0e-4", "1/s"),
             ("0.0", "kg"),
             ("2.0e-3", "1/s"),
-            ("10.0", "mol"),
+            ("0.21", "dimensionless"),
         );
         rejected(eclss_from(&bad, "eclss.yaml"), "humidity_setpoint must be > 0");
         assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
@@ -725,7 +739,7 @@ mod tests {
             ("5.0e-4", "1/min"),
             ("1.7863", "kg"),
             ("2.0e-3", "1/s"),
-            ("10.0", "mol"),
+            ("0.21", "dimensionless"),
         );
         rejected(
             eclss_from(&bad, "eclss.yaml"),

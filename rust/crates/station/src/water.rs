@@ -112,6 +112,7 @@ pub fn build_water_recovery(
             O2_SUPPLY.to_string(),
             CABIN_O2.to_string(),
             *eclss,
+            crate::scenario::STATION_CABIN_AIR_MOL,
         )),
         Box::new(WaterRecovery::new(
             WATER_RECOVERY.to_string(),

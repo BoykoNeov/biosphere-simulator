@@ -35,12 +35,19 @@
 #   balance). The depleting side is the crew O₂ draw (scenario), sized so cabin_o2 never
 #   empties — positivity by well-fed sizing (the LoadDraw discipline), not structural.
 #
-# o2_setpoint — target cabin O₂ inventory the regulator drives toward (mol), > 0. DERIVED
-#   from a cited cabin atmosphere since 2026-09-06: 0.21 x 9500 mol = 1995.0 (see the value's
-#   own source). It is the analogue of an O₂ partial-pressure setpoint at fixed cabin
+# o2_fraction — the O₂ mole fraction of the cabin air the regulator holds (dimensionless),
+#   in (0, 1]. The regulator's target in moles is o2_fraction x the cabin's air at reference
+#   pressure, computed where that air is known (`EclssParams::o2_setpoint_mol`): the station
+#   passes its 9500 mol cabin (0.21 x 9500 = 1995.0, bit-exact), an authored habitat its own
+#   declared air. It is the analogue of an O₂ partial-pressure setpoint at fixed cabin
 #   volume/temperature — and because V and T ARE constants in this model, that analogy is an
-#   exact proportionality rather than a hand-wave, which is what makes the mole count
-#   citable at all.
+#   exact proportionality rather than a hand-wave.
+#   ⚠ UNTIL 2026-10-18 THIS WAS `o2_setpoint: 1995.0 mol` — the fraction already multiplied by
+#   the station's 9500 mol. Its source carried a TRIGGER ("if an ECLSS is ever wired to a cabin
+#   whose air is not 9500 mol, this MUST become a mole fraction"), and the condition was true
+#   from the day it was written: scenarios/bioregenerative_station.yaml, an 8-mol cabin, drained
+#   its O₂ tank every hour for six weeks with nothing going red. The cited quantity was always
+#   the fraction; this is the trigger, fired (docs/plans/post-roadmap-authored-plants.md).
 #
 # Emergent (NOT params): the three steady states co2_eq / h2o_eq / o2_eq above are computed
 #   (system.steady_state) from these coefficients + the forced crew rates, never stored —
@@ -130,7 +137,7 @@ parameters:
     value: 1.7863
     unit: "kg"
     source: "[D] BVAD Rev 2 Table 4-1 'Typical Steady-State Values for Vehicle Atmospheres', printed p. 63 (read as the page image, 2026-10-03), row 'Relative Humidity, %': 25 lower (NASA Std. 3001 Vol 2 Rev A 2015) / 40 nominal ('Typical ISS') / 75 upper (NASA Std. 3001). Taken: the NOMINAL 40 %. n = 0.40 x saturation at 22 °C (295.15 K, BVAD Table 4-73's cabin nominal, printed p. 153) x 9500 mol x M_H2O, on the model's own FAO-56 curve (weather::saturation_vapor_pressure: 2643.93 Pa -> 4.46579 kg saturated) = 1.78632 kg, written to 5 figures; a test re-derives it. ⚠ TRIGGER — like o2_setpoint this encodes the ONE cabin air inventory (9500 mol) AND a cabin temperature the model does not hold as a state. When the cabin gets its own heat store, this MUST become a relative humidity read against it. Replaced 2026-10-03 a first-order draw on all the cabin's vapour that held it at ≈ 1.5 % RH."
-  o2_setpoint:
-    value: 1995.0
-    unit: "mol"
-    source: "[D] BVAD Rev 2 §4.1.1 p. 61, verbatim: 'ISS EVA operations originate from 21% oxygen and 101.3 kPa (14.7 psia) of pressure'. Taken as the cabin COMPOSITION (a mole fraction of 0.21 for an ideal gas), which is the quantity this model needs — NOT Table 4-1's 'p[O2] for Crew; nominal no impairment' 21.2 kPa, which is a crew physiological requirement and a different quantity. n = 0.21 x 9500 mol = 1995.0, where 9500 mol is the cabin air inventory this tree models (station::scenario::greenhouse_bio_scenario chamber_air_mol, untouched here and NOT independently cited). ⚠ WHICH ATMOSPHERE IS A MODELLING CHOICE, not a lookup: the same page and Table 4-1 give three nominal total pressures (101 / 70.3 / 56.5 kPa) and a 34%-oxygen 57 kPa exploration option (Norcross 2013) for surface habitats; the crop reads the mole fraction, so 34% would give a materially different photosynthetic and microbial response. This habitat is modelled ISS-like and sea-level-equivalent. Cross-check across two loci (a consistency check, not a second derivation): Table 4-1's 21.2 kPa over 101.3 kPa is 20.93%, within 0.4% of 21%. ⚠ TRIGGER — this value silently encodes the ONE cabin air inventory within O2Makeup's reach (9500 mol; the other four ECLSS scenarios carry no air inventory at all). If an ECLSS is ever wired to a cabin whose air is not 9500 mol, this MUST become a mole fraction and the flow MUST read the air. Superseded the 10.0 mol DESIGN sizing choice 2026-09-06."
+  o2_fraction:
+    value: 0.21
+    unit: "dimensionless"
+    source: "[D] BVAD Rev 2 §4.1.1 p. 61, verbatim: 'ISS EVA operations originate from 21% oxygen and 101.3 kPa (14.7 psia) of pressure'. Taken as the cabin COMPOSITION (a mole fraction of 0.21 for an ideal gas), which is the quantity this model needs and, since 2026-10-18, the quantity this file stores: the regulator's target in moles is this fraction times the cabin's air, supplied where the cabin is built (the station's 9500 mol; an authored habitat's own declared air). ⚠ HISTORY: stored until 2026-10-18 as `o2_setpoint: 1995.0 mol` = 0.21 x 9500, with a TRIGGER saying it MUST become a mole fraction if an ECLSS were ever wired to a cabin whose air is not 9500 mol — a condition already true when written (scenarios/bioregenerative_station.yaml's 8-mol cabin, which then drained its O2 tank hourly for six weeks; docs/plans/post-roadmap-authored-plants.md). The text of the 1995.0 value's source, from here on, is kept as written: which is the quantity this model needs — NOT Table 4-1's 'p[O2] for Crew; nominal no impairment' 21.2 kPa, which is a crew physiological requirement and a different quantity. n = 0.21 x 9500 mol = 1995.0, where 9500 mol is the cabin air inventory this tree models (station::scenario::greenhouse_bio_scenario chamber_air_mol, untouched here and NOT independently cited). ⚠ WHICH ATMOSPHERE IS A MODELLING CHOICE, not a lookup: the same page and Table 4-1 give three nominal total pressures (101 / 70.3 / 56.5 kPa) and a 34%-oxygen 57 kPa exploration option (Norcross 2013) for surface habitats; the crop reads the mole fraction, so 34% would give a materially different photosynthetic and microbial response. This habitat is modelled ISS-like and sea-level-equivalent. Cross-check across two loci (a consistency check, not a second derivation): Table 4-1's 21.2 kPa over 101.3 kPa is 20.93%, within 0.4% of 21%. ⚠ TRIGGER — this value silently encodes the ONE cabin air inventory within O2Makeup's reach (9500 mol; the other four ECLSS scenarios carry no air inventory at all). If an ECLSS is ever wired to a cabin whose air is not 9500 mol, this MUST become a mole fraction and the flow MUST read the air. Superseded the 10.0 mol DESIGN sizing choice 2026-09-06."

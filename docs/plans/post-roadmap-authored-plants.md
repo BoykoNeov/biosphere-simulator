@@ -153,3 +153,27 @@ Each its own commit, its own predicted diff, full tests `--no-fail-fast`, `--ign
    `param_funnel` gate's hazard), only on master-day boundaries through the driver's checked reset
    hook. The example's horizon is chosen by measuring its run time (the content test runs every
    file twice). Then the authoring manifest and `docs/authoring-reference.md`.
+
+## 5. Slice 1 BUILT 2026-10-18 — the O₂ target as a share, the station half
+
+`eclss.yaml`'s `o2_setpoint: 1995.0 mol` became `o2_fraction: 0.21 dimensionless` (its source kept,
+re-led with what the file now stores). `EclssParams::o2_setpoint_mol(cabin_air_mol)` builds the
+target; `O2Makeup::new` takes the cabin's air and has no default. Every station build passes
+`station::scenario::STATION_CABIN_AIR_MOL` (9500; `air_split::CABIN_AIR_MOL` now names it); the
+standalone ECLSS scenario carries `cabin_air_mol: 9500.0`. The authoring side passes a named,
+temporary `flow_registry::IMPLICIT_CABIN_AIR_MOL` (9500) — the defect, named — until slice 2.
+
+**Predicted:** bit-neutral; no golden; the station manifest's `eclss.yaml` entry only.
+**Measured:** `regen_goldens` 0 of 20 would change; the biosphere and authoring manifests unchanged;
+the station manifest's diff is `param_files["eclss.yaml"]`, both fingerprints (the value and its
+source both moved). `0.21 * 9500.0 == 1995.0` exactly, asserted in the loader's test. The loader
+bounds the fraction to (0, 1], tested both sides.
+
+**Found, not built:** `humidity_setpoint` (1.7863 kg) carries the same hidden 9500 mol — it is BVAD's
+40 % RH *in the station's cabin*. An authored cabin of another size inherits it the same way. It is
+not in the user's answer (which named the O₂ target), so it is recorded here, not changed.
+
+**Found, for slice 2:** two fixtures still start their cabin at the long-gone 10.0
+(`eclss_multirate_cabin.yaml`, `eclss_thermal_habitat.yaml`, "== the frozen o2_setpoint"), and one
+reads `param("o2_setpoint")` inside an authored rate (`param_sets_dsl.yaml`) — so the authoring
+param map's key is part of what slice 2 decides.

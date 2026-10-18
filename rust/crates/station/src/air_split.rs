@@ -59,8 +59,8 @@ use crate::sealed::{build_sealed_station_unread, sealed_fast_flows, CabinAir};
 use crate::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
 
 /// The cabin's reference air (mol) — the frozen sealed station's `chamber_air_capacity_mol`,
-/// kept so `eclss.yaml`'s absolute `o2_setpoint` (0.21 × 9500) stays true for the cabin.
-pub const CABIN_AIR_MOL: f64 = 9500.0;
+/// kept so the regulator's target (`eclss.yaml`'s 0.21 × this) stays true for the cabin.
+pub const CABIN_AIR_MOL: f64 = crate::scenario::STATION_CABIN_AIR_MOL;
 
 /// The cabin's own inert fill (N₂ + Ar lumped), kg of N₂ — the cabin twin of
 /// `biosphere.chamber_inert`.

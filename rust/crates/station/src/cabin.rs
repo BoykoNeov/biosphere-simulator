@@ -106,6 +106,7 @@ pub(crate) fn build_cabin_flows(
             O2_SUPPLY.to_string(),
             cabin_o2.to_string(),
             *eclss,
+            crate::scenario::STATION_CABIN_AIR_MOL,
         )),
     ]
 }

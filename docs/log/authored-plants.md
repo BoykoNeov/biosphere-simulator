@@ -31,3 +31,11 @@ authoring decision, which is what broke the habitat above.
   six-week-old failure on its first run.
 * **Lesson: run before you read.** The plan expected one false sentence; reading would have fixed the
   sentence and left a habitat that empties its oxygen tank 14 times an hour.
+
+**SLICE 1 of 7b BUILT 2026-10-18 — the O₂ target is stored as a mole fraction.** `eclss.yaml`'s
+`o2_setpoint: 1995.0 mol` became `o2_fraction: 0.21`; the target in mol is built per cabin
+(`EclssParams::o2_setpoint_mol`), and the regulator's constructor takes the cabin's air with no
+default. The station passes its 9500 mol; the authoring side a named, temporary 9500 until slice 2.
+Predicted and measured bit-neutral: 0 of 20 goldens move, the station manifest's `eclss.yaml` entry
+is the whole manifest diff. Found: `humidity_setpoint` hides the same 9500 mol (recorded, not changed —
+outside the user's answer); two fixtures still start at the long-gone 10.0.

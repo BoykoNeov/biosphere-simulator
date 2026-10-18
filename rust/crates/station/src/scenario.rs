@@ -53,6 +53,15 @@ pub struct CabinScenario {
     pub dt_seconds: f64,
 }
 
+/// The air (mol, at reference pressure) of the station's cabin — the one cabin every station
+/// build's O₂ regulator serves. `eclss.yaml` stores the regulator's target as a mole fraction
+/// since 2026-10-18; this is what it is a fraction OF (0.21 × 9500 = 1995.0, the pre-change
+/// frozen value bit for bit). The same 9500 as the sealed station's `chamber_air_capacity_mol`.
+/// ⚠ A station build whose cabin is NOT this size must pass its own air, not this constant:
+/// that silent default is the defect the fraction exists to remove
+/// (`docs/plans/post-roadmap-authored-plants.md`).
+pub const STATION_CABIN_AIR_MOL: f64 = 9500.0;
+
 /// `CABIN_GAS_SCENARIO`: the crew respiring into / breathing from the ECLSS cabin.
 pub const CABIN_GAS_SCENARIO: CabinScenario = CabinScenario {
     // Starts at `eclss.yaml`'s `o2_setpoint` (1995.0), as it always has. ⚠ This cabin has

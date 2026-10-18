@@ -476,6 +476,7 @@ pub(crate) fn sealed_fast_flows(
             O2_SUPPLY.to_string(),
             air.o2.to_string(),
             *eclss,
+            crate::scenario::STATION_CABIN_AIR_MOL,
         )),
         Box::new(WaterRecovery::new(
             WATER_RECOVERY.to_string(),

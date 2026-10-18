@@ -67,14 +67,32 @@ pub struct EclssParams {
     pub humidity_setpoint: f64,
     /// k_makeup — proportional O₂-regulator gain (1/s), > 0.
     pub o2_makeup_gain: f64,
-    /// o2_setpoint — target cabin O₂ inventory (mol), > 0.
-    pub o2_setpoint: f64,
+    /// The O₂ mole fraction of the cabin air the regulator holds, in (0, 1] (`eclss.yaml`'s
+    /// `o2_fraction`, BVAD's 21 %). The target in **moles** depends on the cabin, so it is not a
+    /// param: see [`EclssParams::o2_setpoint_mol`]. ⚠ Until 2026-10-18 this field was
+    /// `o2_setpoint: 1995.0` mol — the fraction pre-multiplied by the station's 9500 mol, which
+    /// every authored cabin then inherited whatever its size
+    /// (`docs/plans/post-roadmap-authored-plants.md`).
+    pub o2_fraction: f64,
+}
+
+impl EclssParams {
+    /// The regulator's target cabin O₂ inventory (mol) for a cabin holding `cabin_air_mol` of
+    /// air at reference pressure: `o2_fraction · cabin_air_mol`. The station's 9500 mol gives
+    /// 1995.0 exactly — the pre-2026-10-18 frozen value, bit for bit.
+    pub fn o2_setpoint_mol(&self, cabin_air_mol: f64) -> f64 {
+        self.o2_fraction * cabin_air_mol
+    }
 }
 
 /// ECLSS scenario data (initial cabin inventories, forced crew rates, step).
 #[derive(Debug, Clone, Copy)]
 pub struct EclssScenario {
-    /// Initial cabin O₂ (mol) — starts at the setpoint (`eclss.yaml`'s `o2_setpoint`).
+    /// The cabin's air at reference pressure (mol) — what the regulator's mole fraction is a
+    /// fraction OF. The standalone cabin is the station's, 9500 mol: it was that implicitly
+    /// until 2026-10-18, through the pre-multiplied `o2_setpoint`.
+    pub cabin_air_mol: f64,
+    /// Initial cabin O₂ (mol) — starts at the setpoint (`o2_fraction · cabin_air_mol`).
     ///
     /// ⚠ Every scenario that sets this must move WITH the setpoint. The regulator's dynamics
     /// live in the deviation `e = setpoint − cabin_o2`, so a matched shift leaves `e(t)` — and
@@ -99,6 +117,7 @@ pub struct EclssScenario {
 /// The standalone validation scenario (`STEADY_STATE_SCENARIO`): a clean cabin under a
 /// constant crew load, each species relaxing to an emergent steady state.
 pub const STEADY_STATE_SCENARIO: EclssScenario = EclssScenario {
+    cabin_air_mol: 9500.0,
     cabin_o2_0: 1995.0,
     cabin_co2_0: 0.0,
     cabin_h2o_0: 1.7863,
@@ -327,18 +346,35 @@ pub struct O2Makeup {
     o2_supply: String,
     cabin_o2: String,
     params: EclssParams,
+    /// The target cabin O₂ (mol), fixed at construction from the cabin's air.
+    setpoint: f64,
 }
 
 impl O2Makeup {
     /// Construct an `O2Makeup` with the given ids — the station re-points `cabin_o2` at
     /// the shared cabin/biosphere O₂ pool (the reverse greenhouse seam).
-    pub fn new(id: String, o2_supply: String, cabin_o2: String, params: EclssParams) -> Self {
+    ///
+    /// `cabin_air_mol` is the air of the cabin `cabin_o2` belongs to; the target is
+    /// [`EclssParams::o2_setpoint_mol`] of it. There is no default, on purpose.
+    pub fn new(
+        id: String,
+        o2_supply: String,
+        cabin_o2: String,
+        params: EclssParams,
+        cabin_air_mol: f64,
+    ) -> Self {
         O2Makeup {
             id,
             o2_supply,
             cabin_o2,
             params,
+            setpoint: params.o2_setpoint_mol(cabin_air_mol),
         }
+    }
+
+    /// The target cabin O₂ (mol) this regulator drives toward.
+    pub fn setpoint(&self) -> f64 {
+        self.setpoint
     }
 }
 
@@ -359,7 +395,7 @@ impl Flow for O2Makeup {
         let supplied = makeup_flux(
             donor_amount(snapshot, &self.cabin_o2)?,
             self.params.o2_makeup_gain,
-            self.params.o2_setpoint,
+            self.setpoint,
         ) * dt;
         FlowResult::new(vec![
             Leg::new(self.o2_supply.clone(), -supplied)?,
@@ -437,12 +473,13 @@ pub fn build_eclss(
             humidity_condensate: HUMIDITY_CONDENSATE.to_string(),
             params: *params,
         }),
-        Box::new(O2Makeup {
-            id: O2_MAKEUP.to_string(),
-            o2_supply: O2_SUPPLY.to_string(),
-            cabin_o2: CABIN_O2.to_string(),
-            params: *params,
-        }),
+        Box::new(O2Makeup::new(
+            O2_MAKEUP.to_string(),
+            O2_SUPPLY.to_string(),
+            CABIN_O2.to_string(),
+            *params,
+            scenario.cabin_air_mol,
+        )),
     ];
     let registry = Registry::flows_only(flows, &stocks)?;
     Ok((state, registry))
@@ -487,8 +524,11 @@ mod tests {
         condense_rate: 5.0e-4,
         humidity_setpoint: 1.7863,
         o2_makeup_gain: 2.0e-3,
-        o2_setpoint: 1995.0,
+        o2_fraction: 0.21,
     };
+
+    /// The hand cabin's air (mol) — the station's.
+    const HAND_AIR: f64 = 9500.0;
 
     const DT: f64 = 60.0;
 
@@ -573,6 +613,7 @@ mod tests {
             O2_SUPPLY.to_string(),
             CABIN_O2.to_string(),
             HAND,
+            HAND_AIR,
         )
     }
 
@@ -780,7 +821,7 @@ mod tests {
     fn o2_makeup_adds_toward_setpoint_and_dt_linear() {
         // 2 mol below the setpoint: the tank gives up what the cabin receives.
         //
-        // ⚠ Written against `HAND.o2_setpoint` rather than a literal, and the change is a
+        // ⚠ Written against `HAND.o2_setpoint_mol(HAND_AIR)` rather than a literal, and the change is a
         // RE-POSING to the claim this test actually makes. It was `state(8.0, ...)` against a
         // literal 10.0, which pinned the DEFICIT and the SETPOINT in one assertion; when the
         // setpoint moved 10.0 -> 1995.0 (the cited cabin atmosphere, 2026-09-06) it went red
@@ -788,7 +829,7 @@ mod tests {
         // setpoint's own value is pinned where it belongs — `params::tests::
         // eclss_loader_reads_the_committed_params` — and this test is about the deficit.
         let deficit = 2.0;
-        let s = state(HAND.o2_setpoint - deficit, 3.0, 0.04);
+        let s = state(HAND.o2_setpoint_mol(HAND_AIR) - deficit, 3.0, 0.04);
         let l = legs(&makeup(), &s, &crew_forcing(), DT);
         let expected = HAND.o2_makeup_gain * deficit * DT;
         close(l[O2_SUPPLY], -expected);
@@ -798,9 +839,9 @@ mod tests {
 
     #[test]
     fn o2_makeup_idle_at_setpoint() {
-        // ⚠ `HAND.o2_setpoint`, not a literal — same re-posing as the test above: "idle AT the
+        // ⚠ `HAND.o2_setpoint_mol(HAND_AIR)`, not a literal — same re-posing as the test above: "idle AT the
         // setpoint" is a claim about the zero of `setpoint − cabin_o2`, wherever that sits.
-        let s = state(HAND.o2_setpoint, 3.0, 0.04);
+        let s = state(HAND.o2_setpoint_mol(HAND_AIR), 3.0, 0.04);
         for (_, amount) in legs(&makeup(), &s, &crew_forcing(), DT) {
             assert_eq!(amount, 0.0);
         }

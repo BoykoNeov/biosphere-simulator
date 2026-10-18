@@ -51,7 +51,7 @@ const DT: f64 = STEADY_STATE_SCENARIO.dt_seconds;
 fn steady_state(scenario: &EclssScenario) -> (f64, f64, f64) {
     let p = params::eclss();
     (
-        p.o2_setpoint - scenario.o2_consumption_rate / p.o2_makeup_gain,
+        p.o2_setpoint_mol(scenario.cabin_air_mol) - scenario.o2_consumption_rate / p.o2_makeup_gain,
         scenario.co2_production_rate / p.co2_scrub_rate,
         // Since 2026-10-03 the condenser acts on the excess above its setpoint, so the
         // humidity steady state sits P/k ABOVE the setpoint, not at P/k.

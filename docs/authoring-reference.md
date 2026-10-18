@@ -292,7 +292,9 @@ how positivity holds, and whether the flow is multi-instanceable:
 flow has no `k` to read, and the two annotated rows are uncoverable for reasons the
 `rate_params` docstring records. It is an explicit list rather than "every float on the
 params object" because `EclssParams` also carries **`o2_setpoint`, which is an inventory in
-mol, not a rate**, and checking it would be meaningless.
+mol, not a rate**, and checking it would be meaningless. (Since 2026-10-18 it carries
+`o2_fraction` instead, a mole fraction, and the target in mol is built per cabin — still not a
+rate.)
 
 **The biosphere is absent for a structural reason, not a calibration one.** `Allocation`
 takes a composite `ctx: CarbonContext` (four param objects + four stock ids) plus `pheno`
