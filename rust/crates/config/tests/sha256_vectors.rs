@@ -18,7 +18,11 @@
 //!
 //! # ⚠ Why the frozen param files are NOT this coverage
 //!
-//! `param_files` gives 23 real digests to compare against the manifests, which is a strong
+//! (⚠ Written when the manifests recorded each param file's TEXT digest. Since Step 4a
+//! (2026-10-18) they record two digests over the parsed file, so the paragraph below
+//! describes coverage that no longer exists — the argument for the oracle only got stronger.)
+//!
+//! `param_files` gave 23 real digests to compare against the manifests, which is a strong
 //! end-to-end check and a weak *padding* check: measured, only **two** of the 24 normalized
 //! lengths (`phenology.yaml` at 58 and `radiator.yaml` at exactly 56) land in the
 //! `len % 64 >= 56` window where the length field spills into a second block, **no** file is

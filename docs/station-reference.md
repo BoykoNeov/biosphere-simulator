@@ -291,7 +291,8 @@ Python-side fold of a raw Rust series.
 re-anchored there is the *census* rule (the eight files the reference **loads**, not a glob
 over six Python package directories) and the *normalization* rule, since the eight digits are
 author-neutral either way; the log entry below carries the detail and the two things it
-newly asserts. Two consequences a reader will otherwise miss:
+newly asserts. (⚠ Since Step 4a, 2026-10-18, the digest is no longer the text's: each file is
+recorded as `{sources, values}` over its parsed content — see that date's log entry.) Two consequences a reader will otherwise miss:
 
 - **The completeness gates changed meaning without changing their arithmetic.** They used
   to say *the manifest froze everything Python has*; they now say *Python still matches the

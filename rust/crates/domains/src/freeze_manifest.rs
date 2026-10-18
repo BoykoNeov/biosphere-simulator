@@ -660,7 +660,7 @@ const AUTHORITY: [(&str, &str, &str); 19] = [
     ),
 ];
 
-const COMMENT: &str = "Phase-4 freeze manifest (P4.3). Names the frozen biosphere reference surface. See docs/biosphere-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Each key's producer and why is in _authority: this file has MIXED authority since slice 6 of the reference flip. Regenerate on a deliberate unfreeze, from rust/: cargo run --example dump_biosphere_inventory -- --write-manifest. Slice C7 moved the WRITER to the reference; tests/test_freeze_manifest.py has none and is now only a checker.";
+const COMMENT: &str = "Phase-4 freeze manifest (P4.3). Names the frozen biosphere reference surface. See docs/biosphere-reference.md for the freeze contract + the unfreeze discipline. Hashes are sha-256 PROVENANCE (value enforcement is the scenario goldens): a data file's over its newline-normalized text, a param file's two over its parsed values and its source strings (since Step 4a, 2026-10-18). Each key's producer and why is in _authority: this file has MIXED authority since slice 6 of the reference flip. Regenerate on a deliberate unfreeze, from rust/: cargo run --example dump_biosphere_inventory -- --write-manifest. Slice C7 moved the WRITER to the reference; tests/test_freeze_manifest.py has none and is now only a checker.";
 
 /// The `_authority` block as JSON.
 fn authority_json() -> Json {
