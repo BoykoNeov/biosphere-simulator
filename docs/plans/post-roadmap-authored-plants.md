@@ -635,3 +635,32 @@ suite green (103 test binaries), clippy clean. Pinned in `station/tests/chamber_
 * ⚠ **The test's first draft was wrong, not the code:** the re-sow fires when the development stage
   reads 2, and with the potato's non-integer sums (314.29 + 733.33) that is a few ulps BELOW the sum of
   the sums. Wheat's 1100 + 750 hid it. The threshold is now found from the stage function itself.
+
+### 17b. Slice 2 BUILT 2026-10-18 — the authoring unfreeze
+
+`BED_CROPS` is `["wheat", "potato"]`; `bed_scenario` maps the name to `Crop` and calls `with_crop`;
+the refusal text, `bed.rs`/`schema.rs` docs and `authoring-reference.md` (the grammar block, a bullet,
+the unfreeze log) say so. **Manifest regenerated, measured as predicted:** `bed_crops` gains `potato`
+and its note's text changes — 3 lines in, 2 out; nothing else.
+
+**The maturity day, predicted before the first run.** The chamber holds 22 °C, above the potato's
+18 °C cap, so its thermal time grows 18 − 7 = 11 °C·d a day; stage 2 (314.29 + 733.33 = 1047.62) falls
+on day 95.2, so the re-sow is at the start of day 96, plant step 1536. **Measured: 1536**, 150 days,
+nothing rationed, no reversal (`bed.rs`, `--ignored`, ~40 s).
+
+**Five mutations, each red under `--no-fail-fast`** (station `chamber_crop` + `sowing_clock`,
+authoring `bed`, ignored tests included):
+
+| Mutation | Red |
+|---|---|
+| the re-sow resets with wheat's params | 1 (the station's hook test) |
+| the maturity threshold is wheat's | 3 (incl. the 150-day bed run) |
+| the potato keeps the cold program | 3 |
+| the bed builds wheat whatever it names | 3 |
+| the season is built from wheat's params | 3 |
+
+* The first is caught only at the hook, and that is the right place: the plant registry is built once
+  from the crop's params, so a re-sow's params reach only the seedling's starting values (its leaf area
+  shading the soil), and no bed test pins those. The hook test compares them directly.
+* **Offered, not built:** an example `scenarios/*.yaml` potato habitat (every authored file runs its
+  full horizon in the content sweep).

@@ -6,7 +6,7 @@
     },
     "bed_crops": {
       "side": "rust",
-      "why": "bed::BED_CROPS \u2014 the crops a bed: may grow, the list bed_scenario refuses against (LOAD-BEARING like ref_keywords). wheat only: the chamber's plants are built from the wheat params (2026-10-18, docs/plans/post-roadmap-authored-plants.md)"
+      "why": "bed::BED_CROPS \u2014 the crops a bed: may grow, the list bed_scenario refuses against (LOAD-BEARING like ref_keywords). wheat (2026-10-18) and potato (2026-10-18, \u00a717): each name maps to station::scenario::Crop, whose params, phenology, season switches and cold program follow from it (docs/plans/post-roadmap-authored-plants.md)"
     },
     "bed_stocks": {
       "side": "rust",
@@ -71,7 +71,8 @@
   },
   "_comment": "Phase-9 Step-7 authoring freeze manifest (P9.7). Names the frozen AUTHOR-FACING platform surface: the bounded kinetics grammar + VM node/op set, the scenario file schema, the author-selectable flow-type registry, and the named param loaders. Param VALUES are delegated to docs/station-reference.manifest.json (see delegates_to). See docs/authoring-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (grammar semantics are enforced by parse_vectors.txt, the VM's arithmetic by traj_vectors.txt, and the interpreter by the crossport anchors). Each key's producer and why is in _authority: this file has MIXED authority since slice 8 of the reference flip, and 'rust' means something weaker here than on the other two manifests (there is no built registry to walk \u2014 see authoring::surface). Regenerate on a deliberate unfreeze, from rust/: cargo run --example dump_authoring_inventory -- --write-manifest. Slice C7 moved the WRITER to the reference; tests/test_authoring_freeze_manifest.py has none and is now only a checker.",
   "bed_crops": [
-    "wheat"
+    "wheat",
+    "potato"
   ],
   "bed_stocks": [
     "biosphere.carbon_pool",

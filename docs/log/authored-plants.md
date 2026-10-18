@@ -131,3 +131,20 @@ separated, outrunning uptake under the cold program's dim lamp.
   when only the O₂ target was a share of the air; §15b made the condenser's a share too, and nothing
   re-asked which flows the bed's check should cover. A flow-type property (`needs_cabin_air`) had
   grown a second member, and a rule keyed on one type name did not follow it.
+
+**A POTATO BED BUILT 2026-10-18** (plan §17, on the user's *"1"* — §14's last leftover). The chamber had
+been wheat in five places: the season's params, the re-sow's params, the maturity threshold, the season's
+crop switches and the cold program. Now it is one value, `SealedStationScenario::crop`, and the other
+four follow from it; the stored phenology field is gone. Two commits: the station half bit-neutral
+(0 of 20 goldens, no manifest), then the authoring unfreeze (`bed_crops` += `potato`, one manifest
+value and its note). The potato has no cold program. Predicted before running: a re-sow at the start
+of day 96 (11 °C·d a day at 22 °C, capped at the potato's 18); measured 1536 = 96 × 16. Five mutations
+each red.
+
+* **Lesson: a crop switch that is half done passes every check a run has.** A part-wheat potato bed
+  would build, conserve, never ration and repeat. The defence is structural (one value, the rest
+  derived) plus tests that compare each derived value with the crop's own, and a run long enough to
+  pass the first re-sow, with its day predicted from the crop's sums.
+* **Lesson: a threshold test written with integer constants can hide a rounding edge.** Wheat's sums
+  are whole, so "one ulp below the sum of the sums" was immature; the potato's are not, and the stage
+  reads 2 a few ulps earlier. Find the edge from the function, not from the arithmetic.

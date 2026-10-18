@@ -780,7 +780,7 @@ an author composes it; the kinetics grammar is **not** grown to spell photosynth
 dt: 60.0                 # the FAST step (s); must divide a day
 steps: 4320              # fast steps; must be whole days
 bed:
-  crop: wheat            # bed_crops: wheat only (the chamber's plants are built from wheat params)
+  crop: wheat            # bed_crops: wheat | potato (the crop's params, phenology and cold follow from it)
   plant_steps_per_day: 16   # the plant step — the science is measured at 16 only; others run, unexamined
   lamp_power_w: 200.0    # optional; the reference's 200
   photoperiod_hours: 16  # optional; the reference's 16
@@ -806,6 +806,12 @@ bed:
   small rooms the CO₂ climbs (17 000 ppm by day 30 at 27.7 mol), the chamber's respiration (plants and
   soil, not separated) outrunning the crop's uptake under the cold program's dim lamp, not a fault the
   platform refuses.
+* **The crop is `wheat` or `potato`** (2026-10-18; wheat only until then). A crop is the station's
+  own (`station::scenario::Crop`): its params, its phenology (the `maturity` re-sow's threshold), its
+  season switches and its cold program all follow from the name, so a bed cannot be part one crop and
+  part the other. The potato has **no cold program** — the eight weeks at 4 °C vernalize wheat — so a
+  potato bed is warm with the full lamp from its sowing. ⚠ The potato is authored, not validated: its
+  canopy reads 2.79× low against WOFOST (`docs/log/potato-crop.md`).
 * **An author forcing may not take a name the chamber reads** (its lamp program, setpoint program,
   outdoor temperature, or the plant program variables).
 * **A re-sow draws its seed from the old crop's grain** (`annual_reset`): a calendar that re-sows a
@@ -1108,6 +1114,17 @@ vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — a bed may grow potatoes (§17 of `docs/plans/post-roadmap-authored-plants.md`, the
+  user's "1").** `bed_crops` is `wheat`, `potato`; each name maps to `station::scenario::Crop`, whose
+  params, phenology (the `maturity` re-sow's threshold), season switches and cold program follow from
+  it — the potato has no cold program. **Manifest diff, predicted and measured: the `bed_crops` value
+  and its `_authority` note, nothing else; the biosphere and station manifests and all 20 goldens
+  unchanged** (the station half landed bit-neutral first). Pinned in `authoring/tests/bed.rs`: a
+  potato bed is the station's potato chamber (scenario, starting values, stocks) and starts unlike the
+  wheat bed; it runs clean and repeats; over 150 days (`--ignored`) it re-sows at plant step 1536, the
+  start of day 96 — predicted before running from the potato's sums alone (11 °C·d a day at the
+  chamber's 22 °C, capped at 18 °C; stage 2 at 1047.62 °C·d). Five mutations, each red under
+  `--no-fail-fast`. ⚠ Authored, not validated: the potato's canopy reads 2.79× low against WOFOST.
 - **2026-10-18 — an authored condenser declares its cabin's air (§15c of
   `docs/plans/post-roadmap-authored-plants.md`, the user's "9500 for both").** `eclss.condenser`'s
   `needs_cabin_air` becomes true: `cabin_air_mol` is required on it, no default, and it holds

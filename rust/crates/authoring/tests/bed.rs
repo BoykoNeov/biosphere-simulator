@@ -232,7 +232,7 @@ fn any_plant_step_the_driver_can_interleave_runs() {
 
 #[test]
 fn every_named_refusal_fires() {
-    refused(&edited("crop: wheat", "crop: potato"), "not a crop");
+    refused(&edited("crop: wheat", "crop: rice"), "not a crop");
     refused(&edited("dt: 60.0", "dt: 7.0"), "whole steps");
     refused(&edited("steps: 4320", "steps: 4000"), "whole days");
     refused(
@@ -418,4 +418,66 @@ fn the_example_greenhouse_matures_and_resows_over_a_season() {
         sown >= 139.0 * 16.0,
         "the crop was never re-sown at maturity (last sowing at step {sown})"
     );
+}
+
+/// The fixture growing potatoes (`bed.crop: potato`, 2026-10-18, plan §17).
+fn potato_bed() -> String {
+    edited("crop: wheat", "crop: potato")
+}
+
+/// A potato bed is the station's potato chamber: the crop, and everything that follows from it —
+/// params, phenology, switches, no cold program — and every starting value its builder gives.
+#[test]
+fn a_potato_bed_is_the_stations_potato_chamber() {
+    let doc = parse_document(&potato_bed()).unwrap();
+    let spec = ScenarioSpec::from_yaml(&doc).unwrap().bed.unwrap();
+    let (scenario, _) = authoring::bed::bed_scenario(&spec, 60.0, 4320).unwrap();
+    let mut reference = station::scenario::sealed_station_scenario()
+        .with_crop(station::scenario::Crop::Potato);
+    // The bed's horizon is its own (`steps`); the rest is the station's potato chamber.
+    reference.years = scenario.years;
+    assert_eq!(format!("{scenario:?}"), format!("{reference:?}"));
+    assert_eq!(scenario.cold.days, 0, "a potato bed has no cold program");
+    let bed = build(&potato_bed()).expect("a potato bed builds");
+    let plants = station::plant_chamber::chamber_plants(&reference).unwrap();
+    for (key, value) in &plants.aux {
+        assert_eq!(
+            bed.state.aux[key].to_bits(),
+            value.to_bits(),
+            "starting value {key:?} is not the potato chamber's"
+        );
+    }
+    for (id, stock) in &plants.stocks {
+        assert_eq!(&bed.state.stocks[id], stock, "stock {id:?}");
+    }
+    let wheat = build(&fixture()).unwrap();
+    assert_ne!(
+        format!("{:?}", bed.state.aux),
+        format!("{:?}", wheat.state.aux),
+        "a potato bed starts as the wheat bed does"
+    );
+}
+
+/// A potato bed runs clean, repeats, and ends differently from the wheat bed.
+#[test]
+fn a_potato_bed_runs_clean_and_repeats() {
+    let first = final_bits(&potato_bed());
+    assert_eq!(first, final_bits(&potato_bed()), "two runs ended differently");
+    assert_ne!(first, final_bits(&fixture()), "the crop changed nothing in the run");
+}
+
+/// Past its first maturity, a potato bed re-sows on the POTATO's phenology. Predicted before the
+/// first run from the potato's sums alone: the chamber holds 22 °C, above the potato's 18 °C cap,
+/// so its thermal time grows 18 − 7 = 11 °C·d a day, and development stage 2 (314.29 + 733.33 =
+/// 1047.62 °C·d) is reached on day 95.2 — the re-sow is at the start of day 96, plant step 1536.
+/// Wheat's sums (1850) would not mature by day 150 at that rate, and wheat's cold program (56 days
+/// at 4 °C, below the potato's 7 °C base) would hold it back to about day 151. Slow, so `--ignored`.
+#[test]
+#[ignore = "slow: a 150-day bed run"]
+fn a_potato_bed_resows_at_the_potatos_own_maturity() {
+    let yaml = potato_bed().replace("steps: 4320", "steps: 216000");
+    let result = run_scenario(build(&yaml).unwrap()).expect("150 days run clean");
+    assert_eq!(result.total_rationed, 0);
+    assert!(result.first_reversal.is_none());
+    assert_eq!(result.final_state.aux[station::sowing::SOWN_STEP], 1536.0);
 }

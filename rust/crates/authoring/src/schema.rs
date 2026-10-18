@@ -295,7 +295,8 @@ pub struct ScenarioSpec {
 /// author's stocks through three ports. Everything not named here is the reference's.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BedSpec {
-    /// The crop. `wheat` only: the chamber's plants are built from the wheat params.
+    /// The crop: `wheat` or `potato` (`bed::BED_CROPS`). Its science follows from the name
+    /// (`station::scenario::Crop`).
     pub crop: String,
     /// The plant step, as whole steps per day. ⚠ The plant science is measured at 16 (the
     /// reference's 1/16 day); any other value is allowed and unexamined.

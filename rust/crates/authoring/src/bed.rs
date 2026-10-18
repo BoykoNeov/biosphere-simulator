@@ -6,7 +6,8 @@
 //! station's own scenario type with an allow-listed set of fields changed ([`BedSpec`]). The
 //! science is written once, in Rust; the author composes it.
 //!
-//! **What an author decides** (the user's answers, 2026-10-18): the re-sow calendar, the plant
+//! **What an author decides** (the user's answers, 2026-10-18): the crop (`wheat` or `potato`,
+//! since §17), the re-sow calendar, the plant
 //! step, the lamp, the chamber's air (`air_mol`, the reference's 9500 when absent; the starting
 //! CO₂ and O₂ scale with it), what the walls face, and the three stocks the chamber connects to — the
 //! energy store its lamp and heater draw from, the heat store its cooler feeds, and (for walls
@@ -15,7 +16,11 @@
 //! names them directly. An author may not *declare* a stock with one of those ids.
 //!
 //! **What an author cannot change**, by design rather than omission:
-//! * the crop (`wheat` only — the chamber's plants are built from the wheat params);
+//! * the crop's science: a crop is the station's own ([`station::scenario::Crop`]) — its params,
+//!   its phenology, its season switches and its cold program all follow from the name. The potato
+//!   has no cold program (the cold vernalizes wheat), and it is authored, not validated: its canopy
+//!   reads 2.79× low against WOFOST (`docs/log/potato-crop.md`) and it had never run in a lamp-lit
+//!   room before the bed (`docs/plans/post-roadmap-authored-plants.md` §17);
 //! * the size an author regulator assumes: an O₂ regulator on the bed's O₂ and a condenser on
 //!   its vapour aim at a share of the air they declare, so each must declare exactly the bed's
 //!   air (fixed at 9500 mol until 2026-10-18, when `eclss.yaml`'s humidity target became a
@@ -44,7 +49,7 @@ use station::plant_chamber::{
     assemble_chamber_habitat, chamber_fast_forcings, chamber_plants, chamber_reset_hook,
     chamber_start_stocks, ChamberPorts, ResowRule,
 };
-use station::scenario::SealedStationScenario;
+use station::scenario::{Crop, SealedStationScenario};
 use station::sowing::{FAST_PROGRAM_VARS, PLANT_PROGRAM_VARS};
 
 use crate::errors::AuthoringError;
@@ -56,7 +61,7 @@ use crate::schema::{BedResowSpec, BedSpec, BedSurroundingsSpec, ScenarioSpec};
 use crate::template::eval_numeric_field;
 
 /// The crops a bed may grow.
-pub const BED_CROPS: &[&str] = &["wheat"];
+pub const BED_CROPS: &[&str] = &["wheat", "potato"];
 
 /// What a bed file's run needs beyond [`BuiltScenario`]'s common fields.
 pub struct BedRun {
@@ -82,13 +87,15 @@ pub fn bed_scenario(
     dt: f64,
     steps: u64,
 ) -> Result<(SealedStationScenario, u64), AuthoringError> {
-    if !BED_CROPS.contains(&bed.crop.as_str()) {
-        return Err(AuthoringError::new(format!(
-            "bed.crop: {:?} is not a crop a bed can grow (known: {BED_CROPS:?}); the chamber's \
-             plants are built from the wheat params",
-            bed.crop
-        )));
-    }
+    let crop = match bed.crop.as_str() {
+        "wheat" => Crop::Wheat,
+        "potato" => Crop::Potato,
+        other => {
+            return Err(AuthoringError::new(format!(
+                "bed.crop: {other:?} is not a crop a bed can grow (known: {BED_CROPS:?})"
+            )))
+        }
+    };
     if !(dt.is_finite() && dt > 0.0) {
         return Err(AuthoringError::new(format!(
             "a bed file's dt is its fast step in seconds and must be > 0, got {dt}"
@@ -118,7 +125,7 @@ pub fn bed_scenario(
                 .to_string(),
         ));
     }
-    let mut scenario = station::scenario::sealed_station_scenario();
+    let mut scenario = station::scenario::sealed_station_scenario().with_crop(crop);
     if let Some(w) = bed.lamp_power_w {
         if !(w.is_finite() && w > 0.0) {
             return Err(AuthoringError::new(format!(
