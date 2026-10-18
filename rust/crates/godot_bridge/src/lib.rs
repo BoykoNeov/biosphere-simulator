@@ -228,6 +228,17 @@ pub(crate) fn build_session_from_file(
     // is defensible. It was decided, not inherited.
     let built = authoring::load_scenario_allowing_unsafe_step(path, overrides)
         .map_err(|e| SimError::Validation(format!("authoring: {}", e.message)))?;
+    // A crop bed runs on the station's two-rate day driver, with a re-sow hook; a file-loaded
+    // session here is single-rate. Refused by name (2026-10-18), not left to the multi-rate
+    // check below, whose message would send the author to drop keys a bed file does not have.
+    if built.bed.is_some() {
+        return Err(SimError::Validation(format!(
+            "godot_bridge: file-loaded scenario {:?} carries a crop bed, which runs on the \
+             station's two-rate day driver; a file-loaded session is single-rate only. Run it \
+             headless via authoring::run_scenario.",
+            built.name
+        )));
+    }
     if built.integrator != "euler" {
         return Err(SimError::Validation(format!(
             "godot_bridge: file-loaded scenario {:?} requested integrator {:?}, but a \
@@ -1550,6 +1561,25 @@ mod tests {
                  single-rated at the master cadence"
             );
         });
+    }
+
+    #[test]
+    fn build_session_from_file_rejects_a_crop_bed_by_name() {
+        // A crop bed runs on the station's two-rate day driver with a re-sow hook; a
+        // file-loaded session is single-rate. Refused BY NAME, so the author is not sent to
+        // drop multi-rate keys a bed file does not have.
+        let path = scenarios_dir().join("crop_bed.yaml");
+        assert!(
+            authoring::load_scenario(&path, &BTreeMap::new()).is_ok(),
+            "the bed file must be VALID, or the bridge refusal is vacuous"
+        );
+        match build_session_from_file(&path, &BTreeMap::new()) {
+            Err(SimError::Validation(message)) => {
+                assert!(message.contains("crop bed"), "{message}")
+            }
+            Err(other) => panic!("refused for the wrong reason: {other:?}"),
+            Ok(_) => panic!("a crop-bed file must be refused by the single-rate session"),
+        }
     }
 
     #[test]

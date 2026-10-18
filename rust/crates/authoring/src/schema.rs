@@ -52,7 +52,28 @@ pub const SCENARIO_KEYS: &[&str] = &[
     "flows",
     "forcings",
     "n_sub",
+    "bed",
 ];
+
+/// `BedSpec` — the one lamp-lit crop bed a scenario may carry (2026-10-18,
+/// `docs/plans/post-roadmap-authored-plants.md`).
+pub const BED_KEYS: &[&str] = &[
+    "crop",
+    "plant_steps_per_day",
+    "lamp_power_w",
+    "photoperiod_hours",
+    "surroundings",
+    "power",
+    "heat_sink",
+    "space",
+    "resow",
+];
+
+/// `BedSurroundingsSpec` — the mapping forms of a bed's `surroundings` (exactly one key).
+pub const BED_SURROUNDINGS_KEYS: &[&str] = &["space", "cabin"];
+
+/// `BedResowSpec` — the mapping form of a bed's `resow`.
+pub const BED_RESOW_KEYS: &[&str] = &["every_days"];
 
 /// `IncludeSpec` — the `{bundle, prefix}` mapping form of an include.
 pub const INCLUDE_KEYS: &[&str] = &["bundle", "prefix"];
@@ -263,6 +284,61 @@ pub struct ScenarioSpec {
     /// governs the **fast set only**: a slow flow steps at `dt/2` however large `n_sub`
     /// grows.
     pub n_sub: u32,
+    /// The scenario's one lamp-lit crop bed, if any ([`BedSpec`]). A file with a bed runs on
+    /// the station's day driver: `dt` is the fast (cabin) step, `steps` the fast steps.
+    pub bed: Option<BedSpec>,
+}
+
+/// A lamp-lit crop bed: the station's plant chamber, built by the reference's own builder
+/// (`station::plant_chamber`), configured by an allow-listed set of fields and wired to the
+/// author's stocks through three ports. Everything not named here is the reference's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BedSpec {
+    /// The crop. `wheat` only: the chamber's plants are built from the wheat params.
+    pub crop: String,
+    /// The plant step, as whole steps per day. ⚠ The plant science is measured at 16 (the
+    /// reference's 1/16 day); any other value is allowed and unexamined.
+    pub plant_steps_per_day: u64,
+    /// The lamp's on-window power (W); the reference's 200 when absent.
+    pub lamp_power_w: Option<f64>,
+    /// The lamp's photoperiod (whole hours); the reference's 16 when absent.
+    pub photoperiod_hours: Option<u64>,
+    /// What the chamber's walls face — required, no default.
+    pub surroundings: BedSurroundingsSpec,
+    /// The author's energy stock the lamp and the chamber's heater draw from.
+    pub power: String,
+    /// The author's energy stock the chamber's cooler and latent-heat coil hand heat to.
+    pub heat_sink: String,
+    /// The author's energy stock the walls radiate to — required under `surroundings: {space}`
+    /// and refused otherwise.
+    pub space: Option<String>,
+    /// When the crop is re-sown — required, no default.
+    pub resow: BedResowSpec,
+}
+
+/// What a bed's walls face (`station::chamber::ChamberSurroundings`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum BedSurroundingsSpec {
+    /// `outdoor` — the reference: the weather's daily temperature.
+    Outdoor,
+    /// `structure` — the author's `heat_sink` (lab form, unvalidated).
+    Structure,
+    /// `{space: ε*}` — deep space through a blanket of effective emittance ε* (lab form,
+    /// WHAT-IF: ε* has no source).
+    Space(f64),
+    /// `{cabin: T}` — a cabin held at `T` kelvin (lab form, unvalidated).
+    Cabin(f64),
+}
+
+/// When a bed's crop is re-sown (`station::plant_chamber::ResowRule`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum BedResowSpec {
+    /// `maturity` — when the crop reaches development stage 2 (the sealed station's rule).
+    Maturity,
+    /// `never` — one crop.
+    Never,
+    /// `{every_days: N}` — every N days after the last sowing.
+    EveryDays(u64),
 }
 
 impl ScenarioSpec {
@@ -316,6 +392,10 @@ impl ScenarioSpec {
             None => Vec::new(),
             Some(value) => parse_forcings(value)?,
         };
+        let bed = match field(entries, "bed") {
+            None => None,
+            Some(value) => Some(parse_bed(value)?),
+        };
         Ok(ScenarioSpec {
             name,
             integrator,
@@ -328,8 +408,73 @@ impl ScenarioSpec {
             flows,
             forcings,
             n_sub,
+            bed,
         })
     }
+}
+
+/// Bind a `bed:` mapping (a shape check only; the interpreter rules on the graph).
+fn parse_bed(value: &YamlValue) -> Result<BedSpec, AuthoringError> {
+    let ctx = "bed";
+    let entries = value.as_mapping(ctx)?;
+    reject_unknown_keys(entries, BED_KEYS, ctx)?;
+    let surroundings = match require_field(entries, "surroundings", ctx)? {
+        v @ YamlValue::Scalar { .. } => match scalar_str(v, "bed.surroundings")?.as_str() {
+            "outdoor" => BedSurroundingsSpec::Outdoor,
+            "structure" => BedSurroundingsSpec::Structure,
+            other => {
+                return Err(AuthoringError::new(format!(
+                    "bed.surroundings: {other:?} is not one of outdoor, structure, \
+                     {{space: <effective emittance>}}, {{cabin: <temperature K>}}"
+                )))
+            }
+        },
+        v => {
+            let inner = v.as_mapping("bed.surroundings")?;
+            reject_unknown_keys(inner, BED_SURROUNDINGS_KEYS, "bed.surroundings")?;
+            match inner {
+                [(key, _)] if key == "space" => {
+                    BedSurroundingsSpec::Space(require_f64(inner, "space", "bed.surroundings")?)
+                }
+                [(key, _)] if key == "cabin" => {
+                    BedSurroundingsSpec::Cabin(require_f64(inner, "cabin", "bed.surroundings")?)
+                }
+                _ => {
+                    return Err(AuthoringError::new(
+                        "bed.surroundings: give exactly one of {space: …} or {cabin: …}"
+                            .to_string(),
+                    ))
+                }
+            }
+        }
+    };
+    let resow = match require_field(entries, "resow", ctx)? {
+        v @ YamlValue::Scalar { .. } => match scalar_str(v, "bed.resow")?.as_str() {
+            "maturity" => BedResowSpec::Maturity,
+            "never" => BedResowSpec::Never,
+            other => {
+                return Err(AuthoringError::new(format!(
+                    "bed.resow: {other:?} is not one of maturity, never, {{every_days: N}}"
+                )))
+            }
+        },
+        v => {
+            let inner = v.as_mapping("bed.resow")?;
+            reject_unknown_keys(inner, BED_RESOW_KEYS, "bed.resow")?;
+            BedResowSpec::EveryDays(require_u64(inner, "every_days", "bed.resow")?)
+        }
+    };
+    Ok(BedSpec {
+        crop: require_str(entries, "crop", ctx)?,
+        plant_steps_per_day: require_u64(entries, "plant_steps_per_day", ctx)?,
+        lamp_power_w: opt_f64(entries, "lamp_power_w", ctx)?,
+        photoperiod_hours: opt_u64(entries, "photoperiod_hours", ctx)?,
+        surroundings,
+        power: require_str(entries, "power", ctx)?,
+        heat_sink: require_str(entries, "heat_sink", ctx)?,
+        space: opt_str(entries, "space", ctx)?,
+        resow,
+    })
 }
 
 /// Parse an optional `stocks:` sequence (shared by `ScenarioSpec` and `BundleSpec`);

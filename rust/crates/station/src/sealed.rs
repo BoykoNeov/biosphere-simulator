@@ -26,7 +26,7 @@ use domains::biosphere::stocks::{
 use domains::biosphere::params::PhenologyParams;
 use domains::biosphere::science;
 use domains::biosphere::system::{
-    annual_reset_with, weather_forcings, weather_shared,
+    weather_forcings, weather_shared,
 };
 use domains::crew::{
     CrewParams, WaterBalance, FECAL_WASTE, FOOD_INTAKE_VAR, FOOD_STORE, WATER_BALANCE,
@@ -56,7 +56,7 @@ use simcore::state::{State, Stock};
 
 use crate::chamber::{
     chamber_heat0, plants_read_chamber, require_step_within_response, ChamberParams,
-    ChamberSurroundings, CHAMBER, CHAMBER_SETPOINT_VAR, OUTDOOR_TEMP_VAR,
+    ChamberSurroundings, CHAMBER, CHAMBER_SETPOINT_VAR,
 };
 use crate::driver::{run_master_day, OwnedResetHook};
 use crate::flows::{
@@ -68,10 +68,11 @@ use crate::gas_exchange::{
 };
 use crate::lighting::{lamp_light_path, lamp_lit_fraction_path, lamp_net_radiation_path};
 use crate::plant_chamber::{
-    chamber_flows, chamber_latent_heat_flow, chamber_plants, chamber_start_stocks, ChamberPorts,
+    chamber_fast_forcings, chamber_flows, chamber_latent_heat_flow, chamber_plants,
+    chamber_reset_hook, chamber_start_stocks, ChamberPorts, ResowRule,
 };
 use crate::scenario::{Phase, SealedStationScenario};
-use crate::sowing::{insert_twins, on_sowing_clock, sow_now, PLANT_PROGRAM_VARS};
+use crate::sowing::{insert_twins, on_sowing_clock, PLANT_PROGRAM_VARS};
 use crate::stocks::{
     cabin_h2o_stock, co2_composition, food_store_stock, gas_boundary, o2_composition,
     water_store_stock,
@@ -584,16 +585,6 @@ pub fn sealed_fast_resolver(
         WATER_INTAKE_VAR.to_string(),
         constant(scenario.cabin.water_intake_rate)?,
     );
-    // The lamp's draw follows the cold program (slice 3b), switched with its light since
-    // 2026-10-15 ([`switched_lamp_draw_for`]). ⚠ The efficacy is `lamp.yaml`'s, as the plant
-    // side's PAR is built from the `LampParams` its caller passes: a caller passing a modified
-    // efficacy there would see cold PAR and cold draw disagree (none does).
-    insert_twins(
-        &mut forcings,
-        LAMP_POWER_VAR,
-        switched_lamp_draw_for(scenario, Phase::Cold)?,
-        switched_lamp_draw_for(scenario, Phase::Warm)?,
-    );
     forcings.insert(
         SOLAR_POWER_VAR.to_string(),
         constant(mean_solar_power(scenario))?,
@@ -602,8 +593,9 @@ pub fn sealed_fast_resolver(
         LOAD_POWER_VAR.to_string(),
         constant(balanced_load_w(charge, &scenario.power))?,
     );
-    forcings.insert(OUTDOOR_TEMP_VAR.to_string(), outdoor_temperature(scenario)?);
-    chamber_setpoint_twins(&mut forcings, scenario, &crate::params::chamber())?;
+    // The plant chamber's own: the lamp's draw, the walls' outdoor temperature, the setpoint
+    // program (`plant_chamber::chamber_fast_forcings`, one copy for the station and a bed).
+    forcings.extend(chamber_fast_forcings(scenario)?);
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }
 
@@ -740,22 +732,7 @@ pub fn outdoor_temperature(
 /// matures (a chamber too warm to vernalize it) is never re-sown. Until stage 2 it fired on a
 /// fixed `season_days` calendar, every 305 days.
 pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
-    let bio = scenario.bio;
-    let pheno = scenario.pheno;
-    // `annual_reset_with` and the params the season was built from (`build_season` takes
-    // `params::biosphere()`): identical to `annual_reset` on every frozen build, and it also
-    // re-sows the lab forms' state values, which the plain reset refuses
-    // (`docs/plans/post-roadmap-soil-evaporation.md` §10).
-    let params = crate::lighting::room_params();
-    Box::new(
-        move |_n: u64, current: &State| -> Result<Option<State>, SimError> {
-            if is_mature(current, &pheno)? {
-                Ok(Some(sow_now(annual_reset_with(current, &bio, &params)?)?))
-            } else {
-                Ok(None)
-            }
-        },
-    )
+    chamber_reset_hook(scenario, ResowRule::Maturity)
 }
 
 /// Has `state`'s crop matured — its development stage at 2 ([`science::development_stage`] of

@@ -215,7 +215,12 @@ fn allowed_edges(krate: &str) -> &'static [&'static str] {
         "simcore" => &[],
         "config" => &[],
         "domains" => &["config", "simcore"],
-        "authoring" => &["config", "domains", "simcore"],
+        // `station` added 2026-10-18 (docs/plans/post-roadmap-authored-plants.md, slice 4): an
+        // authored crop bed IS the station's lamp-lit chamber, built by `station::plant_chamber`
+        // rather than copied. The authoring layer reaching DOWN to an engine crate is the
+        // layering's own direction (the reverse, station -> authoring, stays refused — the
+        // godot_bridge note calls that the inversion), and it closes no cycle.
+        "authoring" => &["config", "domains", "simcore", "station"],
         "station" => &["config", "domains", "simcore"],
         other => panic!("no layering rule recorded for engine crate {other:?}"),
     }

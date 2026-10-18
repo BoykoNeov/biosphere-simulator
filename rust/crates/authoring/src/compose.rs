@@ -119,6 +119,8 @@ pub fn apply_includes(
         // classes* of bundle-contributed flows do arrive here, which is exactly why the
         // partition is read from the POST-merge spec.
         n_sub: spec.n_sub,
+        // The scenario's alone, like the run config: a bundle cannot carry a bed.
+        bed: spec.bed.clone(),
     })
 }
 

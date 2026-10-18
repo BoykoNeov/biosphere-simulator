@@ -9,6 +9,7 @@ dependencies = [
  "config",
  "domains",
  "simcore",
+ "station",
 ]
 
 [[package]]

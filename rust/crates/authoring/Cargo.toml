@@ -21,3 +21,7 @@ path = "src/lib.rs"
 config = { path = "../config" }
 simcore = { path = "../simcore" }
 domains = { path = "../domains" }
+# The station's plant chamber, for an authored crop bed (2026-10-18): the bed IS the sealed
+# station's chamber, built by its own builder (station::plant_chamber), never a copy. station
+# does not depend on authoring, so this adds no cycle.
+station = { path = "../station" }

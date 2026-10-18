@@ -244,3 +244,40 @@ seedling's leaf area, the station's copy did not — a lab-only gap, now closed 
 
 **Proof:** `regen_goldens` 0 of 20 would change; all three manifests unchanged; the full suite and
 clippy (below).
+
+## 9. Slice 4 BUILT 2026-10-18 — the runner path and the bed block
+
+**Station side.** `plant_chamber` gained `chamber_fast_forcings` (the lamp's draw, the walls' outdoor
+temperature, the setpoint program — the sealed station's fast resolver now takes them from here),
+`ResowRule { Maturity, EveryDays(n), Never }` with `chamber_reset_hook` (the sealed station's hook is
+`Maturity`), and `assemble_chamber_habitat` — the sealed station's sequence (latent-heat books, gas
+exchange on the fast step, last wrappers) around any habitat's stocks and flows, checking that the
+habitat's ids are disjoint from the chamber's and that each port names an energy stock. The sealed
+station does not call it (its fast registry keeps its own order, byte for byte); the parts are shared.
+Proof of the refactor: 0 of 20 goldens; biosphere and station manifests unchanged.
+
+**Authoring side.** `bed:` (schema), `crate::bed` (`bed_scenario`: the sealed station's scenario with
+the allow-listed fields applied, `years` derived from the horizon so the weather never clamps;
+`bed_stock_ids`; `interpret_bed`), `BuiltScenario.bed: Option<BedRun>`, and `run_bed` on
+`advance_one_master_day`. The author's flows are built over the bed's stocks and theirs together, so
+"every stock" is a wiring, not a rename. Refused: another crop; a `dt` that does not divide a day; a
+horizon that is not whole days; rk4; `n_sub`/`rate_class: slow`; a port naming no stock or a non-energy
+stock; `space` given or missing against the surroundings; `every_days: 0`; an author stock with a bed
+id; an author forcing with a name the chamber reads; an O₂ regulator on the bed's air declaring any air
+but 9500.
+
+**Found while testing, kept as behaviour:** a re-sow draws its seed from the old crop's grain and
+harvests it, so a calendar that re-sows a crop with no grain (three days in, or the morning after a
+re-sow) is refused by `annual_reset` at that re-sow. The test pins the refusal and, with a seed bank
+set, the calendar's timing.
+
+**Slice 5 shrinks** to the example greenhouse: the re-sow calendar landed here.
+
+**A layering decision, made and flagged (2026-10-18).** `simcore/tests/workspace_purity.rs` allowed
+`authoring` to depend on `config`, `domains` and `simcore` only, and calls a new edge "an
+unfreeze-shaped decision". The bed needs `authoring → station`. Taken: it points from the authoring
+layer down to an engine crate — the layering's own direction (the reverse, `station → authoring`, stays
+refused; the godot bridge's notes call that the inversion) — and closes no cycle. The alternative,
+moving the station's chamber machinery (chamber heat, lamp, sowing clock, gas exchange, latent heat)
+down into `domains`, is far larger and riskier. The rule's comment records why; the user was told and
+may veto.

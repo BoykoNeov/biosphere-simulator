@@ -121,8 +121,10 @@ const COMMENT: &str = "Phase-9 Step-7 authoring freeze manifest (P9.7). Names th
 /// frozen text, and a re-anchoring that quietly reworded the contract would be a value
 /// change wearing a refactor's clothes. The one row that *is* reworded is
 /// `parity_vectors/*`, deliberately and as a stated diff — see the header.
-const AUTHORITY: [(&str, &str, &str); 15] = [
+const AUTHORITY: [(&str, &str, &str); 17] = [
     ("_comment", "hand", "prose header"),
+    ("bed_crops", "rust", "bed::BED_CROPS — the crops a bed: may grow, the list bed_scenario refuses against (LOAD-BEARING like ref_keywords). wheat only: the chamber's plants are built from the wheat params (2026-10-18, docs/plans/post-roadmap-authored-plants.md)"),
+    ("bed_stocks", "rust", "the stock ids a crop bed brings, DERIVED by building the reference bed (bed::bed_stock_ids over the sealed station's scenario, walls facing the outdoors) with the station's own builders — the ids an author's flows may wire to and an author's stocks may not take. A renamed plant or chamber stock moves this list, which is the point: it is part of what an authored file may say (2026-10-18)"),
     ("binary_ops", "rust", "BinaryOp::symbol() — the parser's and the S-expr renderer's own spelling. ⚠ Same half-derived shape as expr_nodes: the SYMBOLS are derived, the roster of three variants is hand-maintained. '/' is absent from the TYPE, not merely from the list, so an unsupported op is unrepresentable"),
     ("delegates_to", "hand", "pointer to the station manifest, which owns the param VALUES an authored file reaches through the named loaders. A path, not a derived value — its target's existence is checked by test_manifest_named_files_exist"),
     ("expr_nodes", "rust", "the node names of simcore::expr::Expr, via surface::expr_node_name's exhaustive match. ⚠ HALF-DERIVED: adding a variant is a COMPILE ERROR until someone names it, but the emitted list comes from surface::sample_nodes, a hand-maintained roster of one inhabitant per variant. Python's side is typing.get_args(Expr) and is genuinely derived — that is the checker's advantage on this axis, and it is why the conformance gate below still matters after the flip"),
@@ -135,7 +137,7 @@ const AUTHORITY: [(&str, &str, &str); 15] = [
     ("rate_classes", "rust", "interpreter::RATE_CLASSES, the list the interpreter validates a flow's rate_class against — load-bearing like ref_keywords. Closed at two by multirate_step's signature (it takes exactly two Substeppers), so a third cannot appear without a simcore change"),
     ("ref_keywords", "rust", "expr_parser::REF_KEYWORDS. ⚠ LOAD-BEARING, and the strongest tie on this contract: this is the table the parser tests an identifier against, so a name dropped here is not a mis-description, it is a form the grammar stops accepting — the parse vectors and the anchors go red"),
     ("reference_doc", "hand", "pointer to the prose half of the contract"),
-    ("schema_fields/*", "rust", "the eight schema::*_KEYS consts. ⚠ LOAD-BEARING on the values: each list IS the argument reject_unknown_keys refuses against, so it decides whether a committed scenario file loads at all. ⚠ The LABELS (ScenarioSpec, ParamPackRef, …) are Python class names typed by hand, and two name no Rust type at all (this port binds params: and includes: through enums) — they are contract names, the way crew.food_metabolism is. std::any::type_name was refused for slice 2's reason: its format is unspecified and a toolchain bump must not move a frozen manifest. ⚠ And the completeness half does NOT port: Python catches a whole new spec model by scanning its module; here a new spec is a new const nothing forces into the dump. The compile-forced version (a SpecKind enum threaded through reject_unknown_keys) was priced in slice 8 and deferred as its own change, per slice 7 declining locked_dt"),
+    ("schema_fields/*", "rust", "the schema::*_KEYS consts (eight until 2026-10-18; the bed added BedSpec, BedSurroundingsSpec and BedResowSpec). ⚠ LOAD-BEARING on the values: each list IS the argument reject_unknown_keys refuses against, so it decides whether a committed scenario file loads at all. ⚠ The LABELS (ScenarioSpec, ParamPackRef, …) are Python class names typed by hand, and two name no Rust type at all (this port binds params: and includes: through enums) — they are contract names, the way crew.food_metabolism is. std::any::type_name was refused for slice 2's reason: its format is unspecified and a toolchain bump must not move a frozen manifest. ⚠ And the completeness half does NOT port: Python catches a whole new spec model by scanning its module; here a new spec is a new const nothing forces into the dump. The compile-forced version (a SpecKind enum threaded through reject_unknown_keys) was priced in slice 8 and deferred as its own change, per slice 7 declining locked_dt"),
     ("step_token", "rust", "expr_parser::STEP_TOKEN, hoisted out of the lexer's ident match in slice 8 for the reason above: the token spliced here is the token that lowers to StepN. ⚠ NOT the integrator's treatment — that one stayed 'hand' on both other contracts because neither side had an importable name; this one does"),
 ];
 
@@ -199,6 +201,8 @@ fn reference_keys() -> Vec<(&'static str, Json)> {
         ),
         ("integrator_names", Json::strs(surface::integrator_names())),
         ("param_loaders", Json::strs(surface::param_loaders())),
+        ("bed_crops", Json::strs(crate::bed::BED_CROPS.iter().copied())),
+        ("bed_stocks", Json::strs(reference_bed_stocks())),
         ("rate_classes", Json::strs(surface::rate_classes())),
         ("ref_keywords", Json::strs(surface::ref_keywords())),
         (
@@ -211,6 +215,18 @@ fn reference_keys() -> Vec<(&'static str, Json)> {
         ),
         ("step_token", Json::s(surface::STEP_TOKEN)),
     ]
+}
+
+/// The stock ids the reference bed brings (walls facing the outdoors), sorted.
+fn reference_bed_stocks() -> Vec<String> {
+    let scenario = station::scenario::sealed_station_scenario();
+    let ids: Vec<String> =
+        crate::bed::bed_stock_ids(&scenario, station::chamber::ChamberSurroundings::Outdoor)
+            .expect("the reference bed builds")
+            .into_keys()
+            .collect();
+    assert!(!ids.is_empty(), "the reference bed brings no stocks");
+    ids
 }
 
 /// Print the reference's half of the manifest as JSON — the parity gate's input.

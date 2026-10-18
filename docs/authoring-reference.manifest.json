@@ -4,6 +4,14 @@
       "side": "hand",
       "why": "prose header"
     },
+    "bed_crops": {
+      "side": "rust",
+      "why": "bed::BED_CROPS \u2014 the crops a bed: may grow, the list bed_scenario refuses against (LOAD-BEARING like ref_keywords). wheat only: the chamber's plants are built from the wheat params (2026-10-18, docs/plans/post-roadmap-authored-plants.md)"
+    },
+    "bed_stocks": {
+      "side": "rust",
+      "why": "the stock ids a crop bed brings, DERIVED by building the reference bed (bed::bed_stock_ids over the sealed station's scenario, walls facing the outdoors) with the station's own builders \u2014 the ids an author's flows may wire to and an author's stocks may not take. A renamed plant or chamber stock moves this list, which is the point: it is part of what an authored file may say (2026-10-18)"
+    },
     "binary_ops": {
       "side": "rust",
       "why": "BinaryOp::symbol() \u2014 the parser's and the S-expr renderer's own spelling. \u26a0 Same half-derived shape as expr_nodes: the SYMBOLS are derived, the roster of three variants is hand-maintained. '/' is absent from the TYPE, not merely from the list, so an unsupported op is unrepresentable"
@@ -54,7 +62,7 @@
     },
     "schema_fields/*": {
       "side": "rust",
-      "why": "the eight schema::*_KEYS consts. \u26a0 LOAD-BEARING on the values: each list IS the argument reject_unknown_keys refuses against, so it decides whether a committed scenario file loads at all. \u26a0 The LABELS (ScenarioSpec, ParamPackRef, \u2026) are Python class names typed by hand, and two name no Rust type at all (this port binds params: and includes: through enums) \u2014 they are contract names, the way crew.food_metabolism is. std::any::type_name was refused for slice 2's reason: its format is unspecified and a toolchain bump must not move a frozen manifest. \u26a0 And the completeness half does NOT port: Python catches a whole new spec model by scanning its module; here a new spec is a new const nothing forces into the dump. The compile-forced version (a SpecKind enum threaded through reject_unknown_keys) was priced in slice 8 and deferred as its own change, per slice 7 declining locked_dt"
+      "why": "the schema::*_KEYS consts (eight until 2026-10-18; the bed added BedSpec, BedSurroundingsSpec and BedResowSpec). \u26a0 LOAD-BEARING on the values: each list IS the argument reject_unknown_keys refuses against, so it decides whether a committed scenario file loads at all. \u26a0 The LABELS (ScenarioSpec, ParamPackRef, \u2026) are Python class names typed by hand, and two name no Rust type at all (this port binds params: and includes: through enums) \u2014 they are contract names, the way crew.food_metabolism is. std::any::type_name was refused for slice 2's reason: its format is unspecified and a toolchain bump must not move a frozen manifest. \u26a0 And the completeness half does NOT port: Python catches a whole new spec model by scanning its module; here a new spec is a new const nothing forces into the dump. The compile-forced version (a SpecKind enum threaded through reject_unknown_keys) was priced in slice 8 and deferred as its own change, per slice 7 declining locked_dt"
     },
     "step_token": {
       "side": "rust",
@@ -62,6 +70,35 @@
     }
   },
   "_comment": "Phase-9 Step-7 authoring freeze manifest (P9.7). Names the frozen AUTHOR-FACING platform surface: the bounded kinetics grammar + VM node/op set, the scenario file schema, the author-selectable flow-type registry, and the named param loaders. Param VALUES are delegated to docs/station-reference.manifest.json (see delegates_to). See docs/authoring-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (grammar semantics are enforced by parse_vectors.txt, the VM's arithmetic by traj_vectors.txt, and the interpreter by the crossport anchors). Each key's producer and why is in _authority: this file has MIXED authority since slice 8 of the reference flip, and 'rust' means something weaker here than on the other two manifests (there is no built registry to walk \u2014 see authoring::surface). Regenerate on a deliberate unfreeze, from rust/: cargo run --example dump_authoring_inventory -- --write-manifest. Slice C7 moved the WRITER to the reference; tests/test_authoring_freeze_manifest.py has none and is now only a checker.",
+  "bed_crops": [
+    "wheat"
+  ],
+  "bed_stocks": [
+    "biosphere.carbon_pool",
+    "biosphere.chamber_inert",
+    "biosphere.condensate",
+    "biosphere.humus_carbon",
+    "biosphere.humus_n",
+    "biosphere.leaf_c",
+    "biosphere.litter_carbon",
+    "biosphere.litter_n",
+    "biosphere.microbial_carbon",
+    "biosphere.microbial_n",
+    "biosphere.o2_pool",
+    "biosphere.plant_n",
+    "biosphere.root_c",
+    "biosphere.soil_n",
+    "biosphere.soil_water",
+    "biosphere.stem_c",
+    "biosphere.stem_reserve_c",
+    "biosphere.storage_c",
+    "biosphere.subsoil_water",
+    "biosphere.water_vapor",
+    "boundary.chamber_surroundings",
+    "boundary.loss.carbon",
+    "boundary.n_source",
+    "thermal.chamber"
+  ],
   "binary_ops": [
     "*",
     "+",
@@ -258,6 +295,24 @@
   ],
   "reference_doc": "docs/authoring-reference.md",
   "schema_fields": {
+    "BedResowSpec": [
+      "every_days"
+    ],
+    "BedSpec": [
+      "crop",
+      "heat_sink",
+      "lamp_power_w",
+      "photoperiod_hours",
+      "plant_steps_per_day",
+      "power",
+      "resow",
+      "space",
+      "surroundings"
+    ],
+    "BedSurroundingsSpec": [
+      "cabin",
+      "space"
+    ],
     "BundleSpec": [
       "flows",
       "forcings",
@@ -289,6 +344,7 @@
       "pack"
     ],
     "ScenarioSpec": [
+      "bed",
       "dt",
       "flows",
       "forcings",

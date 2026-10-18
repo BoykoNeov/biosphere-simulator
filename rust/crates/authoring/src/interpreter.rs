@@ -134,6 +134,12 @@ pub struct BuiltScenario {
     ///
     /// Empty for every graph with no demand-controlled flow, which is most of them.
     pub demand_controlled: Vec<(String, f64)>,
+    /// The crop bed's run, for a file with a `bed:` ([`crate::bed`]); `None` otherwise. A bed
+    /// file runs on the station's day driver, not on the paths above: its plants are
+    /// `slow_registry` (on the plant step), everything else `fast_registry` (on `dt`),
+    /// `resolver` is the fast side's, and `registry` is EMPTY — there is no single-rate view
+    /// of a two-rate graph to offer.
+    pub bed: Option<crate::bed::BedRun>,
 }
 
 impl BuiltScenario {
@@ -201,6 +207,9 @@ fn interpret_inner(
 ) -> Result<BuiltScenario, AuthoringError> {
     let spec = apply_includes(spec, base_dir)?;
     let params = resolve_parameters(&spec.parameters, overrides)?;
+    if spec.bed.is_some() {
+        return crate::bed::interpret_bed(&spec, &params, allow_unsafe_step);
+    }
 
     let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
     for stock_spec in &spec.stocks {
@@ -285,6 +294,7 @@ fn interpret_inner(
         n_sub: spec.n_sub,
         has_authored_kinetics,
         demand_controlled,
+        bed: None,
     })
 }
 
@@ -332,7 +342,7 @@ fn load_scenario_inner(
 /// schema-level validator sees only the scenario's own inline `flows` — it would miss
 /// them, and (worse) would miss them silently, lowering a partitioned scenario as if it
 /// were single-rate.
-fn slow_flow_ids(spec: &ScenarioSpec) -> Result<BTreeSet<String>, AuthoringError> {
+pub(crate) fn slow_flow_ids(spec: &ScenarioSpec) -> Result<BTreeSet<String>, AuthoringError> {
     let mut slow = BTreeSet::new();
     for flow_spec in &spec.flows {
         if !RATE_CLASSES.contains(&flow_spec.rate_class.as_str()) {
@@ -441,7 +451,7 @@ fn rate_precondition_message(v: &RateViolation<'_>) -> String {
 /// declaring the shape but no param set is a **registry bug, not authored input**, and is
 /// raised loudly for [`check_rate_preconditions`]'s reason: a pair that cannot be read
 /// must never degrade to "assume it points the right way".
-fn resolve_demand_controlled(
+pub(crate) fn resolve_demand_controlled(
     spec: &ScenarioSpec,
     params: &BTreeMap<String, f64>,
 ) -> Result<Vec<(String, f64)>, AuthoringError> {
@@ -559,7 +569,10 @@ pub fn check_rate_preconditions(
 /// is derived from the quantity (never authored); an unknown quantity/kind is an
 /// [`AuthoringError`]; the deeper `Stock::new` invariants surface as `SimError` mapped
 /// to `AuthoringError`.
-fn build_stock(spec: &StockSpec, params: &BTreeMap<String, f64>) -> Result<Stock, AuthoringError> {
+pub(crate) fn build_stock(
+    spec: &StockSpec,
+    params: &BTreeMap<String, f64>,
+) -> Result<Stock, AuthoringError> {
     let amount = eval_numeric_field(&spec.amount, params, &format!("stock {:?} amount", spec.id))?;
     let quantity = Quantity::from_value(&spec.quantity).map_err(|_| {
         AuthoringError::new(format!(
@@ -598,7 +611,7 @@ fn build_stock(spec: &StockSpec, params: &BTreeMap<String, f64>) -> Result<Stock
 /// Lower one [`FlowSpec`] to a `Flow`: a frozen `type`, or authored `kinetics` (the
 /// `_build_flow` analogue). The schema has already guaranteed exactly one of
 /// `type`/`kinetics` is set.
-fn build_flow(
+pub(crate) fn build_flow(
     spec: &FlowSpec,
     stocks: &BTreeMap<String, Stock>,
     params: &BTreeMap<String, f64>,

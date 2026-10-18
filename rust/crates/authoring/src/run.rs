@@ -242,6 +242,11 @@ pub fn run_scenario_allowing_rationing(built: BuiltScenario) -> Result<RunResult
     // slow set reproduces the single-rate trajectory bit-for-bit, so routing everything
     // through the driver would also work — and would silently rest every golden on that
     // identity holding forever.
+    // A crop bed runs on the station's day driver (`crate::bed`); checked FIRST, because its
+    // plant registry would otherwise read as a multi-rate slow set and hit the aux tripwire.
+    if built.bed.is_some() {
+        return run_bed(built);
+    }
     if built.is_multirate() {
         check_no_aux(&built)?;
         return run_multirate(built);
@@ -363,6 +368,47 @@ fn run_multirate(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
         total_rationed += report.rationed;
         events.extend(report.events);
         watch_state(&watch, &state, n + 1, &mut first_reversal);
+    }
+    Ok(RunResult {
+        final_state: state,
+        total_rationed,
+        events,
+        first_reversal,
+    })
+}
+
+/// Drive a bed file one day at a time through the station's day driver
+/// ([`station::driver::advance_one_master_day`] — the function the sealed station and its
+/// caller-driven session both step through): the re-sow hook consulted at each day's start, the
+/// plants on their step, the fast side on `dt` with conservation asserted after every fast
+/// sub-step. The direction gate judges each day's end (a day is this path's committed state).
+fn run_bed(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
+    let bed = built.bed.expect("run_bed is called with a bed");
+    let plant = EulerIntegrator::new(built.slow_registry);
+    let fast = EulerIntegrator::new(built.fast_registry);
+    let watch = built.demand_controlled;
+    let mut state = built.state;
+    let mut total_rationed = 0u64;
+    let mut events: Vec<Event> = Vec::new();
+    let mut first_reversal = None;
+    watch_state(&watch, &state, 0, &mut first_reversal);
+    for _ in 0..bed.days {
+        let (next, rationed, day_events) = station::driver::advance_one_master_day(
+            &plant,
+            &fast,
+            &state,
+            &bed.plant_resolver,
+            &built.resolver,
+            bed.steps_per_day,
+            bed.plant_steps_per_day,
+            bed.plant_dt,
+            built.dt,
+            Some(&*bed.reset),
+        )?;
+        state = next;
+        total_rationed += rationed;
+        events.extend(day_events);
+        watch_state(&watch, &state, state.n, &mut first_reversal);
     }
     Ok(RunResult {
         final_state: state,

@@ -52,3 +52,13 @@ station's plant chamber as parts with outward `ChamberPorts` (power, heat sink, 
 is rebuilt on them. Proof: 0 of 20 goldens, all three manifests unchanged, full suite and clippy green.
 The station's hand-built starting values were measured equal to the builder's on the reference before the
 copy was deleted; under the lab leaf form the copy lacked the seedling's leaf area (a lab-only gap, closed).
+
+**SLICE 4 BUILT 2026-10-18 — a scenario may carry a crop bed.** `bed:` builds the sealed station's
+lamp-lit chamber (its own builder) into an authored habitat and runs it on the station's day driver.
+Every bed stock is wireable by the author's flows; three ports connect the chamber to the author's
+battery, heat store and (walls facing space) radiative sink; the walls' surroundings and the re-sow
+rule (`maturity`, `never`, `{every_days: N}`) are required. An authoring unfreeze (`bed_crops`,
+`bed_stocks`, three spec models); the station's fast forcings and re-sow hook moved onto
+`plant_chamber`, 0 of 20 goldens. Pinned: the bed's starting state equals the sealed station's, stock
+for stock. Found: a re-sow needs grain from the old crop, so a calendar can be refused by the science.
+A layering edge `authoring → station` was added to the purity gate, with its reason, and flagged.

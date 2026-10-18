@@ -514,6 +514,8 @@ fn aux_scenario(n_sub: u32) -> BuiltScenario {
         // No demand-controlled flow in this hand-built graph (Trickle is forced), so the
         // direction gate has nothing to watch — stated rather than defaulted.
         demand_controlled: Vec::new(),
+        // Not a crop-bed file.
+        bed: None,
     }
 }
 

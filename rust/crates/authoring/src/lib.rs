@@ -19,6 +19,7 @@
 //! the hex-float codec) and `domains` (the frozen crew flows, the Option-C param
 //! constants), exactly as the Python `authoring` package imports `simcore` + `domains`.
 
+pub mod bed;
 pub mod compose;
 pub mod errors;
 pub mod expr_parser;

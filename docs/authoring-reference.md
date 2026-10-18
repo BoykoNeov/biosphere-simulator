@@ -769,6 +769,46 @@ per master step, so `20160 / (336 × 2) = 30.0` exactly. And the honest whole-ru
 the cheap one. The large wall win lands where the slow set is **expensive** — the biosphere
 — which is precisely the domain the registry cannot yet reach.
 
+### A crop bed — the station's lamp-lit chamber in an authored habitat (2026-10-18)
+
+A scenario may carry **one** `bed:` — the sealed station's plant chamber, built by the station's own
+builder (`station::plant_chamber`), not a copy of it. The plant science is written once, in Rust, and
+an author composes it; the kinetics grammar is **not** grown to spell photosynthesis.
+
+```yaml
+dt: 60.0                 # the FAST step (s); must divide a day
+steps: 4320              # fast steps; must be whole days
+bed:
+  crop: wheat            # bed_crops: wheat only (the chamber's plants are built from wheat params)
+  plant_steps_per_day: 16   # the plant step — measured at 16 only; other values unexamined
+  lamp_power_w: 200.0    # optional; the reference's 200
+  photoperiod_hours: 16  # optional; the reference's 16
+  surroundings: outdoor  # REQUIRED: outdoor | structure | {space: ε*} | {cabin: T_K}
+  power: power.battery   # REQUIRED: the author's energy stock the lamp and heater draw from
+  heat_sink: thermal.node   # REQUIRED: the author's energy stock the cooler and coil feed
+  # space: boundary.space   # required under {space: …}, refused otherwise
+  resow: maturity        # REQUIRED: maturity | never | {every_days: N}
+```
+
+* **Every stock the bed brings may be wired by the author's flows** (the manifest's `bed_stocks`):
+  name it in a wiring or a stoichiometry. An author may not *declare* a stock with one of those ids.
+* **The bed's air is fixed at 9500 mol** — `eclss.yaml`'s humidity target hides that size — so an
+  `eclss.o2_makeup` wired to `biosphere.o2_pool` must declare `cabin_air_mol: 9500.0` (refused
+  otherwise).
+* **An author forcing may not take a name the chamber reads** (its lamp program, setpoint program,
+  outdoor temperature, or the plant program variables).
+* **A re-sow draws its seed from the old crop's grain** (`annual_reset`): a calendar that re-sows a
+  crop with no grain is refused at that re-sow, by the science. A re-sow also harvests that grain, so
+  back-to-back re-sows need a new crop's grain each time.
+* **It runs on the station's day driver** (`advance_one_master_day`): the plants on their step, the
+  author's flows and the chamber's on `dt`, the re-sow hook at each day's start, conservation asserted
+  after every fast sub-step, the direction gate at each day's end. Euler only; `n_sub` and
+  `rate_class: slow` are refused. `BuiltScenario.registry` is empty for a bed file (there is no
+  single-rate view of a two-rate graph); the Godot bridge refuses a bed file by name.
+* **The non-outdoor `surroundings` are the lab's forms, unvalidated** (`space`'s ε* is WHAT-IF).
+* **Authored is still not validated.** A bed composes calibrated science into arrangements no one has
+  checked.
+
 ### Templates — the boundary's arithmetic (decision A, as amended)
 
 A `StockSpec.amount` or `ForcingSpec.const` may be a **template expression** over the
@@ -1049,6 +1089,17 @@ vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — a scenario may carry a crop bed (slice 4 of
+  `docs/plans/post-roadmap-authored-plants.md`; the user's answers: author-written re-sow, every stock
+  wireable, author-declared steps, a lamp-lit bed).** `ScenarioSpec` gains `bed`; new spec models
+  `BedSpec`, `BedSurroundingsSpec`, `BedResowSpec`; new manifest keys `bed_crops` (`wheat`) and
+  `bed_stocks` (the 24 ids a bed brings, derived by building the reference bed). See "A crop bed" above.
+  **Manifest diff, predicted and measured: those keys, the three spec models, `ScenarioSpec` +`bed`, two
+  `_authority` rows; the biosphere and station manifests and all 20 goldens unchanged** (the station's
+  fast forcings and re-sow hook moved onto `station::plant_chamber`, bit-identical). Pinned in
+  `authoring/tests/bed.rs`: the bed's starting state equals the sealed station's, stock for stock and
+  value for value, starting values included; a bed file runs clean, repeats and its plants grow; every
+  named refusal fires; the re-sow calendar fires on its day (and a re-sow with no seed is refused).
 - **2026-10-18 — an authored O₂ regulator declares its cabin's air (slice 2 of
   `docs/plans/post-roadmap-authored-plants.md`, the user's "a share of the author's own cabin
   air").** `FlowSpec` gains `cabin_air_mol` (a number or a template expression), **required** on

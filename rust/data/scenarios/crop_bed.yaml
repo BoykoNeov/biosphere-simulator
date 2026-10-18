@@ -1,0 +1,49 @@
+# crop_bed — the smallest habitat around an authored crop bed (2026-10-18, slice 4 of
+# docs/plans/post-roadmap-authored-plants.md). A FIXTURE for the bed path's tests, not a habitat
+# anyone should read science from: a battery for the lamp and the chamber's heater, a thermal node
+# for the chamber's cooler, and a radiator from the node to space.
+#
+# The bed IS the sealed station's lamp-lit plant chamber (station::plant_chamber), built by the
+# station's own builder: its plants, soil, air, heat store, lamp program and cold period are the
+# reference's. What this file chooses is the bed's allow-listed fields and its three ports.
+#
+# dt is the FAST step (60 s, the station's); steps are fast steps and must be whole days. The
+# plants step 16 times a day — the only plant step the science has been measured at.
+
+name: crop_bed
+integrator: euler
+dt: 60.0
+steps: 4320               # 3 days of 1440 one-minute steps
+
+bed:
+  crop: wheat
+  plant_steps_per_day: 16
+  surroundings: outdoor    # the reference: the walls face the weather's daily temperature
+  power: power.battery
+  heat_sink: thermal.node
+  resow: maturity
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 2.0e+10        # J — the sealed station's provisioned battery
+  - id: thermal.node
+    domain: thermal
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9         # J — referenced to T_space, as every thermal node in this tree
+  - id: boundary.space
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    wiring:
+      node: thermal.node
+      space: boundary.space
+    params: thermal

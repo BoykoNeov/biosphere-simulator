@@ -139,6 +139,9 @@ pub fn binary_ops() -> Vec<&'static str> {
 pub fn schema_fields() -> BTreeMap<&'static str, Vec<&'static str>> {
     let mut out: BTreeMap<&'static str, Vec<&'static str>> = BTreeMap::new();
     for (label, keys) in [
+        ("BedResowSpec", crate::schema::BED_RESOW_KEYS),
+        ("BedSpec", crate::schema::BED_KEYS),
+        ("BedSurroundingsSpec", crate::schema::BED_SURROUNDINGS_KEYS),
         ("BundleSpec", crate::schema::BUNDLE_KEYS),
         ("FlowSpec", crate::schema::FLOW_KEYS),
         ("ForcingSpec", crate::schema::FORCING_KEYS),
@@ -305,7 +308,8 @@ mod tests {
         );
         assert!(fields["ScenarioSpec"].contains(&"n_sub"));
         assert_eq!(fields["ParamPackRef"], vec!["pack"]);
-        assert_eq!(fields.len(), 8, "a spec label was added or dropped");
+        // Eleven since 2026-10-18: the crop bed added BedSpec, BedSurroundingsSpec, BedResowSpec.
+        assert_eq!(fields.len(), 11, "a spec label was added or dropped");
     }
 
     #[test]
