@@ -300,6 +300,99 @@ fn a_regulator_on_the_beds_air_must_declare_the_beds_air() {
     assert_eq!(built.demand_controlled.len(), 1);
 }
 
+/// The fixture with its bed resized to `air` mol (`bed.air_mol`).
+fn resized(air: &str) -> String {
+    edited(
+        "plant_steps_per_day: 16\n",
+        &format!("plant_steps_per_day: 16\n  air_mol: {air}\n"),
+    )
+}
+
+/// `yaml` with one more flow, wired to the bed's air, and the boundary stock it pairs with.
+fn with_air_flow(yaml: &str, boundary: &str, flow: &str) -> String {
+    format!(
+        "{}{flow}",
+        yaml.replacen(
+            "  - id: boundary.space\n",
+            &format!("{boundary}  - id: boundary.space\n"),
+            1
+        )
+    )
+}
+
+const O2_SUPPLY: &str = "  - id: boundary.o2_supply\n    domain: boundary\n    quantity: oxygen\n    \
+     kind: boundary\n    amount: 0.0\n    unclamped: true\n    composition:\n      oxygen: 2.0\n";
+const CONDENSATE: &str = "  - id: boundary.condensate\n    domain: boundary\n    quantity: water\n    \
+     kind: boundary\n    amount: 0.0\n";
+
+fn o2_regulator(air: &str) -> String {
+    format!(
+        "  - id: eclss.o2_makeup\n    type: eclss.o2_makeup\n    wiring:\n      o2_supply: \
+         boundary.o2_supply\n      cabin_o2: biosphere.o2_pool\n    params: eclss\n    \
+         cabin_air_mol: {air}\n"
+    )
+}
+
+fn condenser(air: &str) -> String {
+    format!(
+        "  - id: eclss.condenser\n    type: eclss.condenser\n    wiring:\n      cabin_h2o: \
+         biosphere.water_vapor\n      humidity_condensate: boundary.condensate\n    params: \
+         eclss\n    cabin_air_mol: {air}\n"
+    )
+}
+
+/// `bed.air_mol` resizes the room and charges it at the reference's composition (2026-10-18,
+/// plan §16): the starting CO₂ and O₂ scale with the air by the station's own resize
+/// (`SealedStationScenario::with_chamber_air`), so the plants start at the reference's shares,
+/// and the resized bed runs clean and repeats.
+#[test]
+fn a_bed_of_another_size_is_charged_at_the_references_shares_and_runs_clean() {
+    let reference = build(&fixture()).unwrap();
+    let small = build(&resized("3000.0")).expect("a 3000-mol bed builds");
+    let scale = 3000.0 / 9500.0;
+    for id in ["biosphere.o2_pool", "biosphere.carbon_pool"] {
+        let (r, s) = (
+            reference.state.stocks[id].amount,
+            small.state.stocks[id].amount,
+        );
+        assert_eq!(s, r * scale, "{id}: {s} is not the reference's {r} scaled");
+    }
+    let first = final_bits(&resized("3000.0"));
+    assert_eq!(first, final_bits(&resized("3000.0")), "two runs ended differently");
+    assert_ne!(first, final_bits(&fixture()), "the size changed nothing in the run");
+}
+
+/// A regulator on the bed's air reads the bed's size, not 9500: an O₂ regulator on its O₂ and
+/// a condenser on its vapour must each declare `bed.air_mol` — the condenser was not checked
+/// until 2026-10-18, when the size became the author's to choose.
+#[test]
+fn a_regulator_on_a_resized_bed_must_declare_the_resized_air() {
+    let small = resized("3000.0");
+    refused(
+        &with_air_flow(&small, O2_SUPPLY, &o2_regulator("9500.0")),
+        "the bed's air, 3000 mol",
+    );
+    build(&with_air_flow(&small, O2_SUPPLY, &o2_regulator("3000.0")))
+        .expect("an O₂ regulator on the bed's own air builds");
+    refused(
+        &with_air_flow(&small, CONDENSATE, &condenser("9500.0")),
+        "the crop bed's water vapour",
+    );
+    refused(
+        &with_air_flow(&fixture(), CONDENSATE, &condenser("950.0")),
+        "the bed's air, 9500 mol",
+    );
+    build(&with_air_flow(&small, CONDENSATE, &condenser("3000.0")))
+        .expect("a condenser on the bed's own air builds");
+}
+
+#[test]
+fn a_bed_air_that_is_not_a_positive_number_is_refused() {
+    for bad in ["0.0", "-3000.0", "inf", "NaN"] {
+        refused(&resized(bad), "bed.air_mol must be a finite number > 0");
+    }
+}
+
 /// The example greenhouse (`scenarios/lamp_greenhouse.yaml`) over 300 days: the authored bed
 /// reaches maturity and re-sows itself, clean. Slow (~50 s), so `--ignored`; the content test
 /// runs the file's own 14 days on every suite.

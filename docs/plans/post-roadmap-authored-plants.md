@@ -383,7 +383,7 @@ Each touches a frozen contract, so each waits for the user.
   program becomes the crop's, and `bed_crops` grows (an authoring-manifest regeneration). The potato
   itself is authored, not validated (its canopy reads 2.79× low, `docs/log/potato-crop.md`).
   **Medium.**
-* **A bed air other than 9500 mol.** It cannot come first: the condenser's `humidity_setpoint`
+* **A bed air other than 9500 mol.** (**BUILT 2026-10-18, §16.**) It cannot come first: the condenser's `humidity_setpoint`
   (1.7863 kg) is 40 % humidity of exactly 9500 mol at 22 °C, so a smaller room would be held wetter
   (75 % at about 5070 mol, saturated at about 3800), a larger one drier. It needs the next item, then an `air_mol` field on the bed (an
   authoring unfreeze) and the O₂ regulator's `cabin_air_mol` check reading it.
@@ -519,3 +519,42 @@ to rounding, as expected of the shift, not bit equality. **The thermal file stil
 recorded, not added.
 **§15 is complete**, and with it §14's third item; the second (a bed air other than 9500 mol) is now
 unblocked and still the user's call.
+
+## 16. A bed air other than 9500 mol — BUILT 2026-10-18 on the user's *"1"*
+
+§14's second item, unblocked by §15. An authoring unfreeze; nothing on the reference side moves.
+
+**The design (advisor review before building).** `bed.air_mol`, **optional**, the reference's 9500
+when absent — as `lamp_power_w` and `photoperiod_hours` default to the reference's, so
+`lamp_greenhouse.yaml` keeps its bytes. Finite and > 0, no lower bound (none measured). The room is
+**resized, not relabelled**: `SealedStationScenario::with_chamber_air` scales the starting CO₂ and O₂
+by the ratio of the sizes, the inert fill is the rest of the room. That is the separate-air lab's
+own resize, moved onto the scenario so the lab (`air_split::split_scenario`) and the bed call one
+function; at the present size the ratio is exactly 1.0, so every charge keeps its bits. **The
+regulator check grew a second case**: the condenser had the same hole the O₂ regulator was closed
+against — since §15b it aims at a share of the air it declares, and a condenser on
+`biosphere.water_vapor` declaring 950 on the 9500 bed built. Now an `eclss.o2_makeup` on the bed's
+O₂ and an `eclss.condenser` on its vapour must each declare the bed's air.
+
+**Predicted before running.** The authoring manifest moves by exactly one value,
+`schema_fields.BedSpec += "air_mol"`; the biosphere and station manifests unchanged; `regen_goldens`
+0 of 20; the default bed starts bit-identical to the sealed station's chamber (the existing test,
+unedited).
+
+**Measured.** All four as predicted: the manifest's one line, 0 of 20 goldens, the start test green.
+New tests (`authoring/tests/bed.rs`): a 3000-mol bed starts at the reference's amounts × 3000/9500
+exactly, runs clean, repeats, and ends differently from the 9500 bed; on it a regulator or a
+condenser declaring 9500 is refused and one declaring 3000 builds; a condenser declaring 950 on the
+default bed is refused; `air_mol` 0, −3000, inf and NaN are refused. Two mutations, each red under
+`--no-fail-fast`: the bed ignoring `air_mol` (2 tests), the condenser check removed (1).
+
+**How small rooms behave** (a throwaway probe, the crop-only fixture, deleted after): every size
+from BVAD's 1 m² box (27.66 mol, `air_split::BVAD_CHAMBER_AIR_MOL`) to 30000 mol runs 30 days with
+nothing rationed and no reversal. The CO₂ climbs, and faster the smaller the room — 399.6 ppm at the
+start; after 30 days 17 072 at 27.66 mol, 5 026 at 100, 891 at 950, 449 at 9500: the soil
+out-breathes a crop under the cold program's dim lamp, and in a small room nothing dilutes it. The
+leaf carbon is higher the smaller the room (0.0551 vs 0.0509 at 9500), the CO₂ fertilising it. Not a
+fault the platform refuses; an author's habitat needs its own scrubber or crew to balance it.
+
+**Left as it was:** the bed's crop (wheat only, §14's first item), and the thermal test file still
+has no permanent test (§15c).

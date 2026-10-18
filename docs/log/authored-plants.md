@@ -115,3 +115,19 @@ Authoring manifest: `needs_cabin_air` on the condenser, nothing else; 0 of 20 go
   air overturns how the files were designed") was wrong — the condenser only acts on the excess, so its
   behaviour survived; the real cost was supersaturated air nothing checks, and that is what the user
   decided on.
+
+**A BED AIR OTHER THAN 9500 MOL BUILT 2026-10-18** (plan §16, on the user's *"1"* — §14's second
+leftover, unblocked by §15). `bed.air_mol`, optional, the reference's 9500 when absent. The room is
+resized, not relabelled: its starting CO₂ and O₂ scale with the air, by the separate-air lab's own
+resize moved onto the scenario (`SealedStationScenario::with_chamber_air`) so both call one function.
+The bed's regulator check now covers the condenser on its vapour as well as the O₂ regulator on its
+O₂ — the condenser had had the same hole since §15b. Predicted and measured: the authoring manifest
+moves by `BedSpec += "air_mol"` and nothing else, 0 of 20 goldens, the default bed bit-identical to
+the station's chamber. Probe: every size from BVAD's 27.66-mol box to 30000 mol runs a crop-only
+30 days clean; the small rooms' CO₂ climbs (17 072 ppm at 27.66 mol), the soil out-breathing a
+crop under the cold program's dim lamp.
+
+* **Lesson: when a check is closed for one regulator, look for its twins.** The O₂ check was written
+  when only the O₂ target was a share of the air; §15b made the condenser's a share too, and nothing
+  re-asked which flows the bed's check should cover. A flow-type property (`needs_cabin_air`) had
+  grown a second member, and a rule keyed on one type name did not follow it.

@@ -62,6 +62,7 @@ pub const BED_KEYS: &[&str] = &[
     "plant_steps_per_day",
     "lamp_power_w",
     "photoperiod_hours",
+    "air_mol",
     "surroundings",
     "power",
     "heat_sink",
@@ -303,6 +304,9 @@ pub struct BedSpec {
     pub lamp_power_w: Option<f64>,
     /// The lamp's photoperiod (whole hours); the reference's 16 when absent.
     pub photoperiod_hours: Option<u64>,
+    /// The chamber's air (mol); the reference's 9500 when absent. The starting CO₂ and O₂ scale
+    /// with it (the room is charged at the reference's composition).
+    pub air_mol: Option<f64>,
     /// What the chamber's walls face — required, no default.
     pub surroundings: BedSurroundingsSpec,
     /// The author's energy stock the lamp and the chamber's heater draw from.
@@ -469,6 +473,7 @@ fn parse_bed(value: &YamlValue) -> Result<BedSpec, AuthoringError> {
         plant_steps_per_day: require_u64(entries, "plant_steps_per_day", ctx)?,
         lamp_power_w: opt_f64(entries, "lamp_power_w", ctx)?,
         photoperiod_hours: opt_u64(entries, "photoperiod_hours", ctx)?,
+        air_mol: opt_f64(entries, "air_mol", ctx)?,
         surroundings,
         power: require_str(entries, "power", ctx)?,
         heat_sink: require_str(entries, "heat_sink", ctx)?,

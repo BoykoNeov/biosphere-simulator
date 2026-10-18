@@ -388,6 +388,20 @@ impl SealedStationScenario {
         self.years * self.season_days
     }
 
+    /// This scenario with the plants' chamber resized to `chamber_air_mol`, charged at its
+    /// present composition (CO₂ and O₂ scaled by the ratio of the two sizes; the inert fill is
+    /// the rest of the room, `chamber_inert_charge_mol`). The one resize: the separate-air lab
+    /// ([`crate::air_split::split_scenario`]) and an authored bed's `air_mol` both call it. At
+    /// the present size the ratio is exactly 1.0, so the charge keeps its bits.
+    pub fn with_chamber_air(&self, chamber_air_mol: f64) -> Self {
+        let scale = chamber_air_mol / self.bio.chamber_air_capacity_mol;
+        let mut s = *self;
+        s.bio.chamber_air_capacity_mol = chamber_air_mol;
+        s.bio.chamber_co2_mol0 = self.bio.chamber_co2_mol0 * scale;
+        s.bio.chamber_o2_mol0 = self.bio.chamber_o2_mol0 * scale;
+        s
+    }
+
     /// The program's phase `steps` slow steps after a sowing: `floor(steps·bio_dt) mod
     /// season_days < cold.days` is [`Phase::Cold`]. **The one clock** every reader of the program
     /// reaches, through [`Self::phase`] (the state's sowing) or, for a state not yet built, here

@@ -784,6 +784,7 @@ bed:
   plant_steps_per_day: 16   # the plant step — the science is measured at 16 only; others run, unexamined
   lamp_power_w: 200.0    # optional; the reference's 200
   photoperiod_hours: 16  # optional; the reference's 16
+  air_mol: 9500.0        # optional; the reference's 9500 — the chamber's air, charged at the reference's shares
   surroundings: outdoor  # REQUIRED: outdoor | structure | {space: ε*} | {cabin: T_K}
   power: power.battery   # REQUIRED: the author's energy stock the lamp and heater draw from
   heat_sink: thermal.node   # REQUIRED: the author's energy stock the cooler and coil feed
@@ -793,9 +794,17 @@ bed:
 
 * **Every stock the bed brings may be wired by the author's flows** (the manifest's `bed_stocks`):
   name it in a wiring or a stoichiometry. An author may not *declare* a stock with one of those ids.
-* **The bed's air is fixed at 9500 mol** — `eclss.yaml`'s humidity target hides that size — so an
-  `eclss.o2_makeup` wired to `biosphere.o2_pool` must declare `cabin_air_mol: 9500.0` (refused
-  otherwise).
+* **The bed's air is `air_mol`** (the reference's 9500 when absent; fixed at 9500 until 2026-10-18,
+  while `eclss.yaml`'s humidity target hid that size). The room is charged at the reference's
+  composition: its starting CO₂ and O₂ scale with the air by the station's own resize
+  (`SealedStationScenario::with_chamber_air`, the separate-air lab's too), and every reader of the
+  room's size — the leaf's CO₂ and O₂ shares, the vapour ceiling — reads the new size. A regulator
+  on the bed's air must declare exactly that air: an `eclss.o2_makeup` wired to `biosphere.o2_pool`
+  and an `eclss.condenser` wired to `biosphere.water_vapor` (the condenser checked since the same
+  day) are refused at any other `cabin_air_mol`. No lower bound: measured 2026-10-18, the crop-only
+  bed runs clean for 30 days from the 27.7-mol box of BVAD's 1 m² chamber to 30000 mol — in the
+  small rooms the CO₂ climbs (17 000 ppm by day 30 at 27.7 mol), which is the soil out-breathing a
+  crop under the cold program's dim lamp, not a fault the platform refuses.
 * **An author forcing may not take a name the chamber reads** (its lamp program, setpoint program,
   outdoor temperature, or the plant program variables).
 * **A re-sow draws its seed from the old crop's grain** (`annual_reset`): a calendar that re-sows a
@@ -815,7 +824,7 @@ bed:
 * **Authored is still not validated.** A bed composes calibrated science into arrangements no one has
   checked.
 * **The worked example** is `scenarios/lamp_greenhouse.yaml`: a crew breathing the bed's own air, a
-  scrubber, an O₂ regulator on the bed's 9500 mol, solar power and a radiator. Its boundaries carry the
+  scrubber, an O₂ regulator on the bed's (default) 9500 mol, solar power and a radiator. Its boundaries carry the
   composition of the bed pool each pairs with, so every flow balances in carbon and oxygen.
 
 ### Templates — the boundary's arithmetic (decision A, as amended)

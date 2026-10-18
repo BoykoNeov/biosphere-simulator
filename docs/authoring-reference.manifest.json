@@ -299,6 +299,7 @@
       "every_days"
     ],
     "BedSpec": [
+      "air_mol",
       "crop",
       "heat_sink",
       "lamp_power_w",

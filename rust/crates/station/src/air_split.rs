@@ -321,12 +321,7 @@ fn amount(state: &State, id: &str) -> Result<f64, SimError> {
 /// The sealed-station scenario with the plants' chamber resized to `chamber_air_mol`, charged
 /// at the cabin's composition (CO₂ and O₂ scaled by `chamber_air_mol / CABIN_AIR_MOL`).
 pub fn split_scenario(scenario: &SealedStationScenario, split: &AirSplit) -> SealedStationScenario {
-    let scale = split.chamber_air_mol / scenario.bio.chamber_air_capacity_mol;
-    let mut s = *scenario;
-    s.bio.chamber_air_capacity_mol = split.chamber_air_mol;
-    s.bio.chamber_co2_mol0 = scenario.bio.chamber_co2_mol0 * scale;
-    s.bio.chamber_o2_mol0 = scenario.bio.chamber_o2_mol0 * scale;
-    s
+    scenario.with_chamber_air(split.chamber_air_mol)
 }
 
 /// Build the separate-air station: `(state, bio_reg, fast_reg)`, from `scenario` (the

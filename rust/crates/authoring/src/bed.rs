@@ -7,7 +7,8 @@
 //! science is written once, in Rust; the author composes it.
 //!
 //! **What an author decides** (the user's answers, 2026-10-18): the re-sow calendar, the plant
-//! step, the lamp, what the walls face, and the three stocks the chamber connects to — the
+//! step, the lamp, the chamber's air (`air_mol`, the reference's 9500 when absent; the starting
+//! CO₂ and O₂ scale with it), what the walls face, and the three stocks the chamber connects to — the
 //! energy store its lamp and heater draw from, the heat store its cooler feeds, and (for walls
 //! facing space) the radiative sink. **Every** stock of the bed may be wired by the author's
 //! flows: the chamber's stocks sit at their fixed ids ([`bed_stock_ids`]), and an author flow
@@ -15,8 +16,10 @@
 //!
 //! **What an author cannot change**, by design rather than omission:
 //! * the crop (`wheat` only — the chamber's plants are built from the wheat params);
-//! * the chamber's air, 9500 mol — `eclss.yaml`'s humidity target hides that size (slice 1's
-//!   finding), so an author O₂ regulator wired to the bed's O₂ must declare exactly that air;
+//! * the size an author regulator assumes: an O₂ regulator on the bed's O₂ and a condenser on
+//!   its vapour aim at a share of the air they declare, so each must declare exactly the bed's
+//!   air (fixed at 9500 mol until 2026-10-18, when `eclss.yaml`'s humidity target became a
+//!   share and stopped hiding that size);
 //! * the cold program, the chamber's heat params, the soil.
 //!
 //! **How it runs:** the station's day driver ([`station::driver::advance_one_master_day`]), the
@@ -29,7 +32,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use domains::biosphere::stocks::O2_POOL;
+use domains::biosphere::stocks::{O2_POOL, WATER_VAPOR};
 use simcore::environment::{constant, SourceResolver};
 use simcore::error::SimError;
 use simcore::flow::Flow;
@@ -131,6 +134,14 @@ pub fn bed_scenario(
             )));
         }
         scenario.photoperiod_hours = h;
+    }
+    if let Some(air) = bed.air_mol {
+        if !(air.is_finite() && air > 0.0) {
+            return Err(AuthoringError::new(format!(
+                "bed.air_mol must be a finite number > 0, got {air}"
+            )));
+        }
+        scenario = scenario.with_chamber_air(air);
     }
     scenario.cabin_dt = dt;
     scenario.steps_per_day = steps_per_day;
@@ -243,15 +254,24 @@ pub(crate) fn interpret_bed(
         author_stocks.push(stock);
     }
 
-    // An O₂ regulator serving the bed's air must aim at THAT air: the leaf and the regulator
-    // must agree on the room's size.
+    // A regulator serving the bed's air must aim at THAT air: its target is a share of the air it
+    // declares, so the plants and the regulator must agree on the room's size. The O₂ regulator
+    // on the bed's O₂, and (since 2026-10-18, when the bed's air became the author's) the
+    // condenser on the bed's vapour.
     let bed_air = scenario.bio.chamber_air_capacity_mol;
     for flow_spec in &spec.flows {
-        let serves_bed = flow_spec.type_.as_deref() == Some("eclss.o2_makeup")
-            && flow_spec
-                .wiring
-                .iter()
-                .any(|(field, stock)| field == "cabin_o2" && stock == O2_POOL);
+        let served = match flow_spec.type_.as_deref() {
+            Some("eclss.o2_makeup") => Some(("cabin_o2", O2_POOL, "O₂")),
+            Some("eclss.condenser") => Some(("cabin_h2o", WATER_VAPOR, "water vapour")),
+            _ => None,
+        };
+        let Some((field_name, bed_stock, what)) = served else {
+            continue;
+        };
+        let serves_bed = flow_spec
+            .wiring
+            .iter()
+            .any(|(field, stock)| field == field_name && stock == bed_stock);
         if !serves_bed {
             continue;
         }
@@ -262,8 +282,9 @@ pub(crate) fn interpret_bed(
             .transpose()?;
         if declared != Some(bed_air) {
             return Err(AuthoringError::new(format!(
-                "flow {:?} regulates the crop bed's O₂ ({O2_POOL:?}), so its cabin_air_mol must \
-                 be the bed's air, {bed_air} mol; got {declared:?}",
+                "flow {:?} regulates the crop bed's {what} ({bed_stock:?}), so its cabin_air_mol \
+                 must be the bed's air, {bed_air} mol (bed.air_mol, the reference's 9500 when \
+                 absent); got {declared:?}",
                 flow_spec.id
             )));
         }
