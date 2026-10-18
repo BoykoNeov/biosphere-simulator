@@ -124,8 +124,8 @@ The bed's regulator check now covers the condenser on its vapour as well as the 
 O₂ — the condenser had had the same hole since §15b. Predicted and measured: the authoring manifest
 moves by `BedSpec += "air_mol"` and nothing else, 0 of 20 goldens, the default bed bit-identical to
 the station's chamber. Probe: every size from BVAD's 27.66-mol box to 30000 mol runs a crop-only
-30 days clean; the small rooms' CO₂ climbs (17 072 ppm at 27.66 mol), the soil out-breathing a
-crop under the cold program's dim lamp.
+30 days clean; the small rooms' CO₂ climbs (17 072 ppm at 27.66 mol): respiration, plants and soil not
+separated, outrunning uptake under the cold program's dim lamp.
 
 * **Lesson: when a check is closed for one regulator, look for its twins.** The O₂ check was written
   when only the O₂ target was a share of the air; §15b made the condenser's a share too, and nothing

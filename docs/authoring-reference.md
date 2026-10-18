@@ -803,8 +803,9 @@ bed:
   and an `eclss.condenser` wired to `biosphere.water_vapor` (the condenser checked since the same
   day) are refused at any other `cabin_air_mol`. No lower bound: measured 2026-10-18, the crop-only
   bed runs clean for 30 days from the 27.7-mol box of BVAD's 1 m² chamber to 30000 mol — in the
-  small rooms the CO₂ climbs (17 000 ppm by day 30 at 27.7 mol), which is the soil out-breathing a
-  crop under the cold program's dim lamp, not a fault the platform refuses.
+  small rooms the CO₂ climbs (17 000 ppm by day 30 at 27.7 mol), the chamber's respiration (plants and
+  soil, not separated) outrunning the crop's uptake under the cold program's dim lamp, not a fault the
+  platform refuses.
 * **An author forcing may not take a name the chamber reads** (its lamp program, setpoint program,
   outdoor temperature, or the plant program variables).
 * **A re-sow draws its seed from the old crop's grain** (`annual_reset`): a calendar that re-sows a

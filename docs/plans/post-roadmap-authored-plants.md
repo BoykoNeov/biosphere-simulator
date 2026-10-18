@@ -551,10 +551,19 @@ default bed is refused; `air_mol` 0, −3000, inf and NaN are refused. Two mutat
 **How small rooms behave** (a throwaway probe, the crop-only fixture, deleted after): every size
 from BVAD's 1 m² box (27.66 mol, `air_split::BVAD_CHAMBER_AIR_MOL`) to 30000 mol runs 30 days with
 nothing rationed and no reversal. The CO₂ climbs, and faster the smaller the room — 399.6 ppm at the
-start; after 30 days 17 072 at 27.66 mol, 5 026 at 100, 891 at 950, 449 at 9500: the soil
-out-breathes a crop under the cold program's dim lamp, and in a small room nothing dilutes it. The
-leaf carbon is higher the smaller the room (0.0551 vs 0.0509 at 9500), the CO₂ fertilising it. Not a
+start; after 30 days 17 072 at 27.66 mol, 5 026 at 100, 891 at 950, 449 at 9500: the chamber's
+respiration (plants and soil — not separated) outruns the crop's uptake under the cold program's dim
+lamp, and a small room has less air to dilute it. The leaf carbon is higher the smaller the room
+(0.0551 vs 0.0509 at 9500), consistent with CO₂ fertilisation — not tested. Not a
 fault the platform refuses; an author's habitat needs its own scrubber or crew to balance it.
 
 **Left as it was:** the bed's crop (wheat only, §14's first item), and the thermal test file still
 has no permanent test (§15c).
+
+**Checked after the build (advisor's end review).** The survey of the room size's readers had been
+read through truncated greps; re-run in full. Every fixed 9500 in `station/src` is on the cabin side
+(`sealed_fast_flows`' condenser and O₂ regulator, `cabin.rs`, `water.rs`, the station scenario's
+start values, the separate-air lab's cabin) — none on a bed's build path, which never calls
+`sealed_fast_flows`. Every plant-side reader in `domains` takes the size from the `SeasonScenario` it
+is built from; the literals there are in test modules. The causes in the probe paragraph were
+worded as findings and were not tested; reworded.
