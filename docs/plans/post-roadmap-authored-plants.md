@@ -376,7 +376,7 @@ wrong diagnosis waiting for a lit first step.
 
 Each touches a frozen contract, so each waits for the user.
 
-* **Another crop (potato).** The potato's parameters load (`params::potato()`), but the chamber
+* **Another crop (potato).** (**BUILT 2026-10-18, §17.**) The potato's parameters load (`params::potato()`), but the chamber
   builds its plants from the wheat's (`lighting::room_params`), and the chamber's cold program — eight
   weeks at 4 °C after each sowing — exists to vernalize wheat, which a potato does not need. So it is
   three pieces: the station's builders take the crop's parameters (no value moves for wheat), the cold
