@@ -145,7 +145,8 @@ pub fn chamber_start_stocks(
     Ok(stocks)
 }
 
-/// The chamber's plants: the season built for a lamp-lit room (`lighting::room_params`), its
+/// The chamber's plants: the season built from the crop's params for a lamp-lit room
+/// ([`SealedStationScenario::plant_params`]), its
 /// stocks, its plant registry and its starting state values — **the builder's own**, plus the
 /// cold program's sowing clock (slice 4: the crop is sown at step 0).
 ///
@@ -154,7 +155,7 @@ pub fn chamber_start_stocks(
 /// Measured equal on the reference params before the copy was deleted; under the lab leaf form
 /// the builder's carry the seedling's leaf area, which the copy did not.
 pub fn chamber_plants(scenario: &SealedStationScenario) -> Result<ChamberPlants, SimError> {
-    let (bio_state, registry) = build_season_with(&scenario.bio, &crate::lighting::room_params())?;
+    let (bio_state, registry) = build_season_with(&scenario.bio, &scenario.plant_params())?;
     let mut aux = bio_state.aux.clone();
     // The cold program's clock: seeded here, not defaulted at the reader — the omission
     // `vernalization_days` had until §19.
@@ -215,17 +216,17 @@ pub enum ResowRule {
 }
 
 /// The chamber's re-sow hook under `rule`, owned so a caller-driven session can hold it. A re-sow
-/// is `annual_reset_with` the params the season was built from (`room_params`: a run built from
+/// is `annual_reset_with` the params the season was built from (`plant_params`: a run built from
 /// an override is never re-sown with the frozen values — `tests/param_funnel.rs`'s hazard) and
 /// the sowing clock set to the state's own step ([`crate::sowing::sow_now`]).
 pub fn chamber_reset_hook(scenario: &SealedStationScenario, rule: ResowRule) -> OwnedResetHook {
     let bio = scenario.bio;
-    let pheno = scenario.pheno;
+    let pheno = scenario.pheno();
     let bio_steps_per_day = scenario.bio_steps_per_day;
     // `annual_reset_with` and the params the season was built from: identical to `annual_reset`
     // on every frozen build, and it also re-sows the lab forms' state values, which the plain
     // reset refuses (`docs/plans/post-roadmap-soil-evaporation.md` §10).
-    let params = crate::lighting::room_params();
+    let params = scenario.plant_params();
     Box::new(
         move |n: u64, current: &State| -> Result<Option<State>, SimError> {
             let due = match rule {

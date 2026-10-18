@@ -359,7 +359,7 @@ fn main() {
         Side::Reset => {
             use domains::biosphere::stocks::{LEAF_C, ROOT_C, STEM_C, STORAGE_C};
             p.resets.push(after.n);
-            let pheno = scenario.pheno;
+            let pheno = scenario.pheno();
             let tt = before.aux[domains::biosphere::stocks::THERMAL_TIME];
             p.maturity_margins.push((
                 tt - (pheno.tsum_anthesis + pheno.tsum_maturity),

@@ -306,7 +306,7 @@ fn the_hook_resows_at_maturity_and_not_before() {
     let scenario = sealed_station_scenario();
     let pheno = domains::biosphere::params::phenology();
     assert_eq!(
-        (scenario.pheno.tsum_anthesis, scenario.pheno.tsum_maturity),
+        (scenario.pheno().tsum_anthesis, scenario.pheno().tsum_maturity),
         (pheno.tsum_anthesis, pheno.tsum_maturity),
         "the threshold is not the crop's own phenology"
     );
@@ -325,10 +325,10 @@ fn the_hook_resows_at_maturity_and_not_before() {
         s
     };
     let just_before = with_tt(f64::from_bits(mature_tt.to_bits() - 1));
-    assert!(!is_mature(&just_before, &scenario.pheno).unwrap());
+    assert!(!is_mature(&just_before, &scenario.pheno()).unwrap());
     assert!(hook(n, &just_before).unwrap().is_none(), "re-sown before maturity");
     let at = with_tt(mature_tt);
-    assert!(is_mature(&at, &scenario.pheno).unwrap());
+    assert!(is_mature(&at, &scenario.pheno()).unwrap());
     let resown = hook(n, &at).unwrap().expect("not re-sown at maturity");
     assert_eq!(station::sowing::sown_step(&resown).unwrap(), n);
     assert_eq!(resown.aux[THERMAL_TIME], 0.0);

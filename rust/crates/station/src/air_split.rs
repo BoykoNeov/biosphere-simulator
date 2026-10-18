@@ -402,10 +402,10 @@ pub fn build_split_station(
     let bio_reg = if split.watering {
         let (mut flows, mut aux) = bio_reg.into_parts();
         flows.push(Box::new(crew_watering(&resized)));
-        // The room's params, as the season's own account was built from (`lighting::room_params`).
+        // The crop's room params, as the season's own account was built from (`plant_params`).
         if let Some(account) = soil_surface_account_with(
             &resized.bio,
-            &crate::lighting::room_params(),
+            &resized.plant_params(),
             vec![Box::new(crew_watering(&resized))],
         ) {
             let slot = aux

@@ -376,16 +376,61 @@ pub struct SealedStationScenario {
     pub bio_steps_per_day: u64,
     /// The plant chamber's cold period ([`ColdProgram`]).
     pub cold: ColdProgram,
-    /// The crop's phenology — the re-sow hook's maturity threshold (DVS 2,
-    /// `tsum_anthesis + tsum_maturity`). The same file the crop is built from:
-    /// `build_season` takes `params::biosphere()`, whose `pheno` is `params::phenology()`.
-    pub pheno: PhenologyParams,
+    /// The chamber's crop. Its params, its phenology (the re-sow's maturity threshold), its
+    /// season switches and its cold program all follow from it ([`Self::with_crop`]).
+    ///
+    /// ⚠ Until 2026-10-18 the phenology was a field of its own beside a crop built from the
+    /// wheat params by name — two homes for one fact. It is derived now ([`Self::pheno`]), so a
+    /// potato chamber cannot re-sow on wheat's maturity (`docs/plans/post-roadmap-authored-plants.md`
+    /// §17).
+    pub crop: Crop,
+}
+
+/// The crop a plant chamber grows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Crop {
+    /// The reference crop (`params::biosphere()`), and the only one any golden grows.
+    Wheat,
+    /// The second species (`params::potato()`) — authored, not validated
+    /// (`docs/log/potato-crop.md`).
+    Potato,
 }
 
 impl SealedStationScenario {
     /// The Tier-2 master-day horizon (`years · season_days`).
     pub fn days(&self) -> usize {
         self.years * self.season_days
+    }
+
+    /// The chamber's plant params: the crop's, set for a lamp-lit room
+    /// ([`crate::lighting::room_form`]). The season is built from these and every re-sow resets
+    /// with them.
+    pub fn plant_params(&self) -> domains::biosphere::params::BiosphereParams {
+        crate::lighting::room_form(match self.crop {
+            Crop::Wheat => domains::biosphere::params::biosphere(),
+            Crop::Potato => domains::biosphere::params::potato(),
+        })
+    }
+
+    /// The crop's phenology — the re-sow hook's maturity threshold (DVS 2,
+    /// `tsum_anthesis + tsum_maturity`), from the same params the crop is built from.
+    pub fn pheno(&self) -> PhenologyParams {
+        self.plant_params().pheno
+    }
+
+    /// This scenario growing `crop`: from the reference's wheat chamber, the crop, its season
+    /// switches ([`domains::biosphere::potato_switches`], the field potato's own) and its cold
+    /// program. The potato's is none: the cold exists to vernalize wheat, and the potato's
+    /// vernalization fields are wheat's values marked *"INERT for potato — never read"*.
+    /// `Crop::Wheat` returns the scenario unchanged — the wheat → potato direction only.
+    pub fn with_crop(&self, crop: Crop) -> Self {
+        let mut s = *self;
+        if crop == Crop::Potato {
+            s.crop = Crop::Potato;
+            s.bio = domains::biosphere::potato_switches(s.bio);
+            s.cold.days = 0;
+        }
+        s
     }
 
     /// This scenario with the plants' chamber resized to `chamber_air_mol`, charged at its
@@ -521,7 +566,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         bio_dt: BIO_DT,
         bio_steps_per_day: STEPS_PER_DAY as u64,
         cold: crate::params::cold_period(),
-        pheno: domains::biosphere::params::phenology(),
+        crop: Crop::Wheat,
     }
 }
 

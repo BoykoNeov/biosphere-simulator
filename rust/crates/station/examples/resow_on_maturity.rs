@@ -28,7 +28,7 @@ fn main() {
     let charge = domains::params::charge();
     let thermal = domains::params::thermal();
     let lamp = station::params::lamp();
-    let pheno = scenario.pheno;
+    let pheno = scenario.pheno();
     let (state, bio_reg, fast_reg) = build_sealed_station(
         &charge,
         &thermal,

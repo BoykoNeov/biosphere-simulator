@@ -567,3 +567,71 @@ start values, the separate-air lab's cabin) — none on a bed's build path, whic
 `sealed_fast_flows`. Every plant-side reader in `domains` takes the size from the `SeasonScenario` it
 is built from; the literals there are in test modules. The causes in the probe paragraph were
 worded as findings and were not tested; reworded.
+
+## 17. A potato bed — opened 2026-10-18 on the user's *"1"*
+
+§14's first item. Today the chamber is wheat at **five** places, and a bed that switched only some of
+them would build, conserve, never ration and still be part wheat — every check the bed has would pass:
+
+1. the season's params (`plant_chamber::chamber_plants`, `lighting::room_params()`);
+2. the re-sow's params (`chamber_reset_hook`) — missed, every re-sow resets a potato with wheat's;
+3. the maturity threshold (`SealedStationScenario::pheno`, set to `params::phenology()`), which the
+   `Maturity` re-sow reads;
+4. the season's crop switches (`vernalization`, `photoperiod`, `wssd`, `stem_reserves` —
+   `potato_scenario`'s four);
+5. the cold program (eight weeks at 4 °C after each sowing — wheat's vernalization).
+
+**The design (advisor review before writing, 2026-10-18).** One value, `crop`, on
+`SealedStationScenario`; the other four follow from it and cannot be set apart from it:
+* `pheno` is **removed** as a field and derived (`plant_params().pheno`): it has one reader, and a
+  stored copy is a second home that can disagree with the crop.
+* `plant_params()` is the ROOM form over the crop's params: `room_params` becomes the room's
+  setting applied to a base set (`DailyMean` air), not "wheat with the room's setting" — raw
+  `potato()` would read the outdoor air names a room drops.
+* `with_crop(crop)` sets the crop, the four switches and the cold program. The switches get one home
+  in `domains` that `potato_scenario()` is rebuilt on (bit-identical), so the field crop and the bed's
+  cannot drift. It takes a base, so the `SeasonScenario` census (which counts *declarations*,
+  `fn name() -> SeasonScenario`) has nothing new to roster; `potato_scenario` stays rostered.
+* The potato's cold program: none (`days = 0`) — the cold exists to vernalize wheat, and the
+  potato's vernalization fields are wheat's values labelled *"INERT for potato — never read"*.
+* `air_split.rs:408` (the separate-air lab's soil account) reads the scenario's `plant_params()`:
+  identical for wheat, and a split potato scenario then grows potato throughout.
+* `lighting::build_lighting` has its own scenario type and stays wheat.
+
+**Slice 1 — the station side, bit-neutral.** Predicted: `regen_goldens` 0 of 20; all three manifests
+byte-identical; the existing "default bed starts as the sealed station's chamber" test green,
+unedited. New tests: the wheat scenario's derived phenology is `params::phenology()` exactly; a
+potato scenario's params, phenology, switches and cold are the potato's.
+
+**Slice 2 — the authoring unfreeze.** `BED_CROPS += "potato"`; `bed_scenario` calls `with_crop`;
+the refusal text, the docs (`bed.rs`, `schema.rs`, `authoring-reference.md`) and the manifest's
+`bed_crops` note and value — one manifest regeneration. Tests, written to tell a potato from a
+part-wheat bed:
+* day 0 has no cold — warm setpoint, full lamp;
+* a `Maturity` bed is run past the potato's predicted maturity day (predicted from its
+  temperature sums at 22 °C before running): the re-sow fires at the potato's development
+  stage 2, not wheat's, and the re-sown crop is a potato (leaf area per leaf carbon reads the
+  potato's specific leaf area, 33.33 vs wheat's 22.0);
+* builds, runs clean, repeats bit-identically, ends differently from the wheat bed.
+Three mutations, each red under `--no-fail-fast`: the re-sow left on wheat's params; the phenology
+left as wheat's; the cold kept for the potato.
+
+**Authored, not validated.** The potato's canopy reads 2.79× low against WOFOST
+(`docs/log/potato-crop.md`); the 0.60 extinction-coefficient citation is a class that refutes it for
+potato (`docs/log/extinction-coef-bound.md`); it has never run in a lamp-lit sealed room. An example
+`scenarios/*.yaml` potato habitat is **offered to the user, not built**: every authored file runs its
+full horizon in the content sweep.
+
+### 17a. Slice 1 BUILT 2026-10-18 — the crop is one value on the station side
+
+`station::scenario::Crop` (`Wheat`, `Potato`) is a field of `SealedStationScenario`; the `pheno` field
+is gone, derived as `pheno()` from `plant_params()` (the crop's params through
+`lighting::room_form`, which `room_params()` is now built on). `with_crop(Potato)` sets the crop, the
+field potato's switches (`domains::biosphere::potato_switches`, which `potato_scenario()` is now built
+on) and `cold.days = 0`. The chamber's season, its re-sow and the separate-air lab's soil account read
+`plant_params()`. **Measured as predicted:** `regen_goldens` 0 of 20; no manifest moved; the full
+suite green (103 test binaries), clippy clean. Pinned in `station/tests/chamber_crop.rs` (4 tests).
+
+* ⚠ **The test's first draft was wrong, not the code:** the re-sow fires when the development stage
+  reads 2, and with the potato's non-integer sums (314.29 + 733.33) that is a few ulps BELOW the sum of
+  the sums. Wheat's 1100 + 750 hid it. The threshold is now found from the stage function itself.

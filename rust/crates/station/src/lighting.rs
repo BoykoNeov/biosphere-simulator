@@ -54,9 +54,17 @@ pub fn lamp_average_power(scenario: &LightingScenario) -> f64 {
 /// outdoors (`docs/plans/post-roadmap-open-field-night.md` §7b, §9). Differs from the loader's in
 /// that one field since the loader took the within-day air (2026-10-17); `tests/room_air.rs` pins it.
 pub fn room_params() -> domains::biosphere::params::BiosphereParams {
-    let mut p = domains::biosphere::params::biosphere();
-    p.water.air_temperature = domains::biosphere::science::AirTemperatureRead::DailyMean;
-    p
+    room_form(domains::biosphere::params::biosphere())
+}
+
+/// `base` set for a lamp-lit ROOM ([`room_params`]'s one field) — any crop's params, so a room's
+/// potato reads the room as its wheat does (2026-10-18, `docs/plans/post-roadmap-authored-plants.md`
+/// §17). A crop's raw params would read the weather's within-day air, which a room drops.
+pub fn room_form(
+    mut base: domains::biosphere::params::BiosphereParams,
+) -> domains::biosphere::params::BiosphereParams {
+    base.water.air_temperature = domains::biosphere::science::AirTemperatureRead::DailyMean;
+    base
 }
 
 /// Drops the weather's within-day air from a ROOM's forcing table: a room's water reads the room's

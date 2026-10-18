@@ -278,12 +278,21 @@ pub fn consumer_chamber_scenario() -> SeasonScenario {
 /// no business widening a frozen contract. See `tests/scenario_flag_types.rs` for why the
 /// flags are a subtract-only vocabulary.
 pub fn potato_scenario() -> SeasonScenario {
+    potato_switches(DEFAULT_SCENARIO)
+}
+
+/// `base` with the potato's four crop switches: no vernalization, no photoperiod, no drought
+/// development modifier, no stem reserves. **The one home** of the switches: the field crop
+/// ([`potato_scenario`]) and the station's lamp-lit potato chamber
+/// (`station::scenario::SealedStationScenario::with_crop`) are both built on it, so the two
+/// cannot drift (2026-10-18, `docs/plans/post-roadmap-authored-plants.md` §17).
+pub fn potato_switches(base: SeasonScenario) -> SeasonScenario {
     SeasonScenario {
         vernalization: false,
         photoperiod: false,
         wssd: None,
         stem_reserves: false,
-        ..DEFAULT_SCENARIO
+        ..base
     }
 }
 
