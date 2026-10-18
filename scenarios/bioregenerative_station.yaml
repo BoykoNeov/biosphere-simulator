@@ -51,10 +51,11 @@
 # physically sensible — so has_authored_kinetics = True and Godot banners this UNCALIBRATED.
 # FROZEN != CALIBRATED either, and this file leans on that hard: of everything it reads from
 # a frozen loader, only respired_carbon_fraction (0.949) and insensible_water_fraction
-# (0.675) are calibrated (NASA BVAD Table 3-31). Every ECLSS / power / thermal value is a
-# DESIGN placeholder whose own param file says no source CAN fix it (o2_setpoint is
-# "permanently un-bindable as written"; co2_scrub_rate is recorded as ~1-1.5 orders of
-# magnitude fast against the real ISS CDRA cadence). Composing a frozen type buys frozen
+# (0.675) are calibrated (NASA BVAD Table 3-31). Every ECLSS / power / thermal value was a
+# DESIGN placeholder when this was written (co2_scrub_rate is recorded as ~1-1.5 orders of
+# magnitude fast against the real ISS CDRA cadence). ⚠ Since then two ECLSS setpoints were
+# CITED (2026-09-06 o2_setpoint, BVAD's 21 % of a 9500 mol cabin = 1995.0 mol; 2026-10-03
+# humidity_setpoint, BVAD's 40 % RH), and the cabin below is sized to them. Composing a frozen type buys frozen
 # FORM, not endorsement — flow_registry.py: "Registered != calibrated".
 #
 # THE RATE-CLASS PARTITION IS PHYSICS, NOT A FIXTURE DEVICE. eclss_multirate_cabin.yaml is
@@ -79,7 +80,7 @@
 #
 # The run starts deliberately OFF the fixed point in every book at once: the culture blooms
 # 5x, the feed tank fills 4.5x while its monod factor slides 0.250 -> 0.600, the O2 buffer
-# drains 3.4x into it, the regulator lifts cabin O2 from 8.0 to 9.76 mol, the water loop
+# drains 3.4x into it, the regulator lifts cabin O2 from 1993.0 to 1994.76 mol, the water loop
 # charges from empty, and the thermal node warms from 102.7 K to 301.8 K. A habitat that
 # "closes" because nothing moves would prove nothing.
 #
@@ -117,7 +118,7 @@ stocks:
     domain: cabin
     quantity: oxygen
     kind: pool
-    amount: 8.0             # BELOW the frozen o2_setpoint (10.0) — see the direction note
+    amount: 1993.0          # BELOW the frozen o2_setpoint (1995.0) — see the direction note
     composition:
       oxygen: 2.0
   - id: cabin.humidity
@@ -356,17 +357,27 @@ flows:
     params: eclss
 
   # FROZEN, DEMAND-CONTROLLED: S = k_makeup * (o2_setpoint - cabin_o2) * dt, k = 2.0e-3,
-  # setpoint 10.0 mol (k*h = 0.60 — the constraint that fixes n_sub = 12).
+  # setpoint 1995.0 mol (k*h = 0.60 — the constraint that fixes n_sub = 12).
+  #
+  # ⚠ RE-SIZED 2026-10-18. This file was written against the old DESIGN setpoint of 10.0 mol
+  # with a cabin starting at 8.0. On 2026-09-06 the frozen setpoint became 1995.0 (cited), and
+  # nothing ran this file, so for six weeks it asked an 8-mol cabin to reach 1995 mol: the
+  # regulator drained the whole 500-mol tank each hour and the backstop fired 122640 times a
+  # year. Found when a test began running every authored file
+  # (rust/crates/authoring/tests/authored_content.rs). The cabin now starts 2.0 mol below the
+  # new setpoint, as 8.0 was below 10.0; the offset below depends on f*q/k, not on the
+  # setpoint, so every other book in this file runs as before (the tank still ends at 148.2).
   #
   # THE DIRECTION GATE, REASONED (run_scenario raises ReversedFlowError if cabin_o2 is ever
   # found ABOVE the setpoint — the one check rationing structurally cannot perform, because
   # this draw is proportional to the ERROR and so never over-draws anything):
   #   * the equilibrium is BELOW the setpoint by construction — Oc* = S* - f*q/k_makeup =
-  #     10.0 - 0.23725 = 9.76275 — and the offset is strictly positive because the crew
+  #     1995.0 - 0.23725 = 1994.76275 — and the offset is strictly positive because the crew
   #     always breathes;
-  #   * cabin_o2 starts at 8.0, i.e. below it, and the per-sub-step map Oc <- Oc +
-  #     0.6*(10 - Oc) - 0.14235 is a contraction with factor 1 - k*h = 0.4 > 0, so it
-  #     approaches 9.76275 MONOTONICALLY FROM BELOW and cannot overshoot;
+  #   * cabin_o2 starts at 1993.0, i.e. below it, and the per-sub-step map Oc <- Oc +
+  #     0.6*(1995 - Oc) - 0.14235 is a contraction with factor 1 - k*h = 0.4 > 0, so it
+  #     approaches 1994.76275 MONOTONICALLY FROM BELOW and cannot overshoot (measured
+  #     2026-10-18: 1994.76272 after the first hour, 1994.76275 from the second on);
   #   * nothing else adds O2 to the cabin — photosynthesis fills the TANK, and this
   #     regulator is the only path from tank to cabin.
   # `o2_supply` is wired to store.o2_tank, an interior finite pool, so unlike every fixture
