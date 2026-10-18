@@ -21,12 +21,12 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
     CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, LIT_FRACTION_VAR, O2_POOL, PAR_VAR, RN_VAR,
-    ROOTED_DEPTH, SOIL_WATER, STORAGE_C, TEMP_VAR, THERMAL_TIME, VERNALIZATION_DAYS,
+    STORAGE_C, TEMP_VAR, THERMAL_TIME,
 };
 use domains::biosphere::params::PhenologyParams;
 use domains::biosphere::science;
 use domains::biosphere::system::{
-    annual_reset_with, build_season_with, soil_surface_start, weather_forcings, weather_shared,
+    annual_reset_with, weather_forcings, weather_shared,
 };
 use domains::crew::{
     CrewParams, WaterBalance, FECAL_WASTE, FOOD_INTAKE_VAR, FOOD_STORE, WATER_BALANCE,
@@ -55,22 +55,23 @@ use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 use crate::chamber::{
-    chamber_heat0, chamber_stock, plants_read_chamber, require_step_within_response,
-    ChamberCooling, ChamberHeater, ChamberParams, ChamberSurroundings, ChamberWall, CHAMBER,
-    CHAMBER_COOLING, CHAMBER_HEATER, CHAMBER_SETPOINT_VAR, CHAMBER_SURROUNDINGS, CHAMBER_WALL,
-    OUTDOOR_TEMP_VAR,
+    chamber_heat0, plants_read_chamber, require_step_within_response, ChamberParams,
+    ChamberSurroundings, CHAMBER, CHAMBER_SETPOINT_VAR, OUTDOOR_TEMP_VAR,
 };
 use crate::driver::{run_master_day, OwnedResetHook};
 use crate::flows::{
-    CrewRespiration, Harvest, HarvestParams, Lamp, LampParams, WaterRecovery, WaterRecoveryParams,
-    CREW_RESPIRATION, HARVEST, LAMP, LAMP_POWER_VAR, WATER_RECOVERY,
+    CrewRespiration, Harvest, HarvestParams, LampParams, WaterRecovery, WaterRecoveryParams,
+    CREW_RESPIRATION, HARVEST, LAMP_POWER_VAR, WATER_RECOVERY,
 };
 use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
 };
 use crate::lighting::{lamp_light_path, lamp_lit_fraction_path, lamp_net_radiation_path};
+use crate::plant_chamber::{
+    chamber_flows, chamber_latent_heat_flow, chamber_plants, chamber_start_stocks, ChamberPorts,
+};
 use crate::scenario::{Phase, SealedStationScenario};
-use crate::sowing::{insert_twins, on_sowing_clock, sow_now, PLANT_PROGRAM_VARS, SOWN_STEP};
+use crate::sowing::{insert_twins, on_sowing_clock, sow_now, PLANT_PROGRAM_VARS};
 use crate::stocks::{
     cabin_h2o_stock, co2_composition, food_store_stock, gas_boundary, o2_composition,
     water_store_stock,
@@ -272,8 +273,8 @@ pub fn build_sealed_station_unread(
 ) -> Result<(State, Registry, Registry), SimError> {
     // --- biosphere (slow) — build_season verbatim ---
     // The room's params: its water reads the chamber's temperature (`lighting::room_params`).
-    let (bio_state, bio_reg) = build_season_with(&scenario.bio, &crate::lighting::room_params())?;
-    let bio_stocks = bio_state.stocks.clone();
+    let plants = chamber_plants(scenario)?;
+    let (bio_stocks, bio_aux, bio_reg) = (plants.stocks, plants.aux, plants.registry);
 
     // --- fast-domain stocks (cabin + crew + Power/Thermal), biosphere-disjoint ---
     let fecal_target = if close_feces {
@@ -308,32 +309,9 @@ pub fn build_sealed_station_unread(
         true,
     )?);
     fast_seq.push(node_stock(node0)?);
-    // Day 0's setpoint and lamp: the program's on the sowing day (the cold phase's in the
-    // reference; §24c, "start values"). The crop is sown at step 0 (`SOWN_STEP` below). The lamp
-    // is its draw over the first fast group (window 0, dark: 0 W) since the lamp's heat switched
-    // with its light (2026-10-15, `docs/plans/post-roadmap-room-lamp-heat.md` §8); the daily
-    // average until then.
-    let sowing_phase = scenario.phase_since_sowing(0);
-    let first_group_n =
-        crate::driver::day_groups(scenario.steps_per_day, scenario.bio_steps_per_day)?.slow;
-    fast_seq.push(chamber_stock(chamber_heat0(
-        &chamber,
-        scenario.chamber_setpoint(sowing_phase, chamber.warm_setpoint),
-        switched_lamp_draw_for(scenario, sowing_phase)?(first_group_n, scenario.cabin_dt),
-    ))?);
     fast_seq.push(boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0)?);
-    if matches!(
-        surroundings,
-        ChamberSurroundings::Outdoor | ChamberSurroundings::Cabin { .. }
-    ) {
-        // Two-signed: a hotter outside sends heat in.
-        fast_seq.push(boundary::source(
-            CHAMBER_SURROUNDINGS.to_string(),
-            Quantity::Energy,
-            0.0,
-            true,
-        )?);
-    }
+    // The plant chamber's heat store and its walls' boundary (`plant_chamber`, 2026-10-18).
+    fast_seq.extend(chamber_start_stocks(scenario, &chamber, surroundings)?);
 
     let mut fast_stocks: BTreeMap<String, Stock> = BTreeMap::new();
     for s in fast_seq {
@@ -351,35 +329,10 @@ pub fn build_sealed_station_unread(
     for (id, s) in fast_stocks {
         stocks.insert(id, s);
     }
-    // The soil account's five starting values, as `build_season` seeds them — the same
-    // omission as ROOTED_DEPTH below, a second time (§17d of the soil-evaporation plan).
-    let soil_start = soil_surface_start(
-        &scenario.bio,
-        &domains::biosphere::params::biosphere(),
-        stocks[SOIL_WATER].amount,
-        scenario.bio.rooted_depth0,
-    );
-    let state = State::new(
-        0,
-        stocks.clone(),
-        0,
-        BTreeMap::from_iter(soil_start.into_iter().chain([
-            (THERMAL_TIME.to_string(), 0.0),
-            // Seeded at 0 as `build_season` seeds it; a missing key read as 0 everywhere, so
-            // this moved no byte (soil-evaporation plan §19). `tests/starting_aux.rs` gates it.
-            (VERNALIZATION_DAYS.to_string(), 0.0),
-            // ⚠ ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
-            // assemblies (both ports) until 2026-08-12. `build_season` has seeded it
-            // with the cited sowing depth since the root-depth build; the station
-            // builders assembled their own aux and silently started the crop at depth 0.
-            // Invisible while the depth gate was inert; fatal once stress divides by
-            // `TTSW = depth * EXTR * rho * A`.
-            (ROOTED_DEPTH.to_string(), scenario.bio.rooted_depth0),
-            // The cold program's clock (slice 4): the crop is sown now. Seeded here, not
-            // defaulted at the reader — the omission `vernalization_days` had until §19.
-            (SOWN_STEP.to_string(), 0.0),
-        ])),
-    )?;
+    // The plants' starting values are the season builder's own plus the sowing clock
+    // (`plant_chamber::chamber_plants`). ⚠ Hand-assembled here until 2026-10-18 — the copy
+    // that once started the crop at ROOTED_DEPTH 0 (2026-08-12); measured equal before it went.
+    let state = State::new(0, stocks.clone(), 0, bio_aux)?;
 
     // The plant side of the chamber's latent-heat books (2026-10-15): the window's evaporation,
     // recorded for the fast side's `ChamberLatentHeat` (`sealed_fast_flows`). Before any move of
@@ -497,47 +450,22 @@ pub(crate) fn sealed_fast_flows(
             BATTERY.to_string(),
             NODE.to_string(),
         )),
-        Box::new(Lamp::new(
-            LAMP.to_string(),
-            BATTERY.to_string(),
-            CHAMBER.to_string(), // the light is absorbed in the chamber it lights (2b-ii)…
-            CHAMBER.to_string(), // …and the waste heat lands there too (2b-i)
-            *lamp,
-        )),
-        Box::new(ChamberCooling::new(
-            CHAMBER_COOLING.to_string(),
-            CHAMBER.to_string(),
-            NODE.to_string(), // the chamber's cooler hands the lamp heat on to the node
-            *chamber,
-            *thermal_params,
-        )),
-        Box::new(ChamberWall::new(
-            CHAMBER_WALL.to_string(),
-            CHAMBER.to_string(),
-            match surroundings {
-                ChamberSurroundings::Outdoor | ChamberSurroundings::Cabin { .. } => {
-                    CHAMBER_SURROUNDINGS.to_string()
-                }
-                ChamberSurroundings::Space { .. } => SPACE.to_string(),
-                ChamberSurroundings::Structure => NODE.to_string(),
-            },
-            surroundings,
-            *chamber,
-            *thermal_params,
-        )),
-        Box::new(ChamberHeater::new(
-            CHAMBER_HEATER.to_string(),
-            BATTERY.to_string(),
-            CHAMBER.to_string(),
-            *chamber,
-        )),
-        Box::new(RadiatorReject::new(
+    ];
+    // The plant chamber's own four (lamp, cooler, walls, heater), wired to the station's
+    // battery, node and space — the same builder an authored bed uses (2026-10-18).
+    fast_flows.extend(chamber_flows(
+        lamp,
+        chamber,
+        thermal_params,
+        surroundings,
+        STATION_PORTS,
+    ));
+    fast_flows.push(Box::new(RadiatorReject::new(
             RADIATOR_REJECT.to_string(),
             NODE.to_string(),
             SPACE.to_string(),
             *thermal_params,
-        )),
-    ];
+        )));
     if with_harvest {
         fast_flows.push(Box::new(Harvest::new(
             HARVEST.to_string(),
@@ -549,9 +477,18 @@ pub(crate) fn sealed_fast_flows(
     // The heat the plants' evaporation takes from the chamber, handed to the coil (2026-10-15,
     // `docs/plans/post-roadmap-latent-heat-books.md`); the plant side's recorder is booked by
     // `build_sealed_station_unread`.
-    fast_flows.push(crate::latent_heat::latent_heat_flow());
+    fast_flows.push(chamber_latent_heat_flow(STATION_PORTS));
     fast_flows
 }
+
+/// The sealed station's side of its plant chamber's connections: the battery powers the lamp and
+/// the heater, the thermal node takes the cooler's and the coil's heat, `boundary.space` is the
+/// walls' far side under the lab's `Space` surroundings.
+pub const STATION_PORTS: ChamberPorts<'static> = ChamberPorts {
+    power: BATTERY,
+    heat_sink: NODE,
+    space: SPACE,
+};
 
 /// Guard: the biosphere-slow and fast registries share no `FlowId`.
 fn assert_flow_ids_disjoint(bio_reg: &Registry, fast_reg: &Registry) -> Result<(), SimError> {

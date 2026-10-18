@@ -224,3 +224,23 @@ riskiest part — pulling the lamp-lit chamber out of the sealed station — des
    default). A regulator wired to the bed's O₂ must declare the bed's air. The bed's air stays the
    reference 9500 mol unless the user says otherwise: the humidity target hides that size.
 5. **Re-sow calendar + an example greenhouse**, as §4 slice 5.
+
+## 8. Slice 3 BUILT 2026-10-18 — the lamp-lit chamber, extracted
+
+`station::plant_chamber` holds the chamber as parts a habitat assembles: `chamber_plants` (the season
+built for a lamp-lit room, its stocks, its plant registry and **the builder's own starting values** plus
+the sowing clock), `chamber_start_stocks` (the chamber's heat store at the program's day-0 steady state,
+and the walls' boundary when they face the outdoors or a held cabin), `chamber_flows` (lamp, cooler,
+walls, heater) and `chamber_latent_heat_flow` (the evaporation coil). Their outward connections are
+`ChamberPorts { power, heat_sink, space }`; the sealed station passes `sealed::STATION_PORTS` (battery,
+node, `boundary.space`). `sealed_fast_flows` keeps its output and order (the lab separate-air build
+reuses it unchanged); `latent_heat::latent_heat_flow` is deleted (one builder now).
+
+**The starting values, measured before the hand-built copy went.** The station seeded the soil account
+from `params::biosphere()` beside plants built from `room_params()`. The two differ in one field (the
+water's air-temperature read), which seeds nothing, so on the reference params the builder's values and
+the copy are the same keys and values. **Under the lab leaf form they were not:** the builder seeds the
+seedling's leaf area, the station's copy did not — a lab-only gap, now closed by taking the builder's.
+
+**Proof:** `regen_goldens` 0 of 20 would change; all three manifests unchanged; the full suite and
+clippy (below).

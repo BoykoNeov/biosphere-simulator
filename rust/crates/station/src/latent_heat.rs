@@ -28,15 +28,12 @@ use std::sync::Arc;
 
 use domains::biosphere::science::LATENT_HEAT_VAPORIZATION;
 use domains::biosphere::stocks::SOIL_WATER;
-use domains::thermal::NODE;
 use simcore::auxiliary::AuxProcess;
 use simcore::environment::Environment;
 use simcore::error::SimError;
 use simcore::flow::{Flow, FlowResult, Leg};
 use simcore::registry::Registry;
 use simcore::state::State;
-
-use crate::chamber::CHAMBER;
 
 /// The transpiration flow's id: the water whose heat is booked.
 pub const TRANSPIRATION: &str = "biosphere.transpiration";
@@ -176,15 +173,9 @@ impl Flow for ChamberLatentHeat {
     }
 }
 
-/// The fast flow, chamber → thermal node, as the sealed station's canonical fast list carries it
-/// (`sealed::sealed_fast_flows`).
-pub fn latent_heat_flow() -> Box<dyn Flow> {
-    Box::new(ChamberLatentHeat::new(
-        CHAMBER_LATENT_HEAT.to_string(),
-        CHAMBER.to_string(),
-        NODE.to_string(),
-    ))
-}
+// The fast flow, chamber → the habitat's heat store, is built by
+// `crate::plant_chamber::chamber_latent_heat_flow` (one builder for the station and an authored
+// bed, since 2026-10-18).
 
 /// The plant side of the books, on a sealed build's plant registry: the transpiration flow shared
 /// with a new [`WindowEvaporationRecorder`] (appended to the aux list), and [`EVAPORATION_RATE_AUX`]
@@ -260,6 +251,8 @@ pub fn without_latent_heat(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chamber::CHAMBER;
+    use domains::thermal::NODE;
     use simcore::environment::SourceResolver;
     use simcore::quantities::Quantity;
     use simcore::state::Stock;

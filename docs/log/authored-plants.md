@@ -46,3 +46,9 @@ per-flow setpoint. The temporary 9500 is deleted. An authoring unfreeze: the man
 and each flow type's `needs_cabin_air`, as predicted. Declaring it exposed two more fixtures the
 2026-09-06 move had broken in meaning (`eclss_multirate_cabin`, `eclss_thermal_habitat`, designed
 around a 10-mol target): they declare 47.61904761904762 mol, for which 0.21 × air is exactly 10.0.
+
+**SLICE 3 BUILT 2026-10-18 — the lamp-lit chamber, extracted.** `station::plant_chamber` holds the sealed
+station's plant chamber as parts with outward `ChamberPorts` (power, heat sink, space); the sealed station
+is rebuilt on them. Proof: 0 of 20 goldens, all three manifests unchanged, full suite and clippy green.
+The station's hand-built starting values were measured equal to the builder's on the reference before the
+copy was deleted; under the lab leaf form the copy lacked the seedling's leaf area (a lab-only gap, closed).

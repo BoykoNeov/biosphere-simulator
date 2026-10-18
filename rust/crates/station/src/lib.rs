@@ -34,6 +34,7 @@ pub mod objectives;
 pub mod palette;
 pub mod params;
 pub mod perturbations;
+pub mod plant_chamber;
 pub mod regen;
 pub mod scenario;
 pub mod science_gates;
