@@ -203,3 +203,24 @@ by making the assumption explicit. `param_sets_dsl.yaml` reads `o2_fraction`.
 air is refused at build; the field on a scrubber or a kinetics flow is refused; the direction gate
 judges a 100-mol cabin against 21 mol (and reports that setpoint), while the station's air leaves the
 anchor at its setpoint; a `param(...)` expression for the air builds and runs.
+
+## 7. Slices 3–5 re-ordered before building (advisor review, 2026-10-18)
+
+§4's slices 3 and 4 cannot be tested apart (a runner path for bed files has no bed file to run), and the
+riskiest part — pulling the lamp-lit chamber out of the sealed station — deserves its own proof. So:
+
+3. **Extract the chamber (station only).** `build_sealed_station_unread`'s plant chamber (the season, the
+   chamber heat store, `Lamp` / `ChamberCooling` / `ChamberWall` / `ChamberHeater`, the latent-heat books,
+   the gas-exchange move, the last wrappers) becomes its own builder, and the sealed station is rebuilt on
+   it. **Proof:** `regen_goldens` 0 of 20, all three manifests unchanged, the lab separate-air build green.
+   **First, measured:** whether the station's hand-built starting counters equal `build_season_with`'s own
+   (they are seeded from `params::biosphere()` beside plants built from `room_params()`); if not, the
+   difference is a finding, recorded, not fixed inside a bit-identical refactor.
+4. **The runner path + the bed block, together.** Configured by the existing `SealedStationScenario` (an
+   allow-listed set of its fields), not a parallel struct. Interior stocks (plants, soil, chamber air and
+   heat) at fixed ids an author may wire to directly — listed in the manifest; outward connections (the
+   lamp's and heater's power, the cooler's heat sink, the walls' surroundings) are wiring fields onto the
+   author's own stocks, so a habitat never holds two batteries. The walls' surroundings are required (no
+   default). A regulator wired to the bed's O₂ must declare the bed's air. The bed's air stays the
+   reference 9500 mol unless the user says otherwise: the humidity target hides that size.
+5. **Re-sow calendar + an example greenhouse**, as §4 slice 5.
