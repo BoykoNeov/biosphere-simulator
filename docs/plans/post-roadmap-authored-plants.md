@@ -106,3 +106,50 @@ first three and the recommendation on the fourth:
    regulator aims at 21 % of it. A separate authoring unfreeze, built with the crop bed.
 
 The slices and the ceremony follow in §4, written before anything is built.
+
+**A fifth answer, asked after the design was reviewed: the bed is the station's LAMP-LIT chamber**
+(lamp light, the chamber's heat store and temperature), the recommendation, on the user's "prefer
+closer to reality". Not the weather-lit jar.
+
+**A correction to question 3 as it was put.** It promised that author-declared steps would be
+"checked against the existing safety limits". The build-time `k·h < 1` check covers only the
+equipment flows that carry rate constants, **not the plant flows**. For a bed, the checks that
+actually exist are: whole steps per day, one plant step per group of cabin steps, and rationing as
+a run-time failure. The plant science is measured at the 1/16-day step only; another step is
+allowed and unexamined. The user was told this before the slices below were written.
+
+## 4. The slices, written before anything is built
+
+Each its own commit, its own predicted diff, full tests `--no-fail-fast`, `--ignored` before done.
+
+1. **The O₂ target as a share — the station half.** `eclss.yaml`'s `o2_setpoint` (1995.0 mol) is
+   cited as a mole fraction of 0.21 times the 9500 mol the station's cabin holds. Store the
+   fraction, compute the moles where the cabin's air is known. **Predict:** bit-neutral (to be
+   verified: `0.21 * 9500.0 == 1995.0` in f64), no golden moves, `eclss.yaml`'s `values`
+   fingerprint and its key's name move. First: every reader of `o2_setpoint`, and whether the
+   authoring side reads a second copy (the hex-float bundle).
+2. **The O₂ target as a share — the authoring half** (an authoring unfreeze). Every authored use of
+   `eclss.o2_makeup` must declare its cabin's air; **no default** (a default is the silent
+   mis-sizing this removes). The direction gate reads the same per-scenario target the flow aims
+   at, tested with a cabin that is not 9500. Every fixture in `rust/data/scenarios/` and both
+   content files using the regulator gain the declaration.
+3. **A two-rate runner path for files with a bed** — the station's master-day driver, which carries
+   the plants' counters and takes a reset hook. Files without a bed keep today's path verbatim,
+   proven by a bit-level snapshot of every fixture's and content file's final state before and
+   after (the authored-content test pins no values, so it cannot see drift). The step-safety
+   check's slow-step divisor is re-examined for a bed file (Strang's `dt/2` is not the plant
+   step). `godot_bridge`'s wrap of a loaded scenario either runs a bed file on this path or
+   refuses it.
+4. **The bed block — the lamp-lit chamber.** One bed per file (the plant flows hard-code their
+   stock ids; a second is a load error). "Every stock" wiring = an author stock **becomes** a bed
+   stock (the bed's flows cannot be re-pointed, the author's can): quantity and composition must
+   match, an aliased author stock may not carry its own `amount:`, all other ids must be
+   disjoint. The starting state, counters included, is the reference builder's **verbatim** (a
+   hand-rebuilt counter set is how ROOTED_DEPTH once started at 0); the starting-counters gate is
+   mirrored for authored beds. Gas exchange on the cabin's minute step where the bed's air is
+   shared with cabin equipment (the reference's form since 2026-10-03).
+5. **The author's re-sow calendar + one example greenhouse in `scenarios/`.** Re-sow through
+   `annual_reset_with` with the params the run was built from (overrides included; the
+   `param_funnel` gate's hazard), only on master-day boundaries through the driver's checked reset
+   hook. The example's horizon is chosen by measuring its run time (the content test runs every
+   file twice). Then the authoring manifest and `docs/authoring-reference.md`.
