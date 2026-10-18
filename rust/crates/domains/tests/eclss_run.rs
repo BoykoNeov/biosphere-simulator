@@ -55,7 +55,8 @@ fn steady_state(scenario: &EclssScenario) -> (f64, f64, f64) {
         scenario.co2_production_rate / p.co2_scrub_rate,
         // Since 2026-10-03 the condenser acts on the excess above its setpoint, so the
         // humidity steady state sits P/k ABOVE the setpoint, not at P/k.
-        p.humidity_setpoint + scenario.h2o_production_rate / p.condense_rate,
+        p.humidity_setpoint_kg(scenario.cabin_air_mol)
+            + scenario.h2o_production_rate / p.condense_rate,
     )
 }
 
@@ -243,7 +244,7 @@ fn eclss_species_move_monotonically_to_steady_state() {
     assert!((h2o[0] - STEADY_STATE_SCENARIO.cabin_h2o_0).abs() < 1e-12);
     assert_eq!(
         STEADY_STATE_SCENARIO.cabin_h2o_0,
-        params::eclss().humidity_setpoint,
+        params::eclss().humidity_setpoint_kg(STEADY_STATE_SCENARIO.cabin_air_mol),
         "the standalone cabin starts AT the humidity setpoint, as its O₂ starts at the O₂ one"
     );
     assert!((o2[0] - STEADY_STATE_SCENARIO.cabin_o2_0).abs() < 1e-12);

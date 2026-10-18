@@ -49,6 +49,17 @@ use simcore::flow::Flow;
 
 use crate::errors::AuthoringError;
 
+/// The cabin air (mol) every authored `eclss.condenser` is built against — **implicitly**.
+///
+/// ⚠⚠ TEMPORARY, and the defect itself, named. Until 2026-10-18 `eclss.yaml` stored the
+/// condenser's target pre-multiplied by the station's 9500 mol cabin (`humidity_setpoint:
+/// 1.7863` kg), so every authored condenser held 1.7863 kg whatever its cabin held. The file
+/// now stores the relative humidity (`docs/plans/post-roadmap-authored-plants.md` §15, slice
+/// A); this constant keeps the authoring side on the station's cabin until slice B makes the
+/// author DECLARE the cabin's air, with no default — at which point it is deleted, not kept as
+/// a fallback. The `IMPLICIT_CABIN_AIR_MOL` of the O₂ regulator's slice 1, again.
+pub const IMPLICIT_CONDENSER_AIR_MOL: f64 = 9500.0;
+
 /// How one authoring flow-type name lowers to a frozen `Flow` constructor: the exact
 /// set of wiring keyword fields (order-significant — it is the constructor's positional
 /// order) and the frozen param set the flow's constructor needs (or `None`).
@@ -313,6 +324,7 @@ pub fn build_frozen_flow(
             wire("cabin_h2o")?,
             wire("humidity_condensate")?,
             eclss_params(),
+            IMPLICIT_CONDENSER_AIR_MOL,
         ))),
         "eclss.o2_makeup" => Ok(Box::new(O2Makeup::new(
             id.to_string(),
@@ -394,7 +406,13 @@ pub fn kinetics_param_map(param_set: &str) -> Result<BTreeMap<String, f64>, Auth
             let p = params::eclss();
             map.insert("co2_scrub_rate".to_string(), p.co2_scrub_rate);
             map.insert("condense_rate".to_string(), p.condense_rate);
-            map.insert("humidity_setpoint".to_string(), p.humidity_setpoint);
+            // The stored params, not a target in kg: that depends on a cabin, and a kinetics
+            // rate has none (`humidity_setpoint` until 2026-10-18).
+            map.insert("humidity_fraction".to_string(), p.humidity_fraction);
+            map.insert(
+                "saturation_vapour_pressure".to_string(),
+                p.saturation_vapour_pressure,
+            );
             map.insert("o2_makeup_gain".to_string(), p.o2_makeup_gain);
             // The stored param, not a target in mol: that depends on a cabin, and a
             // kinetics rate has none (`o2_setpoint` until 2026-10-18).

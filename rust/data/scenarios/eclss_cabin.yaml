@@ -44,7 +44,7 @@ rng_seed: 0
 stocks:
   # The three cabin-air POOLs. cabin_o2 starts AT the setpoint (the regulator idles) and
   # the crew draw pulls it down to o2_eq = 1993.0; CO2 starts at 0 (a clean cabin) and rises
-  # to co2_eq = 3.0 mol; H2O starts AT its setpoint and rises to h2o_eq = 1.7863 + 0.04 kg.
+  # to co2_eq = 3.0 mol; H2O starts AT its setpoint and rises to h2o_eq = 1.786315428255099 + 0.04 kg.
   # No `composition` — see the note above.
   - id: eclss.cabin_o2
     domain: eclss
@@ -66,7 +66,8 @@ stocks:
     domain: eclss
     quantity: water
     kind: pool
-    amount: 1.7863        # EclssScenario.cabin_h2o_0 (== the frozen humidity_setpoint)
+    amount: 1.786315428255099   # EclssScenario.cabin_h2o_0 (== the condenser's target for 9500 mol;
+                          # 1.7863, the frozen humidity_setpoint, until 2026-10-18)
                           # ⚠ 0.0 until 2026-10-03, when the condenser became one-sided
                           # about a cited 40 % RH setpoint; it tracks `eclss.yaml` exactly
                           # as cabin_o2 above tracks o2_setpoint.

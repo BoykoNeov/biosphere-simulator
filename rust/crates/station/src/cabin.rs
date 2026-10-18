@@ -100,6 +100,7 @@ pub(crate) fn build_cabin_flows(
             domains::eclss::CABIN_H2O.to_string(),
             HUMIDITY_CONDENSATE.to_string(),
             *eclss,
+            crate::scenario::STATION_CABIN_AIR_MOL,
         )),
         Box::new(O2Makeup::new(
             O2_MAKEUP.to_string(),

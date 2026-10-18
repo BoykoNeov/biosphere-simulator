@@ -77,7 +77,8 @@ validation.
 re-captured event. Several frozen coefficients are deliberately **illustrative**, carried
 as such, not hidden:
 - The **ECLSS** rate-constants (`k_scrub` / `k_cond` / `k_makeup`; the O₂ target was here until it
-  was cited on 2026-09-06, and is stored as `o2_fraction` = 0.21 since 2026-10-18) and the
+  was cited on 2026-09-06, and is stored as `o2_fraction` = 0.21 since 2026-10-18; the humidity
+  target likewise, as `humidity_fraction` = 0.40 since the same day) and the
   **station** `harvest_rate` / `recovery_rate` / `recovery_efficiency` / `photon_efficacy`
   are illustrative sizing — BVAD publishes no first-order τ, only steady-state throughput
   (which the closure checks validate). Step 9 explicitly kept them illustrative.
@@ -376,6 +377,27 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — the cabin condenser's target is stored as a relative humidity, `humidity_fraction:
+  0.40`, plus the saturation pressure it is a fraction of (`saturation_vapour_pressure:
+  2643.931192210576 Pa`), not as `humidity_setpoint: 1.7863 kg` (§15 of
+  `docs/plans/post-roadmap-authored-plants.md`, slice A). 6 station goldens move, in ONE number each:
+  `eclss.cabin_h2o` by +1.542826e-05 kg; their 6 `golden_sha256` rows and `eclss.yaml`'s two
+  fingerprints are the whole manifest diff.** The same hidden 9500 mol the O₂ target carried (entry
+  below). `EclssParams::humidity_setpoint_kg(air)` builds the target where the cabin is known and
+  `Condenser::new` takes the cabin's air, no default; every station build passes
+  `STATION_CABIN_AIR_MOL`. The station's target is 1.786315428255099 kg — the derivation the old
+  value was written to five figures of — and every cabin that started AT 1.7863 starts at it (the
+  `cabin_o2_0` rule), so start and target shift together. **Predicted before running, all six named,
+  and measured exactly:** `cabin_h2o` up by that constant, every other leaf of every golden
+  bit-identical (condensate and the crew's water books included), the other 14 goldens identical.
+  ⚠ **Stored as a pressure, not as 295.15 K, on purpose:** a temperature would put the curve's `exp`
+  into every condenser build, and `eclss` / `cabin_gas` / `water_recovery` are Tier 1 in
+  `rust/data/tiers.json` (transcendental-free, last-bit equal on any platform); as a pressure the
+  target is multiply and divide only, and a test re-derives the pressure from the curve. The
+  temperature half of the old TRIGGER stands: the cabin has no heat store; when it gets one, the
+  pressure becomes a live read, `exp` enters every step, and those three rows leave Tier 1 inside
+  that unfreeze. The authoring side keeps a named, temporary 9500 (`IMPLICIT_CONDENSER_AIR_MOL`)
+  until slice B. Advisor-reviewed twice before code.
 - **2026-10-18 — the O₂ regulator's target is stored as a mole fraction, `o2_fraction: 0.21`, not
   as `o2_setpoint: 1995.0 mol` (slice 1 of `docs/plans/post-roadmap-authored-plants.md`). Bit-neutral:
   0 of 20 goldens move; the manifest's `eclss.yaml` entry (both fingerprints) is the whole diff.** The

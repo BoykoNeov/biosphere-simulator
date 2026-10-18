@@ -110,7 +110,7 @@ stocks:
     domain: eclss
     quantity: water
     kind: pool
-    amount: 1.7863        # AT eclss.yaml's humidity_setpoint (0.0 until 2026-10-03, when the
+    amount: 1.786315428255099   # AT the condenser's target, 1.7863 until 2026-10-18 (0.0 until 2026-10-03, when the
                           # condenser became one-sided about it; a dry start would leave the
                           # condenser idle for this whole run — a dead anchor)
 

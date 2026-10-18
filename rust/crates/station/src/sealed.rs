@@ -424,6 +424,7 @@ pub(crate) fn sealed_fast_flows(
             CABIN_H2O.to_string(),
             RECOVERED_WATER.to_string(), // the Step-4 seam: condensate → the buffer
             *eclss,
+            crate::scenario::STATION_CABIN_AIR_MOL,
         )),
         Box::new(O2Makeup::new(
             O2_MAKEUP.to_string(),

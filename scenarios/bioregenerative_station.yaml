@@ -125,7 +125,7 @@ stocks:
     domain: cabin
     quantity: water
     kind: pool
-    amount: 1.7863        # AT eclss.yaml's humidity_setpoint, BVAD's 40 % RH (0.0 until 2026-10-03)
+    amount: 1.786315428255099   # AT the condenser's target, BVAD's 40 % RH (1.7863 until 2026-10-18; 0.0 until 2026-10-03)
 
   # ===========================================================================
   # THE BIOREACTOR — the scrubber's product tank and the algal culture.

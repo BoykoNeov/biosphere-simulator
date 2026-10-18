@@ -162,7 +162,8 @@ fn season(
                 r.room_over_saturation += u64::from(room > 1.0);
                 let before_fix = (before.stocks[WATER_VAPOR].amount
                     + before.stocks[CABIN_H2O].amount
-                    - params::eclss().humidity_setpoint)
+                    - params::eclss()
+                        .humidity_setpoint_kg(station::scenario::STATION_CABIN_AIR_MOL))
                     / saturation_vapour_kg(temp, chamber_air_mol);
                 r.room_rh_max_before = r.room_rh_max_before.max(before_fix);
                 r.room_over_saturation_before += u64::from(before_fix > 1.0);

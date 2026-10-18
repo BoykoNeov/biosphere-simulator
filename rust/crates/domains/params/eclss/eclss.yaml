@@ -20,15 +20,25 @@
 #
 # condense_rate (k_cond) — first-order humidity-condensation rate (1/s), > 0. Condensing
 #   heat exchanger. Structural positivity requires k_cond·dt < 1 (here 0.03). Since
-#   2026-10-03 it acts on the EXCESS above humidity_setpoint, not on the whole cabin vapour.
+#   2026-10-03 it acts on the EXCESS above the humidity target, not on the whole cabin vapour.
 #
-# humidity_setpoint (h2o_set) — the cabin water-vapour inventory the condenser holds (kg), > 0.
-#   One-sided: below it the condenser takes nothing (a condensing heat exchanger cannot
-#   humidify). Until 2026-10-03 there was no setpoint and the condenser drew first-order on all
+# humidity_fraction + saturation_vapour_pressure — the condenser's target. The cabin water-vapour
+#   inventory it holds (kg) is humidity_fraction x saturation_vapour_pressure / P_std x the
+#   cabin's air x M_H2O, computed where that air is known (`EclssParams::humidity_setpoint_kg`):
+#   the station's 9500 mol cabin gives 1.786315428255099 kg, an authored habitat its own air.
+#   One-sided: below the target the condenser takes nothing (a condensing heat exchanger cannot
+#   humidify). Until 2026-10-03 there was no target and the condenser drew first-order on all
 #   of the cabin's vapour, so the cabin settled at P/k = 0.0675 kg — about 1.5 % relative
 #   humidity, set by a solver-stability rate, not chosen by anyone
-#   (docs/plans/post-roadmap-room-temperature.md §13a, §15). DERIVED like o2_setpoint: see the
-#   value's own source.
+#   (docs/plans/post-roadmap-room-temperature.md §13a, §15).
+#   ⚠ UNTIL 2026-10-18 THIS WAS `humidity_setpoint: 1.7863 kg` — the 40 % already multiplied by
+#   the station's 9500 mol at 22 °C, which every authored cabin then inherited whatever its size
+#   (docs/plans/post-roadmap-authored-plants.md §15). Its source's TRIGGER named two hidden
+#   inputs; the air is now the cabin's own, the temperature is still a stored constant.
+#   ⚠ WHY A PRESSURE, NOT A TEMPERATURE: stored as 295.15 K, every condenser build would run the
+#   curve's exp, and three goldens (eclss, cabin_gas, water_recovery) are Tier 1 in
+#   rust/data/tiers.json — transcendental-free, last-bit equal on any platform. As a pressure the
+#   target is multiply and divide only; a test re-derives the pressure from the curve.
 #
 # o2_makeup_gain (k_makeup) — proportional gain of the O₂ partial-pressure regulator (1/s),
 #   > 0. Gives O₂ its restoring force (so O₂ does not recapitulate Power's constructed
@@ -133,10 +143,14 @@ parameters:
     value: 2.0e-3
     unit: "1/s"
     source: "DESIGN — controller-tuning choice, not a literature value: proportional gain (τ ≈ 500 s) giving cabin O₂ its restoring force. The clearest DESIGN case in the file — a P gain is a property of the controller WE wrote, tuned against OUR plant and OUR dt. [B] supports the control law's form; no source can state our gain. Not calibrated."
-  humidity_setpoint:
-    value: 1.7863
-    unit: "kg"
-    source: "[D] BVAD Rev 2 Table 4-1 'Typical Steady-State Values for Vehicle Atmospheres', printed p. 63 (read as the page image, 2026-10-03), row 'Relative Humidity, %': 25 lower (NASA Std. 3001 Vol 2 Rev A 2015) / 40 nominal ('Typical ISS') / 75 upper (NASA Std. 3001). Taken: the NOMINAL 40 %. n = 0.40 x saturation at 22 °C (295.15 K, BVAD Table 4-73's cabin nominal, printed p. 153) x 9500 mol x M_H2O, on the model's own FAO-56 curve (weather::saturation_vapor_pressure: 2643.93 Pa -> 4.46579 kg saturated) = 1.78632 kg, written to 5 figures; a test re-derives it. ⚠ TRIGGER — like o2_setpoint this encodes the ONE cabin air inventory (9500 mol) AND a cabin temperature the model does not hold as a state. When the cabin gets its own heat store, this MUST become a relative humidity read against it. Replaced 2026-10-03 a first-order draw on all the cabin's vapour that held it at ≈ 1.5 % RH."
+  humidity_fraction:
+    value: 0.40
+    unit: "dimensionless"
+    source: "[D] BVAD Rev 2 Table 4-1 'Typical Steady-State Values for Vehicle Atmospheres', printed p. 63 (read as the page image, 2026-10-03), row 'Relative Humidity, %': 25 lower (NASA Std. 3001 Vol 2 Rev A 2015) / 40 nominal ('Typical ISS') / 75 upper (NASA Std. 3001). Taken: the NOMINAL 40 %, as the relative humidity the cabin condenser holds — the quantity this file stores since 2026-10-18. ⚠ HISTORY: stored until 2026-10-18 as `humidity_setpoint: 1.7863 kg` = 0.40 x saturation at 22 °C x 9500 mol x M_H2O written to 5 figures, with a TRIGGER: it encoded the ONE cabin air inventory (9500 mol) AND a cabin temperature the model does not hold as a state. The air half is fired (the target takes the cabin's own air; docs/plans/post-roadmap-authored-plants.md §15); the temperature half stands, see saturation_vapour_pressure. Replaced 2026-10-03 a first-order draw on all the cabin's vapour that held it at ≈ 1.5 % RH. Bounded (0, 1]."
+  saturation_vapour_pressure:
+    value: 2643.931192210576
+    unit: "Pa"
+    source: "The model's own FAO-56 saturation curve (weather::saturation_vapor_pressure, 610.8 exp(17.27 T / (T + 237.3)) Pa) read at T = 22 °C = 295.15 K, BVAD Rev 2 Table 4-73's crew-cabin NOMINAL air temperature, printed p. 153 (nominal attributed there to Thirsk et al. 2009) — the figure's own locus; station/params/chamber.yaml borrows the same 295.15 K for the plant chamber by analogy. Written as the curve's f64 round-trip; a test re-derives it. Stored as a pressure rather than a temperature so the condenser's target needs no exp (three Tier-1 goldens, rust/data/tiers.json). ⚠ TRIGGER — the cabin has no heat store, so this is a fixed temperature, not the room's. When the cabin gets one, this MUST become a live read of its temperature; exp then enters every step, and eclss / cabin_gas / water_recovery leave Tier 1 inside that unfreeze."
   o2_fraction:
     value: 0.21
     unit: "dimensionless"

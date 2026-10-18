@@ -88,3 +88,19 @@ for the user.
   case for keeping the power-of-two rule — time slipping across midnight — was a real risk and a
   wrong prediction; seconds of arithmetic told the two apart, and the cap then fixed a case the guard
   never saw (a window reading *under* the lamp).
+
+**THE HUMIDITY TARGET AS A SHARE, SLICE A BUILT 2026-10-18** (plan §15, on the user's *"1"* — the third
+leftover, first because it unblocks a bed air other than 9500 mol). `eclss.yaml`'s `humidity_setpoint:
+1.7863 kg` became `humidity_fraction: 0.40` and `saturation_vapour_pressure: 2643.931192210576 Pa` (the
+model's curve at BVAD's 22 °C crew-cabin nominal); `Condenser::new` takes the cabin's air and builds
+its target there, as the O₂ regulator does. Predicted before running: six named goldens, `cabin_h2o`
+up by a constant, nothing else. Measured: exactly six, one number each, +1.542826e-05 kg, every other
+leaf bit-identical. Station manifest: `eclss.yaml`'s fingerprints and six golden hashes. Authoring
+keeps a named temporary 9500 until slice B, which waits on a user question (two test files declare a
+47.6-mol cabin for their O₂ regulator).
+
+* **Lesson: store the input in the form that keeps the tier claim true.** Storing 22 °C would have put
+  an `exp` into every condenser build and silently falsified three goldens' "last-bit equal on any
+  platform" (the check that would catch it was deleted with the Linux job). Stored as the pressure at
+  22 °C, the target is multiply and divide; the temperature was a constant either way. Check
+  `rust/data/tiers.json` before adding a transcendental anywhere a Tier-1 golden builds.

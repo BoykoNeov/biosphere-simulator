@@ -1040,7 +1040,8 @@ fn the_multirate_eclss_anchor_runs_its_condenser() {
     )
     .expect("load the multi-rate anchor");
     let result = run_scenario(built).expect("run the multi-rate anchor");
-    let setpoint = domains::params::eclss().humidity_setpoint;
+    let setpoint = domains::params::eclss()
+        .humidity_setpoint_kg(authoring::flow_registry::IMPLICIT_CONDENSER_AIR_MOL);
     let excess = result.final_state.stocks["eclss.cabin_h2o"].amount - setpoint;
     assert!(excess > 0.0, "the condenser never ran: excess {excess}");
     // Measured 2026-10-03 at 2.8387096774195486e-2 — the header's "~2.84e-02 above its

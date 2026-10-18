@@ -391,3 +391,70 @@ Each touches a frozen contract, so each waits for the user.
   air and temperature, as the O₂ target became a share (slices 1–2). The derived 1.78632 kg is not the
   written 1.7863, so the station goldens that read the condenser would move (expected water only, in
   the fifth figure — not measured), with the station's unfreeze ceremony. **Small to medium, and it unblocks the air volume.**
+
+## 15. The cabin humidity target as a share — opened 2026-10-18 on the user's *"1"*
+
+The third of §14, taken first because it unblocks the second. Advisor review before any code
+(2026-10-18), whose points are folded in below.
+
+**The change.** `eclss.yaml`'s `humidity_setpoint: 1.7863 kg` becomes two stored values:
+`humidity_fraction: 0.40 dimensionless` (BVAD Table 4-1's nominal, the quantity the old source
+already cited) and `saturation_vapour_pressure: <e_sat(22 °C)> Pa` — the model's own FAO-56 curve
+read at BVAD Table 4-73's crew-cabin nominal 295.15 K (the figure's own locus;
+`station/params/chamber.yaml` borrows the same number for the plant chamber by analogy), with a test
+re-deriving it from the curve. The target in kilograms is built where the cabin's air is known,
+`EclssParams::humidity_setpoint_kg(cabin_air_mol)`, and `Condenser::new` takes the cabin's air and
+stores its target at construction, as `O2Makeup` does. **Renamed, not re-united:** a reader of the
+old key now fails loudly rather than reading 0.40 as kilograms (none was found: no authored rate
+reads `param("humidity_setpoint")`, and the authoring manifest records no param-set key names).
+`water_cycle.yaml`'s `humidity_setpoint: 0.75` is the plant chamber's, already a fraction, and is
+not touched.
+
+**Why a pressure and not the temperature (advisor, second review).** Storing 295.15 K would put an
+`exp` into every build of the condenser, and three goldens (`eclss`, `cabin_gas`, `water_recovery`)
+are Tier 1 in `rust/data/tiers.json` — `transcendental_free: true`, last-bit agreement on any
+platform. Either that claim goes silently false (the cross-platform run that would catch it was
+deleted 2026-10-10) or the three rows move to Tier 2 with a measured band — a native-port unfreeze
+stacked on a fifth-figure rounding move. Stored as a pressure, the target is
+`fraction × e_sat / P_std × air × M_H2O`, multiply and divide only, so `eclss.rs`'s "all arithmetic is
++ − × ÷" and the tier rows stay true untouched. Nothing real is lost: the temperature was going to be a
+stored constant either way.
+
+**Half of the trigger, not all of it.** The old source's TRIGGER named two hidden inputs, the 9500 mol
+and a cabin temperature the model does not hold. This closes the first. The second stays a stored,
+cited constant, not a state: the cabin has no heat store, so the target cannot follow the room. The
+new TRIGGER: when the cabin gets a heat store, the pressure becomes a live read of its temperature,
+`exp` enters every step, and the three goldens above leave Tier 1 inside that unfreeze.
+
+**Slice A — domains + station.** Every station build passes `STATION_CABIN_AIR_MOL`. The authoring
+call site passes a named temporary constant until slice B. Every cabin that starts AT the target
+(`STEADY_STATE_SCENARIO`, `CABIN_GAS_SCENARIO`, `eclss_cabin.yaml`, `eclss_multirate_cabin.yaml`,
+`eclss_thermal_habitat.yaml`, `scenarios/bioregenerative_station.yaml`) moves to the derived value,
+written as a round-trip literal with a test that it equals the derivation — the matched-start rule
+(`EclssScenario::cabin_h2o_0`): otherwise each cabin starts about 1.6e-5 kg below its target and the
+diff carries a start-up transient that is not this change.
+
+**Predicted before running (slice A).** The goldens that record the cabin's vapour: `eclss_state`,
+`cabin_gas_state`, `water_recovery_state`, `greenhouse_state`, `harvest_state`,
+`sealed_station_state` — six of the twenty. In each, `cabin_h2o` sits higher by the constant
+Δ = derived − 1.7863 ≈ +1.6e-5 kg at every recorded time (target and start shift together, so the
+condenser's flux is unchanged up to rounding); every other water stock moves at most in its last
+bits; every non-water stock is bit-identical; no other golden moves; `tier_contract` and
+`tier_sensitivity` stay green in both crates. Any carbon, oxygen or energy move, or any seventh
+golden, is a finding and stops the slice.
+
+**Slice B — authoring (a user question first).** `eclss.condenser` requires `cabin_air_mol`, no
+default. Open: `eclss_multirate_cabin.yaml` and `eclss_thermal_habitat.yaml` declare 47.619… mol for
+their O₂ regulator (sized so its target is 10 mol). The same air for their condenser drops its target
+from ≈ 1.79 to ≈ 0.009 kg; 9500 gives one cabin two sizes. The user's call.
+
+### 15a. Slice A BUILT 2026-10-18 — measured against the prediction
+
+`regen_goldens` (report, then `--write`): **6 of 20 would change — exactly the six named.** Leaf by leaf
+against `HEAD`, each of the six differs in **one** number, `eclss.cabin_h2o`, by
++1.542826e-05 kg (= 1.786315428255099 − 1.7863); every other leaf of every golden is bit-identical —
+condensate, `crew.water_store`, `recovered_water` and `brine` included, where the prediction allowed
+last-bit moves. The shift argument holds exactly: start and target moved together, so `h2o − setpoint`
+ran the same bits. Manifests: the station's diff is `eclss.yaml`'s two fingerprints and the six
+`golden_sha256` rows; the biosphere and authoring manifests unchanged (the authoring manifest names no
+param-set keys, so the `eclss` set's rename does not reach it).

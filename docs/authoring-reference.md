@@ -283,7 +283,7 @@ how positivity holds, and whether the flow is multi-instanceable:
 | `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** | — (`τ ≫ dt` is not a predicate) |
 | `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) | — (state-dependent) |
 | `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor (`k_scrub·cabin_co2`) | `co2_scrub_rate` |
-| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor, one-sided (`k_cond·max(0, cabin_h2o − humidity_setpoint)`, since 2026-10-03) | `condense_rate` |
+| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor, one-sided (`k_cond·max(0, cabin_h2o − setpoint)`, since 2026-10-03; the setpoint is `humidity_fraction` of the cabin air's saturation since 2026-10-18, that air the station's 9500 mol until slice B of `post-roadmap-authored-plants.md` §15) | `condense_rate` |
 | `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) | `o2_makeup_gain` |
 
 **`rate_params` names the first-order rate constants** — the `k` in a `dx/dt = k·x` or
@@ -294,7 +294,8 @@ flow has no `k` to read, and the two annotated rows are uncoverable for reasons 
 params object" because `EclssParams` also carries **`o2_setpoint`, which is an inventory in
 mol, not a rate**, and checking it would be meaningless. (Since 2026-10-18 it carries
 `o2_fraction` instead, a mole fraction, and the target in mol is built per cabin — still not a
-rate.)
+rate. The same day `humidity_setpoint`, 1.7863 kg, became `humidity_fraction` +
+`saturation_vapour_pressure` — not rates either.)
 
 **The biosphere is absent for a structural reason, not a calibration one.** `Allocation`
 takes a composite `ctx: CarbonContext` (four param objects + four stock ids) plus `pheno`
@@ -1097,6 +1098,15 @@ vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-18 — the `eclss` kinetics param set carries `humidity_fraction` (0.40) and
+  `saturation_vapour_pressure` (2643.93… Pa) in place of `humidity_setpoint` (1.7863 kg) — the station
+  half of §15 of `docs/plans/post-roadmap-authored-plants.md` (the station entry of this date). No
+  authoring manifest key moved (it records no param-set key names), and no file read the old key.**
+  A rate written `param("humidity_setpoint")` now fails at build rather than reading 0.40 as
+  kilograms — the reason for the rename. An authored `eclss.condenser` aims at 0.40 of the
+  saturation of a named, TEMPORARY 9500 mol (`flow_registry::IMPLICIT_CONDENSER_AIR_MOL`) — the
+  station's cabin, as before, 1.5e-5 kg higher — until slice B makes an author declare the cabin's air.
+  The four authored files whose cabin started AT 1.7863 start at the new target.
 - **2026-10-18 — a scenario may carry a crop bed (slice 4 of
   `docs/plans/post-roadmap-authored-plants.md`; the user's answers: author-written re-sow, every stock
   wireable, author-declared steps, a lamp-lit bed).** `ScenarioSpec` gains `bed`; new spec models

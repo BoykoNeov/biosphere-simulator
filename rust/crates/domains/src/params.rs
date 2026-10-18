@@ -112,7 +112,8 @@ fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
         &[
             ("co2_scrub_rate", "1/s"),
             ("condense_rate", "1/s"),
-            ("humidity_setpoint", "kg"),
+            ("humidity_fraction", "dimensionless"),
+            ("saturation_vapour_pressure", "Pa"),
             ("o2_makeup_gain", "1/s"),
             ("o2_fraction", "dimensionless"),
         ],
@@ -121,9 +122,10 @@ fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
     Ok(EclssParams {
         co2_scrub_rate: require_positive(v[0], "co2_scrub_rate", name)?,
         condense_rate: require_positive(v[1], "condense_rate", name)?,
-        humidity_setpoint: require_positive(v[2], "humidity_setpoint", name)?,
-        o2_makeup_gain: require_positive(v[3], "o2_makeup_gain", name)?,
-        o2_fraction: require_half_open(v[4], 0.0, 1.0, "o2_fraction", name)?,
+        humidity_fraction: require_half_open(v[2], 0.0, 1.0, "humidity_fraction", name)?,
+        saturation_vapour_pressure: require_positive(v[3], "saturation_vapour_pressure", name)?,
+        o2_makeup_gain: require_positive(v[4], "o2_makeup_gain", name)?,
+        o2_fraction: require_half_open(v[5], 0.0, 1.0, "o2_fraction", name)?,
     })
 }
 
@@ -385,14 +387,16 @@ mod tests {
         scrub: (&str, &str),
         condense: (&str, &str),
         humidity: (&str, &str),
+        pressure: (&str, &str),
         makeup: (&str, &str),
         setpoint: (&str, &str),
     ) -> String {
         format!(
-            "name: eclss\nprocess: cabin_air_control\nparameters:\n{}{}{}{}{}",
+            "name: eclss\nprocess: cabin_air_control\nparameters:\n{}{}{}{}{}{}",
             block("co2_scrub_rate", scrub.0, scrub.1),
             block("condense_rate", condense.0, condense.1),
-            block("humidity_setpoint", humidity.0, humidity.1),
+            block("humidity_fraction", humidity.0, humidity.1),
+            block("saturation_vapour_pressure", pressure.0, pressure.1),
             block("o2_makeup_gain", makeup.0, makeup.1),
             block("o2_fraction", setpoint.0, setpoint.1),
         )
@@ -660,7 +664,8 @@ mod tests {
         eclss_yaml(
             ("1.0e-3", "1/s"),
             ("5.0e-4", "1/s"),
-            ("1.7863", "kg"),
+            ("0.40", "dimensionless"),
+            ("2643.931192210576", "Pa"),
             ("2.0e-3", "1/s"),
             ("0.21", "dimensionless"),
         )
@@ -671,7 +676,8 @@ mod tests {
         let p = eclss();
         assert_eq!(p.co2_scrub_rate, 1.0e-3);
         assert_eq!(p.condense_rate, 5.0e-4);
-        assert_eq!(p.humidity_setpoint, 1.7863);
+        assert_eq!(p.humidity_fraction, 0.40);
+        assert_eq!(p.saturation_vapour_pressure, 2643.931192210576);
         assert_eq!(p.o2_makeup_gain, 2.0e-3);
         assert_eq!(p.o2_fraction, 0.21);
         // The station's 9500 mol cabin gives the pre-2026-10-18 frozen setpoint EXACTLY: the
@@ -686,7 +692,8 @@ mod tests {
         let bad = eclss_yaml(
             ("0.0", "1/s"),
             ("5.0e-4", "1/s"),
-            ("1.7863", "kg"),
+            ("0.40", "dimensionless"),
+            ("2643.931192210576", "Pa"),
             ("2.0e-3", "1/s"),
             ("0.21", "dimensionless"),
         );
@@ -699,7 +706,8 @@ mod tests {
         let bad = eclss_yaml(
             ("1.0e-3", "1/s"),
             ("5.0e-4", "1/s"),
-            ("1.7863", "kg"),
+            ("0.40", "dimensionless"),
+            ("2643.931192210576", "Pa"),
             ("2.0e-3", "1/s"),
             ("0.0", "dimensionless"),
         );
@@ -707,7 +715,8 @@ mod tests {
         let above_one = eclss_yaml(
             ("1.0e-3", "1/s"),
             ("5.0e-4", "1/s"),
-            ("1.7863", "kg"),
+            ("0.40", "dimensionless"),
+            ("2643.931192210576", "Pa"),
             ("2.0e-3", "1/s"),
             ("1.5", "dimensionless"),
         );
@@ -718,17 +727,32 @@ mod tests {
         assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
     }
 
-    /// A zero setpoint is the pre-2026-10-03 condenser, which dried the cabin to `P/k`.
+    /// A zero target is the pre-2026-10-03 condenser, which dried the cabin to `P/k`; above one
+    /// is a cabin held past saturation. Either bound of the fraction, and a non-positive
+    /// pressure (the same zero target by the other factor), is refused.
     #[test]
-    fn eclss_loader_rejects_a_nonpositive_humidity_setpoint() {
-        let bad = eclss_yaml(
-            ("1.0e-3", "1/s"),
-            ("5.0e-4", "1/s"),
-            ("0.0", "kg"),
-            ("2.0e-3", "1/s"),
-            ("0.21", "dimensionless"),
+    fn eclss_loader_rejects_a_humidity_target_out_of_range() {
+        let with = |fraction: &str, pressure: &str| {
+            eclss_yaml(
+                ("1.0e-3", "1/s"),
+                ("5.0e-4", "1/s"),
+                (fraction, "dimensionless"),
+                (pressure, "Pa"),
+                ("2.0e-3", "1/s"),
+                ("0.21", "dimensionless"),
+            )
+        };
+        for fraction in ["0.0", "1.5"] {
+            rejected(
+                eclss_from(&with(fraction, "2643.931192210576"), "eclss.yaml"),
+                "humidity_fraction must be in (0, 1]",
+            );
+        }
+        rejected(
+            eclss_from(&with("0.40", "0.0"), "eclss.yaml"),
+            "saturation_vapour_pressure must be > 0",
         );
-        rejected(eclss_from(&bad, "eclss.yaml"), "humidity_setpoint must be > 0");
+        assert!(eclss_from(&with("1.0", "2643.931192210576"), "eclss.yaml").is_ok());
         assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
     }
 
@@ -737,7 +761,8 @@ mod tests {
         let bad = eclss_yaml(
             ("1.0e-3", "1/s"),
             ("5.0e-4", "1/min"),
-            ("1.7863", "kg"),
+            ("0.40", "dimensionless"),
+            ("2643.931192210576", "Pa"),
             ("2.0e-3", "1/s"),
             ("0.21", "dimensionless"),
         );
