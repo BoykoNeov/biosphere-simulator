@@ -664,3 +664,11 @@ authoring `bed`, ignored tests included):
   shading the soil), and no bed test pins those. The hook test compares them directly.
 * **Offered, not built:** an example `scenarios/*.yaml` potato habitat (every authored file runs its
   full horizon in the content sweep).
+  **BUILT 2026-10-19** (the user's *"1"*): `scenarios/potato_greenhouse.yaml`, the wheat example's
+  wiring with `crop: potato` and its own header. ⚠ **The one thing it re-checked:** the wheat file's
+  150 W solar line was set where its 14 days run under the cold program's dim lamp; a potato bed has no
+  cold program, so the full lamp meets it from day 1. Measured: the battery ends 14 days at 2.0007e10 J
+  and 150 days at 1.9937e10 J (−0.3 % from 2.0e10), nothing rationed, no reversal, re-sown at plant
+  step 1536. CO₂ 3.00 mol and O₂ 1993.0 as in the wheat file. A slow test pins the season
+  (`bed.rs`, `the_potato_example_resows_and_holds_its_battery_over_a_season`, ~40 s, `--ignored`); the
+  content sweep now runs four habitats in ~13 s.

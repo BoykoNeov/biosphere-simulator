@@ -1,0 +1,152 @@
+# potato_greenhouse — a crew of one breathing the air of a lamp-lit POTATO bed (2026-10-19, the
+# example offered by §17b of docs/plans/post-roadmap-authored-plants.md). The wheat example,
+# lamp_greenhouse.yaml, with the crop changed; everything below the header is that file's wiring.
+#
+# THE BED IS THE REFERENCE'S CHAMBER, growing potatoes. `bed: crop: potato` builds the sealed
+# station's lamp-lit plant chamber with the station's potato builder: the potato's params and
+# phenology, its soil and water, the chamber's air (bed.air_mol; absent here, so 9500 mol), its heat
+# store, and the lamp — with NO cold program. The eight weeks at 4 °C after each wheat sowing exist to
+# vernalize wheat, which a potato does not need, so the lamp runs at full power from day 1.
+#
+# THE LOOP. As in the wheat example: the crew (eclss.crew_metabolism) takes O2 from
+# `biosphere.o2_pool` and adds CO2 to `biosphere.carbon_pool` and water to `biosphere.water_vapor`;
+# the scrubber and the O2 regulator (declaring the bed's 9500 mol) hold the shared air; a solar array
+# charges the battery the lamp draws on; the chamber's cooler and the solar waste heat land on a
+# thermal node that radiates to space. Composition as there: every boundary paired with a bed pool
+# carries that pool's composition, so each flow balances in carbon and oxygen.
+#
+# MEASURED 2026-10-19. The 150 W solar line was set for the wheat file, whose 14 days run under the
+# cold program's dim lamp; here it meets the full lamp, so it was re-checked. The battery ends
+# 14 days at 2.0007e10 J and 150 days at 1.9937e10 J (−0.3 % from its 2.0e10) — level enough, and
+# nothing rationed, so the lamp never went short. CO2 held at 3.00 mol and O2 at 1993.0, as in the
+# wheat file; the chamber's vapour sits near its 75 % setting (~3.45 kg at 22 °C).
+#
+# THE HORIZON is 14 days, the content test's budget (every file in scenarios/ is run twice to its own
+# horizon). The full season is a slow test (`authoring/tests/bed.rs`, --ignored): the potato matures
+# on day 95.2 at the chamber's 22 °C and is re-sown at plant step 1536, the start of day 96.
+#
+# ⚠ AUTHORED, NOT VALIDATED. The potato itself is authored, not validated: its canopy reads 2.79×
+# low (docs/log/potato-crop.md). One crew member against one square metre of potatoes is not a
+# habitat anyone has checked; the platform promises conservation, no rationing and repeatability.
+
+name: potato_greenhouse
+integrator: euler
+dt: 60.0                  # the fast step: the station's minute
+steps: 20160              # 14 days of 1440 minutes
+
+bed:
+  crop: potato
+  plant_steps_per_day: 16 # the plant step the science is measured at
+  surroundings: outdoor
+  power: power.battery
+  heat_sink: thermal.node
+  resow: maturity
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 2.0e+10       # J — the sealed station's provisioned battery
+  - id: thermal.node
+    domain: thermal
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9        # J, referenced to T_space
+  - id: boundary.solar_source
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+  - id: boundary.space
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+  # The crew's metabolic boundaries, composed like the bed pools they pair with.
+  - id: boundary.metabolic_o2_sink
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+    composition:
+      oxygen: 2.0
+  - id: boundary.metabolic_co2_source
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+    composition:
+      carbon: 1.0
+      oxygen: 2.0
+  - id: boundary.metabolic_h2o_source
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+  - id: boundary.co2_removed
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+    composition:
+      carbon: 1.0
+      oxygen: 2.0
+  - id: boundary.o2_supply
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+    composition:
+      oxygen: 2.0
+
+flows:
+  - id: eclss.crew_metabolism
+    type: eclss.crew_metabolism
+    wiring:
+      cabin_o2: biosphere.o2_pool
+      cabin_co2: biosphere.carbon_pool
+      cabin_h2o: biosphere.water_vapor
+      metabolic_o2_sink: boundary.metabolic_o2_sink
+      metabolic_co2_source: boundary.metabolic_co2_source
+      metabolic_h2o_source: boundary.metabolic_h2o_source
+  - id: eclss.co2_scrubber
+    type: eclss.co2_scrubber
+    wiring:
+      cabin_co2: biosphere.carbon_pool
+      co2_removed: boundary.co2_removed
+    params: eclss
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    wiring:
+      o2_supply: boundary.o2_supply
+      cabin_o2: biosphere.o2_pool
+    params: eclss
+    cabin_air_mol: 9500.0  # the bed's air (bed.air_mol's default) — required, and the only value accepted here
+  - id: power.solar_charge
+    type: power.solar_charge
+    wiring:
+      solar_source: boundary.solar_source
+      battery: power.battery
+      waste_heat: thermal.node
+    params: charge
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    wiring:
+      node: thermal.node
+      space: boundary.space
+    params: thermal
+
+forcings:
+  o2_consumption:          # mol/s — the standalone ECLSS scenario's crew
+    const: 0.004
+  co2_production:          # mol/s
+    const: 0.003
+  h2o_production:          # kg/s
+    const: 2.0e-5
+  solar_power:             # W — about the lamp's daily average, so the battery holds roughly level
+    const: 150.0

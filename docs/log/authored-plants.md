@@ -148,3 +148,12 @@ each red.
 * **Lesson: a threshold test written with integer constants can hide a rounding edge.** Wheat's sums
   are whole, so "one ulp below the sum of the sums" was immature; the potato's are not, and the stage
   reads 2 a few ulps earlier. Find the edge from the function, not from the arithmetic.
+
+**THE POTATO EXAMPLE BUILT 2026-10-19** (plan §17b's offered item, on the user's *"1"*):
+`scenarios/potato_greenhouse.yaml`. The wheat example's wiring, with the crop changed and a header
+rewritten for a crop with no cold program. Measured over 150 days: rationed 0, no reversal, re-sown at
+plant step 1536, the battery −0.3 %.
+
+* **Lesson: a copied file inherits claims measured under conditions the copy removes.** The wheat
+  file's "150 W keeps the battery roughly level" had only ever run under the cold program's dim lamp;
+  the potato has none, so the claim was re-measured at the full lamp, not carried. It held.

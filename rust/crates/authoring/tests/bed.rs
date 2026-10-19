@@ -420,6 +420,35 @@ fn the_example_greenhouse_matures_and_resows_over_a_season() {
     );
 }
 
+/// The potato example (`scenarios/potato_greenhouse.yaml`) over 150 days: re-sown at the potato's
+/// own maturity, and the battery holds under the FULL lamp. The wheat example's 14 days run under
+/// the cold program's dim lamp, so its 150 W solar line had never met the full one; a potato bed
+/// has no cold program. Slow (~40 s), so `--ignored`.
+///
+/// Measured 2026-10-19: rationed 0, no reversal, re-sown at plant step 1536 (day 96); the battery
+/// ends at 1.9937e10 J of its 2.0e10 (−0.3 %).
+#[test]
+#[ignore = "slow: a 150-day bed run"]
+fn the_potato_example_resows_and_holds_its_battery_over_a_season() {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../scenarios/potato_greenhouse.yaml");
+    let text = std::fs::read_to_string(path).expect("read the example");
+    assert!(
+        text.contains("steps: 20160 "),
+        "the example's horizon line moved"
+    );
+    let result = run_scenario(build(&text.replace("steps: 20160 ", "steps: 216000")).unwrap())
+        .expect("a season runs clean");
+    assert_eq!(result.total_rationed, 0);
+    assert!(result.first_reversal.is_none());
+    assert_eq!(result.final_state.aux[station::sowing::SOWN_STEP], 1536.0);
+    let battery = result.final_state.stocks["power.battery"].amount;
+    assert!(
+        battery > 0.99 * 2.0e10,
+        "the full lamp ran the battery down to {battery} J"
+    );
+}
+
 /// The fixture growing potatoes (`bed.crop: potato`, 2026-10-18, plan §17).
 fn potato_bed() -> String {
     edited("crop: wheat", "crop: potato")
