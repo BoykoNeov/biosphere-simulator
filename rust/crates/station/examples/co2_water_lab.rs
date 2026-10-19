@@ -21,7 +21,10 @@
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::{CONDENSATE, SOIL_EVAP_TODAY, SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR};
+use domains::biosphere::science::soil_water_stress;
+use domains::biosphere::stocks::{
+    CONDENSATE, ROOTED_DEPTH, SOIL_EVAP_TODAY, SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR,
+};
 use domains::eclss::EclssParams;
 use domains::lab::{with_scrubber_above_target, ABOVE_TARGET_SCRUB_RATE, CO2_TARGET_PA};
 use domains::params;
@@ -37,6 +40,7 @@ use station::sealed::{
 /// The chamber's water stores, as the flows' legs name them.
 const WATER: [&str; 4] = [SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR, CONDENSATE];
 const RECYCLING: &str = "biosphere.recycling";
+const TRANSPIRATION: &str = "biosphere.transpiration";
 
 /// `(flow id, store)` → kg, per year: drawn from the store (`out`) or delivered to it (`into`).
 type Census = BTreeMap<(String, &'static str), Vec<f64>>;
@@ -52,6 +56,13 @@ struct Run {
     watering_steps: Vec<u32>,
     /// The re-sow hook's signed change to each store, summed over the run (kg).
     reset_moved: BTreeMap<&'static str, f64>,
+    /// Water stress at plant-step starts: the lowest factor, and the steps below 1.
+    stress_min: f64,
+    stressed_steps: u64,
+    /// Plant steps whose watering took every kg of condensate held (capped by supply, not need).
+    capped_waterings: u64,
+    /// Plant steps where the counter's soil share fell outside `[0, the flow's soil leg]`.
+    split_out_of_bounds: u64,
     rationed: (u64, u64),
     events: usize,
 }
@@ -100,6 +111,10 @@ fn run(eclss: &EclssParams, start: Option<f64>) -> Run {
     let mut day = 0usize;
     let (slow_per_day, mut slow_seen) = (scenario.bio_steps_per_day as usize, 0usize);
     let evap_today = |s: &State| s.aux.get(SOIL_EVAP_TODAY).copied().unwrap_or(0.0);
+    let b = scenario.bio;
+    let (mut stress_min, mut stressed_steps, mut capped_waterings) = (1.0f64, 0u64, 0u64);
+    let mut split_out_of_bounds = 0u64;
+    let mut step_soil = 0.0;
     let mut observe = |side: Side, before: &State, after: &State| {
         let (registry, env, dt) = match side {
             Side::Reset => {
@@ -113,12 +128,21 @@ fn run(eclss: &EclssParams, start: Option<f64>) -> Run {
                 day = slow_seen / slow_per_day;
                 slow_seen += 1;
                 // The counter restarts on the day's first plant step (`SoilAccount`).
-                soil_evap[day / SEALED_STATION_SEASON_DAYS] +=
-                    if before.n.is_multiple_of(scenario.bio_steps_per_day) {
-                        evap_today(after)
-                    } else {
-                        evap_today(after) - evap_today(before)
-                    };
+                step_soil = if before.n.is_multiple_of(scenario.bio_steps_per_day) {
+                    evap_today(after)
+                } else {
+                    evap_today(after) - evap_today(before)
+                };
+                soil_evap[day / SEALED_STATION_SEASON_DAYS] += step_soil;
+                let f = soil_water_stress(
+                    before.stocks[SOIL_WATER].amount,
+                    before.aux.get(ROOTED_DEPTH).copied().unwrap_or(0.0),
+                    b.soil_extractable_water,
+                    b.ground_area,
+                    b.wssg,
+                );
+                stress_min = stress_min.min(f);
+                stressed_steps += u64::from(f < 1.0);
                 (bio.registry(), bio_r.bind(before, scenario.bio_dt), scenario.bio_dt)
             }
             Side::Fast => (fast.registry(), fast_r.bind(before, scenario.cabin_dt), scenario.cabin_dt),
@@ -135,6 +159,13 @@ fn run(eclss: &EclssParams, start: Option<f64>) -> Run {
                     leg.amount.abs();
                 if leg.amount < 0.0 && flow.id() == RECYCLING && matches!(side, Side::Slow) {
                     watering_steps[day] += 1;
+                    capped_waterings +=
+                        u64::from(-leg.amount >= before.stocks[CONDENSATE].amount * (1.0 - 1e-12));
+                }
+                if leg.amount < 0.0 && flow.id() == TRANSPIRATION && matches!(side, Side::Slow) {
+                    let tol = 1e-12 * (-leg.amount).max(1.0);
+                    split_out_of_bounds +=
+                        u64::from(step_soil < -tol || step_soil > -leg.amount + tol);
                 }
             }
         }
@@ -149,6 +180,10 @@ fn run(eclss: &EclssParams, start: Option<f64>) -> Run {
         soil_evap,
         watering_steps,
         reset_moved,
+        stress_min,
+        stressed_steps,
+        capped_waterings,
+        split_out_of_bounds,
         rationed: (totals.slow_rationed, totals.fast_rationed),
         events: totals.events.len(),
     }
@@ -183,6 +218,10 @@ fn main() {
         println!(
             "{name}: rationed (slow, fast) {:?}  events {}  re-sow hook's water moves {:?}",
             r.rationed, r.events, r.reset_moved
+        );
+        println!(
+            "{name}: water stress min {:.6}, stressed plant steps {}; waterings capped by the condensate held {};              soil-share steps outside [0, leg] {}",
+            r.stress_min, r.stressed_steps, r.capped_waterings, r.split_out_of_bounds
         );
     }
 
@@ -221,7 +260,7 @@ fn main() {
     }
 
     println!("\n== biosphere.transpiration split: the soil's evaporation (its daily counter) and the crop's rest (kg)");
-    let transpired = |r: &Run| r.out[&("biosphere.transpiration".to_string(), SOIL_WATER)].clone();
+    let transpired = |r: &Run| r.out[&(TRANSPIRATION.to_string(), SOIL_WATER)].clone();
     let (bt, st) = (transpired(&base), transpired(&switched));
     for y in 0..bt.len() {
         let (be, se) = (base.soil_evap[y], switched.soil_evap[y]);

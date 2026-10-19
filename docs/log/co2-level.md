@@ -40,12 +40,14 @@ and tables: `docs/plans/post-roadmap-co2-level.md`; tool: `station/examples/co2_
   watering pulses run at a different phase. Adoption is the user's.
 * **The water total, MEASURED the same day** (`station/examples/co2_water_lab.rs`). It asserts the
   golden's bytes first, and its per-store books close to 1.5e-11 kg; the chamber holds 195 kg on
-  every day. Over four years the crop transpires **+13.7 %** (2309 → 2626 kg) against plant carbon
-  +52.5 %; soil evaporation falls 13.2 % under the larger canopy, so the root zone loses +10.8 %.
+  every day. The root zone loses **+10.8 %** (verified by the books); split by the soil's own counter, the crop
+  transpires +13.7 % (2309 → 2626 kg) and soil evaporation falls 13.2 % under the larger canopy.
   Watering from the condensate +13.8 % (33 → 39 watering days). The day series confirms the phase
   reading: the switched run watered four days before the end, the frozen one 14. The TM 102788
-  scorecard cannot move (open build, leaf CO₂ a forcing). Nothing is owed before adoption but the
-  authored-file `k·h` check and the ceremony.
+  scorecard cannot move (open build, leaf CO₂ a forcing). **No water stress on any plant step,
+  either side.** The authoring build already refuses `k·h ≥ 1`; at the 1e-2 rate it would refuse
+  `scenarios/bioregenerative_station.yaml` (300-s fast step, `k·h = 3`) until its `n_sub` is 60.
+  Nothing is owed before adoption but that edit and the ceremony.
 * **Lesson: a flow's name is not its contents.** `biosphere.transpiration` has carried the soil's
   evaporation too since 2026-10-10, and the two moved in opposite directions here (+13.7 % /
   −13.2 %). Read a flow's legs before quoting its total as one process.

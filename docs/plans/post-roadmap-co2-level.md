@@ -297,8 +297,12 @@ water on every day of both runs, so no water crosses to the cabin or the crew's 
 had `rationed (0, 0)` and no events.
 
 ⚠ **`biosphere.transpiration` is the crop's AND the soil's evaporation**, one leg out of the root
-zone since the water-forms adoption (2026-10-10). The tool splits them by the flow's own daily
-counter (`soil_evap_today`, restarted on each day's first plant step).
+zone since the water-forms adoption (2026-10-10). The closure above verifies their SUM (+10.8 %).
+The tool splits them by the soil account's daily counter (`soil_evap_today`, restarted on each
+day's first plant step). That account carries its own instance of the same flow, built by the same
+builder, and the sealed build's wrappers (`plants_read_chamber`, `on_sowing_clock`) wrap aux
+processes as they wrap flows, so both read the same chamber. The tool checks on every plant step
+that the counter's share lies in `[0, the flow's soil leg]`: **0 steps outside, both sides.**
 
 | Four years, kg | Frozen (400 ppm) | 0.13 kPa (1323 ppm) | Change |
 |---|---|---|---|
@@ -308,10 +312,20 @@ counter (`soil_evap_today`, restarted on each day's first plant step).
 | Watering, condensate → soil | 2641.5 | 3006.5 | +13.8 % (33 → 39 watering days) |
 | Condensation from the air | 23.3 | 22.8 | −2.1 % |
 
-**Read against the crop:** plant carbon +52.5 %, crop water +13.7 %. Water per unit of carbon
-falls by about a quarter. The model's stomata do not respond to CO₂ (the surface resistance reads
-leaf area only, Szeicz–Long), so the extra water is the larger canopy's, not a change in the leaf.
-A real leaf partly closes its stomata at high CO₂, so if anything the model overstates the rise.
+**Read against the crop:** the yearly peak of plant carbon rises +52.5 %, the four years' crop
+water +13.7 % (different readouts: a peak stock against a flow total; their ratio is indicative
+only). The model's water flows read no CO₂: `flows.rs`'s transpiration and canopy code carries no
+CO₂ or `ci` input (grepped), so the extra water is the larger canopy's, not a change in the leaf.
+BVAD's own canopy model (Rev 2 p. 187, the `gS` formula under Eq. 4-26, after Monje 1998; read from the extracted
+text, not the page image) makes stomatal conductance proportional to net photosynthesis over the
+CO₂ concentration, so a real canopy at this level would transpire less per unit of growth than
+this model does. If anything, the model overstates the rise.
+
+**The bigger crop is never short of water.** On every plant step of both runs the water-stress
+factor is 1 (0 stressed steps; minimum 1.000000). Most waterings take all the condensate held (23
+watering steps frozen, 24 switched), so the watering is supply-limited, but the FAO-56 trigger
+(FTSW 0.45) sits above the stress threshold and the soil is refilled before the crop feels it.
+That holds at today's level too; the higher level does not change it.
 
 **The phase reading is confirmed by the day series.** The yearly mean soil water agrees between
 sides to 1–4 % (62.8 / 63.0 / 61.4 / 66.8 against 63.6 / 62.4 / 63.7 / 68.7 kg), and the
@@ -335,6 +349,14 @@ gains the cited `co2_fraction` (130 Pa of 101.325 kPa) and the 1e-2 rate; `param
 `sibling_params.txt`; the authoring registry and the three authored files (five entries) that set
 `co2_scrub_rate`; six goldens (`eclss`, `cabin_gas`, `water_recovery`, `greenhouse`, `harvest`,
 `sealed_station`) regenerated against the predictions already measured here, with the inert-charge
-move now among them; the station and authoring manifests regenerated. **Open before any build:**
-an authored file that classes the scrubber slow runs it at `k·h = 18`. It must be refused or moved
-to the fast class.
+move now among them; the station and authoring manifests regenerated.
+
+**The authored scrubbers, checked (resolves §6's "check this before building").** The authoring
+build already refuses any first-order rate with `k·h ≥ 1` (`interpreter.rs`,
+`check_rate_preconditions`, reading `effective_step`, slow set at `dt/2`); `effective_step`'s
+1800-s note is that guard's history, not a live file. No authored file classes the scrubber slow.
+Four of the five files that place one step it at 60 s (`k·h = 0.6` at 1e-2). The fifth,
+`scenarios/bioregenerative_station.yaml`, reads `params: eclss` and steps its fast set at
+`3600 / 12 = 300 s`: at 1e-2 that is `k·h = 3`, so **adoption would make that file refuse to
+build** until its `n_sub` rises to 60 (60 s). That is an authored-content edit, in the adoption's
+batch, with its tests re-run.
