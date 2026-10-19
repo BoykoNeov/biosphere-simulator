@@ -6,7 +6,7 @@
 //! `sim_io` hex-float snapshot.
 //!
 //! `godot/sealed_smoke.gd` drives the identical `build("sealed") + step_n(SEALED_RESUME_DAYS)`
-//! through the actual cdylib; `tests/crossport/test_godot_two_rate_parity.py` asserts the two
+//! through the actual cdylib; `godot_bridge/tests/cross_boundary.rs` asserts the two
 //! snapshots are **byte-for-byte** identical — the "the two-rate, season-crossing sim survives
 //! the FFI boundary bit-exact" proof (Step-1's smoke was single-rate; this is the multi-domain,
 //! re-sown, "fast-forward decades" arm). Both sides are pure Rust on the same libm.

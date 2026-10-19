@@ -19,7 +19,7 @@
 //! the namespace, they read `registry.flows`, and Rust does that identically* — does not
 //! transfer to this contract at all.
 //!
-//! What Python has here and Rust cannot have is **language introspection**:
+//! What Python had here and Rust cannot have is **language introspection**:
 //! `typing.get_args(Expr)` enumerates the node union, `vars(authoring.schema)` finds every
 //! pydantic model, `model_fields` reads each one's fields, and `FLOW_TYPES` is a dict.
 //! Rust's equivalents are an `enum`, a `match` and a set of `const`s, none of which is

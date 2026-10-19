@@ -348,7 +348,7 @@ pub fn solar_schedule(scenario: &PowerScenario) -> Schedule {
 /// stays; what was wrong was the claim about the other port. ⚠ The general point outlives
 /// this function: a compensated reduction is a **second** source of cross-port divergence,
 /// independent of libm, and the tolerance contract's rationale names only transcendentals.
-/// Five more `sum()` calls over floats live in the retiring Python tree — the drift
+/// Five more `sum()` calls over floats lived in the retiring Python tree — the drift
 /// regression and the perennial re-sow among them.
 pub fn daily_solar_energy(scenario: &PowerScenario) -> f64 {
     let solar = solar_schedule(scenario);
@@ -407,7 +407,7 @@ mod tests {
 
     /// The three Power stocks (battery POOL + the two boundary reservoirs).
     ///
-    /// ⚠ `boundary::source` takes an unclamped flag Python's does not: the solar source is
+    /// ⚠ `boundary::source` takes an unclamped flag Python's did not: the solar source is
     /// unclamped (it goes arbitrarily negative as cumulative supply).
     fn state(battery: f64) -> State {
         let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();

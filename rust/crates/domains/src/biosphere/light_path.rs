@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn the_day_dose_is_conserved_at_every_step_size() {
-        // The port's own copy of the property the Python side pins: the window means are
+        // The port's own copy of the property the Python side pinned: the window means are
         // an exact partition of one integral, so summing them reproduces the flat
         // daytime mean's dose whatever the step.
         for steps_per_day in [1usize, 2, 4, 8, 32, 96] {

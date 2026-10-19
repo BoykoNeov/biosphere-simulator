@@ -48,7 +48,7 @@
 #   science (the chamber-scale diagnosis's fourth independent witness) — see
 #   docs/plans/post-roadmap-cue-humification.md finding 4.
 #
-# Units discipline (P4 / config/units.py): the three fractions are dimensionless
+# Units discipline (P4; now rust/crates/config/src/params.rs): the three fractions are dimensionless
 #   ("mol/mol", exact-string guarded) and bound-checked to [0, 1] — a fraction outside
 #   it would create or destroy carbon in a leg. `slow_decomposition_rate` is a 1/day
 #   first-order rate like its two siblings. Zero is valid for every one of them

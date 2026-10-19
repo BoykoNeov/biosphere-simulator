@@ -86,7 +86,8 @@ as such, not hidden:
   `insensible_water_fraction` = 0.675) **are** literature-bound (NASA/TP-2015-218570 Rev 2
   Table 3-31 + Rose et al. 2015; Step 9). The one structural residual — RQ = 1 forces
   crew O₂ consumption ~11.8 % below BVAD — is *measured and pinned*
-  (`tests/test_bvad_validation.py`), not a freeze omission.
+  (`rust/crates/station/src/science_gates.rs`, the `bvad` gate; it was
+  `tests/test_bvad_validation.py` until S6 deleted it), not a freeze omission.
 This mirrors the biosphere, which froze uncalibrated `TODO(cite)` crop params behind a
 documented-finding note. A calibration pass is a future, deliberate unfreeze.
 
@@ -210,7 +211,8 @@ Step 10 invents **no new scenario** and adds **no new golden** — it pins the s
 | `HEAT_CLOSURE_SCENARIO` 15-yr (Tier-1) | P6.7 | `sealed_energy_drift_summary.json` |
 
 The two sealed horizons are importable constants (`SEALED_STATION_YEARS = 4`,
-`SEALED_ENERGY_YEARS = 15`, `station/scenario.py`) recorded in the manifest and asserted
+`SEALED_ENERGY_YEARS = 15`, `rust/crates/station/src/scenario.rs`; `station/scenario.py`
+until S6) recorded in the manifest and asserted
 against those constants, so the frozen horizons cannot drift. Each golden is a hex-float
 byte snapshot via `sim_io` (the energy drift-summary is the per-year peak-node-temperature
 vector + the period class). They are bit-identical **within a build**; the coupled runs use
@@ -230,7 +232,8 @@ violation.
   *data*, scoped out by the biosphere doc too.
   ⚠ **RETIRED 2026-08-18** with their goldens (same slice). Neither name ever appeared in
   this manifest, so nothing frozen here moved.
-- The **cross-domain perturbation harness** (`src/station/perturbations.py`) — diagnostics,
+- The **cross-domain perturbation harness** (`rust/crates/station/src/perturbations.rs`;
+  `src/station/perturbations.py` until S6) — diagnostics,
   **no golden** (the Phase-3 `perturbations.py` precedent; determinism re-runs are the
   insurance). Its `ScaledFlow` is perturbation-only, so it is deliberately **not** in the
   frozen flow set.
@@ -256,24 +259,28 @@ The freeze is earned by Phase 6 Steps 1–9 (full detail + measured numbers in t
 - **Integrated crew metabolism is validated against NASA BVAD** (Step 9): the one un-tuned
   output (RQ) is pinned; the ~11.8 % O₂ residual is measured, not hidden.
 
-Tests of record: `tests/test_sealed_station_stability.py` (Tier 1 + Tier 2, marked-slow),
-`tests/test_sealed_station_landmine.py` (Tier 3), `tests/test_regression_sealed_station.py`,
-`tests/test_station_perturbations.py`, `tests/test_bvad_validation.py`, and each step's
-`test_*_run.py` + `test_regression_*.py`.
+Tests of record: `rust/crates/station/tests/golden_regression.rs` (every station golden),
+`rust/crates/station/src/science_gates.rs` (the two science claims, BVAD's among them),
+`rust/crates/station/tests/perturbations.rs`, and the crate's other `tests/*.rs`. ⚠ Until
+S6 (2026-08-27) this line named the Python tests of record —
+`test_sealed_station_stability.py`, `test_sealed_station_landmine.py`,
+`test_regression_sealed_station.py`, `test_station_perturbations.py`,
+`test_bvad_validation.py` — all deleted; read them at `4f7168e^`. BVAD's seven bookkeeping
+checks beside the one gate were deferred at S3 as a science decision and deleted unported.
 
 ## The manifest
 
 `docs/station-reference.manifest.json` is the machine-readable surface, **generated** by
-`tests/test_station_freeze_manifest.py` (`uv run python
-tests/test_station_freeze_manifest.py`). It names the integrator, the two sealed horizons,
+the reference since C7 (from `rust/`: `cargo run --example dump_station_inventory --
+--write-manifest`; until C7 by `tests/test_station_freeze_manifest.py`, deleted by S6). It names the integrator, the two sealed horizons,
 the derived flow set + aux set, the ten param files (+ provenance hashes), each scenario
 → golden (+ hash), and the `delegates_to` pointer to the biosphere manifest.
 
 ⚠⚠ **Since 2026-08-16 (slice 7 of the reference flip) this file has MIXED AUTHORITY, and
 regenerating it needs `cargo`.** The keys the Rust reference tree can produce — `flow_set`,
 `aux_set`, `sealed_station_years`, `sealed_energy_years` — are read out of it by shelling
-`cargo run --example dump_station_inventory`; the rest is still the checker's or
-hand-written. **The manifest states this itself**, per key, in its own `_authority` block,
+`cargo run --example dump_station_inventory`; the rest was the checker's or
+hand-written (S6 deleted the checker, so a `python` row is one not yet re-anchored). **The manifest states this itself**, per key, in its own `_authority` block,
 which is the thing to read before assuming any field is Rust-derived.
 
 ⚠⚠ **`science_bands` + `liveness_floors` re-anchored to Rust on 2026-08-18 (slice C4b), and
@@ -286,8 +293,9 @@ This contract's two claims are declared in `rust/crates/station/src/science_gate
 (the same exported `science_gates!` macro the biosphere's 13 use, in a second table because
 a gate lives with the runs it reads and these read `station` types). Only the two `locus`
 strings moved; `quantity`/`bound`/`source` are byte-identical, and the Python test bodies
-stay as the checker's conformance half. ⚠ `sealed_energy_drift`'s golden hash is still a
-Python-side fold of a raw Rust series.
+stayed as the checker's conformance half until S6 deleted them. ⚠ `sealed_energy_drift`'s
+golden hash was then still a Python-side fold of a raw Rust series; C5 moved the fold to
+the reference.
 
 ⚠ **`param_files` joined the Rust half on 2026-08-17 (slice C8)** — what
 re-anchored there is the *census* rule (the eight files the reference **loads**, not a glob
@@ -297,10 +305,11 @@ newly asserts. (⚠ Since Step 4a, 2026-10-18, the digest is no longer the text'
 recorded as `{sources, values}` over its parsed content — see that date's log entry.) Two consequences a reader will otherwise miss:
 
 - **The completeness gates changed meaning without changing their arithmetic.** They used
-  to say *the manifest froze everything Python has*; they now say *Python still matches the
-  reference*, and a failure is a **checker** drift. The completeness question itself moved
-  to `tests/crossport/test_inventory_parity.py`, which compares the committed manifest
-  against a freshly built Rust tree.
+  to say *the manifest froze everything Python has*; after C8 they said *Python still matches
+  the reference*, and a failure was a **checker** drift. The completeness question itself
+  moved to `tests/crossport/test_inventory_parity.py`, and then to the reference's own
+  `rust/crates/station/tests/manifest_writer.rs`, which byte-compares the committed manifest
+  against the one the tree writes.
 - **`sealed_energy_years` is `LONG_HORIZON_YEARS` in the reference tree** — the same
   constant the biosphere manifest freezes. Moving the decade horizon is one reference-side
   edit that unfreezes *two* contracts.
@@ -363,17 +372,21 @@ biosphere change follows *its* discipline instead.) The procedure:
    dump_station_inventory -- --write-manifest` — and review its diff: the changed hashes /
    flow set / param set are the git-visible record of exactly what was unfrozen. ⚠ **The
    command changed on 2026-08-18 (C7's station half)**; it was `uv run python
-   tests/test_station_freeze_manifest.py`, which now has no writer at all and is a checker
-   only. The step has needed a Rust toolchain since 2026-08-16 and now *is* the Rust
+   tests/test_station_freeze_manifest.py`, which then had no writer at all and was a checker
+   only until S6 deleted it. The step has needed a Rust toolchain since 2026-08-16 and now *is* the Rust
    toolchain. **Predict the diff before running it** — a re-anchored key that
    moves when you expected it not to is a finding, not a diff to accept.
 5. **Record provenance.** Update this file and the Phase-6 plan with what changed and why (a
    calibration cites its primary source per `docs/param-file-conventions.md`).
-6. **Re-run the gates:** full suite (incl. `-m slow` for the sealed stability), `ruff`,
-   `pyright`; commit with a Conventional Commit that names the unfreeze.
+6. **Re-run the gates:** from `rust/`, `cargo test --workspace --no-fail-fast`, `cargo test -- --ignored`
+   (the slow tests) and `cargo clippy --all-targets -- -D warnings`. ⚠ No CI job runs the
+   reference's tests since 2026-10-10, so this run is the gate. This step named `-m slow`,
+   `ruff` and `pyright` until 2026-10-19; S6 deleted the Python suite they ran on.
+   Commit with a Conventional Commit that names the unfreeze.
 
-An undocumented unfreeze fails CI by construction (a moved golden, or the completeness
-gate), so the discipline is enforced, not merely requested.
+An undocumented unfreeze fails the test suite by construction (a moved golden, or the
+completeness gate), so the discipline is enforced, not merely requested — ⚠ but only when the
+suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
 
 ### Unfreeze log
 

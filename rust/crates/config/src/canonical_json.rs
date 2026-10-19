@@ -15,7 +15,7 @@
 //! must not route through `f64`; the writer does the same, for a different reason — see
 //! [`Json::Number`].
 //!
-//! # The four things Python does that a naive writer does not
+//! # The four things Python did that a naive writer does not
 //!
 //! Measured against all three manifests before this module was written, rather than
 //! recalled:

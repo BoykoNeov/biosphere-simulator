@@ -1,18 +1,19 @@
 //! The multi-rate authoring surface — the Rust mirror (post-roadmap Step 6).
 //!
-//! Python is the reference (`tests/test_authoring_multirate_partition.py`,
-//! `tests/test_authoring_rate_precondition.py`); this file exists so the two ports cannot
-//! silently disagree about **which scenarios the platform refuses to build** and **which
-//! step each rate class is judged at**.
+//! Python was the reference when this was written
+//! (`tests/test_authoring_multirate_partition.py`, `tests/test_authoring_rate_precondition.py`,
+//! both deleted by S6); this file existed so the two ports could not silently disagree about
+//! **which scenarios the platform refuses to build** and **which step each rate class is
+//! judged at**.
 //!
-//! The Rust mirror carries three facts Python's does not, all consequences of the port's
+//! The Rust mirror carries three facts Python's did not, all consequences of the port's
 //! own scope:
 //!
 //! * **Parameter packs are deferred here**, and that is *load-bearing* for the
 //!   precondition — see `pack_deferral_is_what_makes_the_frozen_rate_read_sound`.
 //! * **`k` is read from the frozen constant**, not off the built flow (a `Box<dyn Flow>`
 //!   exposes no params accessor).
-//! * **The routing branch has no injection seam.** Python monkeypatches `multirate_step`
+//! * **The routing branch has no injection seam.** Python monkeypatched `multirate_step`
 //!   to raise; Rust cannot. It is pinned *behaviorally* instead, via aux — see
 //!   `a_single_rate_scenario_never_touches_the_driver`.
 
@@ -376,7 +377,7 @@ fn the_slow_step_tracks_the_split_actually_used() {
 
 #[test]
 fn pack_deferral_is_what_makes_the_frozen_rate_read_sound() {
-    // **The Rust-only coupling, and it is a safety one.** Python reads `k` off the
+    // **The Rust-only coupling, and it is a safety one.** Python read `k` off the
     // *built flow*, because a param PACK may have inflated it — that is Step 5's
     // load-bearing reason the check is at build time at all. Rust reads the FROZEN
     // constant (`frozen_rate_value`), which is only correct while packs cannot exist
@@ -522,7 +523,7 @@ fn aux_scenario(n_sub: u32) -> BuiltScenario {
 
 #[test]
 fn a_single_rate_scenario_never_touches_the_driver() {
-    // **THE BRANCH PIN.** Python monkeypatches `multirate_step` to raise; Rust has no
+    // **THE BRANCH PIN.** Python monkeypatched `multirate_step` to raise; Rust has no
     // such seam, so this pins the branch *behaviorally* — and the observable is aux.
     //
     // `step_report` advances `State.aux`; `multirate_step` deliberately NEVER does

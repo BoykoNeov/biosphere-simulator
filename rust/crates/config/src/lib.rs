@@ -1,6 +1,12 @@
 //! The param-file boundary — the Rust port of Python's `src/config` (reference flip,
 //! slice C1).
 //!
+//! ⚠ **History, not authority** (2026-10-19). This crate was ported from Python and its comments
+//! still name the code it came from (`test_*.py` files, Python modules and classes). S6 deleted
+//! all of it at `4f7168e` (2026-08-27); read it at `4f7168e^`. Since the reference flip
+//! (2026-08-16) this crate is the reference: a comment saying it was "ported from" or "mirrors"
+//! Python records where the code came from, not a copy it must keep matching.
+//!
 //! Python's layering puts `config/` **below** the domains: `domains.*.loader` imports
 //! `config`, never the other way round, and the pure core (`simcore`) imports neither.
 //! This crate mirrors that exactly — it is zero-dependency, including on `simcore`, so

@@ -1,7 +1,14 @@
 //! Native Rust port of the frozen Python `authoring` boundary (Phase 9).
 //!
-//! The Python `src/authoring` package is the declarative-scenario boundary layer:
-//! schema → interpreter → run, plus the rate-expression parser. This crate mirrors it.
+//! The Python `src/authoring` package was the declarative-scenario boundary layer:
+//! schema → interpreter → run, plus the rate-expression parser. This crate was written to
+//! mirror it, and since S6 deleted it this crate is the only one.
+//!
+//! ⚠ **History, not authority** (2026-10-19). This crate was ported from Python and its comments
+//! still name the code it came from (`test_*.py` files, Python modules and classes). S6 deleted
+//! all of it at `4f7168e` (2026-08-27); read it at `4f7168e^`. Since the reference flip
+//! (2026-08-16) this crate is the reference: a comment saying it was "ported from" or "mirrors"
+//! Python records where the code came from, not a copy it must keep matching.
 //!
 //! **Step 4a** ported the rate-grammar parser (the sole Tier-0 parse-parity surface) +
 //! the canonical S-expr renderer, at **zero YAML dependency** — the parse-parity +

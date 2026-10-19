@@ -65,7 +65,7 @@ pub fn biosphere_parents() -> BTreeMap<DomainId, DomainId> {
 /// ⚠ The walk carries a `visited` set rather than recursing, so a malformed `parents`
 /// containing a **cycle** terminates instead of overflowing the stack. That is not
 /// defensive breadth: `a_malformed_cycle_terminates_instead_of_recursing_forever` is one
-/// of the ported tests, and the Python original carries the same guard for the same
+/// of the ported tests, and the Python original carried the same guard for the same
 /// reason.
 pub fn descendant_stocks(
     domain_index: &BTreeMap<DomainId, BTreeSet<StockId>>,
@@ -278,7 +278,7 @@ mod tests {
     // ---------------------------------------------------------------------------
 
     /// The parent map is a FLAT two-level tree: five leaves, one root, no leaf is a
-    /// parent. Mirrors `test_parent_map_is_flat_two_level_tree_under_biosphere`.
+    /// parent. Ported from `test_parent_map_is_flat_two_level_tree_under_biosphere`.
     #[test]
     fn the_parent_map_is_a_flat_two_level_tree_under_one_root() {
         let parents = biosphere_parents();
@@ -293,7 +293,7 @@ mod tests {
     }
 
     /// The root's descendants are the union of every leaf's stocks, and each leaf's are
-    /// exactly its own members. Mirrors `test_descendant_stocks_root_unions_all_leaves`
+    /// exactly its own members. Ported from `test_descendant_stocks_root_unions_all_leaves`
     /// and `test_descendant_stocks_leaf_equals_its_own_members`.
     #[test]
     fn the_root_unions_every_leaf_and_a_leaf_is_exactly_its_own_members() {
@@ -320,7 +320,7 @@ mod tests {
 
     /// ⚠ The FLAT default reproduces the domain index exactly — the pre-hierarchy
     /// behaviour, which is what makes the parent map an addition rather than a change.
-    /// Mirrors `test_flat_default_reproduces_domain_index`.
+    /// Ported from `test_flat_default_reproduces_domain_index`.
     #[test]
     fn the_flat_default_reproduces_the_domain_index() {
         let (_state, registry) = build_season(&sealed_chamber_scenario()).expect("built");
@@ -340,7 +340,7 @@ mod tests {
     }
 
     /// The open field is a strict SUBSET of the sealed chamber: no water compartment, no
-    /// consumers. Mirrors `test_descendant_stocks_open_field_is_a_subset`,
+    /// consumers. Ported from `test_descendant_stocks_open_field_is_a_subset`,
     /// `test_water_compartment_populated_when_sealed_empty_when_open` and
     /// `test_consumers_compartment_populated_when_enabled_empty_otherwise`.
     #[test]
@@ -363,7 +363,7 @@ mod tests {
     }
 
     /// ⚠ A malformed `parents` containing a CYCLE terminates instead of recursing
-    /// forever. Mirrors `test_descendant_stocks_tolerates_a_malformed_cycle`.
+    /// forever. Ported from `test_descendant_stocks_tolerates_a_malformed_cycle`.
     ///
     /// The value is that this test can only fail by hanging or overflowing, so it is
     /// written against a cycle that has a stock in it — a walk that bailed out early
@@ -394,7 +394,7 @@ mod tests {
     // ---------------------------------------------------------------------------
 
     /// A two-compartment transfer reports its crossing flux on both sides and balances.
-    /// Mirrors `test_two_compartment_transfer_reports_crossing_flux_and_balances`.
+    /// Ported from `test_two_compartment_transfer_reports_crossing_flux_and_balances`.
     #[test]
     fn a_two_compartment_transfer_reports_its_crossing_flux_and_balances() {
         let before = state_of(vec![
@@ -450,7 +450,7 @@ mod tests {
     }
 
     /// ⚠⚠ THE CHECK THE GLOBAL GATE STRUCTURALLY CANNOT MAKE: a balanced-but-MISAPPLIED
-    /// delta. Mirrors `test_balanced_but_misapplied_delta_trips_the_identity`.
+    /// delta. Ported from `test_balanced_but_misapplied_delta_trips_the_identity`.
     ///
     /// The step's legs say 3 mol crossed atmosphere → plants; the applied state moved 3
     /// mol out of the atmosphere and into a *third* compartment. Globally the carbon
@@ -488,7 +488,7 @@ mod tests {
     }
 
     /// A leg books EVERY quantity its stock carries: a CO₂-pool leg books both carbon and
-    /// oxygen. Mirrors `test_composition_fold_books_both_carbon_and_oxygen`.
+    /// oxygen. Ported from `test_composition_fold_books_both_carbon_and_oxygen`.
     #[test]
     fn the_composition_fold_books_both_carbon_and_oxygen_for_one_leg() {
         let co2 = Stock::new(

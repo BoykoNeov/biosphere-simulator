@@ -9,8 +9,9 @@ records **how the port is judged faithful** — the per-scenario tier assignment
 Tier-2 bands and their provenance, the op-for-op libm audit, and the discovered-discrepancy
 protocol.
 
-Like the freeze contracts this is **boundary-side docs only**: `git diff src/` stays
-**empty** — the Python reference is untouched; the Rust port lives under `rust/`.
+Like the freeze contracts this is **boundary-side docs only**: `git diff src/` stayed
+**empty** — the Python reference was untouched; the Rust port lives under `rust/`. (⚠ S6
+deleted `src/` on 2026-08-27, so that check has no subject; correction 4 below.)
 The machine-readable companion is **`rust/data/tiers.json`** (the per-golden tier +
 band table — the **authoritative** source; this doc's prose must not contradict it). The
 plan of record is [`docs/plans/phase-7-native-core.md`](plans/phase-7-native-core.md).
@@ -183,14 +184,23 @@ inverts accordingly: step 1's question becomes "is this a **Python** defect, or 
 change Python has not followed yet?", and step 2 still routes a genuine finding through the
 owning freeze contract's unfreeze discipline.
 
-**3. Byte-exactness is now a Rust claim, and Python's is the tolerance-gated side.** Rust
+**3. Byte-exactness is now a Rust claim, and Python's was the tolerance-gated side.** Rust
 reproduces all eighteen exactly on the generation platform, with **no exemptions** — that
-census is `tests/crossport/test_golden_provenance.py`. Python reproduces sixteen of them
-exactly and diverges on two by ~1–2 ULP; those two are named in
+census was `tests/crossport/test_golden_provenance.py` until S6. Python reproduced sixteen of
+them exactly and diverged on two by ~1–2 ULP; those two were named in
 `tests/golden_platform.PYTHON_DIVERGES` with their measured sizes, gated at a **1e-14**
 last-bit-noise ceiling (a thousand times tighter than the Tier-2 bands below), and the
 roster is checked in both directions so a divergence that heals is as red as one that
 appears.
+
+**4. S6 (2026-08-27) deleted the Python side, and 2026-10-10 deleted the CI job that ran the
+reference's tests** (the user's call). So, read below: every *"Python reference"*, *"Python
+comparator"* and `tests/crossport/` file is gone (read them at `4f7168e^`); the comparator is
+`domains::tiers` over `rust/data/tiers.json`; the discovered-discrepancy protocol has one
+side, and its question is *"a defect, or the reference moving?"*; and the `crossport` CI job
+that enforced the tiers *"on every push"* no longer runs, so the tiers are enforced when
+`cargo test` is run, by hand. Added 2026-10-19, when the stale-record clean-up found the rest
+of this file still read as current.
 
 ⚠ **What did *not* change: the tiers, the bands, and their measured provenance.** The
 question the bands answer — how far a one-ULP libm disagreement moves a whole trajectory —
@@ -203,9 +213,9 @@ sensitivity in the table below was re-measured on 2026-08-16 and every figure re
 transcendentals"; `measure_tier2_bands.py` is pure Python and shims CPython's own `math`,
 so the basis was always Python-side and the inversion does not reach it.
 
-⚠ The purity invariant this file opens with — *`git diff src/` stays empty* — is A's rule
-and is **not** rewritten here. It is slice 11's, together with the standing posture section
-in `CLAUDE.md`.
+⚠ The purity invariant this file opens with — *`git diff src/` stays empty* — was A's rule
+and was **not** rewritten here; it was slice 11's, together with the standing posture section
+in `CLAUDE.md`. S6 then deleted `src/`, and the posture section now carries the rule.
 
 ## Why a tolerance contract at all — the frozen goldens don't cross the language boundary
 
@@ -490,7 +500,7 @@ As of Phase 7 exit, **no such discrepancy has been found**: all 20 goldens pass 
 across both the local same-libm run and a **Linux container replicating the CI cross-libm
 comparison** (glibc-Rust vs the UCRT goldens — the de-risk described above), with zero
 changes to the Python reference (`git diff src/` empty throughout). The `crossport` CI job
-enforces this on every push going forward; the container run is the pre-landing proof that
+enforced this on every push until it was deleted (correction 4); the container run is the pre-landing proof that
 the measured bands absorb the real cross-libm divergence.
 
 ## Port-agnostic — and C# at the Phase-8 boundary
@@ -500,5 +510,6 @@ The interchange (`sim_io` hex-float JSON) and the comparator (`domains::tiers` +
 **port-agnostic**: they validate *any* port's snapshot, not Rust's specifically. Phase 7 is
 Rust-only, but the roadmap's second port target — **C#** for the Godot front-end (Phase 8) —
 reuses this whole harness for free: a C# emitter producing the same `sim_io` snapshot is
-gated by the identical Python comparator against the identical goldens at the identical tiers.
+gated by the identical comparator (`domains::tiers`, since S6) against the identical goldens
+at the identical tiers.
 The tolerance contract is the port's, not the language's.

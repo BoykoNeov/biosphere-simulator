@@ -2,13 +2,13 @@
 //! (canopy / photosynthesis / respiration / transpiration / phenology / allocation /
 //! nitrogen / chamber) (Phase-7 P7.4).
 //!
-//! Every function mirrors its Python twin character-for-character; the transcendentals
-//! are op-for-op (`math.exp`→`.exp()`, `math.sqrt`→`.sqrt()`, `q10**e`→`.powf(e)`,
-//! `(t+c)**2`→`.powf(2.0)`) so the cross-port deviation is bounded by last-ULP libm
-//! differences (Tier 2). The `ValueError`-raising input guards (`ground_area > 0`, …) are
-//! omitted — they never fire for the frozen scenarios and would force `Result` on hot
-//! rate laws; the *behavioral* clamps (`lai == 0 → 0`, `max(0, …)`, piecewise cutoffs)
-//! are kept exactly.
+//! Every function was written to mirror its Python twin (deleted by S6, `4f7168e`)
+//! character-for-character; the transcendentals are op-for-op (`math.exp`→`.exp()`,
+//! `math.sqrt`→`.sqrt()`, `q10**e`→`.powf(e)`, `(t+c)**2`→`.powf(2.0)`) so the cross-port deviation
+//! is bounded by last-ULP libm differences (Tier 2). The `ValueError`-raising input guards
+//! (`ground_area > 0`, …) are omitted — they never fire for the frozen scenarios and would force
+//! `Result` on hot rate laws; the *behavioral* clamps (`lai == 0 → 0`, `max(0, …)`, piecewise
+//! cutoffs) are kept exactly.
 
 use simcore::error::SimError;
 
@@ -614,7 +614,7 @@ pub fn fraction_transpirable(soil_water: f64, capacity: f64) -> f64 {
 /// 1000 mm of extractable water over 1 m², a 7.7 m soil column. See
 /// `docs/plans/post-roadmap-soil-water-rebasing.md`. There is **no wilting floor**: the
 /// response is linear to zero at `FTSW = 0`, so the shutoff is asymptotic rather than
-/// hard. The port carries the rule, not the rationale — the Python reference measured
+/// hard. The port carries the rule, not the rationale — the Python reference (before S6) measured
 /// that the arbitration backstop still never fires.
 pub fn water_stress_factor(ftsw: f64, threshold: f64) -> f64 {
     if ftsw >= threshold {
@@ -661,7 +661,7 @@ pub fn daily_thermal_time(temp_c: f64, t_base: f64, t_cap: f64) -> f64 {
 /// back to 0 at the ceiling, and 0 at/above it. Hand-mirrored from
 /// `domains/biosphere/phenology.py::vernalization_day` (post-roadmap scope (B) inc. 1).
 ///
-/// The Python side raises on ill-ordered cardinals; here the ordering is a *loader*
+/// The deleted Python side raised on ill-ordered cardinals; here the ordering is a *loader*
 /// invariant (the params arrive already validated through `biosphere_params.txt`), so
 /// this stays a total function — the same split the rest of this module uses.
 pub fn vernalization_day(
@@ -718,8 +718,8 @@ pub fn photoperiod_factor(daylength_h: f64, cpp: f64, ppsen: f64) -> f64 {
 /// it is a ratio on `[0, 1 + WSSD]`. Unstressed (`WSFG = 1`) it is EXACTLY 1.0, which is
 /// what keeps every non-water-limited scenario bit-identical on both ports.
 ///
-/// Mirrors `domains.biosphere.phenology.drought_development_factor`. ⚠ The Python side
-/// REJECTS `wssd < -1` (below it development would run backwards, which the source rules
+/// Mirrors `domains.biosphere.phenology.drought_development_factor`. ⚠ The deleted Python side
+/// REJECTED `wssd < -1` (below it development would run backwards, which the source rules
 /// out); the port carries the rule, not the rationale — but Rust has no constructor to
 /// raise from, so the bound is enforced where scenarios are declared rather than here.
 /// Negative `WSSD` down to −1 is [F]'s own provision for species drought delays.
@@ -856,8 +856,8 @@ pub fn partition(dmi: f64, dvs: f64, table: &[PartitionRow]) -> (f64, f64, f64, 
 /// constant (Agren 1985), and the paper omits all data there. Mirrors
 /// `domains.biosphere.nitrogen.target_n_concentration`.
 ///
-/// A non-positive `w_plateau` is a param-file error, caught at load in Python; here the
-/// guard degenerates to the plateau branch rather than panicking mid-step.
+/// A non-positive `w_plateau` is a param-file error, caught at load in the deleted Python port;
+/// here the guard degenerates to the plateau branch rather than panicking mid-step.
 pub fn target_n_concentration(w_t_ha: f64, coefficient: f64, exponent: f64, w_plateau: f64) -> f64 {
     if w_plateau <= 0.0 || w_t_ha <= w_plateau {
         return coefficient;
@@ -1370,7 +1370,7 @@ mod tests {
     /// (This was checked by mutation, after being flagged as a plausible hazard.) What
     /// callers CAN get wrong is dropping a factor; that is pinned on a non-unit plot in
     /// `system.rs::capture_scales_with_ground_area_at_its_call_sites`.
-    /// Mirrors `tests/test_soil_layers.py::test_captured_water_is_the_column_arithmetic`.
+    /// Ported from `tests/test_soil_layers.py::test_captured_water_is_the_column_arithmetic`.
     #[test]
     fn captured_water_is_the_column_arithmetic() {
         // 1 m of soil at EXTR 0.13 over 2 m2 holds 260 kg of extractable water.
@@ -1387,7 +1387,7 @@ mod tests {
     /// inverted. Measured, not assumed: with the whole function replaced by `1.0` the
     /// entire suite stayed green. That is the same position `Drainage` and `root_depth`
     /// are in, and the reason these pins have to CONSTRUCT the stressed state.
-    /// Mirrors `tests/test_phenology.py` (the `drought_development_factor` block).
+    /// Ported from `tests/test_phenology.py` (the `drought_development_factor` block).
     #[test]
     fn drought_development_factor_reproduces_the_sources_worked_examples() {
         // "if WSSD is 0.4, the maximum value of WSFD at WSFG = 0 is equal to 1.4".
@@ -1400,10 +1400,10 @@ mod tests {
         assert_eq!(drought_development_factor(0.0, -1.0), 0.0);
     }
 
-    /// The EXACT identity the whole freeze rests on, on both ports: unstressed must be
-    /// 1.0 to the bit, not approximately 1.0. A form that returned `1.0 + 1e-16` here
-    /// would move every golden's last ULP on the Python side while the Rust suite,
-    /// having no stressed scenario, stayed green.
+    /// The EXACT identity the whole freeze rests on, on both ports while there were two: unstressed
+    /// must be 1.0 to the bit, not approximately 1.0. A form that returned `1.0 + 1e-16` here
+    /// would move every golden's last ULP on the then golden-producing Python side while the Rust
+    /// suite, having no stressed scenario, stayed green.
     #[test]
     fn wsfd_is_exactly_one_when_unstressed() {
         for wssd in [0.4, -0.4, 1.5, -1.0, 0.0] {
@@ -1458,7 +1458,8 @@ mod tests {
     /// Listing 7 L33 takes "the shallowest of the rooted depths set by the soil and by
     /// the crop"). No Rust scenario declares a soil shallower than the crop's own cap,
     /// so this branch is unreachable from any run here — measured: dropping it left the
-    /// rest of the suite green. The Python side pins it as a whole-season behaviour.
+    /// rest of the suite green. The deleted Python side also pinned it as a whole-season
+    /// behaviour; here only this unit test pins it.
     #[test]
     fn a_shallow_soil_caps_rooting_before_the_crop_does() {
         let params = params::RootDepthParams {
@@ -1577,7 +1578,7 @@ mod tests {
     // `_photo()`, with the arithmetic written out in the comment — never read back out
     // of a run of this tree (§5ad exit gate, clause 2).
     //
-    // ⚠ The Python fixture holds the params as literals ON PURPOSE, so that the physics
+    // ⚠ The Python fixture held the params as literals ON PURPOSE, so that the physics
     // pins are independent of the loader. Kept: `_photo()` and `_canopy()` do not call
     // `params::photosynthesis()`, so a loader regression cannot silently move a pin.
     // -----------------------------------------------------------------------------
@@ -1617,7 +1618,7 @@ mod tests {
 
     /// `Ac = Vcmax·(Ci − Γ*) / (Ci + Kc·(1 + O/Ko))` — Farquhar, von Caemmerer & Berry
     /// (1980). Hand value: `100·(400 − 42.75) / (400 + 404.9·(1 + 210/278.4))`.
-    /// Mirrors `test_photosynthesis.py::test_rubisco_limited_rate_known_value`.
+    /// Ported from `test_photosynthesis.py::test_rubisco_limited_rate_known_value`.
     #[test]
     fn rubisco_limited_rate_is_the_hand_computed_fvcb_value() {
         let ac = rubisco_limited_rate(400.0, &_photo());
@@ -1649,7 +1650,7 @@ mod tests {
     }
 
     /// `Aj = J·(Ci − Γ*) / (4·Ci + 8·Γ*)` at the `J` pinned above.
-    /// Mirrors `test_photosynthesis.py::test_light_limited_rate_known_value`.
+    /// Ported from `test_photosynthesis.py::test_light_limited_rate_known_value`.
     #[test]
     fn light_limited_rate_is_the_hand_computed_value() {
         let p = _photo();
@@ -1743,7 +1744,7 @@ mod tests {
     /// 1.3219831112621092, i.e. **4.05 % LOWER**. The SIGN is the point: `Ag` is concave
     /// in PAR, so resolving the canopy into depths can only lower the sum. A port that
     /// silently picked up the old number would be re-introducing the Jensen high-bias.
-    /// Mirrors `test_photosynthesis.py::test_canopy_assimilation_known_value`.
+    /// Ported from `test_photosynthesis.py::test_canopy_assimilation_known_value`.
     #[test]
     fn canopy_assimilation_is_the_hand_composed_daily_flux() {
         let lai = 5.0 * _canopy().sla_per_mol_c / 1.0; // 5 mol leaf C over 1 m² ⇒ 2.936
@@ -1992,7 +1993,7 @@ mod tests {
     /// Hand values with `t_base = 5`, `t_cap = 25` (band = 20 degC), deliberately NOT the
     /// committed `(0, 30)`: with a base of zero the subtraction is invisible, so a rate
     /// that returned the raw temperature would pass on the frozen params.
-    /// Mirrors `test_daily_thermal_time_cardinal_values` and its two neighbours.
+    /// Ported from `test_daily_thermal_time_cardinal_values` and its two neighbours.
     #[test]
     fn thermal_time_is_the_degree_day_rate_capped_at_both_cardinals() {
         // Every value below is exact in binary, so these are equalities, not bands.
@@ -2038,7 +2039,7 @@ mod tests {
     /// (reproductive / TSUM1 instead of / TSUM2) reddens nothing else in the binary -
     /// 1250 degC*day would read 1.25 instead of 1.5. It is pinned here because the
     /// reproductive branch IS live (23 tests enter it) and no other test looks at it.
-    /// Mirrors `test_development_stage_cardinal_values` and its monotonicity neighbour.
+    /// Ported from `test_development_stage_cardinal_values` and its monotonicity neighbour.
     #[test]
     fn development_stage_is_the_two_phase_tsum_ramp() {
         for (thermal_time, expected) in [
@@ -2078,7 +2079,7 @@ mod tests {
     ///
     /// ⚠ Both BOUNDARIES are closed at zero - at the base AND at the ceiling - so
     /// a `<`/`<=` slip at either end is a silent full vernalization day.
-    /// Mirrors `test_vernalization_day_matches_hand_computed_literals`.
+    /// Ported from `test_vernalization_day_matches_hand_computed_literals`.
     #[test]
     fn vernalization_day_is_the_three_segment_cold_response() {
         let c = (-1.0, 0.0, 8.0, 12.0);
@@ -2131,7 +2132,7 @@ mod tests {
     /// the source rather than derived here, so it verifies the equation was READ
     /// correctly rather than merely copied plausibly. The two half-value cases sit on
     /// opposite ramps, so a single mis-transcribed cardinal breaks one of them.
-    /// Mirrors `test_vernalization_day_reproduces_the_sources_own_worked_example`.
+    /// Ported from `test_vernalization_day_reproduces_the_sources_own_worked_example`.
     #[test]
     fn vernalization_day_reproduces_the_sources_own_worked_example() {
         let c = (-1.0, 0.0, 8.0, 12.0);
@@ -2151,7 +2152,7 @@ mod tests {
     ///
     /// ⚠ Measured: removing the clamp reddens nothing in the binary, and the clamp
     /// is live (20 tests enter it with a raw value outside [0, 1]).
-    /// Mirrors `test_vernalization_factor_is_qualitative_for_winter_europe_wheat` and
+    /// Ported from `test_vernalization_factor_is_qualitative_for_winter_europe_wheat` and
     /// `test_a_quantitative_cultivar_never_reaches_the_clamp`.
     #[test]
     fn vernalization_factor_arrests_a_qualitative_cultivar_and_saturates_at_one() {
@@ -2198,7 +2199,7 @@ mod tests {
     /// ⚠ The DIRECTION is the whole content: a long-day crop is slowed by SHORT
     /// days, so the factor rises with daylength and is 1 at/above `cpp`. Swapping the
     /// comparison turns this into a short-day crop and reddens only three unrelated
-    /// bands. Mirrors `test_photoperiod_factor_matches_hand_computed_literals`.
+    /// bands. Ported from `test_photoperiod_factor_matches_hand_computed_literals`.
     #[test]
     fn photoperiod_factor_is_the_long_day_response_and_never_goes_negative() {
         let (cpp, ppsen) = (16.0, 0.09);
@@ -2260,7 +2261,7 @@ mod tests {
     /// `verfun` and `ppfun` are limitation factors bounded above by 1; `WSFD` is a ratio
     /// on `[0, 1 + WSSD]` and drought HASTENS development ([F] Table 15.2). Written
     /// against the other two functions rather than as a bare inequality, because the
-    /// claim IS the comparison. Mirrors `test_wsfd_may_exceed_one_unlike_its_two_
+    /// claim IS the comparison. Ported from `test_wsfd_may_exceed_one_unlike_its_two_
     /// neighbours` and `test_wsfd_is_monotone_increasing_as_water_runs_out`.
     #[test]
     fn wsfd_may_exceed_one_unlike_the_two_vegetative_modifiers() {
@@ -2315,13 +2316,13 @@ mod tests {
 
     /// `e_s(T)` against FAO-56's own table, and `Δ` alongside it.
     ///
-    /// ⚠ SCOPE, STATED HONESTLY (the Python file states it too and it survives the port):
+    /// ⚠ SCOPE, STATED HONESTLY (the Python file stated it too and it survived the port):
     /// the `e_s` magnitudes are an external cross-check — FAO-56 tabulates
     /// `e_s(20 °C) = 2.339 kPa` and this tree computes it from Tetens' constants. The
     /// SLOPE literals are only formula-consistent (FAO-56's 4098-form and this module's
     /// analytic `B·C` derivative agree to these digits), so they are not independent
     /// evidence; the independent slope check is the finite difference below.
-    /// Mirrors `tests/test_transpiration.py::test_svp_and_slope_match_fao56_table`.
+    /// Ported from `tests/test_transpiration.py::test_svp_and_slope_match_fao56_table`.
     #[test]
     fn saturation_vapour_pressure_and_its_slope_match_the_fao56_table() {
         for (temp_c, es_kpa, slope_kpa) in [
@@ -2350,7 +2351,7 @@ mod tests {
     /// dropped or transposed factor even if the table literals above were themselves
     /// copied out of this tree. Measured: the before-battery's `slope_svp` mutation
     /// (dropping the `SVP_C` factor) reddened NOTHING in the whole lib binary.
-    /// Mirrors `test_slope_is_the_analytic_derivative_of_svp`.
+    /// Ported from `test_slope_is_the_analytic_derivative_of_svp`.
     #[test]
     fn the_svp_slope_is_the_analytic_derivative_of_the_curve() {
         let (t, h) = (18.0, 1e-4);
@@ -2365,7 +2366,7 @@ mod tests {
 
     /// The combination equation at one operating point, **hand-composed in the comment**.
     ///
-    /// ⚠ The Python test calls its `6.158958394549651` a "pinned regression literal" — a
+    /// ⚠ The Python test called its `6.158958394549651` a "pinned regression literal" — a
     /// value read out of the tree, which S5's exit gate (clause 2) rejects. The same
     /// number is legitimate as a HAND computation, so the derivation is written out here
     /// and each intermediate is asserted, which is what makes it re-checkable without
@@ -2381,7 +2382,7 @@ mod tests {
     ///   T_pot    = λE/λ · 86400 = 174.6464/2.45e6 · 86400 = 6.1590 mm/day
     /// ```
     ///
-    /// Mirrors `test_penman_monteith_pinned_value`.
+    /// Ported from `test_penman_monteith_pinned_value`.
     #[test]
     fn penman_monteith_is_the_hand_composed_combination_equation() {
         let (ra, rs) = (50.0, 70.0);
@@ -2419,7 +2420,7 @@ mod tests {
     }
 
     /// No available energy and no vapour deficit ⇒ no evaporative demand, exactly.
-    /// Mirrors `test_penman_monteith_zero_energy_zero_vpd_is_zero`.
+    /// Ported from `test_penman_monteith_zero_energy_zero_vpd_is_zero`.
     #[test]
     fn penman_monteith_is_zero_with_no_energy_and_no_vapour_deficit() {
         assert_eq!(
@@ -2445,7 +2446,7 @@ mod tests {
     /// It is pinned here at the function's own contract (it is `pub`, and a longwave term
     /// is the obvious next weather science), and the unreachability is asserted rather
     /// than left as a comment that could rot.
-    /// Mirrors `test_penman_monteith_clamps_negative_radiation_to_zero`.
+    /// Ported from `test_penman_monteith_clamps_negative_radiation_to_zero`.
     #[test]
     fn penman_monteith_clamps_negative_available_energy_and_no_weather_row_can_reach_it() {
         // (a) The clamp itself, on the function's own contract. Unclamped this operating
@@ -2489,7 +2490,7 @@ mod tests {
     /// other. They must be the same arithmetic or water appears and disappears at a
     /// re-sow. ⚠ The before-battery's `ground_area` mutation reddened three tests, only
     /// one of which is about the area factor.
-    /// Mirrors `test_transpirable_capacity_is_the_column_arithmetic` and
+    /// Ported from `test_transpirable_capacity_is_the_column_arithmetic` and
     /// `test_transpirable_capacity_agrees_with_captured_water`.
     #[test]
     fn transpirable_capacity_is_the_column_arithmetic_and_agrees_with_captured_water() {
@@ -2521,7 +2522,7 @@ mod tests {
     /// `cargo test --workspace`): `rooted_depth0` is a cited positive everywhere, so no
     /// run ever asks. Flipping its return to 1.0 — "a crop with no root zone is
     /// unstressed" — reddened nothing at all before this test.
-    /// Mirrors `test_fraction_transpirable_is_atsw_over_ttsw` and
+    /// Ported from `test_fraction_transpirable_is_atsw_over_ttsw` and
     /// `test_fraction_transpirable_returns_zero_for_zero_capacity`.
     #[test]
     fn fraction_transpirable_is_atsw_over_ttsw_and_is_not_clamped_above_one() {
@@ -2555,7 +2556,7 @@ mod tests {
     /// only AT `FTSW = 0`, so the shutoff is asymptotic; reinstating a hard floor at 0.05
     /// reddened exactly one stranger. The absence is a deliberate rule, not an oversight —
     /// it is what the absolute-kg ramp this replaced used to provide.
-    /// Mirrors `test_water_stress_factor_cardinal_values` and
+    /// Ported from `test_water_stress_factor_cardinal_values` and
     /// `test_water_stress_factor_has_no_wilting_floor`.
     #[test]
     fn water_stress_factor_is_the_wssg_ramp_with_a_cap_and_no_wilting_floor() {
@@ -2593,7 +2594,7 @@ mod tests {
     /// before the form was written). Also pins the `ground_area` factor in the
     /// DENOMINATOR: hardcoding it to 1.0 there reddened two tests, neither of which is
     /// about the stress path.
-    /// Mirrors `test_soil_water_stress_composes_the_three` and
+    /// Ported from `test_soil_water_stress_composes_the_three` and
     /// `test_a_full_root_zone_is_unstressed_at_every_depth`.
     #[test]
     fn soil_water_stress_composes_the_three_and_a_full_zone_is_unstressed_at_any_depth() {
@@ -2628,7 +2629,7 @@ mod tests {
     /// (so a negative depth reverses the flow) each reddened NOTHING in the lib binary.
     /// The saturation branch itself is live — a `panic!` in it stops 20 tests — but
     /// nothing was checking what it returns.
-    /// Mirrors `test_root_zone_fraction_is_a_clamped_ratio` and
+    /// Ported from `test_root_zone_fraction_is_a_clamped_ratio` and
     /// `test_root_zone_fraction_can_only_reduce_never_reverse`.
     #[test]
     fn root_zone_fraction_is_a_clamped_ratio_that_can_only_reduce() {
@@ -2767,7 +2768,7 @@ mod tests {
     /// ⚠ §5ad's control M3 measured this function BARE: changing the per-10 °C exponent
     /// to per-5 reddened 6 tests and NOT ONE of them was about temperature response.
     /// This is the test that was missing.
-    /// Mirrors `tests/test_respiration.py::test_q10_factor_known_values`.
+    /// Ported from `tests/test_respiration.py::test_q10_factor_known_values`.
     #[test]
     fn q10_is_the_doubling_ladder_either_side_of_the_reference_temperature() {
         for (temp, want) in [
@@ -2842,13 +2843,13 @@ mod tests {
     /// runs both flows BACKWARDS — the plant would deposit carbon into the atmosphere
     /// and un-respire. §5ad's battery measured the unclamped form reddening 21 tests,
     /// none of them about the carbon budget.
-    /// Mirrors `tests/test_respiration.py::test_growth_respiration_clamps_*`.
+    /// Ported from `tests/test_respiration.py::test_growth_respiration_clamps_*`.
     #[test]
     fn available_for_growth_is_the_difference_and_the_clamp_is_exact_at_equality() {
         close(available_for_growth(1.0, 0.2), 0.8, "surplus day");
         assert_eq!(available_for_growth(0.2, 1.0), 0.0);
         assert_eq!(available_for_growth(1.0, 1.0), 0.0);
-        // The composed growth-respiration loss Python returns from its own function:
+        // The composed growth-respiration loss Python returned from its own function:
         // (1 − Yg) · available = 0.25 · 0.8 = 0.2 mol C/day. Composed here rather than
         // wrapped, because Rust computes it inline in `GrowthRespiration::evaluate`.
         close(
@@ -2860,7 +2861,7 @@ mod tests {
 
     /// The three knots are the table's own rows, returned unchanged.
     ///
-    /// Mirrors `tests/test_allocation.py::test_partition_fractions_known_values`.
+    /// Ported from `tests/test_allocation.py::test_partition_fractions_known_values`.
     #[test]
     fn partition_fractions_at_a_knot_are_that_row_verbatim() {
         let t = table();
@@ -2889,7 +2890,7 @@ mod tests {
     ///     fs 0.50 + 0.75·(0.10 − 0.50) = 0.20
     ///     fr 0.20 + 0.75·(0.10 − 0.20) = 0.125
     ///     fo 0.00 + 0.75·(0.80 − 0.00) = 0.60
-    /// Mirrors `tests/test_allocation.py::test_partition_fractions_known_values[0.5|1.5]`.
+    /// Ported from `tests/test_allocation.py::test_partition_fractions_known_values[0.5|1.5]`.
     #[test]
     fn partition_fractions_between_knots_interpolate_in_the_right_direction() {
         let t = table();
@@ -2915,7 +2916,7 @@ mod tests {
     /// instead of the last still sums to 1, still returns a legal set of fractions, and
     /// reddened 2 tests in §5ad's battery — neither about allocation. The below-table
     /// limb is reached by any pre-emergence step, so neither branch is hypothetical.
-    /// Mirrors `tests/test_allocation.py::test_partition_fractions_known_values[-1.0|3.0]`.
+    /// Ported from `tests/test_allocation.py::test_partition_fractions_known_values[-1.0|3.0]`.
     #[test]
     fn partition_fractions_flat_extrapolate_from_the_nearer_end_row() {
         let t = table();
@@ -2931,7 +2932,7 @@ mod tests {
     /// A property of the FILE SHAPE rather than of the arithmetic: one shared-breakpoint
     /// table interpolates to sum 1 everywhere by linearity (`lerp(1,1) = 1`), which is
     /// exactly why `allocation.yaml`'s header refuses independent FL/FS/FR/FO tables.
-    /// Mirrors `tests/test_allocation.py::test_partition_fractions_sum_to_one_everywhere`.
+    /// Ported from `tests/test_allocation.py::test_partition_fractions_sum_to_one_everywhere`.
     #[test]
     fn the_partition_fractions_sum_to_one_everywhere_including_outside_the_table() {
         let t = table();
@@ -2954,7 +2955,7 @@ mod tests {
     /// flow still balanced — and reddened 2 tests, neither about where the carbon went.
     /// A sum-preserving reshuffle is invisible to conservation BY CONSTRUCTION, which is
     /// the shape of most of this batch.
-    /// Mirrors `tests/test_allocation.py::test_partition_splits_dmi_exactly` and
+    /// Ported from `tests/test_allocation.py::test_partition_splits_dmi_exactly` and
     /// `test_partition_fills_storage_in_the_reproductive_phase`.
     #[test]
     fn partition_splits_the_increment_into_four_named_legs_that_sum_back_to_it() {
@@ -3022,7 +3023,7 @@ mod tests {
     /// Every literal is hand-computed from the equation: `5.697 / sqrt(4) = 2.8485 %` and
     /// `5.697 / sqrt(16) = 1.424250 %`, i.e. the concentration halves per four-fold mass,
     /// which IS `b = 0.5`.
-    /// Mirrors `test_target_is_constant_below_greenwoods_domain_bound`,
+    /// Ported from `test_target_is_constant_below_greenwoods_domain_bound`,
     /// `test_target_declines_as_a_power_law_above_the_bound` and
     /// `test_target_is_continuous_at_the_bound`.
     #[test]
@@ -3070,7 +3071,7 @@ mod tests {
     /// NOT assert is that the crossing is where the curve actually crosses — a gate on
     /// `peak_w < 14.4248` stays green if the curve moves out from under the constant. So
     /// this pin is the gate's other half rather than a second copy of it.
-    /// Mirrors `test_the_target_meets_n_critical_at_14_42_t_per_ha`.
+    /// Ported from `test_the_target_meets_n_critical_at_14_42_t_per_ha`.
     #[test]
     fn the_greenwood_target_meets_the_stress_threshold_at_the_crossing() {
         let p = crate::biosphere::params::nitrogen();
@@ -3132,7 +3133,7 @@ mod tests {
     /// ramp visible. The Python side had them all along
     /// (`test_soil_n_availability_cardinal_values` parametrizes six points); the port
     /// carried the midpoint over and lost the discriminating ones.
-    /// Mirrors `test_soil_n_availability_cardinal_values`.
+    /// Ported from `test_soil_n_availability_cardinal_values`.
     #[test]
     fn the_availability_ramp_is_pinned_off_its_own_symmetry_point() {
         // The band `[0.01, 0.05]` of the Python fixture, whose quarter points are exact
@@ -3241,7 +3242,7 @@ mod tests {
     ///
     /// The constants are held as literals rather than read through `params::senescence()`
     /// — batch A's convention, so a loader regression cannot silently move a physics pin.
-    /// Mirrors `test_mutual_shading_is_a_STEP_at_the_cited_threshold`.
+    /// Ported from `test_mutual_shading_is_a_STEP_at_the_cited_threshold`.
     #[test]
     fn the_mutual_shading_step_is_flat_above_the_threshold_and_absent_below_it() {
         const RDR: f64 = 0.02;
@@ -3289,7 +3290,7 @@ mod tests {
     /// zero, and still doubles when the area halves. Run as a mutation, it left that test
     /// GREEN and reddened only this one. A point value is not a shape, and the area rule's
     /// licence is a claim about the shape.
-    /// Mirrors `test_the_area_rule_transfers_because_lai_is_LINEAR_in_leaf_carbon`.
+    /// Ported from `test_the_area_rule_transfers_because_lai_is_LINEAR_in_leaf_carbon`.
     #[test]
     fn leaf_area_index_is_linear_in_leaf_carbon_which_is_what_licenses_the_area_rule() {
         let crate::biosphere::params::CanopyParams {

@@ -7,7 +7,7 @@
 //! interpreter evaluates those expressions to literals at **build time**.
 //!
 //! **This is the boundary-eval cross-port surface (Step 3's deliberate amendment of
-//! decision A).** The Python boundary now does `+ − ×`; the Rust boundary must compute
+//! decision A).** The Python boundary did `+ − ×` until S6; the Rust boundary had to compute
 //! the same float. It is benign — the ops are IEEE-deterministic and decimals
 //! round-trip via `f64::from_str` (correctly-rounded, like Python `float()`) — but it
 //! is load-bearing, so it is a real parity surface (the graph-dump gate diffs it).

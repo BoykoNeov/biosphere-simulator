@@ -1,7 +1,7 @@
 # water_recovery — the station water-processor coefficients (Phase 6, Step 4)
 # Currency/unit: WATER (kg). The first STATION-owned params (CrewRespiration reused the
 # crew's respired_carbon_fraction; these are new). They parameterise the station-owned
-# WaterRecovery flow (station/flows.py) that closes the crew water loop:
+# WaterRecovery flow (rust/crates/station/src/flows.rs; station/flows.py until S6) that closes the crew water loop:
 #
 #     recovered_water → water_store (+η_w) + brine (+(1−η_w)),   processed = k_rec·recovered_water
 #
@@ -27,7 +27,7 @@
 #   whole-system recovery (humidity condensate + urine combined) — deliberately below a
 #   real ISS-class urine+condensate recovery so `brine` carries a visible, honest loss.
 #
-# Units discipline (P4 / config/units.py): neither is a conserved-Quantity canonical unit,
+# Units discipline (P4; now rust/crates/config/src/params.rs): neither is a conserved-Quantity canonical unit,
 #   so each is a schema-validated, bound-checked float carrying a declared unit
 #   (exact-string guarded at the loader, like Power's charge_efficiency / the ECLSS rates),
 #   NOT routed through pint.

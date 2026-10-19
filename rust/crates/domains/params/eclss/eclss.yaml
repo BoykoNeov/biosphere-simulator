@@ -1,7 +1,7 @@
 # eclss — cabin-air control-loop coefficients (Phase 5, Step 6)
 # Currency/units: OXYGEN (mol), CARBON (mol), WATER (kg). The coefficients the ECLSS core
 # introduces — the equipment properties of the three control loops. The forced crew
-# metabolic RATES and the initial cabin inventories are scenario data (eclss/scenario.py),
+# metabolic RATES and the initial cabin inventories are scenario data (eclss/scenario.py; now rust/crates/domains/src/eclss.rs),
 # NOT params (the biosphere/Power/Thermal data-vs-coefficient split).
 #
 # The standalone ECLSS domain holds three single-quantity cabin POOLs (cabin_o2 / cabin_co2
@@ -64,7 +64,7 @@
 #   each control loop IS a restoring force, so any constant crew load has a unique stable
 #   steady state (no derived/tuned load, unlike Power's balanced_load_w).
 #
-# Units discipline (P4 / config/units.py): none of these is a conserved-Quantity canonical
+# Units discipline (P4; now rust/crates/config/src/params.rs): none of these is a conserved-Quantity canonical
 #   unit, so each is a schema-validated, bound-checked float carrying a declared unit
 #   (exact-string guarded at the loader, like Power's charge_efficiency / Thermal's
 #   emissivity), NOT routed through pint.

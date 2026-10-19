@@ -50,7 +50,7 @@ use std::collections::BTreeMap;
 
 /// One trajectory, reduced to the scalar series the gates fold.
 ///
-/// ⚠⚠ **Pre-reduction is the station's precedent, and it opens a hole Python does not
+/// ⚠⚠ **Pre-reduction is the station's precedent, and it opens a hole Python did not
 /// have.** `station/examples/emit_sealed_energy_drift.rs` already folds a per-step
 /// temperature series rather than materializing 109,801 `State`s, and `year_summaries`
 /// is generic precisely so it can. But that fold computes `n_years = (len - 1) / year`,

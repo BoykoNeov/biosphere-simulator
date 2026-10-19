@@ -2,7 +2,7 @@
 # Currency/units: CARBON (mol), WATER (kg), OXYGEN (mol). The coefficients the Crew core
 # introduces — the physiology fractions that split each ingested quantity across its named
 # output fates. The forced crew intake RATES and the initial store inventories are scenario
-# data (crew/scenario.py), NOT params (the biosphere/Power/Thermal/ECLSS data-vs-coefficient
+# data (crew/scenario.py; now rust/crates/domains/src/crew.rs), NOT params (the biosphere/Power/Thermal/ECLSS data-vs-coefficient
 # split).
 #
 # The standalone Crew domain holds three finite provisioned-consumable POOLs (food_store /
@@ -29,7 +29,7 @@
 #   time-to-depletion store0/rate — the LoadDraw discipline), NOT structural. Because no
 #   flow reads a stock, the forced-only RK4 ≡ Euler bit-identity holds (Crew revives it).
 #
-# Units discipline (P4 / config/units.py): neither fraction is a conserved-Quantity
+# Units discipline (P4; now rust/crates/config/src/params.rs): neither fraction is a conserved-Quantity
 #   canonical unit, so each is a schema-validated, bound-checked float carrying a declared
 #   unit (exact-string guarded at the loader, like Power's charge_efficiency / ECLSS's
 #   rates), NOT routed through pint.
@@ -57,7 +57,7 @@
 # NOTE — RQ = 1.0 is baked into CrewRespiration (PQ = 1: one O₂ consumed per CO₂ produced),
 #   vs BVAD's nominal RQ 0.86 (daily-effective 0.881). Calibrating CO₂ to BVAD therefore
 #   makes the model's O₂ consumption ≈ 11.8 % low — the one genuinely un-tuned structural
-#   prediction, pinned in tests/test_bvad_validation.py. That miss is a documented model
+#   prediction, pinned in tests/test_bvad_validation.py until S6. That miss is a documented model
 #   limitation (a fixed RQ, no metabolic-water machinery), not a parameter error.
 #
 # Sources:

@@ -1,5 +1,11 @@
 //! Native Rust port of the frozen Python `station.*` cross-domain assembly (P7.5).
 //!
+//! ⚠ **History, not authority** (2026-10-19). This crate was ported from Python and its comments
+//! still name the code it came from (`test_*.py` files, Python modules and classes). S6 deleted
+//! all of it at `4f7168e` (2026-08-27); read it at `4f7168e^`. Since the reference flip
+//! (2026-08-16) this crate is the reference: a comment saying it was "ported from" or "mirrors"
+//! Python records where the code came from, not a copy it must keep matching.
+//!
 //! The assembly layer that imports both the four Phase-5 siblings ([`domains::power`],
 //! [`domains::thermal`], [`domains::eclss`], [`domains::crew`]) and the [`domains::biosphere`]
 //! and owns **all** cross-domain wiring by *choosing which stock id each flow points at*

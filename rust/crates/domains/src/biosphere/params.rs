@@ -51,7 +51,7 @@ use config::{
 /// standard atomic weight of carbon, [12.0096, 12.0116]).
 ///
 /// **Crop data, not generic dimensional analysis** — mol (substance) and kg (mass) are
-/// dimensionally incompatible without a molar mass, which is exactly why Python keeps
+/// dimensionally incompatible without a molar mass, which is exactly why the Python port kept
 /// this in the domain loader rather than in its units boundary, and why it lives here
 /// rather than in [`config`].
 pub const MOLAR_MASS_CARBON_KG_PER_MOL: f64 = 0.012011;
@@ -385,8 +385,8 @@ pub struct RootDepthParams {
 /// BOTH halves of the mechanism at maturity - [E]'s Listing 3 Line 114 is
 /// `FINISH DS = 2., CELVN = 3.`, i.e. its program has no state past maturity, so running
 /// the form there would extrapolate it outside the program that defines it. See the
-/// Python module for the quotes and for why that is a DOMAIN BOUNDARY rather than a
-/// cited cessation rule.
+/// deleted Python module (`4f7168e^`) for the quotes and for why that is a DOMAIN
+/// BOUNDARY rather than a cited cessation rule.
 #[derive(Debug, Clone, Copy)]
 pub struct StemReserveParams {
     pub remobilizable_fraction: f64,
@@ -1639,7 +1639,7 @@ pub fn potato() -> BiosphereParams {
 /// # ⚠⚠ This is the set the reference LOADS, which is what re-anchors `param_files`
 ///
 /// The recorded sha-256 values are author-neutral — both sides digest the same bytes — so
-/// what actually moves to the reference is the **census rule**. Python's rule is a
+/// what actually moves to the reference is the **census rule**. Python's rule was a
 /// non-recursive glob of a package directory minus `demo.yaml`; this is the list of files
 /// the compiled reference actually reads. A file that stopped being loaded would drop out of
 /// the manifest here, where under the glob rule it would stay in it.
@@ -1882,7 +1882,7 @@ mod tests {
     }
 
     /// ⚠ The MUST-EQUAL constraint between the two files that fold with the carbon
-    /// fraction. Python documents it and enforces it nowhere; a divergence models a
+    /// fraction. The Python port documented it and enforced it nowhere; a divergence models a
     /// silently inconsistent plant (leaf area per mol C and N per mol C disagreeing
     /// about what a mol of carbon weighs), so it is asserted here rather than trusted.
     #[test]
@@ -2116,7 +2116,7 @@ parameters:
     // `PHENOLOGY_YAML` through `include_str!`, so the only file they can ever see is the
     // committed one - which is valid. Removing any of the three leaves
     // `cargo test -p domains --lib` at 212 passed / 0 failed; the control (declaring
-    // `t_base` in K, which the committed file is not) reddens 29. Python has five tests
+    // `t_base` in K, which the committed file is not) reddens 29. Python had five tests
     // for exactly those three rules and they have NO successor here. Closing that needs
     // text-injectable variants of the three readers - the shape `allocation_from` already
     // uses in this file - which is a production change and therefore a decision of its
@@ -2131,7 +2131,7 @@ parameters:
     /// and would happily agree on a wrong number. This one names the SOURCE ROW each
     /// value comes from, so replacing a cardinal with a plausible neighbour from [D]'s
     /// range (-1.3 / 3.8 / 6.0 / 15.7) fails here and nowhere else.
-    /// Mirrors `test_load_phenology_params_matches_committed_values` and
+    /// Ported from `test_load_phenology_params_matches_committed_values` and
     /// `test_committed_file_loads_the_cited_winter_europe_values`.
     #[test]
     fn the_committed_phenology_block_is_the_cited_winter_europe_parameterization() {
@@ -2183,7 +2183,7 @@ parameters:
     /// Both cases matter and they fail for different reasons: a temperature declared in
     /// kelvin is a unit the tree never uses, while a thermal SUM declared as a bare
     /// `degC` is the plausible slip - a sum is not a temperature, and the two differ by
-    /// a factor of time. Mirrors `test_phen_loader_rejects_a_wrong_unit`.
+    /// a factor of time. Ported from `test_phen_loader_rejects_a_wrong_unit`.
     #[test]
     fn a_wrong_phenology_unit_is_rejected() {
         for (from, to, what) in [
@@ -2306,7 +2306,7 @@ parameters:
 
     /// An inverted cardinal band is rejected: `t_base` above `t_cap` would make the
     /// degree-day rate NEGATIVE on the plateau branch, which is the one branch no scenario
-    /// in the tree reaches. Mirrors `test_phen_loader_rejects_inverted_cardinal_band`.
+    /// in the tree reaches. Ported from `test_phen_loader_rejects_inverted_cardinal_band`.
     #[test]
     fn an_inverted_phenology_cardinal_band_is_rejected() {
         let broken = phenology_with("t_base", "40.0");
@@ -2322,7 +2322,7 @@ parameters:
 
     /// A non-positive thermal sum is rejected - both of them are DIVISORS in
     /// `development_stage`, so a zero is an infinity in DVS rather than a slow crop.
-    /// Mirrors `test_phen_loader_rejects_non_positive_sum`.
+    /// Ported from `test_phen_loader_rejects_non_positive_sum`.
     #[test]
     fn a_non_positive_thermal_sum_is_rejected() {
         for field in ["tsum_anthesis", "tsum_maturity"] {
@@ -2347,7 +2347,7 @@ parameters:
     /// break. Two of the pairs are DIVISORS (the ramp widths), so an equal pair is a
     /// division by zero and a swapped pair is a negative-width ramp - the response would
     /// come out inverted rather than merely wrong.
-    /// Mirrors `test_vernalization_day_rejects_ill_ordered_cardinals`.
+    /// Ported from `test_vernalization_day_rejects_ill_ordered_cardinals`.
     #[test]
     fn ill_ordered_vernalization_cardinals_are_rejected() {
         for (field, value, what) in [
@@ -2377,7 +2377,7 @@ parameters:
     /// The two saturation params are bound-checked: `vdsat` is a DIVISOR-shaped saturation
     /// point that must be positive, and a negative `vsen` would make cold RETARD
     /// development - the opposite of the mechanism.
-    /// Mirrors `test_vernalization_factor_rejects_bad_params`.
+    /// Ported from `test_vernalization_factor_rejects_bad_params`.
     #[test]
     fn a_bad_vernalization_sensitivity_or_saturation_is_rejected() {
         rejects(
@@ -2403,7 +2403,7 @@ parameters:
     /// The photoperiod pair, same shape: `cpp` is the critical daylength and must be
     /// positive, and a negative `ppsen` would make SHORT days accelerate a long-day crop.
     /// `ppsen == 0` is legal - that is the day-neutral crop, and the tree ships one.
-    /// Mirrors `test_photoperiod_factor_rejects_bad_params`.
+    /// Ported from `test_photoperiod_factor_rejects_bad_params`.
     #[test]
     fn a_bad_photoperiod_pair_is_rejected() {
         rejects(
@@ -2463,7 +2463,7 @@ parameters:
     /// a well-watered crop), not cited points. Recorded here so the pin is not misread as
     /// an endorsement — it asserts that the numbers the frozen goldens were produced with
     /// are these, not that a source states them.
-    /// Mirrors `test_load_transpiration_params_matches_committed_values`.
+    /// Ported from `test_load_transpiration_params_matches_committed_values`.
     #[test]
     fn the_committed_transpiration_resistances_are_the_provisional_literature_typical_pair() {
         let p = transpiration();
@@ -2486,7 +2486,7 @@ parameters:
     /// a rejection-only test cannot have — a guard tuned one notch too tight forbids a
     /// real crop rather than a bad file, and here the committed 50/70 is what proves the
     /// guard is not simply always-on.
-    /// Mirrors `test_transp_loader_rejects_non_positive`.
+    /// Ported from `test_transp_loader_rejects_non_positive`.
     #[test]
     fn a_non_positive_transpiration_resistance_is_rejected() {
         for field in [
@@ -2594,7 +2594,7 @@ parameters:
     /// `min/m` is the plausible slip rather than a nonsense unit — it is the same
     /// quantity at 60× the scale, so it would load a canopy sixty times more resistant
     /// and produce a perfectly plausible-looking season.
-    /// Mirrors `test_transp_loader_rejects_a_wrong_unit`,
+    /// Ported from `test_transp_loader_rejects_a_wrong_unit`,
     /// `test_transp_loader_rejects_an_unknown_field` and
     /// `test_transp_loader_rejects_a_missing_source`.
     #[test]
@@ -2652,7 +2652,7 @@ parameters:
     /// 1.3 m are the "Wheat winter" row (Gregory et al., 1978). Spring wheat is 0.012 /
     /// 1.8 — slower but deeper — so the two wheats are not interchangeable, and the
     /// body-text range is 3–5 cm/day, which our 1.8 cm/day sits below.
-    /// Mirrors `test_winter_wheat_carries_table_25s_own_row`.
+    /// Ported from `test_winter_wheat_carries_table_25s_own_row`.
     #[test]
     fn winter_wheat_carries_table_25s_own_root_depth_row() {
         let p = root_depth();
@@ -2674,7 +2674,7 @@ parameters:
     /// zero maximum depth is a crop that cannot root at all. That is exactly the shape
     /// this file's own header warns about — the mechanism is bit-identically inert on
     /// every frozen scenario — so the guard has to be where the value is read.
-    /// Mirrors `test_a_non_positive_parameter_is_rejected_at_the_boundary`.
+    /// Ported from `test_a_non_positive_parameter_is_rejected_at_the_boundary`.
     #[test]
     fn a_non_positive_root_depth_bound_is_rejected() {
         for field in ["max_extension_rate", "max_rooted_depth"] {
@@ -2709,7 +2709,7 @@ parameters:
     /// hand-written list and nothing in the tree follows an embed into it. The belief cost a
     /// filesystem read and a leak in a unit test; it is retired here, and the manifest going
     /// byte-identical across the commit that added four embeds is the measurement.
-    /// Mirrors `test_potato_overrides_root_depth_rather_than_sharing_wheats`.
+    /// Ported from `test_potato_overrides_root_depth_rather_than_sharing_wheats`.
     #[test]
     fn potato_overrides_the_rooting_habit_rather_than_sharing_wheats() {
         let text = POTATO_ROOT_DEPTH_YAML;
@@ -2741,7 +2741,7 @@ parameters:
     /// rather than decorative is `k·dt < 1`: the first-order draw self-limits against the
     /// start-of-step pool, which is why the closed water ring never needs the arbitration
     /// backstop. Asserted at the engine's ACTUAL step, not at 1.0 day.
-    /// Mirrors `test_loader_reads_committed_rates`.
+    /// Ported from `test_loader_reads_committed_rates`.
     ///
     /// ⚠ Until 2026-10-09 this pinned a MATCHED PAIR with `condensation_rate`, deleted with the
     /// condenser's draw below its setting (`docs/plans/post-roadmap-chamber-dehumidifier.md`).
@@ -2786,7 +2786,7 @@ parameters:
     /// flows entirely. A negative would run the ring backwards: condensate evaporating into
     /// vapour through a flow whose legs say the opposite, which the flow-level direction
     /// pins would not catch because the legs would still balance.
-    /// Mirrors `test_loader_rejects_negative_rate`.
+    /// Ported from `test_loader_rejects_negative_rate`.
     #[test]
     fn a_negative_water_cycle_rate_is_rejected_but_a_zero_one_is_legal() {
         // One rate since `condensation_rate` was deleted (2026-10-09).
@@ -2839,7 +2839,7 @@ parameters:
     /// load a ring that returns half the standing condensate per YEAR and still produce
     /// a run that conserves water perfectly. (Pinned on `condensation_rate` until that key
     /// was deleted, 2026-10-09; `recycling_rate` is the file's one rate now.)
-    /// Mirrors `test_loader_rejects_bad_unit`.
+    /// Ported from `test_loader_rejects_bad_unit`.
     #[test]
     fn a_wrong_water_cycle_unit_is_rejected() {
         let from = "  recycling_rate:\n    value: 0.5\n    unit: \"1/day\"";
@@ -2886,7 +2886,7 @@ parameters:
     /// Each bound is asserted at its own shape, because reading one off another is the
     /// mistake this module has already made once (`the_respiration_bounds_are_rejected_each
     /// _at_its_own_shape`, whose first draft had both bounds mirror-imaged).
-    /// Mirrors `test_canopy_loader_rejects_a_non_positive_sla`,
+    /// Ported from `test_canopy_loader_rejects_a_non_positive_sla`,
     /// `test_canopy_loader_rejects_a_non_positive_extinction_coef`,
     /// `test_canopy_loader_rejects_a_bad_carbon_fraction`,
     /// `test_photo_loader_rejects_non_positive_kinetics` and
@@ -2970,7 +2970,7 @@ parameters:
     /// The exact-string guard is the one that counts (`config/units.py`'s live pint
     /// conversions were all measured to be identities), so a file that renames `1/day`
     /// to `per_day` must be refused rather than coerced.
-    /// Mirrors `tests/test_respiration.py::test_resp_loader_rejects_a_wrong_unit`.
+    /// Ported from `tests/test_respiration.py::test_resp_loader_rejects_a_wrong_unit`.
     #[test]
     fn a_wrong_respiration_unit_is_rejected() {
         for (field, wrong) in [
@@ -3011,7 +3011,7 @@ parameters:
     /// lossless and legitimate"); it was written from the range NAME rather than from the
     /// helper, and the helper was four files away. Recorded because a bound test written
     /// from the wrong end passes on every input except the two that define it.
-    /// Mirrors `test_resp_loader_rejects_non_positive_rates` and
+    /// Ported from `test_resp_loader_rejects_non_positive_rates` and
     /// `test_resp_loader_rejects_out_of_unit_interval_efficiency`.
     #[test]
     fn the_respiration_bounds_are_rejected_each_at_its_own_shape() {
@@ -3067,7 +3067,7 @@ parameters:
     /// between. ⚠ The strictly-increasing rule is asserted with an EQUAL pair as well as
     /// a decreasing one: equal knots make the interpolation weight a division by zero,
     /// and a `<=` written for `<` is invisible on any decreasing case.
-    /// Mirrors `test_alloc_loader_rejects_non_increasing_dvs`,
+    /// Ported from `test_alloc_loader_rejects_non_increasing_dvs`,
     /// `test_alloc_loader_rejects_out_of_range_fraction` and
     /// `test_alloc_loader_rejects_too_few_rows`.
     #[test]
@@ -3119,7 +3119,7 @@ parameters:
     /// EMPTY (trigger == cessation) or UNREACHABLE (cessation above the DVS cap, which
     /// caps at 2.0, so the drain would never stop). Both are asserted, because a
     /// per-field check would pass either.
-    /// Mirrors `tests/test_stem_reserves.py::test_the_loader_refuses_a_cessation_that_is_unreachable_or_empty`.
+    /// Ported from `tests/test_stem_reserves.py::test_the_loader_refuses_a_cessation_that_is_unreachable_or_empty`.
     #[test]
     fn the_stem_reserve_window_is_rejected_when_empty_or_unreachable() {
         // An EMPTY window: the two ends coincide, so the mechanism can never act.
@@ -3380,7 +3380,7 @@ parameters:
     /// EQUAL case of the concentration band, which is what separates the `<` the loader
     /// writes from the `<=` it could have been written with.
     ///
-    /// Mirrors `test_nitrogen_loader_rejects_a_wrong_unit`,
+    /// Ported from `test_nitrogen_loader_rejects_a_wrong_unit`,
     /// `_rejects_non_positive_capacity`, `_rejects_out_of_range_carbon_fraction`,
     /// `_rejects_inverted_concentration_band`, `_rejects_negative_residual`,
     /// `_rejects_a_missing_source`, `_rejects_an_unknown_field` and
@@ -3514,7 +3514,7 @@ parameters:
     /// shipped: `0.005 * (M_C / cf)` and `0.005 * M_C / cf` are bit-identical at these
     /// values, so an assertion that the loader divides before it multiplies would have
     /// been green under both orders. The order comment in `nitrogen_from` stays a comment.
-    /// Mirrors `test_load_nitrogen_params_applies_carbon_fraction_fold` and
+    /// Ported from `test_load_nitrogen_params_applies_carbon_fraction_fold` and
     /// `test_committed_params_are_the_values_read_off_the_primary`.
     #[test]
     fn the_committed_nitrogen_thresholds_fold_to_kg_n_per_mol_c() {
@@ -3580,7 +3580,7 @@ parameters:
     /// ⚠ And the accept half is what stops the guard being always-on: `senescence.yaml`'s
     /// own header states "a zero rate is valid (no turnover of that organ)", which is
     /// exactly the case a `require_positive` would have broken.
-    /// Mirrors `test_senescence_loader_rejects_a_negative_rate` and
+    /// Ported from `test_senescence_loader_rejects_a_negative_rate` and
     /// `test_senescence_loader_accepts_zero_rate`.
     ///
     /// ⚠ **The accept half READS BACK THE FIELD UNDER TEST, and the first draft did not.**
@@ -3679,7 +3679,7 @@ parameters:
     /// assertion (`LISTING5_STEM == ((0.0, 0.0),)`) has no successor and is not an
     /// absence: it asserts that a constant defined four lines above it still holds the
     /// value it was given, which is true of any constant.
-    /// Mirrors `test_rdr_root_is_the_closest_of_the_three_to_its_source`.
+    /// Ported from `test_rdr_root_is_the_closest_of_the_three_to_its_source`.
     #[test]
     fn rdr_root_is_the_closest_of_the_three_frozen_rates_to_its_cited_source() {
         const LISTING5_LEAF_PLATEAU: f64 = 0.012; // LLVT at DS 1.8-2.5
@@ -3755,7 +3755,7 @@ parameters:
     /// finding written into this batch before the fact rather than after it: an accept half
     /// that reads one fixed field asserts, for every OTHER field, that the field it did not
     /// touch is unchanged — and never looks at the one it did.
-    /// Mirrors `test_loader_rejects_negative_rate` in `test_decomposition.py` and
+    /// Ported from `test_loader_rejects_negative_rate` in `test_decomposition.py` and
     /// `test_microbial_respiration.py`.
     #[test]
     fn a_negative_decomposer_rate_is_rejected_and_a_zero_one_loads() {
@@ -3895,7 +3895,7 @@ parameters:
     /// silent factor: `1/year` where `1/day` is meant would run the decomposer chain 365x
     /// slow, produce a perfectly conserved, perfectly plausible trajectory, and move no
     /// bound anything else asserts.
-    /// Mirrors `test_loader_rejects_bad_unit` in `test_decomposition.py` and
+    /// Ported from `test_loader_rejects_bad_unit` in `test_decomposition.py` and
     /// `test_microbial_respiration.py`.
     #[test]
     fn a_wrong_decomposer_unit_is_rejected() {
@@ -3958,7 +3958,7 @@ parameters:
     /// `every_value_matches_the_generated_table`, and 4.015 is that number times 365. The
     /// claim this test is FOR is where our rate sits on RothC's scale, so that is all it
     /// asserts. The two RothC constants are the SOURCE's, not numbers this tree produced.
-    /// Mirrors `test_every_rothc_rate_is_safe_at_the_frozen_timestep` and
+    /// Ported from `test_every_rothc_rate_is_safe_at_the_frozen_timestep` and
     /// `test_our_rate_sits_between_the_two_plant_material_rates`.
     #[test]
     fn the_frozen_decomposer_rates_are_step_safe_and_the_litter_rate_is_dpm_like() {

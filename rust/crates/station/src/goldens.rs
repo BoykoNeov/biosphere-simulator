@@ -393,7 +393,7 @@ pub const STATION: &[Golden] = &[
 /// **Every golden the reference authors** — the twenty, across both crates.
 ///
 /// ⚠ This is the Rust successor to `tests/golden_platform.RUST_AUTHORED` and
-/// `tests/crossport/regen_goldens_from_rust.RUST_EMITTERS`, which the Python side keeps as
+/// `tests/crossport/regen_goldens_from_rust.RUST_EMITTERS`, which the Python side kept as
 /// *two* rosters with a gate asserting they name the same files. Here they are one thing:
 /// a name that cannot be spelled without the function beside it, so the duplication the
 /// Python gate exists to police does not arise. ⚠ The exception list is now **one** entry

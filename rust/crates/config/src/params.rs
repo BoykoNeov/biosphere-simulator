@@ -3,7 +3,7 @@
 //!
 //! # What this replaces, and what it deliberately is not
 //!
-//! Python's boundary is three things: `config/loader.py` (a safe YAML read),
+//! Python's boundary (deleted by S6) was three things: `config/loader.py` (a safe YAML read),
 //! `config/units.py` (pint), and a hand-written pydantic schema per process inside each
 //! `domains.*.loader`. This module is the first two, plus the parts of the third that
 //! every param file shares.

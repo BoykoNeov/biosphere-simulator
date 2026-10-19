@@ -64,7 +64,7 @@ pub fn window_override(base: Schedule, start: u64, end: u64, value: f64) -> Sche
 /// Consumes the resolver ([`SourceResolver::into_parts`]), inserts `schedule` under `var`,
 /// and rebuilds via [`SourceResolver::new`] (which re-checks the forcing⊕shared
 /// disjointness, #16, so a new forcing var must not collide with a shared var — the return
-/// is `Result` where Python's is infallible, the disjointness re-check being a Rust
+/// is `Result` where Python's was infallible, the disjointness re-check being a Rust
 /// feature not a Python one). The `shared` map is carried verbatim.
 pub fn with_forcing(
     resolver: SourceResolver,

@@ -38,7 +38,7 @@
 //!
 //! **The deferred grammar is deferred here too (do NOT complete it).** An unsupported
 //! operator such as `/`, an unknown identifier, an unbalanced paren, or trailing junk
-//! is a [`ParseError`] — exactly as the Python parser raises `AuthoringError`. The
+//! is a [`ParseError`] — exactly as the Python parser raised `AuthoringError`. The
 //! error *messages* are deliberately **not** pinned cross-port (Tier-0 parity is
 //! structural: accept→same AST, reject→both error).
 
@@ -450,7 +450,7 @@ pub fn parse_rate_expr(text: &str) -> Result<Expr, ParseError> {
 /// (the structural graph dump omits rate strings; the trajectory depends only on the
 /// AST), so the contract is per-port round-trip stability, **not** cross-port
 /// byte-identity — a `Const` renders via `f64::Display`, which round-trips on this port
-/// (Python uses `repr`, which round-trips on that one).
+/// (Python used `repr`, which round-trips on that one).
 pub fn render_rate_expr(node: &Expr) -> String {
     match node {
         Expr::Const(v) => format!("{v}"),

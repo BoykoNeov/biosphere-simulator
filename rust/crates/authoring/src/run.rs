@@ -65,7 +65,7 @@ pub const SPLIT: Split = Split::Strang;
 /// The legal `integrator:` values an authored scenario may name — the Rust analogue of
 /// Python's `run._INTEGRATORS` keys, and the authoring manifest's `integrator_names`.
 ///
-/// ⚠ **Hand-maintained, and honestly so.** Python's copy is the *dispatch table itself*
+/// ⚠ **Hand-maintained, and honestly so.** Python's copy was the *dispatch table itself*
 /// (a dict, enumerated), whereas here the dispatch is a `match` on `built.integrator`
 /// and a Rust `match` cannot be enumerated — the same limitation
 /// [`crate::flow_registry::FLOW_TYPE_NAMES`] records for itself. Two things close the
@@ -141,7 +141,7 @@ pub struct Reversal {
 /// A crossing at step 0 is a wiring error (the file starts the stock above the
 /// setpoint); a crossing later means something else in the graph is filling it past the
 /// regulator's target. Different fixes, so the step is never omitted. Not parity-pinned
-/// (no error text is), but it carries the same two facts Python's does.
+/// (no error text is), but it carries the same two facts Python's did.
 fn reversal_message(v: &Reversal, steps: u64) -> String {
     let when = if v.step == 0 {
         "at the INITIAL state, so this is a wiring error: the scenario file starts this          stock above the setpoint"

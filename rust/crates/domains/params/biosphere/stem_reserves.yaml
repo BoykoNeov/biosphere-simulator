@@ -71,7 +71,7 @@
 #       carbohydrates (starch, sucrose plus glucose)"), row "Wheat"; **§2.2.2 pp. 46-47**
 #       for the redistribution rate and the induction condition; **§3.2.4 p. 93**
 #       ("Formation of shielded reserves") for the formation form; **§3.2.6 p. 95**
-#       ("except for their reserves, stems do not lose weight"). The book allocation.py
+#       ("except for their reserves, stems do not lose weight"). The book allocation.py (deleted by S6)
 #       already cites.
 
 name: winter_wheat

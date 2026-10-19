@@ -5,12 +5,12 @@
 #   pools are pure carbon ({CARBON: 1}) — single-currency CARBON, no oxygen (the
 #   CO₂-releasing, O₂-consuming microbial respiration is Phase-2 Step 5, not this step).
 #
-# Units discipline (P4 / config/units.py): the first-order rate (1/day) is NOT a
+# Units discipline (P4; now rust/crates/config/src/params.rs): the first-order rate (1/day) is NOT a
 #   conserved-Quantity canonical unit, so it is a schema-validated, bound-checked float
 #   carrying a declared unit (exact-string guarded at the loader, like senescence's
 #   rdr_* / respiration's maintenance_coef). A zero rate is valid (no decomposition).
 #
-# Deferred Step-5+ seams (documented in decomposition.py): microbial death / turnover
+# Deferred Step-5+ seams (documented in decomposition.py, deleted by S6): microbial death / turnover
 #   (microbial_C → litter_C recycling), microbe-explicit Michaelis kinetics
 #   (Vmax · microbial_C · litter/(K_m + litter)), and the CO₂/O₂-coupled microbial
 #   respiration. Step 4 is the carbon-only litter → microbial transfer.

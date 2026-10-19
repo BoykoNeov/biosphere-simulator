@@ -245,7 +245,7 @@ mod runs {
         };
     }
 
-    // ⚠ Cached, and not for tidiness. Python runs each decade trajectory once through a
+    // ⚠ Cached, and not for tidiness. Python ran each decade trajectory once through a
     // `scope="module"` fixture; Rust has no fixtures, so thirteen independent `#[test]`s
     // would re-run the two 15-year chambers several times each. `OnceLock` is the
     // fixture's analogue and it is thread-safe, which matters because the test harness

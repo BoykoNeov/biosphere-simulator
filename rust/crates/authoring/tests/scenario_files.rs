@@ -1,9 +1,9 @@
 //! Integration tests for the Phase-9 Step-4b Rust scenario-file interpreter.
 //!
-//! Reads the *committed* anchor scenario files (shared with the Python side) through
+//! Reads the *committed* anchor scenario files (once shared with the Python side) through
 //! the whole `authoring` pipeline (closed-subset YAML reader → schema → interpreter →
 //! run) and checks the structural + run invariants. The **cross-port** byte-identity /
-//! graph-dump parity lives in `tests/crossport/test_crossport.py` (it needs Python);
+//! graph-dump parity lived in `tests/crossport/test_crossport.py` until S6 deleted it;
 //! this file is the Rust-only "the interpreter builds and runs the anchors" gate, plus
 //! the reject cases (a malformed / illegal scenario is an `AuthoringError`, never a
 //! silent mis-build — the reject→both-error side of Tier-0 parse-parity).
@@ -19,7 +19,7 @@ use authoring::{
     apply_includes, load_scenario, run_scenario, run_scenario_allowing_rationing, BuiltScenario,
 };
 
-/// The repo's committed scenario directory (shared with the Python anchor tests).
+/// The repo's committed scenario directory (once shared with the Python anchor tests).
 fn scenarios_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios")
 }
@@ -162,7 +162,7 @@ fn unknown_integrator_is_rejected() {
 #[test]
 fn integrator_names_all_dispatch() {
     // ⚠ Slice 8: `run::INTEGRATOR_NAMES` is spliced into the authoring freeze manifest, so
-    // a name listed there is a promise to an author. Python's copy is the dispatch dict
+    // a name listed there is a promise to an author. Python's copy was the dispatch dict
     // itself and cannot lie; this one is a hand-maintained slice beside a `match`, so the
     // promise is checked by *running* every name. (The reverse direction — an arm added and
     // not listed — is not checkable here; the manifest's `_authority` entry says so.)
@@ -178,7 +178,7 @@ fn integrator_names_all_dispatch() {
 // --- Step 6b: file composition (`includes` / bundles) ------------------------
 //
 // The cross-port byte-identity / graph-dump / run-match parity for the composition
-// anchors lives in `tests/crossport/test_crossport.py` (it needs Python). These are the
+// anchors lived in `tests/crossport/test_crossport.py` until S6 deleted it. These are the
 // Rust-only "the interpreter composes and runs the anchors" gate, the includes-first
 // order pin (a unit test on the merged Vec — the serialized outputs are id-sorted, so
 // order is only observable here), and the compose reject cases.
@@ -687,11 +687,11 @@ fn missing_include_raises() {
 //
 // NOTE (advisor): reject-parity is a Rust-SAFETY property here, not a cross-port parity
 // surface (as it was for 4a rate strings). The Rust port deliberately rejects a
-// *superset* of what Python accepts — a `{pack: …}` reference and a non-zero frozen-flow
+// *superset* of what Python accepted — a `{pack: …}` reference and a non-zero frozen-flow
 // priority both SUCCEED in Python but ERROR in Rust (the deferred surfaces below). So
 // these prove "the Rust interpreter never silently mis-builds", not "both ports agree on
-// rejection". The accept→same-graph parity is carried by the anchor byte-identity /
-// graph-dump / run-match gates in `tests/crossport/test_crossport.py`.
+// rejection". The accept→same-graph parity was carried by the anchor byte-identity /
+// graph-dump / run-match gates in `tests/crossport/test_crossport.py`, deleted by S6.
 
 const STOCKS_HEADER: &str = "name: t\nintegrator: euler\ndt: 1.0\nsteps: 1\n";
 
@@ -775,8 +775,9 @@ fn param_pack_on_a_frozen_type_is_deferred() {
 
 // ---------------------------------------------------------------------------
 // The `dt` hazard gate (post-roadmap) — the Rust mirror of Python's
-// tests/test_authoring_dt_hazard.py. Python is the reference; this file exists so the
-// two ports cannot silently disagree about whether a rationed authored run is an error.
+// tests/test_authoring_dt_hazard.py. Python was the reference then; this file existed so
+// the two ports could not silently disagree about whether a rationed authored run is an
+// error, and since S6 it is the only gate.
 //
 // The hazard itself: every frozen rate constant was sized against the `dt` of its own
 // frozen scenario, but an author picks `dt`. At dt = 3600 `eclss.co2_scrubber`'s k*dt is
@@ -863,7 +864,7 @@ fn the_build_now_refuses_the_unsafe_dt_before_any_step_runs() {
         "the k*h value must be named: {}",
         err.message
     );
-    // The hatch must be discoverable from the message — but by its RUST name. Python's is
+    // The hatch must be discoverable from the message — but by its RUST name. Python's was
     // the kwarg `allow_unsafe_step=True`; Rust has no default arguments, so the hatch is
     // a separate function (the `run_scenario_allowing_rationing` idiom). The message text
     // is explicitly not a parity target (`crate::errors`), so each port names its own API.

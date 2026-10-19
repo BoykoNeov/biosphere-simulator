@@ -1,6 +1,6 @@
 //! The drift-instrument kit, checked against the reference it was ported from (slice C5).
 //!
-//! ⚠ The fixtures below are **the same numbers `tests/test_drift.py` uses**, on purpose.
+//! ⚠ The fixtures below are **the same numbers `tests/test_drift.py` used**, on purpose.
 //! These folds decide two frozen goldens and — from C4 — five of the fifteen science
 //! gates, so the question a Rust test has to answer is not "is this self-consistent" but
 //! "does it agree with the reference". Sharing the fixtures makes a behavioural divergence
@@ -141,7 +141,7 @@ fn year_summaries_segments_like_the_perennial_tests() {
 
 #[test]
 fn year_summaries_handles_short_trajectories() {
-    // ⚠ The `usize` underflow guard, and the reason it exists. Python returns `[]` for
+    // ⚠ The `usize` underflow guard, and the reason it exists. Python returned `[]` for
     // both because `(len - 1) // year` is `-1` and `range(-1)` is empty; the literal Rust
     // transcription of that expression underflows — a debug panic, and in release a
     // near-`usize::MAX` year count. Ported from `test_drift.py`'s own edge case.

@@ -3,7 +3,7 @@
 //! The ECLSS `cabin_*` / `boundary` constructors build **single-quantity** pools; the
 //! coupled cabin loop needs the gas-phase composition (`{C:1,O:2}` / `{O:2}`) or OXYGEN
 //! fails to close (the scrubber removes 2 O per CO₂, the makeup adds 2 O per O₂). The
-//! Python assembly builds these gas stocks inline because `boundary.py` / `eclss.stocks`
+//! Python assembly built these gas stocks inline because `boundary.py` / `eclss.stocks`
 //! take no composition arg and extending them is a core change; the Rust port centralizes
 //! the same inline builders here (used by [`crate::cabin`] / [`crate::water`] /
 //! [`crate::greenhouse`] / [`crate::sealed`]) rather than re-declaring them per module.

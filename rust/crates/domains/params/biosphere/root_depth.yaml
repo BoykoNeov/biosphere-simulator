@@ -3,7 +3,7 @@
 #   accumulator, not a stock. It has no counterparty and is invisible to the conservation
 #   gate by construction (simcore.auxiliary). Both values are per-crop constants.
 #
-# Units discipline (P4 / config/units.py): m/day and m are not conserved-Quantity
+# Units discipline (P4; now rust/crates/config/src/params.rs): m/day and m are not conserved-Quantity
 #   canonical units, so both are schema-validated, bound-checked floats carrying a
 #   declared unit, exact-string guarded at the loader (the senescence/respiration
 #   precedent).
@@ -28,7 +28,7 @@
 #   THAT KNOWN, at the user's explicit direction over a recorded refusal. Nitrogen uptake
 #   is demand-bound on every step of every scenario; this gates supply, which has >=1.9x
 #   headroom at its tightest. So no golden can catch its removal — the pins in
-#   tests/test_root_depth.py are unit-level and mutation-verified for exactly that reason.
+#   tests/test_root_depth.py (deleted by S6) were unit-level and mutation-verified for exactly that reason.
 #
 # Clean-room: values from cited primary literature ONLY, read OFF THE PAGE IMAGE — [E]'s
 #   text layer column-collapses Table 25 (18 rate values against 15 species labels; the

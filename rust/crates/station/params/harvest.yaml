@@ -1,11 +1,11 @@
 # harvest — the station grain-harvest coefficient (Phase 6, Step 6)
 # Currency/unit: CARBON (mol). A STATION-owned param (like water_recovery / lamp; the
 # CrewRespiration merge reused the crew's respired_carbon_fraction). It parameterises the
-# station-owned Harvest flow (station/flows.py) that makes the crew's food regenerative:
+# station-owned Harvest flow (rust/crates/station/src/flows.rs; station/flows.py until S6) that makes the crew's food regenerative:
 #
 #     storage_c → food_store,   harvested = k_harvest · storage_c · dt
 #
-# storage_c is the biosphere's grain / storage organ — the one plant pool allocation.py
+# storage_c is the biosphere's grain / storage organ — the one plant pool allocation.py (until S6)
 # excludes from maintenance / senescence / the f_N biomass sum (it is "harvested, not
 # shed"), so it accumulates post-anthesis without being clawed back. Harvest is its only
 # new sink (annual_reset, its sole existing consumer, does not fire in a ≤7-day run). So
@@ -20,11 +20,11 @@
 #   once per master day and this flow drains it across the day's 1440 sub-steps, so the
 #   grain settles to a positive quasi-steady (daily harvest ≈ daily fill): a regenerative
 #   source being drained, not a static reservoir emptied. Because it reads a stock it is
-#   donor-controlled like biosphere Grazing (herbivory.py) one trophic level up — but the
+#   donor-controlled like biosphere Grazing (herbivory.py until S6) one trophic level up — but the
 #   biosphere it couples is Euler-locked by its freeze, so the coupled run is Euler-only
 #   (no RK4 cross-check, matching the greenhouse).
 #
-# Units discipline (P4 / config/units.py): 1/s is not a conserved-Quantity canonical unit,
+# Units discipline (P4; now rust/crates/config/src/params.rs): 1/s is not a conserved-Quantity canonical unit,
 #   so it is a schema-validated, bound-checked float carrying a declared unit
 #   (exact-string guarded at the loader, like water_recovery's recovery_rate / the ECLSS
 #   rates), NOT routed through pint.

@@ -99,7 +99,7 @@ pub fn build_harvest_at(
     // once the store is geometric: the biosphere seeds `soil_water0` for a 0.15 m zone,
     // and that inside a 1.3 m zone is `FTSW = 0.115` — a grain-filling crop declared at a
     // third of its growth threshold on day 0. Re-derived here from the same [F] Eqns
-    // 14.26-14.28 the scenario defaults use, exactly as Python does.
+    // 14.26-14.28 the scenario defaults use, exactly as Python did.
     let bio = &scenario.greenhouse.bio;
     let atsw = science::captured_water(
         scenario.rooted_depth0,
@@ -239,7 +239,7 @@ mod tests {
     /// `scenario.rs`'s `every_scenarios_water_stores_are_geometric`: that census covers
     /// declared scenarios, and the harvest injection is a store rewritten at BUILD time,
     /// which no scenario-level census can see.
-    /// Mirrors `tests/test_soil_layers.py::test_the_harvest_injection_keeps_depth_and_
+    /// Ported from `tests/test_soil_layers.py::test_the_harvest_injection_keeps_depth_and_
     /// water_together`.
     #[test]
     fn the_harvest_injection_keeps_depth_and_water_together() {

@@ -22,8 +22,8 @@
 //!
 //! # The platform policy, ported rather than reinvented
 //!
-//! `tests/golden_platform.py` carries the rule and its reason: a hex-float golden is
-//! byte-exact only *within a single build on the platform that generated it* — here
+//! `tests/golden_platform.py` (deleted by S6) carried the rule and its reason: a hex-float golden
+//! is byte-exact only *within a single build on the platform that generated it* — here
 //! Windows/UCRT. A run whose graph touches a transcendental (`exp` / `sqrt` / `sin` /
 //! `powf`) lands last-ULP-different on another libm, so a byte compare of a *re-run*
 //! against the Windows golden fails off the generation platform. That is physically
@@ -31,7 +31,7 @@
 //!
 //! ⚠⚠ **And `cargo test` ran on a Linux runner** (pinned in `.github/workflows/ci.yml`;
 //! `ubuntu-26.04` since 2026-10-04, glibc's libm either way) until that job was deleted on
-//! 2026-10-10; the Godot parity job still runs the reference there, so this stays. Python's answer is
+//! 2026-10-10; the Godot parity job still runs the reference there, so this stays. Python's answer was
 //! `windows_golden_only`, a pytest skip. Rust has no skip, and the obvious translation —
 //! `#[cfg(windows)]` — is the shape this repo has been bitten by twice: a gate that
 //! compiles out is a gate nobody can see is gone. So the translation here is
@@ -48,7 +48,7 @@
 //! mention in `rust/` is a doc-comment pointer in `domains/src/lib.rs`). So `tiers.json`
 //! is a *fifth* item for the plan's FINDING 2 — a contract artifact stranded in the dying
 //! tree — recorded there rather than papered over here with a number nobody measured.
-//! `golden_platform.py`'s C3 comment refuses exactly that move and the refusal still
+//! `golden_platform.py`'s C3 comment refused exactly that move and the refusal still
 //! holds: *"writing a band nobody measured is the derived-not-measured move this contract
 //! exists to refuse."*
 
@@ -79,13 +79,13 @@ use crate::{params, run};
 /// How a golden's bytes behave across libm implementations.
 ///
 /// ⚠ The classification is by **what the evaluation graph touches**, not by the set that
-/// happens to diverge on one glibc build. `golden_platform.py` states why and the reason
+/// happens to diverge on one glibc build. `golden_platform.py` stated why and the reason
 /// is inherited unchanged: a few contracting/regulator-erased finals coincidentally match
 /// on some libms, and relying on that coincidence makes CI brittle across glibc versions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Numerics {
     /// `*` `/` `+` `-` only — IEEE-correctly-rounded, so byte-exact on every conformant
-    /// platform. The four ungated goldens on the Python side are the same four here.
+    /// platform. The four goldens the Python side left ungated are the same four here.
     PureArithmetic,
     /// Touches `exp` / `sin` / `acos` / `powf` / `sqrt`, which IEEE-754 does **not**
     /// mandate correctly-rounded. Byte-exact within a build on its generation platform.

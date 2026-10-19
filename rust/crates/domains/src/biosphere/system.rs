@@ -83,7 +83,8 @@ pub struct SeasonScenario {
     /// WSSG — the threshold FRACTION of transpirable soil water below which growth
     /// and transpiration decline ([F] Table 15.1, wheat 0.30). ⚠ Replaced the absolute
     /// `sw_wilting`/`sw_critical` kg band on 2026-08-12: see the Python
-    /// `SeasonScenario.wssg` and docs/plans/post-roadmap-soil-water-rebasing.md.
+    /// `SeasonScenario.wssg` (deleted by S6; `4f7168e^`) and
+    /// docs/plans/post-roadmap-soil-water-rebasing.md.
     pub wssg: f64,
     /// mm/day **AVAILABLE** — a capacity, not a rate (the flow is demand-driven,
     /// [F] Eqn 14.8). A zero is still a hard off.
@@ -95,12 +96,13 @@ pub struct SeasonScenario {
     pub sn_critical: f64,
     /// The reference soil layer the soil-N pool is DECLARED to be, for the root-zone
     /// access gate. Scenario/soil data, like `sn_residual`/`sn_critical`. DESIGN, not
-    /// cited - see the Python `SeasonScenario.soil_layer_depth`.
+    /// cited - see the deleted Python `SeasonScenario.soil_layer_depth` (`4f7168e^`).
     pub soil_layer_depth: f64,
     /// `WSTORG` - extractable water present BELOW the current rooted depth (kg). The
     /// default is `soil_depth * soil_extractable_water * 1000 * ground_area`, i.e. the
     /// profile at the drained upper limit. Must be > 0 for roots to grow ([F] Box 14.1
-    /// `If WSTORG = 0 Then GRTD = 0`). See the Python `SeasonScenario.subsoil_water0`.
+    /// `If WSTORG = 0 Then GRTD = 0`). See the deleted Python `SeasonScenario.subsoil_water0`
+    /// (`4f7168e^`).
     pub subsoil_water0: f64,
     /// MAI, the moisture availability index ([F] 14.25-14.28), 0..1. Both stores are
     /// `depth * EXTR * rho * A * MAI`; the port carries it as data exactly as Python
@@ -145,7 +147,8 @@ pub struct SeasonScenario {
     /// crop params, and a value-only switch would hand every second species wheat's
     /// tabulated 0.40 by default. POTATO sets it `false` — [E] Table 7 gives potato a
     /// RANGE ("0.2-0.4") where wheat gets a single 0.4, and picking inside someone else's
-    /// range is our number wearing their name. See the Python `SeasonScenario`.
+    /// range is our number wearing their name. See the deleted Python `SeasonScenario`
+    /// (`4f7168e^`).
     pub stem_reserves: bool,
 }
 
@@ -1353,8 +1356,8 @@ pub fn build_season_with(
 /// season in the first quarter-year and then clamp on the final day for the rest.
 ///
 /// At `dt = 1.0` this is `values[min(n, last)]` exactly, so no golden moves across the
-/// change. The port mirrors the rule, not the rationale — the Python reference in
-/// `domains/biosphere/season.py::_table` is the authority.
+/// change. The port mirrors the rule, not the rationale — the rationale lived in the deleted
+/// Python `domains/biosphere/season.py::_table` (`4f7168e^`); this function is now the authority.
 /// The within-day PAR forcing: the sinusoidal day, averaged over the step window.
 ///
 /// Mirrors `season._sine_light_path`. Where `table_schedule` holds a daily observation
@@ -1367,9 +1370,9 @@ fn sine_light_path(daytime_mean_par: Vec<f64>, daylength_s: Vec<f64>) -> Schedul
         let t = n as f64 * dt;
         let day = (t as usize).min(last);
         // The window is guaranteed inside one day by the step dividing the day; a build
-        // that broke that would surface as an error in the Python reference, and here the
+        // that broke that would have surfaced as an error in the deleted Python port; here the
         // schedule signature has nowhere to put one, so it is clamped to 0 the same way a
-        // dark window is. (The Python side raises; the divergence is unreachable while
+        // dark window is. (The Python side raised; the divergence is unreachable while
         // `BIO_DT` divides the day, which its own module asserts.)
         light_path::half_sine_window_mean(
             t - t.trunc(),
@@ -1467,7 +1470,7 @@ fn air_temperature_path(
 /// Factored out of [`weather_resolver`] so the station lighting / sealed seams can rebuild
 /// the resolver with `PAR`/`daylength` overridden by the lamp (a built `SourceResolver`'s
 /// `Box<dyn Fn>` schedules are not `Clone`, so they cannot be copied out of an existing
-/// resolver — the override must reconstruct the map). The Python analogue is the
+/// resolver — the override must reconstruct the map). The Python analogue was the
 /// `dict(base.forcings)` copy; here we regenerate the same table.
 pub fn weather_forcings(
     scenario: &SeasonScenario,
@@ -2247,7 +2250,7 @@ mod tests {
     /// Neither is reachable from a frozen scenario: the default store (195 kg) never
     /// empties, and the frozen plots are all 1 m2 so the re-sow return's area factor is
     /// invisible. Both mutants (dropping the clamp; using a unit area in the return)
-    /// left the Rust suite green before this test existed. The Python side reaches the
+    /// left the Rust suite green before this test existed. The deleted Python side reached the
     /// clamp through its own near-empty-store pin.
     #[test]
     fn the_clamp_and_the_resow_return_hold_on_an_emptying_store() {
@@ -2348,7 +2351,7 @@ mod tests {
     /// a stressed season is vegetative, so the season still accelerates). A direction
     /// assertion is not a value assertion, and neither is a bound.
     ///
-    /// Mirrors `tests/test_phenology.py::test_thermal_time_aux_drought_is_NOT_gated_off
+    /// Ported from `tests/test_phenology.py::test_thermal_time_aux_drought_is_NOT_gated_off
     /// _at_anthesis` and `..._reads_the_same_ftsw_as_the_other_consumers`.
     #[test]
     fn wsfd_uses_wssg_and_is_not_gated_off_at_anthesis() {
@@ -2765,12 +2768,12 @@ mod tests {
     /// An inverted soil-nitrogen band is rejected at assembly, and BOTH sides of the
     /// boundary are asserted.
     ///
-    /// Mirrors `test_soil_n_availability_rejects_inverted_band`, whose Rust successor batch
+    /// Ported from `test_soil_n_availability_rejects_inverted_band`, whose Rust successor batch
     /// E recorded as absent by an inherited decision and left as an S6 item: the rate law
     /// keeps the Phase-7 no-guard rule, so the rejection had to land somewhere else or
     /// nowhere. Here it lands on `build_season`.
     ///
-    /// ⚠ The equal case is the one worth writing down. Python's rule is `>=`, and equality
+    /// ⚠ The equal case is the one worth writing down. Python's rule was `>=`, and equality
     /// is not a harmless edge: `sn_residual == sn_critical` makes the ramp's denominator
     /// zero, so it is the one inverted-band input that could produce a NaN rather than a
     /// step. It is rejected, and asserted separately from the strictly-inverted case.
@@ -2818,14 +2821,14 @@ mod tests {
     /// no scenario in the Rust roster is water-limited.
     ///
     /// This walks the aux vector `build_plants` actually produces and EVALUATES it, which
-    /// is a stronger claim than reading the struct fields back: the Python test asserts
+    /// is a stronger claim than reading the struct fields back: the Python test asserted
     /// `proc.drought is None`, this asserts that a bone-dry root zone changes nothing.
     ///
     /// ⚠ The plot is deliberately OFF-DEFAULT (3.5 m2, EXTR 0.09, `wssg` 0.42,
     /// `wssd` 0.17). Every scenario in the tree has `ground_area == 1.0` and the
     /// reference EXTR, so a hardcoded 1.0 or a swapped threshold in the wiring is
     /// invisible on the defaults - the same blindness the soil-layers build recorded.
-    /// Mirrors `test_the_wiring_declines_wssd_for_potato_not_just_the_scenario_field`
+    /// Ported from `test_the_wiring_declines_wssd_for_potato_not_just_the_scenario_field`
     /// and `test_thermal_time_aux_without_drought_is_the_plain_rate`.
     ///
     /// ⚠ **The gap this note used to record is CLOSED.** It read *"potato has no Rust
@@ -3041,7 +3044,7 @@ mod tests {
     /// nothing more. ⚠ The GATING half is the part that distinguishes `0.018 m/day` from
     /// `0.018 m/day × f_water × f_temp`: without it the crop would reach the cap in
     /// exactly 73 days, and the two are otherwise indistinguishable from a trajectory.
-    /// Mirrors `test_depth_follows_es_law_and_stops_at_the_cited_cap` and
+    /// Ported from `test_depth_follows_es_law_and_stops_at_the_cited_cap` and
     /// `test_extension_is_temperature_and_water_gated_not_a_flat_rate`.
     #[test]
     fn rooted_depth_follows_the_gated_extension_law_and_stops_at_the_cited_cap() {
@@ -3093,7 +3096,7 @@ mod tests {
     /// The fixture lifts BOTH the crop cap and the soil cap to 99 m, leaving the flowering
     /// stop as the only thing that can bind, and evaluates the accumulator on two
     /// hand-built states either side of anthesis.
-    /// Mirrors `test_root_growth_stops_at_flowering`.
+    /// Ported from `test_root_growth_stops_at_flowering`.
     #[test]
     fn root_growth_stops_at_flowering_when_neither_cap_can_bind() {
         struct WarmEnv;
@@ -3144,7 +3147,7 @@ mod tests {
         assert_eq!(flowering, 0.0, "root growth must stop at flowering");
         // ⚠ ON the boundary, not merely past it: `is_vegetative` tests DVS < 1, so
         // exactly at anthesis the stop must already have fired. The port's own hazard —
-        // the Python file does not make this distinction — and the same boundary batch B
+        // the Python file did not make this distinction — and the same boundary batch B
         // pinned for the anthesis gate.
         let exactly = proc
             .evaluate(&at(pheno.tsum_anthesis), &WarmEnv, 1.0)
@@ -3165,7 +3168,7 @@ mod tests {
     /// (2026-10-10): the reference's event watering puts its application loss below the roots
     /// on every watering, so its store is never dry and the roots reach the cap (measured: 1.30 m).
     /// That is the gate working on a store that is wet, not the gate failing.
-    /// Mirrors `test_a_dry_subsoil_stops_root_extension`.
+    /// Ported from `test_a_dry_subsoil_stops_root_extension`.
     #[test]
     fn a_dry_below_root_store_stops_extension_for_the_whole_season() {
         let book = pre_adoption_params();
@@ -3306,13 +3309,13 @@ mod tests {
     ///
     /// Rooted depth is a property of the standing crop, not of the soil, so it resets with
     /// the other per-cycle accumulators. No golden can see it (measured bit-identical
-    /// either way on the Python side), and the chambers re-sow many times.
+    /// either way on the Python side, before S6), and the chambers re-sow many times.
     /// ⚠ The recorded value just after a reset is NOT exactly `rooted_depth0`:
     /// `annual_reset` sets the accumulator and the same step then applies one extension
     /// increment before the state is snapshotted. So the bound is one unstressed STEP
     /// (`rate · dt`), not one day — pinning the value exactly would be pinning the reset's
     /// position within the step.
-    /// Mirrors `test_a_resown_crop_starts_with_the_sowing_root_system`.
+    /// Ported from `test_a_resown_crop_starts_with_the_sowing_root_system`.
     #[test]
     fn a_resown_crop_starts_with_the_sowing_root_system() {
         let scenario = perennial_chamber_scenario();
@@ -3365,7 +3368,7 @@ mod tests {
     /// uptake is demand-bound there and the gate only shrinks supply — so if the second
     /// half ever reddens, the frozen crop has become supply-bound and `soil_layer_depth`
     /// (a DESIGN value) has silently become load-bearing.
-    /// Mirrors `test_the_gate_scales_uptake_capacity` and
+    /// Ported from `test_the_gate_scales_uptake_capacity` and
     /// `test_the_gate_is_inert_on_the_frozen_reference_and_that_is_recorded`.
     #[test]
     fn the_root_zone_gate_throttles_uptake_and_is_inert_on_the_frozen_reference() {
@@ -3409,7 +3412,7 @@ mod tests {
     ///
     /// ⚠ The effect size is a property of THIS scenario at THIS irrigation capacity, not
     /// of the model, and the bound is two-sided so a slide in either direction is caught
-    /// rather than absorbed. The Python side has watched this ratio move twice for reasons
+    /// rather than absorbed. The Python side watched this ratio move twice for reasons
     /// unrelated to what it measures (WSFD in 2026-08-12, the depth-resolved canopy in
     /// 2026-08-15), each time with nothing red because the bound had slack — which is why
     /// it is re-measured on this port rather than copied across.
@@ -3418,7 +3421,7 @@ mod tests {
     /// (2026-10-10): the reference's event watering refills the whole deficit whatever
     /// `irrigation_mm_day`, so a crop watered below its demand cannot be built under it (measured:
     /// the grain ratio fell to 1.0).
-    /// Mirrors `test_reaching_the_subsoil_is_what_saves_the_deep_water_crop`.
+    /// Ported from `test_reaching_the_subsoil_is_what_saves_the_deep_water_crop`.
     #[test]
     fn reaching_the_below_root_store_is_what_saves_the_deep_water_crop() {
         let book = pre_adoption_params();
@@ -3516,7 +3519,7 @@ mod tests {
     ///
     /// ⚠ Under the book's forms, as the claim above (and the naive control needs a store nothing
     /// re-wets: under event watering the application loss would refill it).
-    /// Mirrors `test_the_deep_water_effect_is_water_and_not_the_nitrogen_gate`.
+    /// Ported from `test_the_deep_water_effect_is_water_and_not_the_nitrogen_gate`.
     #[test]
     fn the_clean_and_naive_deep_water_controls_are_not_interchangeable() {
         let book = pre_adoption_params();
@@ -3556,7 +3559,7 @@ mod tests {
     /// `TTSW = depth · EXTR · ρ · A`, so a synthetic state without it has zero capacity,
     /// zero FTSW, and a transpiration flow that returns nothing at all — a silent pass for
     /// a test whose whole subject is that these flows carry water.
-    /// Mirrors `test_three_cycle_flows_carry_only_water_in_ring_order`.
+    /// Ported from `test_three_cycle_flows_carry_only_water_in_ring_order`.
     #[test]
     fn the_three_cycle_flows_carry_only_water_in_ring_order() {
         let scenario = sealed_chamber_scenario();
@@ -3679,7 +3682,7 @@ mod tests {
     /// water is conserved over four stocks rather than three. Omitting it would make a
     /// conserved transfer look like a leak — and including it without the non-vacuity
     /// half below would make a frozen ring look conserved.
-    /// Mirrors `test_sealed_closed_water_loop_is_conserved`,
+    /// Ported from `test_sealed_closed_water_loop_is_conserved`,
     /// `test_sealed_water_cycle_is_active_and_distributes` and
     /// `test_sealed_water_cycle_never_rations`.
     #[test]
@@ -3768,7 +3771,7 @@ mod tests {
     /// 154.1, 101.3, 123.9 kg at the cycle starts); the sealed station's run, traced day by day,
     /// showed no trend over four seasons (`docs/plans/post-roadmap-soil-evaporation.md` §15). The
     /// return RULE this pins is the same under either watering.
-    /// Mirrors `test_the_resow_returns_the_abandoned_zones_water_so_there_is_no_ratchet`.
+    /// Ported from `test_the_resow_returns_the_abandoned_zones_water_so_there_is_no_ratchet`.
     #[test]
     fn the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years() {
         let book = pre_adoption_params();
@@ -3899,7 +3902,7 @@ mod tests {
     /// flows are applied. Batch A's review found the biosphere called
     /// `assert_flow_balanced_default` nowhere in the crate and added the gas-flow case;
     /// this is the water one.
-    /// Mirrors `test_the_capture_is_a_balanced_internal_transfer`.
+    /// Ported from `test_the_capture_is_a_balanced_internal_transfer`.
     #[test]
     fn the_root_zone_capture_is_a_balanced_internal_transfer() {
         let scenario = DEFAULT_SCENARIO;
@@ -3970,7 +3973,7 @@ mod tests {
     ///
     /// So this successor asserts the SPLIT, not just the total: the total is what both
     /// readings agree on.
-    /// Mirrors `test_nitrogen_is_conserved_across_the_annual_reset`, widened.
+    /// Ported from `test_nitrogen_is_conserved_across_the_annual_reset`, widened.
     #[test]
     fn the_resow_splits_the_parents_nitrogen_by_concentration_and_is_not_a_windfall() {
         let scenario = perennial_chamber_scenario();
@@ -4053,7 +4056,7 @@ mod tests {
     /// this repo has been bitten more than once by a scope claim outliving the roster that
     /// made it true. A new chamber scenario that grew past 1 t/ha would move onto a branch
     /// this reasoning assumes it never reaches, and nothing else would say so.
-    /// Mirrors `test_only_open_season_enters_the_declining_branch`.
+    /// Ported from `test_only_open_season_enters_the_declining_branch`.
     #[test]
     fn only_the_open_field_crop_leaves_greenwoods_plateau() {
         let bound = params::nitrogen().n_target_w_plateau;
@@ -4123,7 +4126,7 @@ mod tests {
             );
             // ...and not by a whisker. Measured on this tree: sealed 0.37688,
             // perennial 0.32108, consumer 0.34375 t/ha — a ~2.6x margin under the bound.
-            // ⚠ The Python docstring this is ported from quotes "0.09-0.63 t/ha", which is
+            // ⚠ The Python docstring this is ported from quoted "0.09-0.63 t/ha", which is
             // a different tree's numbers; the RANGE is re-measured here rather than
             // carried over, because a ported band is a claim about the port's own run.
             assert!(w < 0.5 * bound, "{name} peaked at {w} t/ha");
@@ -4169,7 +4172,7 @@ mod tests {
     /// starts at its own maximum and drains: the ported form failed here on its first run,
     /// and it failed for the right reason. Both directions on the series is the claim that
     /// survives the difference, and it is the claim those tests were making anyway.
-    /// Mirrors `test_sealed_litter_accumulates_then_drains`,
+    /// Ported from `test_sealed_litter_accumulates_then_drains`,
     /// `test_sealed_microbial_is_fed_and_respired`,
     /// `test_sealed_microbial_respiration_is_active` and
     /// `test_sealed_litter_n_accumulates_then_drains`.
@@ -4226,7 +4229,7 @@ mod tests {
     /// stated: an identity without the seed, and a bounded deviation with it. A first
     /// write-up of the Python original attributed that deviation to a "pulsed-input
     /// transient", which the algebra above rules out.
-    /// Mirrors `test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED`,
+    /// Ported from `test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED`,
     /// `test_litter_pool_cn_is_TWO_regimes_set_by_which_event_fills_the_pool`'s
     /// shedding-fed regime and
     /// `test_the_free_mineralization_rate_no_longer_EXISTS_to_be_calibrated`.
@@ -4286,9 +4289,9 @@ mod tests {
     /// STATIONARITY watch, which goes on passing while summing the wrong total. So the
     /// roster is asserted as a SET derived from the built state rather than trusted to
     /// memory: adding a soil pool without updating the summaries fails here, by name.
-    /// The set is computed the way the Python original computes it — every CARBON stock
+    /// The set is computed the way the Python original computed it — every CARBON stock
     /// that is not a boundary and carries no oxygen in its composition, i.e. not CO2.
-    /// Mirrors `test_open_field_has_no_decomposer_stocks`, `test_open_field_has_no_litter_n`
+    /// Ported from `test_open_field_has_no_decomposer_stocks`, `test_open_field_has_no_litter_n`
     /// and `test_every_organic_carbon_pool_is_named_by_the_summary_tuples`.
     #[test]
     fn only_a_sealed_chamber_builds_soil_pools_and_its_organic_carbon_roster_is_these_eight() {
@@ -4360,7 +4363,7 @@ mod tests {
     /// neither a successor nor a row — a live structural invariant, silently absent. *A
     /// coverage table assembled by reading cannot see its own omissions; enumerate the
     /// inputs and subtract.*
-    /// Mirrors `test_microbial_n_is_a_POOL_so_extinction_can_never_orphan_it`.
+    /// Ported from `test_microbial_n_is_a_POOL_so_extinction_can_never_orphan_it`.
     #[test]
     fn microbial_nitrogen_is_a_pool_so_an_extinction_pass_can_never_orphan_it() {
         let (state, _) = build_season(&sealed_chamber_scenario()).expect("sealed chamber");

@@ -2,11 +2,11 @@
 # Currency/unit: ENERGY (J) for the flow; the param is a µmol-per-J photon efficacy.
 # A STATION-owned param (like water_recovery.yaml — the lamp is a cross-domain device
 # that carries electrical ENERGY into biology, owned by no single domain). It
-# parameterises the station-owned Lamp flow (station/flows.py):
+# parameterises the station-owned Lamp flow (rust/crates/station/src/flows.rs; station/flows.py until S6):
 #
 #     battery → light_used (+η_lamp) + waste_heat (+(1−η_lamp)),   draw = lamp_power·dt
 #
-# and, via the SAME lamp_power schedule, the biosphere's PAR forcing (station/lighting.py):
+# and, via the SAME lamp_power schedule, the biosphere's PAR forcing (rust/crates/station/src/lighting.rs):
 #
 #     PAR = photon_efficacy · lamp_power / ground_area   (µmol photons m⁻² s⁻¹)
 #
@@ -21,7 +21,7 @@
 #              = photon_efficacy / PAR_UMOL_PER_J        (= photon_efficacy / 4.57)
 #   where PAR_PHOTON_ENERGY_J_PER_UMOL (J µmol⁻¹) is the inverse of the biosphere's own
 #   McCree (1972) 4.57 µmol J⁻¹ PAR-band conversion (a σ/CODATA-style physical constant,
-#   NOT a param — station/flows.py). So efficacy and the radiant fraction are two
+#   NOT a param — rust/crates/station/src/flows.rs). So efficacy and the radiant fraction are two
 #   accountings of ONE device, made consistent by derivation, never two params that could
 #   disagree. Physical ceiling: PAR_UMOL_PER_J (all input → PAR photons ⇒ η_lamp = 1, heat
 #   leg exactly 0); the loader rejects a value above it (over-unity) and a non-positive one.
@@ -31,7 +31,7 @@
 #   calibration is a later Phase-6 step). Flagged TODO(cite) until bound at the validation
 #   gate.
 #
-# Units discipline (P4 / config/units.py): µmol/J is not a conserved-Quantity canonical
+# Units discipline (P4; now rust/crates/config/src/params.rs): µmol/J is not a conserved-Quantity canonical
 #   unit, so photon_efficacy is a schema-validated, bound-checked float carrying a declared
 #   unit (exact-string guarded at the loader, like Power's charge_efficiency / the ECLSS
 #   rates), NOT routed through pint.
@@ -49,7 +49,7 @@
 #   [A] McCree, K.J. (1972), "Test of current definitions of photosynthetically active
 #       radiation against leaf photosynthesis data", Agric. Meteorol. 10:443–453 — the PAR
 #       photon/energy conversion (~4.57 µmol J⁻¹, daylight), the biosphere's own constant
-#       (domains/biosphere/weather.py), inverted here for the radiant-energy split.
+#       (rust/crates/domains/src/biosphere/weather.rs), inverted here for the radiant-energy split.
 #   [B] Kusuma, P., Pattison, P.M. & Bugbee, B. (2020), "From physics to fixtures to food:
 #       current and potential LED efficacy", Horticulture Research 7:56.
 #       https://doi.org/10.1038/s41438-020-0283-7 (open access; verified 2026-07-16).

@@ -22,8 +22,9 @@ Its machine-readable companion is **`docs/authoring-reference.manifest.json`**
 **Frozen** = the items below are the committed contract. A change to any of them is an
 **unfreeze event** that must follow the discipline at the bottom of this file. As
 everywhere in this project, freezing is a *process* discipline, **not a code lock**:
-nothing forbids editing `schema.py`. The completeness gate + the cross-port vectors make
-an undocumented change *fail CI*, which is what gives the freeze teeth.
+nothing forbids editing `rust/crates/authoring/src/schema.rs`. The completeness gate + the
+parse/traj vectors make an undocumented change *fail the test suite*, which is what gives the
+freeze teeth — when the suite is run, by hand since 2026-10-10 (no CI job runs it).
 
 **Frozen ≠ finished.** The grammar in particular is **deliberately incomplete** (below) —
 it is expected to grow. The discipline only insists each addition be *justified,
@@ -75,8 +76,8 @@ human-readable account.
 
 A `kinetics` flow's `rate` is an expression in a **bounded, closed** grammar — a fixed,
 finite primitive set with no user functions, recursion, loops, or I/O. Precedence and
-associativity are **explicitly pinned** (`src/authoring/expr_parser.py`, mirrored
-char-for-char by `rust/crates/authoring/src/expr_parser.rs`):
+associativity are **explicitly pinned** (`rust/crates/authoring/src/expr_parser.rs`, written
+to mirror `src/authoring/expr_parser.py` char-for-char; S6 deleted the Python one):
 
 ```
 expr    := term  (("+" | "-") term)*         # left-associative
@@ -154,7 +155,7 @@ Three properties an author can rely on:
   (correctly-rounded, deterministic cross-port), unlike the libm transcendentals. On the
   natural domain (`S ≥ 0`, `K > 0`) it is **bit-identical to the frozen `f_O2`** —
   gated by `tests/test_authoring_monod.py`, the `SelfDischarge`-oracle pattern applied to
-  a grammar primitive.
+  a grammar primitive (⚠ deleted by S6; a name search on 2026-10-19 found no Rust successor).
 - **It is RK4-order-safe.** `S/(S+K)` is C∞ on the natural domain. The obvious cheap
   alternative `min(k·S, Vmax)` is *not* equivalent: its kink is non-differentiable and
   destroys RK4's convergence order, and `rk4` is a frozen integrator name.
@@ -171,12 +172,13 @@ else. If you need the clamp, write it.
 > `has_authored_kinetics` — unlike a frozen `type`, which raises nothing and is no more
 > validated.
 
-### The VM — `simcore/expr.py` (the one-time core addition, decision A)
+### The VM — `simcore/expr.py`, now `rust/crates/simcore/src/expr.rs` (the one-time core addition, decision A)
 
 The AST + evaluator + `DeclarativeFlow` live in `simcore` because an authored rate is
 evaluated **per step, inside the integrator** (once per Euler step, per stage under RK4),
 so it must be pure stdlib and deterministic like every other flow. *Parsing* text → AST
-is a one-time **boundary** act and stays in `src/authoring`. This module is the
+is a one-time **boundary** act and stays in the authoring boundary (`src/authoring` until S6,
+`rust/crates/authoring` now). This module is the
 **one deliberate, one-time extension of the frozen core** since the biosphere/station
 freeze — purely additive (every frozen golden stayed byte-identical), a single engine
 primitive like adding an integrator, never per-scenario code.
@@ -188,7 +190,8 @@ set are what an author writes against, so those are what the manifest freezes.
 
 ### The scenario file schema
 
-Eight pydantic spec models (`src/authoring/schema.py`), every one `extra="forbid"` — so
+Eight pydantic spec models (`src/authoring/schema.py` until S6; their Rust mirror,
+`rust/crates/authoring/src/schema.rs`, is the surface now), every one `extra="forbid"` — so
 **each model's field set is exactly the legal key set** of an authored file, and a typo'd
 key is a schema error, not a silent drop. The manifest freezes each model's fields.
 
@@ -244,11 +247,12 @@ what lets the **same** bundle compose twice.
 **The `render_rate_expr` spelling is a per-port internal detail, NOT a cross-port
 contract.** The graph dump omits rate strings and a trajectory depends only on the AST, so
 the contract is *per-port round-trip stability* (`parse(render(node)) == node`) — Python
-renders a `Const` via `repr`, Rust via `f64::Display`; both round-trip on their own port.
+rendered a `Const` via `repr` until S6, Rust via `f64::Display`; each round-trips on its own port.
 
 ### The author-selectable flow-type registry
 
-`FLOW_TYPES` (`src/authoring/flow_registry.py`) maps an authoring type name → the frozen
+`FLOW_TYPES` (`src/authoring/flow_registry.py` until S6; now `FLOW_TYPE_NAMES` + `FlowTypeSpec`
+in `rust/crates/authoring/src/flow_registry.rs`) maps an authoring type name → the frozen
 class + its **exact `wiring` field set** + its param set + its `rate_params` + its
 `demand_controlled` pair. The manifest freezes all five per entry: **the wiring names are
 as much the contract as the type name** — renaming one breaks every scenario file that
@@ -902,7 +906,7 @@ each plan of record:
   evidence — 22 committed pins across six files asserted the run-time rationing verdict and
   **could no longer construct their own subject** once the error moved to build time.
 - **The interpreter is faithful** — the fifteen crossport anchor runs
-  (`tests/crossport/authoring_files.py::ANCHORS`, the authoritative live list), including
+  (`tests/crossport/authoring_files.py::ANCHORS`, the authoritative list until S6 deleted it), including
   an authored crew run **byte-identical to the frozen `crew_state.json`** — via a bare
   file, via a template at its default, and via a single-bundle `include` — and, since
   Tier 1, an authored ECLSS cabin **byte-identical to the frozen `eclss_state.json`** on
@@ -926,16 +930,17 @@ each plan of record:
   and the same-bundle-twice namespaced anchor (each half bit-identical to a frozen
   single-instance run) all match across ports.
 
-Tests of record: `tests/test_authoring_{crew,param_packs,kinetics,templates,compose}.py`,
-`tests/crossport/test_crossport.py`, `rust/crates/authoring/tests/`.
+Tests of record: `rust/crates/authoring/tests/`. ⚠ Until S6 (2026-08-27) this line also named
+`tests/test_authoring_{crew,param_packs,kinetics,templates,compose}.py` and
+`tests/crossport/test_crossport.py`, all deleted; read them at `4f7168e^`.
 
 ## The manifest
 
 `docs/authoring-reference.manifest.json` is the machine-readable surface, **written by
 the reference** since slice C7 of the reference flip (2026-08-18):
 `cd rust && cargo run --example dump_authoring_inventory -- --write-manifest`.
-`tests/test_authoring_freeze_manifest.py` keeps the completeness and conformance gates
-and has **no writer** — the manifest is a generated artifact, so a hand edit to it is
+`tests/test_authoring_freeze_manifest.py` kept the completeness and conformance gates,
+with **no writer**, until S6 deleted it — the manifest is a generated artifact, so a hand edit to it is
 red (`rust/crates/authoring/tests/manifest_writer.rs` regenerates and compares bytes). Every
 frozen set in it is **derived from its live single source of truth, never hand-listed**
 — the discipline both prior manifests rest on.
@@ -973,11 +978,12 @@ the manifest's own `_authority` block. ⚠ `parity_vectors` stays classified `py
 although the reference now hashes those files: `_authority` records who produced the
 **value**, not who ran the digest — the biosphere contract read
 `scenarios/*/golden_sha256` as `rust` for four slices while Python hashed it. C7
-corrected that row, which had argued the opposite. The Python
-derivations still run and still derive from the live package — they have become
-**conformance checks on the checker**, answering *"has Python drifted from the contract?"*
-rather than *"what is the contract?"*. A **Rust-only** addition now widens the frozen
-surface at the next regeneration; a **Python-only** one fails immediately.
+corrected that row, which had argued the opposite. ⚠ The generator that produced that value
+was deleted by S6, and the row still reads `python` (2026-10-19): moving it is a manifest
+change, with its ceremony. The Python derivations ran as **conformance checks on the
+checker** — *"has Python drifted from the contract?"* rather than *"what is the contract?"* —
+until S6 deleted them. A **Rust-only** addition widens the frozen surface at the next
+regeneration.
 
 **⚠ What that cost, on this contract specifically.** The biosphere and station manifests
 re-anchored to a *runtime enumeration of a built registry*, which Rust does identically.
@@ -999,8 +1005,8 @@ completeness census is weaker there than it was here**, per key:
 reddens `parse_parity_accept_and_reject` and `trajectory_parity_all_scenarios`; dropping
 `n_sub` from `SCENARIO_KEYS` reddens fourteen tests across five targets; changing
 `STEP_TOKEN` reddens the parser suite; dropping `slow` from `RATE_CLASSES` reddens the
-multi-rate suite. Keeping the Python derivation is what still covers the checker's own
-tree, which is why the flip kept it rather than deleting it.
+multi-rate suite. Keeping the Python derivation is what covered the checker's own tree,
+which is why the flip kept it rather than deleting it; S6 deleted both together.
 
 ## Documented boundaries (deferred, by name — not omissions)
 
@@ -1068,7 +1074,9 @@ A future maintainer should read these as intentional scope, each surfaced when i
 - **"Authored ≠ validated" surfacing** — *the Godot half is now BUILT* (the recorded Step-7
   follow-up, done 2026-07-16). `SimSession.has_authored_kinetics()` exposes the marker across
   the FFI boundary and `from_file_dashboard` shows an UNCALIBRATED banner when it is set;
-  `tests/crossport/test_godot_from_file.py` gates **both** halves — the marker crossing the FFI
+  `tests/crossport/test_godot_from_file.py` gated **both** halves (⚠ deleted by S6; a name search on 2026-10-19 found no Rust successor
+  by the marker's name; the file-loading smokes in `rust/crates/godot_bridge/tests/cross_boundary.rs`
+  were not checked for it) — the marker crossing the FFI
   (including that the flag **clears** when the same session is rebuilt into a palette scenario:
   it is per-session state, not per-file) and the banner *itself* being drawn, driven through the
   real widget on a kinetics-bearing file. Consumer-side display only: no
@@ -1087,30 +1095,34 @@ type or its wiring names, a param loader, or the composition semantics — is an
    **advisor-reviewed before writing anything** — each deferred op carries an unresolved
    cross-port semantic choice (`x/0` is the canonical example), and freezing the wrong
    answer is worse than deferring.
-2. **Make the change** boundary-side wherever possible. `git diff src/simcore/` **must
-   stay empty** — `simcore/expr.py` was the *one* sanctioned, one-time addition (decision
-   A); a second core edit is not an unfreeze, it is a new decision needing its own review.
-3. **Land it on BOTH ports.** The grammar/schema is a cross-port contract: a Python-only
-   change is a broken contract, not a half-done one. Add the parse/traj vectors or the
-   anchor that pins the new surface.
+2. **Make the change** boundary-side wherever possible. `git diff rust/crates/simcore/`
+   **must stay empty** — `simcore/expr.py` (now `rust/crates/simcore/src/expr.rs`) was the
+   *one* sanctioned, one-time addition (decision A); a second core edit is not an unfreeze,
+   it is a new decision needing its own review. (⚠ This step named `src/simcore/` until
+   2026-10-19; S6 deleted it on 2026-08-27.)
+3. **Pin the new surface.** Add the parse/traj vectors or the anchor that pins it. ⚠ This
+   step read *"Land it on BOTH ports"* until 2026-10-19: the grammar/schema was a cross-port
+   contract while there were two ports, and S6 deleted the Python one on 2026-08-27.
 4. **Regenerate the manifest** — `cd rust && cargo run --example
    dump_authoring_inventory -- --write-manifest` — and review its diff; the changed sets
    are the git-visible record of exactly what was unfrozen. ⚠ **Since slice C7 the
    reference writes the whole file**, so this step is a `cargo` step and nothing else;
    editing the committed manifest by hand is red rather than merely discouraged
    (`rust/crates/authoring/tests/manifest_writer.rs` compares it byte for byte with a
-   regeneration). Predict the diff *before* running it — and note that step 3's "land it
-   on both ports" has a direction: the reference side is what the manifest records, so
-   landing Rust first and Python second is the order that keeps the ceremony honest.
+   regeneration). Predict the diff *before* running it.
 5. **Record provenance.** Update this file and the Phase-9 plan with what changed and why
    (a deferred op joining moves it out of the *deliberately incomplete* table above).
-6. **Re-run the gates:** the full suite (incl. `-m slow`), `ruff`, `pyright`, `cargo test`,
-   `clippy -D warnings`; confirm the **20 frozen goldens stay byte-identical** (an
+6. **Re-run the gates:** from `rust/`, `cargo test --workspace --no-fail-fast`, `cargo test -- --ignored`
+   (the slow tests) and `cargo clippy --all-targets -- -D warnings`. ⚠ No CI job runs the
+   reference's tests since 2026-10-10, so this run is the gate. This step named `-m slow`,
+   `ruff` and `pyright` until 2026-10-19; S6 deleted the Python suite they ran on.
+   Confirm the **20 frozen goldens stay byte-identical** (an
    authoring change that moves a science golden is a bug, not an unfreeze); commit with a
    Conventional Commit that names the unfreeze.
 
-An undocumented unfreeze fails CI by construction (the completeness gate, or a moved
-vector/anchor), so the discipline is enforced, not merely requested.
+An undocumented unfreeze fails the test suite by construction (the completeness gate, or a
+moved vector/anchor), so the discipline is enforced, not merely requested — ⚠ but only when
+the suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
 
 ### Unfreeze log
 

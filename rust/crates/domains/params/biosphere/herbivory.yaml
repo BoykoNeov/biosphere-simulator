@@ -44,13 +44,13 @@
 #   ample-O₂ (210 mol), so f_O2 ≈ 1 here (low/sharp K_O2); it is load-bearing only as O₂
 #   approaches its floor.
 #
-# Units discipline (P4 / config/units.py): the first-order rates (1/day) are NOT a
+# Units discipline (P4; now rust/crates/config/src/params.rs): the first-order rates (1/day) are NOT a
 #   conserved-Quantity canonical unit, so each is a schema-validated, bound-checked float
 #   carrying a declared unit (exact-string guarded at the loader, like decomposition's
 #   decomposition_rate / microbial_respiration's m_resp / senescence's rdr_*). A zero rate
 #   is valid (no grazing / no respiration / no mortality); negative is rejected.
 #
-# Deferred seams (documented in herbivory.py): the bilinear/Holling functional response;
+# Deferred seams (documented in herbivory.py, deleted by S6): the bilinear/Holling functional response;
 #   assimilation efficiency < 1 (egesta/feces routed straight to litter rather than the 1:1
 #   intake → biomass here); consumer phenology; and multiple consumer levels / full
 #   trophic webs.

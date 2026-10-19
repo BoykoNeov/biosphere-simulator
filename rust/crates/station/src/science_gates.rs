@@ -26,9 +26,9 @@
 //!
 //! It re-anchored the two **loci** and nothing else. The `quantity` / `bound` / `source`
 //! strings are byte-identical to the ones the pytest markers carried, and both runs are
-//! the ones the Python gates already drove. The Python test bodies **stay** — they are
-//! the checker's own conformance half, and retiring them is Stage 3's call, not a free
-//! consequence of moving a claim.
+//! the ones the Python gates already drove. The Python test bodies **stayed** — they were
+//! the checker's own conformance half, and retiring them was Stage 3's call, not a free
+//! consequence of moving a claim. S6 retired them.
 //!
 //! ⚠ The estimate this slice was scheduled under said `predicted_equilibrium_temperature`
 //! was Python-only. It was not: [`crate::system::predicted_equilibrium_temperature`], the
@@ -143,7 +143,7 @@ mod runs {
     /// The steady-state O₂-supply flux of the BVAD cabin, per crewmember per day (mol).
     ///
     /// ⚠ Read as a **one-step boundary delta between the last two states**, exactly as
-    /// the Python gate reads it: at steady state the fluxes are constant, so one step's
+    /// the Python gate read it: at steady state the fluxes are constant, so one step's
     /// change in the boundary reservoir *is* the rate. `abs` because `boundary.o2_supply`
     /// is a source and drains as it supplies.
     ///

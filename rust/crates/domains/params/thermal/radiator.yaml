@@ -5,7 +5,7 @@
 # permanent deep-space boundary via the Stefan-Boltzmann grey-body law:
 #     R = ε·σ·A·(T⁴ − T_space⁴)      (W),   T = T_space + Q/C      (K)
 # where Q = node sensible heat (J) and σ is the CODATA physical constant (NOT a param —
-# it is fixed by physics; see thermal/flows.py STEFAN_BOLTZMANN). The four coefficients
+# it is fixed by physics; see STEFAN_BOLTZMANN in rust/crates/domains/src/thermal.rs). The four coefficients
 # below are the tunable radiative + thermal-mass properties.
 #
 # emissivity (ε) — grey-body emissivity of the radiator surface (dimensionless), ∈ (0, 1]:
@@ -36,7 +36,7 @@
 #   radiator IS the restoring force, so any constant load has a unique stable T_eq (no
 #   derived/tuned load, unlike Power's balanced_load_w).
 #
-# Units discipline (P4 / config/units.py): none of these is a conserved-Quantity canonical
+# Units discipline (P4; now rust/crates/config/src/params.rs): none of these is a conserved-Quantity canonical
 #   unit, so each is a schema-validated, bound-checked float carrying a declared unit
 #   (exact-string guarded at the loader, like Power's charge_efficiency / the biosphere's
 #   growth_efficiency), NOT routed through pint.

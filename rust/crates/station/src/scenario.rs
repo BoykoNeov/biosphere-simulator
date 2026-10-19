@@ -286,7 +286,7 @@ pub const SEALED_STATION_SEASON_DAYS: usize = 305;
 
 /// The Tier-2 combined-ledger horizon (whole seasons). 4 since the scope-B decomposer
 /// calibration (2026-07-21): the enlarged soil-pool equilibria lengthen the year-1
-/// soil-establishment spin-up, so the Python biomass gate needs 2 settled post-spin-up
+/// soil-establishment spin-up, so the Python biomass gate needed 2 settled post-spin-up
 /// diffs. Mirrors Python `station.scenario.SEALED_STATION_YEARS`; the golden is horizon 4.
 pub const SEALED_STATION_YEARS: usize = 4;
 
@@ -912,7 +912,7 @@ mod water_geometry_tests {
     /// zone's water, giving `FTSW = 0.115` on day 0 for a grain-filling crop and a 79 %-low
     /// grain, and nothing went red until a golden moved. Correct-by-inheritance is not
     /// covered; it is untested.
-    /// Mirrors `test_every_scenarios_water_stores_are_geometric`.
+    /// Ported from `test_every_scenarios_water_stores_are_geometric`.
     #[test]
     fn every_scenarios_water_stores_are_geometric() {
         for (name, scenario) in rostered() {
@@ -961,7 +961,7 @@ mod water_geometry_tests {
     ///
     /// Together these are what make the CROP cap the binding one on the frozen roster and
     /// `FTSW0 = 1` everywhere — the two facts every water claim in this batch rests on.
-    /// Mirrors `test_both_stores_are_derived_from_geometry_not_chosen`.
+    /// Ported from `test_both_stores_are_derived_from_geometry_not_chosen`.
     #[test]
     fn the_inherited_soil_is_the_cited_one_and_the_crop_cap_binds() {
         assert_eq!(DEFAULT_SCENARIO.soil_extractable_water, 0.13);
@@ -996,7 +996,7 @@ mod water_geometry_tests {
     ///
     /// `wssg` is the sharp one and it is a SCENARIO field, so none of the param-file guards
     /// reaches it: `water_stress_factor` returns `1.0` whenever `ftsw >= threshold`, so a
-    /// zero `wssg` reads even a bone-dry root zone as perfectly unstressed. Python raises;
+    /// zero `wssg` reads even a bone-dry root zone as perfectly unstressed. Python raised;
     /// Rust cannot without putting a `Result` on a rate law called every step. Asserting no
     /// scenario declares one is the successor that costs nothing at runtime.
     #[test]
@@ -1039,7 +1039,7 @@ mod water_geometry_tests {
     /// golden cannot check it: the golden records whatever `rooted_depth0` says, so if
     /// `root_depth.yaml`'s cap moved the golden would stay green and the stated
     /// relationship would quietly become false.
-    /// Mirrors `test_the_harvest_scenarios_root_system_tracks_the_crop_maximum`.
+    /// Ported from `test_the_harvest_scenarios_root_system_tracks_the_crop_maximum`.
     #[test]
     fn the_harvest_scenarios_root_system_tracks_the_crop_maximum() {
         assert_eq!(

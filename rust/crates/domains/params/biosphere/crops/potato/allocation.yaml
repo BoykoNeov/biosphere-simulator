@@ -82,7 +82,7 @@
 #   (ruling B: the oracle is a diagnostic, never a fit target). It is also the single
 #   cause behind both measured downstream gaps — a starved early canopy and an over-filled
 #   tuber — which is why "fix the canopy" and "fix the yield" are one question here, not
-#   two. Measured in tests/test_potato_crop.py.
+#   two. Measured in tests/test_potato_crop.py (deleted by S6).
 #
 # Clean-room: values derived from cited primary literature ONLY, never from the WOFOST
 #   potato oracle's parameters (which are not read at all — see ./phenology.yaml).

@@ -31,8 +31,8 @@
 //! would diff **green** while the two ports lowered *different* partitions. The moment to
 //! add the field is *before* the case that needs it, not after.
 //!
-//! `eclss_multirate_cabin.yaml` in `tests/crossport/authoring_files.py::ANCHORS` is now
-//! that case (`n_sub 30`, `eclss.condenser` slow) — but the fields stay unconditional,
+//! `eclss_multirate_cabin.yaml` in `tests/crossport/authoring_files.py::ANCHORS` (deleted by
+//! S6) was that case (`n_sub 30`, `eclss.condenser` slow) — but the fields stay unconditional,
 //! because a field rendered only in the interesting case is a field the diff cannot see
 //! when it matters. Every other anchor still renders `n_sub 1` / all-`fast`.
 

@@ -18,7 +18,7 @@
 #   is 0 before anthesis and fills the reproductive phase (DVS > 1) — the Step-11
 #   storage-organ column the oracle fixture requires (TWSO ≈ 11.5 of TAGP ≈ 20.4 t/ha).
 #
-# Deferred Step-11 seam (documented in allocation.py): DVS-keyed senescence (see
+# Deferred Step-11 seam (documented in allocation.py, deleted by S6): DVS-keyed senescence (see
 #   senescence.yaml). The storage organ (FO) is now built (this file's fo column).
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed

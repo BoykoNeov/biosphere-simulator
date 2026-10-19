@@ -8,8 +8,8 @@
 //! slices 6 and 7. Slice 8 deliberately made this program a producer from its first
 //! commit, and C7 finishes the job: `docs/authoring-reference.manifest.json` is written
 //! here, by `--write-manifest`, instead of by
-//! `tests/test_authoring_freeze_manifest.py::_build_manifest()`. That module keeps its
-//! ~15 completeness and conformance gates and has no writer.
+//! `tests/test_authoring_freeze_manifest.py::_build_manifest()`. That module kept its
+//! ~15 completeness and conformance gates, without a writer, until S6 deleted it.
 //!
 //! ⚠⚠ **Read `authoring::surface`'s module docs before trusting the word "derived" here.**
 //! The other two dumps enumerate a **built registry**: they ask a canonical scenario which
@@ -57,9 +57,10 @@
 //!   conflates who produces a value with who digests it. The biosphere contract has read
 //!   `scenarios/*/golden_sha256` as `rust` since slice 4 while *Python* computed that
 //!   digest, for the mirror-image reason. The value here is the Python generator's
-//!   (`tests/crossport/gen_authoring_vectors.py`, still live and still gated by
-//!   `tests/crossport/test_crossport.py`), so `python` is who it names; the key moves when
-//!   that generator does.
+//!   (`tests/crossport/gen_authoring_vectors.py`, gated by `tests/crossport/test_crossport.py`
+//!   until S6 deleted both), so `python` is who it names. ⚠ The key was to move when that
+//!   generator did; S6 deleted the generator and the row still reads `python` (2026-10-19) —
+//!   moving it is a manifest change, with its ceremony.
 //!
 //! ## ⚠ The trap the biosphere half set, measured for and absent here
 //!
@@ -113,8 +114,8 @@ const COMMENT: &str = "Phase-9 Step-7 authoring freeze manifest (P9.7). Names th
 /// The `_authority` block, as `(manifest path, side, why)`.
 ///
 /// ⚠ `side` is who produced the **value** — not who hashed it and not who wrote the
-/// file. A `python` row is a key still authored by the retiring checker, which under the
-/// C plan is a queue and not a classification.
+/// file. A `python` row is a key authored by the checker S6 deleted and not yet
+/// re-anchored; under the C plan that is a queue and not a classification.
 ///
 /// ⚠ The prose was moved here from `tests/test_authoring_freeze_manifest.py::_AUTHORITY`
 /// mechanically (generated from the committed manifest and diffed), not retyped: it is

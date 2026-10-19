@@ -60,7 +60,7 @@
 #   the golden diff: only the WATER stocks may change). Both rates satisfy rate·dt < 1 at
 #   the Euler-daily step for structural positivity (rationed == 0).
 #
-# Units discipline (P4 / config/units.py): the first-order rates (1/day) are NOT a
+# Units discipline (P4; now rust/crates/config/src/params.rs): the first-order rates (1/day) are NOT a
 #   conserved-Quantity canonical unit, so each is a schema-validated, bound-checked float
 #   carrying a declared unit (exact-string guarded at the loader, like decomposition's
 #   decomposition_rate / mineralization's two rates). A zero rate is valid (no condensation
@@ -85,7 +85,7 @@
 #   (oracle-validatable) and "5 non-PP files" (no oracle) — and water_cycle.yaml is in
 #   NEITHER. It is a no-oracle file, and therefore scope (C)'s, which was established
 #   empirically rather than assumed: the Condensation flow that consumes these params
-#   exists ONLY in the `if scenario.sealed:` branch of atmosphere.py, and the oracle
+#   exists ONLY in the `if scenario.sealed:` branch of atmosphere.py (deleted by S6), and the oracle
 #   trajectory runs `build_season()` — whose default scenario is sealed=False, and whose
 #   assembled registry contains no condensation flow at all. So these rates are never even
 #   LOADED in an oracle run and cannot move that trajectory. (The 7-vs-5 omission is

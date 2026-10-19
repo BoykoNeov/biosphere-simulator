@@ -10,7 +10,7 @@
 //! deletes. The regression contract, i.e. *this run still produces these bytes*, had no
 //! owner on the side that is now canonical.
 //!
-//! The Python original is 17 `tests/test_regression_*.py` modules routed through
+//! The Python original was 17 `tests/test_regression_*.py` modules routed through
 //! `tests/golden_platform.assert_matches_golden`, plus
 //! `test_golden_provenance.test_rust_reproduces_the_committed_golden_bytes` (which shelled
 //! out to `cargo run` for exactly the reason this file exists: an `examples/` program is a
@@ -84,7 +84,7 @@ fn every_domains_golden_is_still_this_reference_s_output() {
 /// byte-compared everywhere and transcendental ones structurally off Windows. That leaves
 /// one silent failure mode — a golden reclassified as transcendental to make a real
 /// regression go away on CI. This asserts the pure-arithmetic set is exactly the two the
-/// Python side leaves ungated in this crate (`crew`, `eclss` — no `@windows_golden_only`
+/// Python side left ungated in this crate (`crew`, `eclss` — no `@windows_golden_only`
 /// marker in `tests/test_regression_{crew,eclss}.py`), so a reclassification is a visible
 /// edit to this literal rather than a one-word change in a roster.
 #[test]

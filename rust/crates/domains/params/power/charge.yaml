@@ -23,7 +23,7 @@
 #   loss onto η_c (set η_c ≈ 0.90) — a Phase-6 validation-gate calibration choice, NOT
 #   made here (Phase 5 ships machinery, not calibrated numbers; the value is provisional).
 #
-# Units discipline (P4 / config/units.py): a dimensionless efficiency is NOT a
+# Units discipline (P4; now rust/crates/config/src/params.rs): a dimensionless efficiency is NOT a
 #   conserved-Quantity canonical unit, so it is a schema-validated, bound-checked float
 #   carrying a declared unit (exact-string guarded at the loader, like the biosphere's
 #   growth_efficiency). It must lie in (0, 1]: 0 (a battery that stores nothing) and
@@ -31,7 +31,7 @@
 #
 # Capacity is NOT here (deliberate): POOL stocks have no upper clamp in this engine, so
 #   battery capacity is sizing/scenario data (the initial SOC + well-fed sizing), landed
-#   with build_power in Step 3 — not a flow coefficient. See power/stocks.py.
+#   with build_power in Step 3 — not a flow coefficient. See power/stocks.py (now rust/crates/domains/src/power.rs).
 #
 # Clean-room: value from cited primary literature ONLY (battery efficiency is textbook).
 #

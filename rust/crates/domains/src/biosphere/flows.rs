@@ -1,7 +1,7 @@
 //! The biosphere flows + the coupled carbon budget + the thermal-time aux — the Rust
 //! port of the flow classes across `domains.biosphere.*` (Phase-7 P7.4).
 //!
-//! Every `evaluate` mirrors the Python arithmetic and **leg-emission order**
+//! Every `evaluate` was written to mirror the Python arithmetic and **leg-emission order**
 //! character-for-character (the reduction sums `co2_atmos` across Allocation/
 //! GrowthRespiration/MaintenanceRespiration in flow-id × leg order, so leg order is
 //! load-bearing). The `MaintenanceRespiration` shortfall loop walks the fixed
@@ -630,7 +630,7 @@ impl Flow for StemRemobilization {
         }
         // Association is load-bearing: float multiplication is not associative, so
         // `(rate*reserve)*dt` and `rate*(reserve*dt)` can differ in the last bit. This is
-        // the grouping the Python reference uses and the goldens were produced from.
+        // the grouping the Python reference used and the goldens were first produced from.
         let reserve = amt(snapshot, &self.stem_reserve_c);
         let flux = self.params.remobilization_rate * reserve * dt;
         if flux == 0.0 {
@@ -1592,7 +1592,7 @@ pub struct NitrogenUptake {
     pub ground_area: f64,
     /// The root-functional-coupling gate: the accumulator naming rooted depth, and the
     /// reference layer it is measured against (scenario/soil data). Measured
-    /// bit-identically inert on the frozen roster - see the Python root_depth.py.
+    /// bit-identically inert on the frozen roster - see `root_depth.py` at `4f7168e^` (deleted).
     pub rooted_depth_aux: String,
     pub soil_layer_depth: f64,
     pub sn_residual: f64,
@@ -1869,8 +1869,9 @@ impl Flow for NitrogenSenescence {
         let root = amt(snapshot, &self.root_c);
         // The identical arithmetic the Senescence flow above uses (Rust inlines the rate
         // law rather than routing it through `science`, so this mirrors the expression, not
-        // a shared helper — the drift hazard that buys is pinned Python-side by comparing
-        // this flow's shed carbon against Senescence's own litter leg).
+        // a shared helper — the drift hazard that buys was pinned Python-side, and is pinned
+        // the same way here, by comparing this flow's shed carbon against Senescence's own
+        // litter leg).
         let lai = leaf * self.sla_per_mol_c / self.ground_area;
         let dvs = shedding_dvs(snapshot, &self.thermal_time_aux, &self.pheno)?;
         let (leaf_age, root_rate) = age_shedding_rates(dvs, self.rdr_leaf, self.rdr_root);
@@ -2877,7 +2878,7 @@ mod tests {
     /// because it is the claim that would have to be re-checked if a composition ever
     /// changed, and because the FOUR-organ sum (storage included) is the part a reader
     /// gets wrong. Its independent content is the organ ROSTER, not the ratio.
-    /// Mirrors `test_gas_exchange.py::test_allocation_releases_o2_equal_to_carbon_fixed`
+    /// Ported from `test_gas_exchange.py::test_allocation_releases_o2_equal_to_carbon_fixed`
     /// and `::test_allocation_storage_carbon_releases_o2_too`.
     #[test]
     fn allocation_releases_one_oxygen_per_carbon_fixed_across_all_four_organs() {
@@ -2897,7 +2898,7 @@ mod tests {
     /// field has no O₂ stock at all, so an unconditional leg would be a missing-stock
     /// panic rather than an imbalance, and a conditional one that fires on the wrong
     /// branch changes nothing any conserved quantity can see.
-    /// Mirrors `test_gas_exchange.py::test_allocation_open_field_has_no_o2_leg`.
+    /// Ported from `test_gas_exchange.py::test_allocation_open_field_has_no_o2_leg`.
     #[test]
     fn allocation_in_the_open_field_emits_no_oxygen_leg() {
         let legs = legs_of(&allocation(ctx_open(), None), &growing_state(), 800.0);
@@ -3296,7 +3297,7 @@ mod tests {
     /// `daily_thermal_time(T) * dt`, the pre-scope-(B) behaviour.
     ///
     /// At 18 degC with the committed `t_base = 0` that is 18.0 per day, so a half-day
-    /// step is exactly 9.0. Mirrors `test_aux_process_returns_increment_form` and
+    /// step is exactly 9.0. Ported from `test_aux_process_returns_increment_form` and
     /// `test_thermal_time_aux_without_modifiers_is_the_plain_rate`.
     #[test]
     fn thermal_time_aux_without_modifiers_is_the_plain_rate_times_dt() {
@@ -3310,7 +3311,7 @@ mod tests {
 
     /// The SECOND accumulator, in its own increment form: 4 degC is inside the cited
     /// optimum band `[0, 8]`, so VERDAY is exactly 1 day/day and a half-day step accrues
-    /// exactly 0.5. Mirrors `test_vernalization_aux_returns_increment_form`.
+    /// exactly 0.5. Ported from `test_vernalization_aux_returns_increment_form`.
     ///
     /// ⚠ It reads AIR temperature and ignores the snapshot entirely - the source
     /// prescribes crown temperature but notes the two differ only under snow cover, and
@@ -3337,7 +3338,7 @@ mod tests {
     /// Hand-computed: fully vernalized (60 >= vdsat = 50) gives `verfun = 1`; a 10-hour
     /// day at `cpp = 16`, `ppsen = 0.09` gives `ppfun = 1 - 0.09*6 = 0.46`; the plain
     /// rate at 18 degC is 18. So the increment is `18 * 1 * 0.46 = 8.28`.
-    /// Mirrors `test_thermal_time_aux_applies_both_modifiers_multiplicatively`.
+    /// Ported from `test_thermal_time_aux_applies_both_modifiers_multiplicatively`.
     #[test]
     fn thermal_time_aux_multiplies_the_two_vegetative_modifiers() {
         let proc_ = ThermalTimeAccumulation {
@@ -3374,7 +3375,7 @@ mod tests {
     /// The qualitative cultivar's ARREST, at the process level: with no accumulated cold
     /// `verfun` is 0, so thermal time does not advance AT ALL despite warm weather. A
     /// clamp-free `verfun` would make this NEGATIVE and run development backwards.
-    /// Mirrors `test_thermal_time_aux_arrests_completely_when_unvernalized`.
+    /// Ported from `test_thermal_time_aux_arrests_completely_when_unvernalized`.
     #[test]
     fn thermal_time_aux_arrests_completely_when_unvernalized() {
         let proc_ = ThermalTimeAccumulation {
@@ -3396,7 +3397,7 @@ mod tests {
     /// The boundary case is the point: `thermal_time == tsum_anthesis` gives `DVS == 1.0`
     /// exactly, and `is_vegetative` tests `< 1.0`, so the gate closes AT anthesis rather
     /// than after it. One step earlier the same weather gives zero.
-    /// Mirrors `test_thermal_time_modifiers_are_gated_off_at_and_after_anthesis`.
+    /// Ported from `test_thermal_time_modifiers_are_gated_off_at_and_after_anthesis`.
     #[test]
     fn the_vegetative_modifiers_are_gated_off_at_and_after_anthesis() {
         let proc_ = ThermalTimeAccumulation {
@@ -3437,7 +3438,7 @@ mod tests {
     /// ⚠ The dry state is CONSTRUCTED. No scenario in the Rust roster is water
     /// limited - every one of them holds `WSFG == 1` - so this condition cannot be
     /// reached by running anything the tree ships.
-    /// Mirrors `test_thermal_time_aux_without_drought_is_the_plain_rate`.
+    /// Ported from `test_thermal_time_aux_without_drought_is_the_plain_rate`.
     #[test]
     fn thermal_time_aux_without_a_cited_wssd_ignores_a_bone_dry_root_zone() {
         let mut stocks = BTreeMap::new();
@@ -3596,7 +3597,7 @@ mod tests {
     /// product entirely — a plant that transpires as if it were never water-limited —
     /// reddened exactly ONE test in the 221-test lib binary, and that test is about
     /// drought-ACCELERATED phenology. A whole feedback removed, noticed by one stranger.
-    /// Mirrors `test_transpiration_leg_is_pm_times_fwater_times_area`.
+    /// Ported from `test_transpiration_leg_is_pm_times_fwater_times_area`.
     #[test]
     fn the_transpiration_leg_is_potential_times_water_stress_times_area() {
         // 25 kg in a 130 kg zone is FTSW 0.1923, so WSFG = 0.1923/0.30 = 0.6410...
@@ -3643,7 +3644,7 @@ mod tests {
     /// `WSFG` reaches 0 only at `FTSW = 0`, where the absolute-kg ramp it replaced shut
     /// off at a nonzero wilting mass. Exactly zero at exactly empty is what replaces the
     /// old structural-positivity guarantee.
-    /// Mirrors `test_transpiration_shuts_off_at_an_empty_root_zone`.
+    /// Ported from `test_transpiration_shuts_off_at_an_empty_root_zone`.
     #[test]
     fn transpiration_shuts_off_exactly_at_an_empty_root_zone() {
         let s = water_only_state(0.0, TEST_DEPTH, 0.0, 0.0);
@@ -3663,7 +3664,7 @@ mod tests {
     /// factors cancel exactly. The second half is the physically right consequence of
     /// sizing the soil honestly, and a test that pinned only the first would pass on a
     /// build that had dropped the denominator's area.
-    /// Mirrors `test_transpiration_scales_with_ground_area_under_the_extensive_transform`
+    /// Ported from `test_transpiration_scales_with_ground_area_under_the_extensive_transform`
     /// and `test_a_bigger_plot_on_the_same_water_is_drier`.
     #[test]
     fn transpiration_scales_with_the_plot_only_when_the_water_scales_with_it() {
@@ -3704,7 +3705,7 @@ mod tests {
     ///
     /// dt-linearity is what makes the step size a numerical choice rather than a
     /// scientific one; the balance is what keeps a sealed chamber's water conserved.
-    /// Mirrors `test_transpiration_scales_linearly_with_dt`,
+    /// Ported from `test_transpiration_scales_linearly_with_dt`,
     /// `test_transpiration_is_water_balanced` and `test_irrigation_is_water_balanced`.
     #[test]
     fn the_water_flows_are_dt_linear_and_balanced() {
@@ -3746,7 +3747,7 @@ mod tests {
     /// reddened one test, about the root-zone capture. The forcing changed MEANING on
     /// 2026-08-12 — mm/day applied became mm/day AVAILABLE — so what the capacity limb
     /// means is "the irrigation system's throughput", not "the amount applied".
-    /// Mirrors `test_irrigation_takes_the_smaller_of_capacity_and_deficit` and
+    /// Ported from `test_irrigation_takes_the_smaller_of_capacity_and_deficit` and
     /// `test_irrigation_leg_is_rate_times_area`.
     #[test]
     fn irrigation_takes_the_smaller_of_the_system_capacity_and_the_deficit() {
@@ -3782,7 +3783,7 @@ mod tests {
     /// a bucket with a bottom, so "water non-limiting" became a checkable claim rather
     /// than a label. The last is how an irrigation-cut window works, and it had to survive
     /// the rate → capacity re-interpretation unchanged.
-    /// Mirrors `test_irrigation_stops_at_the_drained_upper_limit` and
+    /// Ported from `test_irrigation_stops_at_the_drained_upper_limit` and
     /// `test_a_zero_capacity_is_still_a_hard_off`.
     #[test]
     fn irrigation_stops_at_the_drained_upper_limit_and_a_zero_capacity_is_a_hard_off() {
@@ -3813,7 +3814,7 @@ mod tests {
     /// that stays perfectly balanced — reddened nine tests, every one of them a
     /// compensation-point or chamber gate. A balanced mutation is invisible to
     /// conservation by construction; only the rate law itself can catch it.
-    /// Mirrors `test_recycling_flux_is_first_order_in_condensate`,
+    /// Ported from `test_recycling_flux_is_first_order_in_condensate`,
     /// `test_fluxes_are_zero_at_empty_pools` and `test_cycle_flows_are_dt_linear`.
     ///
     /// ⚠ **The condenser's first-order half was RETIRED 2026-10-09** (a biosphere unfreeze,
@@ -4301,7 +4302,7 @@ mod tests {
     /// check is real coverage of the wiring and no coverage at all of the arithmetic; the
     /// after-battery could not see the difference, because it only ever asked whether each
     /// MUTATION was caught and never whether each new TEST was reachable.*
-    /// Mirrors `tests/test_carbon_budget.py::test_context_budget_matches_standalone_rate_laws`.
+    /// Ported from `tests/test_carbon_budget.py::test_context_budget_matches_standalone_rate_laws`.
     #[test]
     fn the_shared_carbon_budget_is_the_standalone_rate_laws_recomposed() {
         let ctx = ctx_open();
@@ -4375,7 +4376,7 @@ mod tests {
     /// therefore separates "the nitrogen factor is missing" from "its denominator is the
     /// wrong organ set", and both were measured to redden it.
     ///
-    /// Mirrors `test_context_limitation_is_f_water_times_f_n` and
+    /// Ported from `test_context_limitation_is_f_water_times_f_n` and
     /// `test_context_limitation_is_one_at_the_non_limiting_point`.
     #[test]
     fn the_limitation_is_the_product_and_both_factors_actually_bite() {
@@ -4476,7 +4477,7 @@ mod tests {
     /// `cargo test -p domains --lib`. Not "no test about growth respiration": no test at
     /// all. It moves carbon between two BOUNDARY stocks, so no organ, no chamber gas and
     /// no conserved quantity moves with it, and only the goldens' committed bytes see it.
-    /// Mirrors `test_carbon_budget.py::test_growth_flow_leg_is_the_composed_loss_and_pins_the_step6_literal`.
+    /// Ported from `test_carbon_budget.py::test_growth_flow_leg_is_the_composed_loss_and_pins_the_step6_literal`.
     #[test]
     fn the_growth_respiration_leg_is_the_complement_of_the_growth_efficiency() {
         let ctx = ctx_open();
@@ -4501,7 +4502,7 @@ mod tests {
     /// The budget is recomposed rather than quoted, so the test states the rule
     /// (`DMI = Yg · available`, split by the table at this state's DVS) rather than a
     /// number this tree produced.
-    /// Mirrors `test_allocation_legs_are_the_partitioned_increment` and
+    /// Ported from `test_allocation_legs_are_the_partitioned_increment` and
     /// `test_allocation_dmi_agrees_with_growth_resp_budget`.
     #[test]
     fn the_allocation_legs_are_the_partitioned_increment_and_the_co2_leg_is_their_sum() {
@@ -4541,7 +4542,7 @@ mod tests {
     /// §5ad measured that mutation reddening one test in 259, and that one is about a
     /// deep-water crop. So the shares are asserted individually, against the organ
     /// ratios, and not merely through their sum.
-    /// Mirrors `test_maintenance_deficit_day_draws_the_shortfall_from_organs` and
+    /// Ported from `test_maintenance_deficit_day_draws_the_shortfall_from_organs` and
     /// `test_maintenance_partial_deficit_splits_covered_and_shortfall`.
     #[test]
     fn open_field_maintenance_burns_the_shortfall_in_proportion_to_each_organ() {
@@ -4635,7 +4636,7 @@ mod tests {
     ///
     /// Pinned at three stages: inside the window (both halves act), exactly AT the
     /// cessation (both stop), and above it (both stop and stay stopped).
-    /// Mirrors `test_the_transfer_actually_STOPS_and_the_ungated_control_reproduces`,
+    /// Ported from `test_the_transfer_actually_STOPS_and_the_ungated_control_reproduces`,
     /// `test_the_two_halves_share_ONE_cessation_number_in_the_shipped_wiring` and
     /// `test_a_forgotten_cessation_fails_CLOSED_rather_than_running_unbounded`.
     #[test]
@@ -4701,7 +4702,7 @@ mod tests {
     /// First-order means the draw is donor-controlled and therefore self-limiting, which
     /// is why the Euler arbitration backstop is structurally unreachable on it: doubling
     /// the standing reserve exactly doubles the flux.
-    /// Mirrors `test_the_drain_rate_is_BIT_INERT_on_carbon_and_only_relabels` (the form
+    /// Ported from `test_the_drain_rate_is_BIT_INERT_on_carbon_and_only_relabels` (the form
     /// half) and the remobilization block of `tests/test_stem_reserves.py`.
     #[test]
     fn the_remobilization_drains_the_reserve_into_the_grain_and_is_first_order() {
@@ -4749,7 +4750,7 @@ mod tests {
     /// agreeing accidents. `dt`-linearity is asserted on the same three flows in one
     /// test because it is one property of the whole budget, and a per-flow version would
     /// pass while two of them disagreed about the day.
-    /// Mirrors `test_three_flows_share_one_budget`, the three `*_clamps_to_zero_in_the_dark`
+    /// Ported from `test_three_flows_share_one_budget`, the three `*_clamps_to_zero_in_the_dark`
     /// tests and the three `*_scales_linearly_with_dt` tests.
     #[test]
     fn the_three_budget_flows_share_one_budget_clamp_together_and_scale_with_dt() {
@@ -4824,7 +4825,7 @@ mod tests {
     /// a factor `GrowthRespiration` does not share leaves the two ratios identical, and
     /// that mutation left this test green. A ratio test sees a factor that VARIES with the
     /// state and cannot see one that does not.
-    /// Mirrors `test_limitation_scales_growth_and_allocation_identically`.
+    /// Ported from `test_limitation_scales_growth_and_allocation_identically`.
     #[test]
     fn the_limitation_scales_growth_and_allocation_by_the_same_ratio() {
         let s = with_storage(growing_state(), 2.0);
@@ -4998,7 +4999,7 @@ mod tests {
     /// `0.05697 · 0.0266911 · 2.0 = 3.041e-3 kg N` — four times the day's supply of
     /// `0.0015 · 1 m² · 0.5 = 7.5e-4 kg N`. The nearly-full plant is demand-bound: it is
     /// `1e-5 kg N` short with the soil saturated, so the draw is the SHORTFALL.
-    /// Mirrors `test_uptake_leg_is_capacity_times_availability_times_area`,
+    /// Ported from `test_uptake_leg_is_capacity_times_availability_times_area`,
     /// `test_uptake_is_demand_limited_when_the_shortfall_is_small` and
     /// `test_uptake_shuts_off_at_residual_soil_n`.
     #[test]
@@ -5057,7 +5058,7 @@ mod tests {
     /// the deficit clamps at zero. That is what separates it from a demand-controlled
     /// makeup whose error is SIGNED and can oscillate (bucket 2's export-fidelity
     /// finding), and it is why the clamp is a modelling statement rather than a guard.
-    /// Mirrors `test_demand_limited_uptake_is_dt_linear_and_deadbeat_at_dt_1`.
+    /// Ported from `test_demand_limited_uptake_is_dt_linear_and_deadbeat_at_dt_1`.
     #[test]
     fn the_uptake_closes_the_shortfall_in_one_step_and_does_not_overshoot() {
         let p = params::nitrogen();
@@ -5086,7 +5087,7 @@ mod tests {
     /// runs backwards, pumping nitrogen out of the plant and into the soil at a rate set
     /// by how far above target it is. Measured before this test existed: that mutation
     /// reddened one test in 282, and that test is about the wiring, not the law.
-    /// Mirrors `test_uptake_stops_entirely_at_or_above_the_target_concentration`.
+    /// Ported from `test_uptake_stops_entirely_at_or_above_the_target_concentration`.
     #[test]
     fn the_uptake_stops_at_the_target_and_never_runs_backwards() {
         let p = params::nitrogen();
@@ -5158,7 +5159,7 @@ mod tests {
     /// and dropping it from the fertilization rate each left the ENTIRE workspace green.
     /// That is the same hole `system.rs::capture_scales_with_ground_area_at_its_call_sites`
     /// was written for one currency over, on two more call sites.
-    /// Mirrors `test_uptake_scales_with_ground_area` and
+    /// Ported from `test_uptake_scales_with_ground_area` and
     /// `test_fertilization_leg_is_rate_times_area`.
     #[test]
     fn the_uptake_and_the_fertilization_both_scale_with_the_plot() {
@@ -5199,7 +5200,7 @@ mod tests {
     /// says the LEAN arm — a plant already below the residual — is reached by NOTHING in
     /// the binary, because every frozen scenario runs above `n_critical` all season. Both
     /// arms are therefore constructed here rather than driven.
-    /// Mirrors `test_shed_nitrogen_uses_the_same_carbon_flux_as_the_senescence_flow`.
+    /// Ported from `test_shed_nitrogen_uses_the_same_carbon_flux_as_the_senescence_flow`.
     #[test]
     fn the_shed_nitrogen_is_the_senescing_carbon_at_the_remobilized_concentration() {
         let sen = params::senescence();
@@ -5302,7 +5303,7 @@ mod tests {
     /// unrelated first-order rate constants — which is what it was before, and which
     /// measured 0.004. Real wheat straw is ~80, so this is the right quantity in the right
     /// place rather than a fitted one.
-    /// Mirrors `test_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio`.
+    /// Ported from `test_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio`.
     #[test]
     fn the_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio() {
         let p = params::nitrogen();
@@ -5488,7 +5489,7 @@ mod tests {
     /// organ sizes, so no pair of legs can be swapped without the arithmetic noticing:
     /// that is what makes this the test the "stem shed at the root's rate" mutation dies
     /// on, which nothing about senescence caught before.
-    /// Mirrors `test_senescence_legs_are_the_hand_computed_losses`,
+    /// Ported from `test_senescence_legs_are_the_hand_computed_losses`,
     /// `test_senescence_flux_proportional_to_organ_carbon` and
     /// `test_senescence_flux_zero_organ_is_zero`.
     #[test]
@@ -5520,7 +5521,7 @@ mod tests {
     /// has no rounding to hide behind, and the biosphere is frozen at `dt = 1/16` (¼ before 2026-09-30), so a leg
     /// that was only approximately dt-linear would be a different mechanism at the frozen
     /// step than at the fixture's.
-    /// Mirrors `test_senescence_scales_linearly_with_dt`.
+    /// Ported from `test_senescence_scales_linearly_with_dt`.
     #[test]
     fn the_senescence_legs_are_bit_exactly_linear_in_dt() {
         let s = sen_state(3.0, 1.0, 1.0);
@@ -5549,7 +5550,7 @@ mod tests {
     /// The stem leg is asserted UNCHANGED across the crossing: mutual shading is a
     /// canopy-closure mechanism, and a term that leaked into the other organs would still
     /// balance, still be dt-linear, and still shed faster once the canopy closed.
-    /// Mirrors `test_senescence_sheds_FASTER_once_the_canopy_closes`.
+    /// Ported from `test_senescence_sheds_FASTER_once_the_canopy_closes`.
     #[test]
     fn senescence_sheds_faster_from_the_leaf_only_once_the_canopy_closes() {
         let flow = senescence_flow(1.0);
@@ -5899,7 +5900,7 @@ mod tests {
     /// single-flow test structurally cannot see — reddens here. Each flow's O2 leg is
     /// asserted to be the NEGATIVE of its own CO2 leg, which states the PQ = 1
     /// stoichiometry where it can be wrong rather than leaving it to the composition gate.
-    /// Mirrors `test_decomposition_PARTITIONS_the_decayed_litter_into_co2_and_microbes`
+    /// Ported from `test_decomposition_PARTITIONS_the_decayed_litter_into_co2_and_microbes`
     /// and `test_respiration_burns_microbial_to_co2_consuming_o2`.
     #[test]
     fn the_three_humified_flows_each_send_their_own_cited_share_to_co2() {
@@ -5962,7 +5963,7 @@ mod tests {
     /// every leg exactly zero — which is what makes positivity structural rather than
     /// clamped. Asserted per flow with the other two pools held fixed, so a flow reading
     /// the wrong pool's carbon reddens instead of merely returning a different number.
-    /// Mirrors `test_flux_is_first_order_in_litter`, `test_flux_is_zero_at_zero_litter`,
+    /// Ported from `test_flux_is_first_order_in_litter`, `test_flux_is_zero_at_zero_litter`,
     /// `test_flux_is_first_order_in_microbial`, `test_flux_is_zero_at_zero_microbial`,
     /// `test_decomposition_self_limits_at_zero_litter` and
     /// `test_respiration_self_limits_at_zero_microbial`.
@@ -5993,7 +5994,7 @@ mod tests {
     /// whole leg vector rather than one representative leg, because a partition applied
     /// before the `dt` scaling rather than after would leave the withdrawal linear and one
     /// destination not.
-    /// Mirrors `test_decomposition_is_dt_linear`, `test_respiration_is_dt_linear` and
+    /// Ported from `test_decomposition_is_dt_linear`, `test_respiration_is_dt_linear` and
     /// `test_flows_are_dt_linear`.
     #[test]
     fn every_soil_leg_is_bit_exactly_linear_in_dt() {
@@ -6069,7 +6070,7 @@ mod tests {
     /// 1/2 nowhere near — so a wrong `K` or a wrong FORM is invisible to it. That is batch
     /// G's mutual-shading finding (a pin AT the knot is blind to the shape either side of
     /// it) applied before writing rather than found after.
-    /// Mirrors `test_release_leg_throttles_with_f_o2_rather_than_ignoring_it` and the
+    /// Ported from `test_release_leg_throttles_with_f_o2_rather_than_ignoring_it` and the
     /// `o2_half_saturation = 0` isolation every Python fixture in this batch relies on.
     #[test]
     fn the_oxygen_throttle_is_live_on_all_six_soil_flows_and_shaped_either_side_of_its_knot() {
@@ -6100,7 +6101,7 @@ mod tests {
     /// empty or absent pool moves nothing, so there is never a divide-by-zero and never a
     /// negative leg — and it includes a NEGATIVE `moved_carbon`, which the guard rejects
     /// rather than propagating into a leg that would deposit into its own donor.
-    /// Mirrors `test_carried_nitrogen_moves_the_donor_pools_own_ratio` and
+    /// Ported from `test_carried_nitrogen_moves_the_donor_pools_own_ratio` and
     /// `test_carried_nitrogen_is_zero_at_every_degenerate_input`.
     #[test]
     fn carried_nitrogen_moves_the_donor_pools_own_ratio_and_is_zero_at_every_degenerate_input() {
@@ -6135,7 +6136,7 @@ mod tests {
     /// flux carries and a bare rate does not: the `f_O2` throttle (F5, F9) and an empty
     /// carbon pool under standing nitrogen (F10). The second half below uses the first of
     /// those, so this test rules out the collapsed form rather than merely describing it.
-    /// Mirrors `test_carried_n_on_a_first_order_carbon_flux_is_that_same_rate`.
+    /// Ported from `test_carried_n_on_a_first_order_carbon_flux_is_that_same_rate`.
     #[test]
     fn the_nitrogen_riding_a_first_order_carbon_flux_is_that_same_carbon_rate() {
         let s = soil_fixture(F_FULL_O2);
@@ -6170,7 +6171,7 @@ mod tests {
     ///
     /// ⚠ The three N:C ratios in the fixture are distinct, so a leg reading the wrong
     /// pool's nitrogen reddens rather than returning a plausible number.
-    /// Mirrors `test_litter_transfer_splits_its_nitrogen_the_way_the_carbon_split`,
+    /// Ported from `test_litter_transfer_splits_its_nitrogen_the_way_the_carbon_split`,
     /// `test_microbial_release_splits_its_nitrogen_the_way_the_carbon_split` and
     /// `test_mineralization_is_the_nitrogen_of_the_carbon_that_LEFT_AS_CO2`.
     #[test]
@@ -6237,7 +6238,7 @@ mod tests {
     /// any tolerance loose enough to be written. Same trap as F5, one flow further on, and
     /// the third assertion is the control that says the throttle really is biting here
     /// rather than the two flows agreeing because both ignore it.
-    /// Mirrors `test_transfer_leg_recomputes_EXACTLY_the_carbon_Decomposition_moves` and
+    /// Ported from `test_transfer_leg_recomputes_EXACTLY_the_carbon_Decomposition_moves` and
     /// `test_release_leg_recomputes_EXACTLY_the_carbon_MicrobialRespiration_burns`.
     #[test]
     fn each_nitrogen_leg_recomputes_its_siblings_carbon_flux_with_the_o2_throttle_biting() {
@@ -6300,7 +6301,7 @@ mod tests {
     /// CO2 at the litter step. The two-sided bound is the form that is still true, and a
     /// re-collapsed direct mineralization — which would send the WHOLE withdrawal to
     /// soil — still fails it. *A pin guarding a mechanism you removed is decoration.*
-    /// Mirrors `test_return_legs_self_limit_when_no_carbon_is_moving`,
+    /// Ported from `test_return_legs_self_limit_when_no_carbon_is_moving`,
     /// `test_return_legs_self_limit_at_an_empty_donor` and
     /// `test_only_the_RESPIRED_share_reaches_soil_n_the_rest_still_transits`.
     #[test]
@@ -6368,7 +6369,7 @@ mod tests {
     /// form reddens exactly three tests and this is one of them. The three states below are
     /// three different ways for nothing to be dying — no nitrogen, no biomass, no death
     /// rate — and an uncoupled form sheds in the last two.
-    /// Mirrors `test_n_shedding_flux_is_zero_at_every_degenerate_input`,
+    /// Ported from `test_n_shedding_flux_is_zero_at_every_degenerate_input`,
     /// `test_n_senescence_self_limits_at_zero_plant_n` and
     /// `test_n_senescence_self_limits_when_no_carbon_is_senescing`.
     #[test]

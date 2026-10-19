@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `authored-plants.md`
+**Re-read against the record's last row:** `stale-record-cleanup.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -355,6 +355,10 @@ against the branch that does not bind.
   2026-10-18 as "live with it"*, review Step 4b, on the user's "Linux is not a goal"). An unfreeze
   that moves one of them from a Linux box has no regeneration step there. Record it in the
   ceremony; do not `--write` around it.
+* **Checks S6 deleted that nothing ported** (found 2026-10-19, `log/stale-record-cleanup.md`): BVAD's seven
+  bookkeeping checks; `monod` ≡ frozen `f_O2` and the Godot uncalibrated-banner gate (no Rust successor by name);
+  the station manifest's path-exists check, which its own note still names. Each is a fact to know until a
+  finding leans on it.
 * **CI's Rust toolchain is unpinned** (`dtolnay/rust-toolchain@stable`), found 2026-10-04
   (`log/ci-runner-pinned.md`): the 1.99.0 release alone turned clippy red for three days with
   tests green throughout. The runner image is now pinned (`ubuntu-26.04`); the toolchain was
@@ -611,6 +615,11 @@ holds — a `source:` edit still moves a fingerprint. Nothing in §3 is re-propo
 authored, scenarios/, o2_setpoint, setpoint and authoring. The §3 habitat item is marked done. The parked
 `o2_setpoint` mole-fraction item (B's slice 4) is unchanged but now has a home: Step 7b's design absorbs it,
 and the broken habitat is the measured cost of leaving it parked. Nothing in §3 is re-proposed.
+
+⚠ *Re-read 2026-10-19* (`log/stale-record-cleanup.md`, Step 8 of the 2026-09-29 review BUILT): grepped this
+plan for Python, ruff, pyright, CI, BVAD, monod and test_. Nothing is struck: no item here was a stale comment.
+One fact is added to §4 (the checks S6 deleted that nothing ported). The CI-toolchain bullet in §4 still reads as
+live; it was not re-checked against the 2026-10-10 deletion of the reference's CI job. Nothing in §3 is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

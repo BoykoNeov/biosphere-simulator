@@ -23,8 +23,8 @@
 //!
 //! `Const` renders through [`simcore::hexfloat::format`] (not a decimal spelling) so a
 //! literal's parity is **bit-exact** — the value the parser produced, not a rounded
-//! re-print. The Python generator emits the identical spelling via `float.hex()`, which
-//! the hex-float codec reproduces digit-for-digit (proven in Phase-7 Step 0).
+//! re-print. The Python generator (deleted by S6) emitted the identical spelling via `float.hex()`,
+//! which the hex-float codec reproduces digit-for-digit (proven in Phase-7 Step 0).
 
 use simcore::expr::Expr;
 use simcore::hexfloat;

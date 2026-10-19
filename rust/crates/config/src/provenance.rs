@@ -11,7 +11,7 @@
 //! under the rule implemented here. So *"`param_files` is now Rust's"* would be the wrong
 //! headline. What moves is the pair of **rules**:
 //!
-//! 1. the **census** — which files count. Python's rule is a non-recursive glob of a
+//! 1. the **census** — which files count. Python's rule was a non-recursive glob of a
 //!    package directory minus `demo.yaml`; the reference's is *the set it actually loads*,
 //!    a compile-time `include_str!` list, cross-checked against the directory.
 //! 2. the **normalization** — how bytes become a digest ([`normalize_newlines`]).
@@ -29,7 +29,7 @@
 //!
 //! # The rule, and why it is narrower than Python's
 //!
-//! Python's is `hashlib.sha256("\n".join(Path.read_text().splitlines()))`. `read_text`
+//! Python's was `hashlib.sha256("\n".join(Path.read_text().splitlines()))`. `read_text`
 //! applies universal-newline translation, and `str.splitlines` *additionally* splits on
 //! eight further characters — vertical tab, form feed, the three ASCII separators, NEL, LS
 //! and PS — enumerated by codepoint in [`EXOTIC_LINE_SEPARATORS`] (written as escapes there,

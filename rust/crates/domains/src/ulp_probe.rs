@@ -44,7 +44,7 @@
 //! | biosphere | `canopy.math.exp` + `photosynthesis.math.exp` | the `par` forcing |
 //! | station / greenhouse | both of the above | the same seams, composed (in `station::ulp_probe`) |
 //!
-//! **Power.** Python shims the module's whole `math` reference, which reaches both
+//! **Power.** Python shimmed the module's whole `math` reference, which reaches both
 //! [`crate::power::solar_schedule`] *and* [`crate::power::balanced_load_w`] — the derived load
 //! is a sum over that same `sin`. So [`nudged_power_resolver`] mirrors both, nudging the `sin`
 //! **result** rather than the `peak · sin(…)` product.
@@ -84,15 +84,15 @@
 //! seams *write* `PAR_VAR`, none reads it. So nothing else moves.
 //!
 //! ⚠ The asymmetry this probe inherited is now **half** resolved, and the half that remains
-//! is the reason this note stays. Python shims `canopy.math` for `intercepted_fraction`'s
+//! is the reason this note stays. Python shimmed `canopy.math` for `intercepted_fraction`'s
 //! `exp`; on the reference side that function was dead (no production call site) and was
-//! **deleted on 2026-08-27**, closing clause 4 of S5's exit gate. The Python twin is still
-//! there and still shimmed, so `measure_tier2_bands.py` goes on perturbing a path its own
-//! carbon budget no longer runs. That contribution was **measured at exactly zero** in
+//! **deleted on 2026-08-27**, closing clause 4 of S5's exit gate. The Python twin stayed
+//! shimmed until S6, so `measure_tier2_bands.py` went on perturbing a path its own carbon
+//! budget no longer ran. That contribution was **measured at exactly zero** in
 //! 2026-08-15 (both biosphere rows read `0.0` when `canopy` was the only shim, which is what
-//! forced the second shim), so the Python instrument's numbers come from its
-//! `photosynthesis` shim alone and the deletion cannot move them. It dies with the checker
-//! at S6; nothing here depends on it.
+//! forced the second shim), so the Python instrument's numbers came from its
+//! `photosynthesis` shim alone and the deletion could not move them. It died with the
+//! checker at S6; nothing here depends on it.
 //!
 //! **Thermal.** The `t⁴` is inside a flow, and the subtraction `t⁴ − T_space⁴` can cancel, so
 //! perturbing the flow's *output* would understate the sensitivity — the one place a cheaper

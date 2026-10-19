@@ -8,7 +8,7 @@
 #   This closes the carbon loop (litter → microbial → CO₂ → photosynthesis) and is the
 #   chamber's decomposer O₂ sink (the Biosphere-2 soil-respiration mechanism).
 #
-# Units discipline (P4 / config/units.py): the first-order rate (1/day) is NOT a
+# Units discipline (P4; now rust/crates/config/src/params.rs): the first-order rate (1/day) is NOT a
 #   conserved-Quantity canonical unit, so it is a schema-validated, bound-checked float
 #   carrying a declared unit (exact-string guarded at the loader, like decomposition's
 #   decomposition_rate / senescence's rdr_*). A zero rate is valid (no respiration —
@@ -18,7 +18,7 @@
 #   (o2_half_saturation below; chamber.oxygen_limitation_factor), applied here and to the
 #   plant maintenance shortfall so respiration self-throttles on a depleting O₂ pool.
 #
-# Deferred seams (documented in microbial_respiration.py): microbial death/turnover as
+# Deferred seams (documented in microbial_respiration.py, deleted by S6): microbial death/turnover as
 #   microbial_C → litter_C recycling, and microbe-explicit substrate Michaelis kinetics
 #   (Vmax · microbial_C · litter/(K_m + litter)).
 #

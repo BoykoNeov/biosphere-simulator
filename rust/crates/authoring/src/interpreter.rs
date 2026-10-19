@@ -504,7 +504,7 @@ pub(crate) fn resolve_demand_controlled(
 /// (`+ − × <`) ⇒ byte-safe against the Python mirror.
 ///
 /// **Where `k` comes from differs from Python, and the difference is load-bearing** —
-/// see [`crate::flow_registry::frozen_rate_value`]. Python reads the **pack-resolved**
+/// see [`crate::flow_registry::frozen_rate_value`]. Python read the **pack-resolved**
 /// value off the built flow (a pack may inflate a gain, which is *why* the check is at
 /// build time); Rust reads the **frozen constant**, which is sound only because packs are
 /// deferred here. So this mirror carries the rule, not the rationale, and its

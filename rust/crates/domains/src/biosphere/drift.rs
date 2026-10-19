@@ -1,6 +1,6 @@
 //! Drift instrumentation — decade-scale stability metrics (slice C5 of the reference flip).
 //!
-//! The Rust half of what `domains/biosphere/drift.py` has done since Phase-4 Step-1: a
+//! The Rust half of what `domains/biosphere/drift.py` did from Phase-4 Step-1 until S6: a
 //! **measurement instrument** over a closed-biosphere trajectory (`&[State]`), used to
 //! decide *operationally* whether the emergent limit cycle is conservation-stable over
 //! decade-scale runs. "No drift" is the subtle one — the cycle is *meant* to oscillate, so
@@ -29,11 +29,11 @@
 //! goldens were Python-authored no matter which port ran the trajectory. They are now
 //! Rust's end to end. C4 (the science-gate census) needs this kit for 5 of its 15 gates.
 //!
-//! ## Generic over `State`, exactly as the Python is
+//! ## Generic over `State`, exactly as the Python was
 //!
 //! [`year_summaries`] takes the per-year `summary_fn` from the caller, so this module
 //! imports no stock-id catalog and the *station* can use it on a thermal-node trajectory
-//! (`station` already depends on `domains`) — the same layering Python has.
+//! (`station` already depends on `domains`) — the same layering Python had.
 //!
 //! ⚠ **The segmentation is inclusive of the next year's boundary state** and the period is
 //! in whatever unit the caller's trajectory is indexed by — **steps** for the biosphere
@@ -163,7 +163,7 @@ pub const MASS_DRIFT_SLOPE_BOUND: f64 = 1e-11;
 /// `dt = 1/16`), while the station's `run_master_day` trajectory is per-DAY. Passing days
 /// where steps are meant is the trap `post-roadmap-step-unfreeze.md` §1 records.
 /// ⚠ Generic over the element type, not fixed to `State`, and that is the faithful port:
-/// Python's is duck-typed over any sequence and only *happens* to be handed a
+/// Python's was duck-typed over any sequence and only *happened* to be handed a
 /// `list[State]`. The station folds a pre-reduced per-step temperature series with it
 /// (`examples/emit_sealed_energy_drift.rs`) rather than materializing 109,801 `State`s to
 /// satisfy a signature.

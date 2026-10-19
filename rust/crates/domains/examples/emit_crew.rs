@@ -3,7 +3,7 @@
 //!
 //! Unlike the Step-0 `simcore/examples/emit_crew.rs` (which hand-built the golden's
 //! own values to test the *interchange*), this **computes** crew_state from the ported
-//! engine — the real cross-port validation. `tests/crossport/test_crossport.py` runs
+//! engine — the real cross-port validation. `tests/crossport/test_crossport.py` ran
 //! this and compares the output to `crew_state.json` at **Tier 1 (bit-exact)**.
 //!
 //! Tier-0 invariants are asserted here in Rust: `rationed == 0`, `events == ()`, and —

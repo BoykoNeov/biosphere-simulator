@@ -492,6 +492,8 @@ written.
 
 ## Step 8 — stale record clean-up
 
+**TAKEN AND BUILT 2026-10-19** on the user's *"1, 2 and 3"*: `post-roadmap-stale-record-cleanup.md`. Slices 1–2 (comments and docs only); slice 3 not built. ⚠ The false rule quoted below was already gone (`e15b9f3`), and the counts below were a different matching rule's — the plan doc re-counts.
+
 ### The state, counted 2026-09-29
 
 - 648 lines in 87 Rust source files mention Python; 106 of them, in 19 files, are inside

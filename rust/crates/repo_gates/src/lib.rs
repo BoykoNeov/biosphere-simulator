@@ -102,7 +102,7 @@ const LOG_SELF: &str = "post-roadmap-log.md";
 /// Every `post-roadmap-*.md` named in `text`, excluding the log itself and any hit
 /// prefixed by `memory/`.
 ///
-/// The Python original is `(?<!memory/)\b(post-roadmap-[a-z0-9-]+\.md)`. Both exclusions
+/// The Python original was `(?<!memory/)\b(post-roadmap-[a-z0-9-]+\.md)`. Both exclusions
 /// are load-bearing and both are asserted in `tests/scanners.rs`:
 ///
 /// * the **lookbehind** keeps `memory/post-roadmap-direction.md` (a memory file, not a plan
@@ -153,7 +153,7 @@ pub fn plan_docs(text: &str) -> std::collections::BTreeSet<String> {
 
 /// The record file a pointer row names: `[the record](log/<slug>.md)`.
 ///
-/// The Python original is `\[the record\]\(log/([a-z0-9-]+\.md)\)`.
+/// The Python original was `\[the record\]\(log/([a-z0-9-]+\.md)\)`.
 pub fn record_link(row: &str) -> Option<String> {
     const OPEN: &str = "[the record](log/";
     let start = row.find(OPEN)? + OPEN.len();

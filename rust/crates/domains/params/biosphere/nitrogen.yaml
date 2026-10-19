@@ -6,7 +6,7 @@
 #   thresholds (residual / critical) and ground_area are SCENARIO/soil data (flow args),
 #   not crop params. The N-application rate is FORCING read through the source resolver.
 #
-# Units discipline (P4 / config/units.py): max_uptake_capacity (kg/m^2/day) is per-area
+# Units discipline (P4; now rust/crates/config/src/params.rs): max_uptake_capacity (kg/m^2/day) is per-area
 #   (NOT a conserved-Quantity canonical unit), so it is a schema-validated, bound-checked
 #   float carrying a declared unit, exact-string guarded at the loader. The concentration
 #   thresholds n_residual/n_critical are declared as kg N/kg DM (a dimensionless mass
@@ -115,7 +115,7 @@ parameters:
   # critical and f_N == 1; above it the plant is stressed at its own target.
   #   MEASURED: open_season peaks at 12.633 t/ha == 88 % of the crossing, i.e. f_N == 1
   #   holds on a ~12 % margin, not structurally. Any change that grows the open-field
-  #   crop ~15 % moves a frozen golden. Pinned in tests/test_nitrogen_form.py, NOT left
+  #   crop ~15 % moves a frozen golden. Pinned in tests/test_nitrogen_form.py (deleted by S6), NOT left
   #   as prose (the "freeze's prose half is ungated" lesson).
   n_target_coefficient:
     value: 0.05697

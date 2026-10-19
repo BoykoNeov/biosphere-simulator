@@ -28,7 +28,7 @@ new trophic level in a later phase). The discipline only insists the revision be
 reviewed, and re-captured* — not silent.
 
 **Not part of the biosphere reference (scoped out, by name):**
-- The **Phase-0 engine-skeleton demo** — `domains/biosphere/flows.py` (the trivial
+- The **Phase-0 engine-skeleton demo** — `domains/biosphere/flows.py` until S6 (the trivial
   `Photosynthesis`/`Respiration`/`Harvest` transfers, *no real biology*) and its
   `params/demo.yaml`. These exercise the *engine* (RK4 vs Euler, the conservation gate). The
   manifest excludes `demo.yaml` explicitly.
@@ -119,7 +119,8 @@ golden.** A prose-only correction: no golden, threshold, scenario or manifest va
 
 `season.run_perennial` applies `annual_reset` **unconditionally** — it never asks whether the
 scenario is a perennial one — and the 2026-08-13 step sweep drove *every* scenario through
-it. The sealed chamber's golden (`tests/test_regression_sealed_season.py`) uses plain
+it. The sealed chamber's golden (`tests/test_regression_sealed_season.py` then; since S6
+`rust/crates/domains/tests/golden_regression.rs`) uses plain
 `run_season` and re-sows never. Re-measured on today's tree:
 
 ⚠ **This table is a 2026-08-14 record and its `sealed_chamber` row no longer describes the
@@ -163,7 +164,8 @@ entry for what was and was not checked in binding it.
 reproduces exactly today; it is the **re-sown** sealed run's sequence, and the 76.82 it was
 compared against is the **no-re-sow** run's. Two configurations, not two trees. Separated,
 each converges monotonically from below to its own RK4 limit — which is what dissolves the
-apparent paradox. Both sequences are tabulated in `src/domains/biosphere/step.py`. What
+apparent paradox. Both sequences were tabulated in `src/domains/biosphere/step.py` (deleted
+by S6; read it at `4f7168e^`). What
 remains true is the *instruction*: **do not quote a convergence figure without saying which
 run it belongs to.**
 
@@ -470,8 +472,10 @@ the plan doc:**
    both directions; nobody should later discover the inertness and conclude it was missed.
 3. **No golden can catch its removal.** Deleting the aux process or the gate factor leaves
    every golden green. `aux_set` catches the process disappearing; everything else is
-   pinned in `tests/test_root_depth.py`, whose assertions are mutation-verified for
-   exactly that reason.
+   pinned in `tests/test_root_depth.py`, whose assertions were mutation-verified for
+   exactly that reason. ⚠ S6 deleted that file (2026-08-27); its Rust successors are the
+   root-depth tests in `rust/crates/domains/src/biosphere/{flows,system}.rs`, which this
+   contract has not re-verified by mutation (noted 2026-10-19).
 
 ### The param files — 15 clean-room biosphere param files
 
@@ -576,7 +580,8 @@ The fixture is unchanged and its hash has not moved, but **the shape of the day 
 now the day's radiation reached the crop as one daytime-mean PAR held flat across the whole
 day, and the only thing in the model that knew the sun sets was the factor `× daylength_s`
 inside the assimilation aggregator. Now `PAR_VAR` is a **within-day schedule**
-(`domains/biosphere/light_path.py`): the cited sinusoidal path ([E], *"The path of radiation
+(`domains/biosphere/light_path.py` then; `rust/crates/domains/src/biosphere/light_path.rs`
+since S6): the cited sinusoidal path ([E], *"The path of radiation
 intensity during the day is assumed to be sinusoidal"*), handed to the forcing seam as the
 **analytic mean over each step's window**, and the aggregator integrates over one day of
 seconds instead of over the photoperiod.
@@ -584,7 +589,8 @@ seconds instead of over the photoperiod.
 - **The day's photon dose is conserved exactly, at any step size** — `peak = (π/2)·mean` is
   the value that makes it so, and the window means are an exact partition of one integral.
   No parameter is introduced, no radiation created, `IRRAD` untouched. This is a
-  redistribution, not a recalibration, and `tests/test_light_path.py` pins it.
+  redistribution, not a recalibration, and `tests/test_light_path.py` pinned it until S6;
+  `light_path.rs`'s own tests pin it now.
 - **The manifest gains `forcing.light_path`**, a sampled fingerprint of the shape — and it is
   the one hash in this contract that is **compared**, not merely recorded. The shape can be
   changed without touching any file the other hashes cover, so provenance alone would have
@@ -684,7 +690,7 @@ Phase-3 goldens re-affirmed + the three Phase-4 long-horizon artifacts:
 | drift summary | both long-horizon runs (stability signature) | 15 | `drift_summary.json` |
 
 The long-horizon length is `LONG_HORIZON_YEARS = 15` — a single importable constant
-(`scenario.py`) shared by the long-horizon golden, the decade probe, and this manifest, so the
+(`scenario.py` until S6; now the reference's own) shared by the long-horizon golden, the decade probe, and this manifest, so the
 frozen horizon cannot drift. Each golden is a hex-float byte snapshot via `sim_io` (the
 `drift_summary` is the per-year peak-`leaf_c` / year-end `consumer_carbon` vectors + the period
 class). They are bit-identical **within a build**; the season uses transcendentals
@@ -711,9 +717,12 @@ The freeze is earned by Phase 4 Steps 1–4 (full detail + measured numbers in t
 - **The reference integrator + dt are locked** (Euler, `dt = 1`) — RK4 cross-check retired the
   escalation preconditions and structurally agreed, so Step 2 (escalation) was skipped.
 
-Tests of record: `tests/test_decade_stability.py`, `tests/test_biosphere_stress.py`
-(marked-slow), `tests/test_drift.py`, `tests/test_regression_long_horizon.py`, and the four
-Phase-3 scenario regression tests.
+Tests of record: `rust/crates/domains/tests/golden_regression.rs` (every biosphere golden),
+`rust/crates/domains/src/biosphere/science_gates.rs` (the science gates, decade stability
+among them), and `rust/crates/domains/tests/drift.rs`. ⚠ Until S6 (2026-08-27) this line
+named the Python tests of record — `test_decade_stability.py`, `test_biosphere_stress.py`,
+`test_drift.py`, `test_regression_long_horizon.py` and the four Phase-3 scenario regression
+tests — all deleted; read them at `4f7168e^`.
 
 ## The manifest
 
@@ -729,7 +738,7 @@ It names the integrator + dt, the horizon, the derived flow set + aux set, the p
 
 ⚠ **`tests/test_freeze_manifest.py` no longer writes it.** Until C7 that module assembled and
 serialized the file — so the contract was *authored* by the reference (slices 6, C4, C8, C9)
-and *written* by the checker. It is now a checker only, and the committed file is held to the
+and *written* by the checker. It was then a checker only until S6 deleted it, and the committed file is held to the
 writer byte for byte by `rust/crates/domains/tests/manifest_writer.rs` (S2 moved that gate
 out of Python; S6 build item 1 retired the original). One consequence to know
 before editing: **the manifest is a generated artifact, so a hand edit to it is red.** The
@@ -738,18 +747,20 @@ edit belongs in the writer.
 ### ⚠⚠ Who produces it — MIXED AUTHORITY since 2026-08-16 (reference-flip slice 6)
 
 The keys the **Rust reference tree** can produce are now read from it, by shelling
-`cargo run --example dump_biosphere_inventory`; the rest are still the checker's. **The file
+`cargo run --example dump_biosphere_inventory`; the rest were the checker's (S6 deleted it,
+so a `python` row is one not yet re-anchored). **The file
 says which is which, per key, in its own `_authority` block** — so a reader cannot mistake a
 Python-retained field for a Rust-derived one. Two consequences:
 
-- **Regeneration needs `cargo`.** The gates do not: nothing in `test_freeze_manifest.py`
-  shells cargo, and the base suite stays offline-clean. The cargo-side gates (is the manifest
-  *stale* against the reference tree; does the frozen `dt_days` literal still match the
-  reference's `BIO_DT`) live in `tests/crossport/test_inventory_parity.py`.
+- **Regeneration needs `cargo`.** While Python lived the gates did not: nothing in
+  `test_freeze_manifest.py` shelled cargo. The cargo-side gates (is the manifest *stale*
+  against the reference tree; does the frozen `dt_days` literal still match the reference's
+  `BIO_DT`) lived in `tests/crossport/test_inventory_parity.py`, and then in
+  `rust/crates/domains/tests/manifest_writer.rs`.
 - **The completeness gates changed meaning without changing their arithmetic.**
   `set(manifest["flow_set"]) == set(_flow_set())` used to say *the manifest froze everything
-  Python has*; it now says *Python still matches the reference*. A failure there is a **Python**
-  drift and is **not** fixed by regenerating.
+  Python has*; after slice 6 it said *Python still matches the reference*, and a failure there
+  was a **Python** drift, **not** fixed by regenerating. S6 deleted those gates.
 
 ⚠ **"The manifest is Rust-anchored" was the wrong summary until slice C4 (2026-08-18), and
 this paragraph is the record of what changed.** It read: *"By content most of it is still
@@ -786,8 +797,8 @@ gave it a second side to be compared *against*. The reference now embeds the fix
 finds **on disk**; `test_the_weather_hash_matches_the_reference_tree` fails if the two ever
 stop being the same bytes. This is the `locked_dt_days` shape — the reference emits the value
 **to be checked and never spliced**, so the key does not re-anchor. It guards a scheduled
-hazard rather than a hypothetical one: C9's `include_str!` reaches out of the Rust tree into
-the Python one, and the relocation slice will move that file. A control confirmed the teeth —
+hazard rather than a hypothetical one: C9's `include_str!` reached out of the Rust tree into
+the Python one, and the relocation slice was to move that file. A control confirmed the teeth —
 one digit changed in one `TEMP` value reddens exactly this test.
 
 ⚠ **The two anti-derived literals are unchanged, and `dt_days` gained the half it was
@@ -829,8 +840,10 @@ gate and is none. It stays enforced by the goldens.
   survives for the two *station* gates only, until slice C4b.
 
   ⚠ **A deleted claim is a different failure from an unexercised row, and only one of them is
-  structural.** The macro makes the second impossible; the first is caught by the manifest
-  comparison in `tests/crossport/test_inventory_parity.py` — measured, not assumed: deleting a
+  structural.** The macro makes the second impossible; the first was caught by the manifest
+  comparison in `tests/crossport/test_inventory_parity.py` (deleted by S6; the byte gate in
+  `rust/crates/domains/tests/manifest_writer.rs` is its successor, not re-measured for this
+  case on 2026-10-19) — measured, not assumed: deleting a
   gate declaration leaves the whole Rust suite **green** (the test simply ceases to exist) and
   turns that gate red naming the missing scenario.
 
@@ -851,8 +864,9 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
 1. **Justify + review.** Write down *why* (a calibration source, a new process, a bug). For a
    science or numerical change, get it **advisor-reviewed** before regenerating anything — the
    project's standing rhythm.
-2. **Make the change** boundary-side. `git diff src/simcore/` **must stay empty** —
-   unconditionally. (Even an RK4 escalation is a domain-side instantiation choice; there is no
+2. **Make the change** boundary-side. `git diff rust/crates/simcore/` **must stay empty** —
+   unconditionally. (⚠ This step named `src/simcore/` until 2026-10-19; S6 deleted it on
+   2026-08-27, so the check it prescribed had no subject.) (Even an RK4 escalation is a domain-side instantiation choice; there is no
    unfreeze path that edits `simcore/`.)
 3. **Regenerate the affected goldens** and **review the byte diff** — a change there means the
    trajectory moved, which is the point. **All seven of this contract's goldens are the
@@ -920,8 +934,11 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
    crests at 14.186, ×3); a carbon gain by another route can.
 6. **Record provenance.** Update this file and the Phase-4 plan with what changed and why (a
    calibration cites its primary source per `docs/param-file-conventions.md`).
-7. **Re-run the gates:** full suite (incl. `-m slow` for the stress), `ruff`, `pyright`; commit
-   with a Conventional Commit that names the unfreeze.
+7. **Re-run the gates:** from `rust/`, `cargo test --workspace --no-fail-fast`, `cargo test -- --ignored`
+   (the slow tests) and `cargo clippy --all-targets -- -D warnings`. ⚠ No CI job runs the
+   reference's tests since 2026-10-10, so this run is the gate. This step named `-m slow`,
+   `ruff` and `pyright` until 2026-10-19; S6 deleted the Python suite they ran on.
+   Commit with a Conventional Commit that names the unfreeze.
 
 ⚠ **"An undocumented unfreeze fails CI by construction" is NOT true in general, and the
 2026-08-12 `WSFD` build is the counter-example.** The claim used to read that way here. It

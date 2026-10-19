@@ -22,12 +22,12 @@
 //!   over the four canonical builds.
 //! * `light_path_samples` — the within-day PAR **shape**, sampled on a fixed grid and
 //!   written as hex-float text. The manifest stores a sha-256 *of these strings*; the
-//!   hashing is left to Python because it is pure formatting and this crate has no digest
-//!   dependency. ⚠ The sampling grid (three day lengths × the day's quarters) is
-//!   necessarily written out on both sides — Python must sample the same grid to check
-//!   itself against the reference. That is a duplicated literal whose *disagreement is
-//!   red in both directions*, which is the only tolerable kind: change either grid and
-//!   the fingerprints stop matching.
+//!   hashing was left to Python until C7 moved the writer here, and is now
+//!   `config::provenance`'s hand-rolled sha-256 (see [`manifest`]). ⚠ While Python
+//!   lived, the sampling grid (three day lengths × the day's quarters) was written out on
+//!   both sides — Python sampled the same grid to check itself against the reference, a
+//!   duplicated literal whose *disagreement was red in both directions*. S6 deleted the
+//!   Python side, so the grid has one copy now.
 //! * `horizons` — the run lengths, as the port's own constants.
 //! * `locked_dt_days` — ⚠ **emitted for CHECKING and never spliced into the manifest.**
 //!   `integrator` and `dt_days` are the two deliberately hand-written literals of the
@@ -41,8 +41,8 @@
 //! * ⚠ **`integrator` is deliberately NOT emitted, even though `dt_days` is.** The two
 //!   literals are not symmetric: `BIO_DT` is a real constant in this tree, while the
 //!   scheme is selected inline by each run helper and has no importable name on *either*
-//!   side — the Python module has said so since P4.3. A `"EulerIntegrator"` string typed
-//!   into this file would be a second hand-written literal checked against the first,
+//!   side — the Python module said so from P4.3 until S6 deleted it. A `"EulerIntegrator"`
+//!   string typed into this file would be a second hand-written literal checked against the first,
 //!   which reads like a gate and is not one. It stays what it has always been: documented
 //!   in the manifest, enforced by the goldens (an RK4 switch moves every one).
 //! * `weather_sha256` — ⚠ **emitted for CHECKING and never spliced, like
@@ -138,7 +138,7 @@ use simcore::hexfloat;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-/// The four canonical builds — the same union the Python manifest is derived from
+/// The four canonical builds — the same union the Python manifest was derived from
 /// (`_canonical_registries()`): the open field carries the boundary-atmosphere producer
 /// flows, the sealed chambers add the decomposer / water-cycle / consumer ones.
 fn canonical() -> Vec<SeasonScenario> {
@@ -304,9 +304,8 @@ fn inventory() -> (BTreeSet<&'static str>, BTreeSet<&'static str>) {
 /// slice 3, and still the *checking* surface after C7 moved the *writing*.
 ///
 /// ⚠ Deliberately unchanged by C7, raw UTF-8 and all. The manifest is now written
-/// directly (no pipe), but `tests/crossport/test_inventory_parity.py` still reads this,
-/// and the encoding pin it grew after slice C4's mojibake is a control that only has
-/// teeth while there is non-ASCII to mangle.
+/// directly (no pipe); `tests/crossport/test_inventory_parity.py` read this until S6
+/// deleted it, and the encoding pin it grew after slice C4's mojibake went with it.
 pub fn dump() {
     let (flows, aux) = inventory();
 
@@ -555,8 +554,8 @@ fn census_json(field: &str) -> Json {
 /// The `_authority` block, as `(manifest path, side, why)`.
 ///
 /// ⚠ `side` is who produced the **value** — not who hashed it and not who wrote the file;
-/// see the header above. A `python` row is a key still authored by the retiring checker,
-/// which under C is a queue and not a classification.
+/// see the header above. A `python` row is a key authored by the checker S6 deleted,
+/// not yet re-anchored; under C that is a queue and not a classification.
 ///
 /// ⚠ The prose was moved here from `tests/test_freeze_manifest.py::_AUTHORITY`
 /// mechanically (generated from the committed manifest and diffed), not retyped: it is

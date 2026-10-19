@@ -5,10 +5,10 @@
 //! slice 6.** In slice 3 it was a *witness*: it dumped the inventory and a Python gate
 //! checked it against a manifest Python had generated, so the two sides had independent
 //! origins and a disagreement was a finding. Since slice 7 the manifest is **generated from
-//! this output** — `tests/test_station_freeze_manifest.py::_build_manifest()` shells this
-//! example and splices the keys below in. The Python-side helpers that used to produce them
-//! (`_flow_set()`, `_aux_set()`, the two sealed-horizon constants) have become **conformance
-//! checks on the checker**.
+//! this output** — first by `tests/test_station_freeze_manifest.py::_build_manifest()`, which
+//! shelled this example and spliced the keys below in, and since C7 by this crate itself. The
+//! Python-side helpers that used to produce them (`_flow_set()`, `_aux_set()`, the two
+//! sealed-horizon constants) became conformance checks on the checker, and S6 deleted them.
 //!
 //! ⚠ **This was the half of slice 3 nobody had measured.** Slice 2 measured the biosphere
 //! names against the manifest and found them identical; the station set had only ever been
@@ -259,8 +259,9 @@ fn census(field: &str) -> String {
 /// The biosphere contract this one delegates to rather than re-hashing.
 ///
 /// ⚠ A path, not a derived value — `_authority` marks it `hand`. Its target's
-/// existence is checked on the Python side (`test_manifest_named_files_exist`), and
-/// since C7 what that gate actually guards is a literal in THIS file.
+/// existence was checked on the Python side (`test_manifest_named_files_exist`), which since
+/// C7 guarded a literal in THIS file. ⚠ S6 deleted that test and no Rust test took it over,
+/// though the manifest note below still names it (2026-10-19).
 const BIOSPHERE_MANIFEST: &str = "docs/biosphere-reference.manifest.json";
 
 const AUTHORITY: [(&str, &str, &str); 16] = [
@@ -477,9 +478,8 @@ fn inventory() -> (
 /// The reference's half of the manifest, as JSON on stdout — the checking surface.
 ///
 /// ⚠ Deliberately still a `println!` stream of raw UTF-8, unchanged by C7's station half.
-/// `tests/crossport/test_inventory_parity.py` reads it, and the `encoding="utf-8"` pin
-/// that reader grew after C4's mojibake is a control that only has teeth while there is
-/// non-ASCII to mangle — which, since C4b put the claim text here, there is.
+/// `tests/crossport/test_inventory_parity.py` read it, with an `encoding="utf-8"` pin grown
+/// after C4's mojibake, until S6 deleted that reader and its pin.
 pub fn dump() {
     let (flows, aux, files) = inventory();
 

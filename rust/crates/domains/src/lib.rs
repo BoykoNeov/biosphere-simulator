@@ -2,11 +2,17 @@
 //!
 //! The four standalone domains — [`power`], [`thermal`], [`eclss`], [`crew`] — each
 //! port their Python twin's stocks, flows, scenario, and system-builder onto the
-//! [`simcore`] engine. There is **no new science**: every flow's arithmetic mirrors
-//! the Python `evaluate` character-for-character (float `+`/`*` are not associative,
-//! so op-order is load-bearing for the bit-exact Tier-1 gate on crew/eclss), and the
-//! coefficients arrive from the frozen Python loaders via [`params`] (a generated
-//! hex-float file, not a re-parsed YAML).
+//! [`simcore`] engine. There is **no new science**: every flow's arithmetic was written to
+//! mirror the Python `evaluate` character-for-character (float `+`/`*` are not associative,
+//! so op-order is load-bearing for the bit-exact Tier-1 gate on crew/eclss). The
+//! coefficients arrived from the frozen Python loaders via [`params`] (a generated hex-float
+//! file) until slice C1; [`params`] now loads the frozen YAML itself.
+//!
+//! ⚠ **History, not authority** (2026-10-19). This crate was ported from Python and its comments
+//! still name the code it came from (`test_*.py` files, Python modules and classes). S6 deleted
+//! all of it at `4f7168e` (2026-08-27); read it at `4f7168e^`. Since the reference flip
+//! (2026-08-16) this crate is the reference: a comment saying it was "ported from" or "mirrors"
+//! Python records where the code came from, not a copy it must keep matching.
 //!
 //! Cross-port tiers (see `docs/plans/phase-7-native-core.md` / `tests/crossport/`):
 //! **crew** and **eclss** are transcendental-free ⇒ Tier-1 bit-exact; **power** (the
