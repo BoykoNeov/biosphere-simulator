@@ -226,3 +226,46 @@ The soil-water split (`soil_water`, `subsoil_water`, `condensate`) may move free
 within 1 %. The cabin stays above its target at every day's end (the crew breathes ~40× the crop's
 peak lit uptake). 15 of 20 goldens byte-identical. The carbon leak test's cabin falls to about
 1.14 mol during the leak (≈ 120 ppm), against ≈ 400 ppm today.
+
+## 10. Measured against §9 (2026-10-20) — lab only, nothing frozen moved
+
+`cargo run --release -q -p station --example crew_size_lab` (from `rust/`, below-normal priority;
+`station/examples/crew_size_lab.rs`). Raw output:
+`sources/temp-evidence/crew-size/crew-size-lab-n4.txt` (all five) and `crew-size-lab-n4-sealed.txt`
+(the sealed station again, with the re-sow days). **All five frozen sides reproduce their golden's
+bytes.** Every switched run: `rationed 0`, `events 0`.
+
+**Every predicted number held.** To the printed figures: food stores 935.0526 / 3272.589 /
+373 222.598; fecal 3.31232 / 37.098 / 6465.647; the cabin 12.30264 (crop cabins 12.3026, sealed
+12.303); `co2_removed` 61.521 and sealed 120 216.8 (predicted ≈ 120 220); `cabin_o2` 1994.4293;
+`o2_supply` −61.064; crew water 9.0850, 18.481 (predicted ≈ 18.48), 77.752, sealed 17 869.0
+(≈ 17 869); brine 2130.56 (≈ 2131). No day ends with the cabin below its target (0 of 8, 8, 1221).
+The soil-water total is unchanged to the fourth decimal while its split moved freely, as flagged
+(condensate +55 %, subsoil −9.7 %, soil −5.3 %). The sealed grain peak, read per season by the
+lab: **−0.33 % to −0.35 %** in all four seasons (predicted about −0.4 %). Re-sow days identical
+(141, 281, … 1121).
+
+**The plant stocks, against "each about −0.4 %":** root −0.59 %, stem reserve −0.52 %, stem −0.50 %,
+**leaf −0.06 %**. Three in range; the leaf moved less than predicted. The final day's leaf belongs
+to a crop re-sown on day 1121, 99 days old, so it says more about that crop's stage than about the
+CO₂ slope. Recorded as a miss of the size, not of the sign.
+
+**Three moves not predicted, each explained:**
+
+* **The cabin's humidity, +11.1 % (1.8538 → 2.0592 kg), in every build.** The condenser holds the
+  vapour above its target by the crew's humidity over its rate, and that output is ×4.04. Same
+  mechanism as the CO₂ and O₂ offsets; it was left out of the table, not out of the model.
+* **The harvest build's soil carbon, −69.9 %** (litter, microbes, humus). That build sends the
+  crew's feces into the soil (`build_harvest(…, close_feces = true)`), so the soil's carbon input
+  is the fecal carbon, ÷3.33 like it.
+* **The sealed station's energy, by about 0.01 %** (battery +1.2 MJ over four years, the node and
+  the two boundaries with it). By elimination it is the plant room's heater, the one flow on the
+  battery that is not fixed: the lamp follows the same re-sow days, and the base load and the solar
+  charge are constants. A slightly smaller crop transpires a little differently, which changes
+  the heat the heater makes up.
+
+**Unchanged and not run:** the 15 other goldens (none reads the station's crew); the non-golden
+tests of §6, read at adoption. **Adoption is the user's call**, a station unfreeze: five goldens,
+the station manifest's hashes, and the scenario's form (§4: the crew count and the loaded `f_resp`,
+the BVAD constants in one module, the 200 kg crop-cabin store, the crew-only cabins started at
+the target).
