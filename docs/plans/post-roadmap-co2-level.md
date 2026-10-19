@@ -280,3 +280,61 @@ station's water readouts in the TM 102788 scorecard (`real-world-checks.md`) sho
 **Also moved in `sealed_station`, not predicted in size:** battery −0.51 %, `boundary.space`
 +0.12 %, the thermal node +0.04 %, the chamber's surroundings −0.07 %. The energy books move with
 the crop, presumably through the chamber's heat (lamp, cooling, latent). The path was not traced.
+
+### The water total, measured (2026-10-19)
+
+The readout owed above. `cargo run --release -q -p station --example co2_water_lab` (from `rust/`,
+below-normal priority, 455 s; raw: `sources/temp-evidence/co2-level/co2-water-lab.txt`, day series:
+`.../co2-water-series.csv`). The tool runs the sealed station's four years twice through the lab's
+two-rate driver in the reference's interleaved order. It **asserts** that the frozen side's final
+state is `sealed_station_state.json` byte for byte before printing anything. Every flow of both
+sides is re-evaluated on each step's start state, and its legs into and out of the chamber's four
+water stores (soil, subsoil, vapour, condensate) are summed by flow and by year.
+
+**The instrument closes.** For each store and each side, delivered − drawn + the re-sow hook's
+moves equals final − initial to within 1.5e-11 kg. The chamber holds exactly 195.000000 kg of
+water on every day of both runs, so no water crosses to the cabin or the crew's loop. Both runs
+had `rationed (0, 0)` and no events.
+
+⚠ **`biosphere.transpiration` is the crop's AND the soil's evaporation**, one leg out of the root
+zone since the water-forms adoption (2026-10-10). The tool splits them by the flow's own daily
+counter (`soil_evap_today`, restarted on each day's first plant step).
+
+| Four years, kg | Frozen (400 ppm) | 0.13 kPa (1323 ppm) | Change |
+|---|---|---|---|
+| **Crop transpiration** | 2308.9 | 2625.8 | **+13.7 %** (yearly +12.8 to +14.7 %) |
+| Soil evaporation | 285.2 | 247.6 | −13.2 % (the larger canopy shades the soil) |
+| Both, out of the root zone | 2594.1 | 2873.4 | +10.8 % |
+| Watering, condensate → soil | 2641.5 | 3006.5 | +13.8 % (33 → 39 watering days) |
+| Condensation from the air | 23.3 | 22.8 | −2.1 % |
+
+**Read against the crop:** plant carbon +52.5 %, crop water +13.7 %. Water per unit of carbon
+falls by about a quarter. The model's stomata do not respond to CO₂ (the surface resistance reads
+leaf area only, Szeicz–Long), so the extra water is the larger canopy's, not a change in the leaf.
+A real leaf partly closes its stomata at high CO₂, so if anything the model overstates the rise.
+
+**The phase reading is confirmed by the day series.** The yearly mean soil water agrees between
+sides to 1–4 % (62.8 / 63.0 / 61.4 / 66.8 against 63.6 / 62.4 / 63.7 / 68.7 kg), and the
+condensate means scatter both ways (43 / 46 / 65 / 52 against 38 / 52 / 58 / 45). The switched
+run waters on day 1215, four days before the end (soil 68.4 → 144.7, condensate 84.2 → 1.1). The
+frozen run last watered on day 1205, 14 days before. That alone makes the final day's −77 % / +70 %
+split.
+
+**Also seen, already in the frozen run and not this item's:** the re-sow hook moves root-zone
+water into the subsoil (768 kg over four years frozen, 810 switched), as a new seedling's shallow
+roots reset the root zone. Recorded only.
+
+**The TM 102788 scorecard cannot move.** It builds the open field with leaf CO₂ as a fixed
+forcing (`station/tests/scorecard_tm102788.rs`, no ECLSS or sealed build anywhere in it), so the
+scrubber cannot reach it. It is also the one real-chamber check of the crop's water, and it was
+run at 1000 ppm, close to the adopted level: water 0.928 of measured (the figure since the lit-share
+adoption, `log/lit-share-stomata.md`, quoted from the record, not re-run here).
+
+**What adoption would cost** (from §6, unchanged): the station unfreeze ceremony; `eclss.yaml`
+gains the cited `co2_fraction` (130 Pa of 101.325 kPa) and the 1e-2 rate; `params.rs`,
+`sibling_params.txt`; the authoring registry and the three authored files (five entries) that set
+`co2_scrub_rate`; six goldens (`eclss`, `cabin_gas`, `water_recovery`, `greenhouse`, `harvest`,
+`sealed_station`) regenerated against the predictions already measured here, with the inert-charge
+move now among them; the station and authoring manifests regenerated. **Open before any build:**
+an authored file that classes the scrubber slow runs it at `k·h = 18`. It must be refused or moved
+to the fast class.

@@ -37,8 +37,18 @@ and tables: `docs/plans/post-roadmap-co2-level.md`; tool: `station/examples/co2_
   plant +52.5 %, grain +49.4 %, within 0.5 % of the first-order price. One unpredicted move,
   explained: `chamber_inert` −0.235 kg, because a higher CO₂ start leaves less "rest of the air".
   The sealed station's final-day water split moved −77 % / +70 % with the sum unchanged: the
-  watering pulses run at a different phase. **Owed before adoption:** the transpiration total, and
-  a day series to confirm the phase reading. Adoption is the user's.
+  watering pulses run at a different phase. Adoption is the user's.
+* **The water total, MEASURED the same day** (`station/examples/co2_water_lab.rs`). It asserts the
+  golden's bytes first, and its per-store books close to 1.5e-11 kg; the chamber holds 195 kg on
+  every day. Over four years the crop transpires **+13.7 %** (2309 → 2626 kg) against plant carbon
+  +52.5 %; soil evaporation falls 13.2 % under the larger canopy, so the root zone loses +10.8 %.
+  Watering from the condensate +13.8 % (33 → 39 watering days). The day series confirms the phase
+  reading: the switched run watered four days before the end, the frozen one 14. The TM 102788
+  scorecard cannot move (open build, leaf CO₂ a forcing). Nothing is owed before adoption but the
+  authored-file `k·h` check and the ceremony.
+* **Lesson: a flow's name is not its contents.** `biosphere.transpiration` has carried the soil's
+  evaporation too since 2026-10-10, and the two moved in opposite directions here (+13.7 % /
+  −13.2 %). Read a flow's legs before quoting its total as one process.
 * **Lesson: a first-order remover's level is the load's, not the equipment's.** "Size it from the
   real machine" sounds like realism, but the level then reports the crew's size. Cite the
   quantity the source actually states, here the level.
