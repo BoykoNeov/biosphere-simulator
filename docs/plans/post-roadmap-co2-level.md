@@ -449,3 +449,14 @@ declares `cabin_air_mol` (six files: `eclss_cabin`, `eclss_multirate_cabin`,
 `eclss_thermal_habitat`, `bioregenerative_station`, `lamp_greenhouse`, `potato_greenhouse`);
 `kinetics_param_map` exposes `co2_partial_pressure`; `IMPLICIT_SCRUBBER_AIR_MOL` is deleted; the
 authoring manifest is regenerated. Then the crew-size fix (§9, the user's "option 1").
+
+**Follow-up checks after the push (advisor's list).** The swapped `co2_target_lab` was run once:
+all six frozen sides reproduce the new goldens' bytes, and its old-form side lands exactly on the
+pre-adoption values (cabin CO₂ 3.0 / 3.796 mol, `chamber_inert` 210.134228 kg), with the same moved
+counts as §9 (raw: `sources/temp-evidence/co2-level/co2-target-lab-after-adoption.txt`). The
+authored files' measured prose was re-read with the throwaway probe (its source and outputs kept in
+the same folder: `probe-main.rs.txt`, `potato-solar-150d.txt`, `potato-solar-14d.txt`,
+`bioregen-year.txt`): in `bioregenerative_station.yaml` the bloom (5×), feed tank (4.5×), monod
+factor (0.250 → 0.600) and regulator (1994.76 mol) read as before, and the O₂ buffer now drains
+500 → 136.4 (was 148.2), corrected there. `lamp_greenhouse.yaml` quotes no measured CO₂ or battery
+figure. The `air_split` example notes that it now runs at a different level from its test.

@@ -81,9 +81,13 @@
 #
 # The run starts deliberately OFF the fixed point in every book at once: the culture blooms
 # 5x, the feed tank fills 4.5x while its monod factor slides 0.250 -> 0.600, the O2 buffer
-# drains 3.4x into it, the regulator lifts cabin O2 from 1993.0 to 1994.76 mol, the water loop
+# drains 3.7x into it, the regulator lifts cabin O2 from 1993.0 to 1994.76 mol, the water loop
 # charges from empty, and the thermal node warms from 102.7 K to 301.8 K. A habitat that
-# "closes" because nothing moves would prove nothing.
+# "closes" because nothing moves would prove nothing. (⚠ Re-measured 2026-10-19 after the cabin
+# began holding a cited CO2 level, docs/plans/post-roadmap-co2-level.md §10: the bloom, the feed
+# tank, the monod factor and the regulator read as before; the O2 buffer drains 500 -> 136.4,
+# where it was 148.2 (3.4x), with the cabin now holding 12.24 mol of CO2 instead of 0.47. The
+# thermal figure was not re-read: no flow it depends on reads the cabin's CO2.)
 #
 # All floats carry an explicit decimal point (the YAML-1.1 dotless-exponent hazard: under
 # the 1.1 float resolver yaml.safe_load parses `2e-5` as a *string*).
@@ -166,7 +170,7 @@ stocks:
   # NOT `unclamped`, because it is a real finite inventory rather than a ledger entry.
   # ⚠ State that honestly: the CONSEQUENCE (arbitration would scale the regulator's draw
   # if this tank ran low) is STRUCTURAL REASONING, NOT EXERCISED — the tank drains
-  # monotonically 500 -> 148.2 and never approaches zero, so `rationed == 0` here says
+  # monotonically 500 -> 136.4 (148.2 until 2026-10-19) and never approaches zero, so `rationed == 0` here says
   # nothing about the clamped path. Sizing a run that actually empties it would be a
   # different scenario, and is not attempted.
   - id: store.o2_tank
@@ -373,7 +377,8 @@ flows:
   # year. Found when a test began running every authored file
   # (rust/crates/authoring/tests/authored_content.rs). The cabin now starts 2.0 mol below the
   # new setpoint, as 8.0 was below 10.0; the offset below depends on f*q/k, not on the
-  # setpoint, so every other book in this file runs as before (the tank still ends at 148.2).
+  # setpoint, so every other book in this file runs as before (the tank still ends at 148.2;
+  # 136.4 since the CO2 level of 2026-10-19).
   #
   # THE DIRECTION GATE, REASONED (run_scenario raises ReversedFlowError if cabin_o2 is ever
   # found ABOVE the setpoint — the one check rationing structurally cannot perform, because

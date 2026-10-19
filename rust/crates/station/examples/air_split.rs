@@ -14,6 +14,11 @@
 //!   10 mol/s, vapour off).
 //!
 //! It writes nothing and takes no decision.
+//!
+//! ⚠ **Since 2026-10-19 this runs at the adopted cabin CO₂ level (0.13 kPa), while
+//! `tests/air_split.rs` runs at the old 400 ppm** its pins were measured at, through the lab's
+//! first-order switch (`docs/plans/post-roadmap-co2-level.md` §10). Their numbers are no longer
+//! the same runs: at 1283 ppm the fan-fed chamber is far less hungry.
 
 use domains::biosphere::params as bio_params;
 use domains::biosphere::readouts::withdrawal_demand;
