@@ -154,6 +154,11 @@ is the build that reads it; the row now runs there.
    double the plant tissue. ⚠ No citation can fix it: the form is wrong (real CO₂ removal is a
    cyclic bed swing, not a first-order drain), so chasing it is a **form and sizing decision**, not a
    page to find. BVAD is on the shelf (`sources/`) and carries equipment figures.
+   ⚠ *2026-10-19* (`post-roadmap-co2-level.md`, taken as the next item): BVAD Rev 2 carries **no** CO₂-
+   removal equipment figures. The "÷8, ISS CDRA's 144-min bed cycle" label mistakes a swing period
+   for a removal time constant; an airflow estimate gives ~÷24 before capture efficiency. The ÷8 and
+   ÷30 rows stand as measurements at those rates. The item was re-read as the cabin's *level*, which
+   BVAD Table 4-1 does cite. The bullet above is left as written.
 2. **Maintenance respiration (`maintenance_coef`).** Its own recorded range alone crosses the yield
    tripwire and moves the jar's CO₂ low by −15 % to +32 %, the largest plant-side swing measured.
 3. **Growth efficiency (`growth_efficiency`).** +10 % crosses the tripwire; the top of its recorded

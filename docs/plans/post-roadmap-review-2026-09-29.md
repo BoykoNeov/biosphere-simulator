@@ -363,7 +363,7 @@ only if a second development machine becomes real.
 
 ## Step 5 — sources for numbers
 
-**Item 1 (the triage table) TAKEN AND BUILT 2026-10-19** on the user's *"1, 2 and 3"*: `post-roadmap-uncited-triage.md`. ⚠ The "60" below counted the text `TODO(cite)`, not values; the roster is 45 uncited values, 40 measured. The scrubber's error is re-read there as ~8–30×. Items 2–3 unchanged: the Bernacchi PDF is still owed.
+**Item 1 (the triage table) TAKEN AND BUILT 2026-10-19** on the user's *"1, 2 and 3"*: `post-roadmap-uncited-triage.md`. ⚠ The "60" below counted the text `TODO(cite)`, not values; the roster is 45 uncited values, 40 measured. The scrubber's error is re-read there as ~8–30×. Items 2–3 unchanged: the Bernacchi PDF is still owed. ⚠ *2026-10-19, item 2* (`post-roadmap-co2-level.md`, OPENED and PRICED): **BVAD Rev 2 carries no CO₂-removal equipment figures**; grepped for CDRA, four-bed, molecular sieve, swing bed, amine, LiOH. The scrubber was re-read as a cabin *level* (Table 4-1 cites those) and priced at three cited levels; the choice is the user's.
 
 ### The state
 

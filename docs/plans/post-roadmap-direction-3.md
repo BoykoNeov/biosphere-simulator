@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `uncited-triage.md`
+**Re-read against the record's last row:** `co2-level.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -631,6 +631,14 @@ stands. §2.4 (Bernacchi) is unchanged and still owed; none of its constants is 
 "which lever relieves" the whole-crew draw "is not measured" STANDS: the triage moved the scrubber on the frozen
 1 m² station, not at the crew's area. Nothing in §3 is re-proposed; §3's partition-table verdicts are unchanged
 (the table ranks first at ±10 % and is listed, not proposed).
+
+⚠ *Re-read 2026-10-19* (`log/co2-level.md`: OPENED and PRICED, lab-only, the level is the user's). Grepped this
+plan for scrub, ppm, CO₂ controller, enrichment and the cabin's CO₂. **§2.2 is NOT decided by this.** §2.2's
+controller adds CO₂ to plant-only chambers and vents it two-sided. This item concerns the crew cabin's
+remover, which only takes CO₂ out; the only change is the level it stops at. The plan doc §8 says so. The
+§2.2 note that "which lever relieves" the whole-crew draw "is not measured" STANDS: this item priced levels
+on the frozen 1 m² station. §2.5's rule stands: a finding (the level is nobody's choice) leans on one value,
+which is how the queue is meant to be taken. §3 holds no CO₂-level item; nothing there is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
