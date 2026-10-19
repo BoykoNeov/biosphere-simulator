@@ -13,16 +13,17 @@ predictions; no value, golden, manifest or `source:` string moved. Plan: `docs/p
   the ECLSS stand-in 10.5 / 0.59 / 12.4. `bioregenerative_station.yaml` calls the first *"one crew member"*,
   `lamp_greenhouse.yaml` the second *"a crew of one"*, and `crew_habitat_template.yaml` multiplies the first per
   crew member. Recorded, not touched: a science change and a re-labelling do not share a batch.
-* **The form.** The food rate is BVAD's food-carbon total (24.654 + 1.332 = 25.986 mol C/CM-d), so no second copy of
-  the loaded `f_resp` is typed into a constant; breathed out it is +0.028 % over BVAD's CO₂ (the rounding of 0.949).
-  This departs on purpose from the science gate, which calibrates to the CO₂ load. Water re-derived from BVAD:
-  +1.065 %.
+* **The form.** The food rate is computed at run time, `N × BVAD's CO₂ load ÷ the loaded f_resp`, as the science
+  gate's cabin is, so `f_resp` exists once. ⚠ A constant food-carbon total (24.654 + 1.332 = 25.986 mol C/CM-d) was
+  the first draft and was withdrawn on review the same day: its 1.332 carries the same 50 % feces-carbon assumption
+  that made `f_resp` 0.949, so it is a hidden second copy. Water re-derived from BVAD: +1.065 %.
 * **A coverage hazard, found before building.** The two crew-only cabins start at 0 CO₂; at one crew member they reach
   the scrubber's target at step 712 of 900, so the scrubber would be tested on a fifth of the run and no golden would
   say so. Proposed: start them at the target, as every other cabin store starts at its own.
 * **Predicted at one crew member** (before any measurement): food draw and fecal carbon ÷13.3; the cabin 12.568 →
-  12.217 mol (1323 → 1286 ppm); sealed grain −0.2 % to −1.4 %; 15 of 20 goldens byte-identical. The crew's body heat
-  is in no room's books, so nothing there moves.
+  12.217 mol (1323 → 1286 ppm); the sealed station's plant stocks about −0.5 % (its golden holds no grain; the
+  soil-water split may move freely, its total within 1 %); 15 of 20 goldens byte-identical. The authored bed does not
+  read the station's crew (read in `bed.rs`'s build path). The crew's body heat is in no room's books.
 * **Not closure.** One crew member still needs about 14 m² of crop; the bed is 1 m². The crew-coupled loop stays
   refused.
 * **The crew count is the user's choice** (one recommended; four needs the water store measured; 13.3 with water to
