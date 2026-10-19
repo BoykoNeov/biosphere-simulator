@@ -184,3 +184,45 @@ the known O₂ miss (−11.8 % against BVAD) is unchanged.
    four crew members, BVAD water on and off, and the start at the target, against §6.
 2. **The user's adoption choice**, on the measured numbers.
 3. **Adoption** as a station unfreeze: save the lab's switched states as bytes, regenerate, `cmp`.
+
+## 9. The user's answers (2026-10-20), and the predictions at four crew members
+
+**Four crew members; water re-derived from BVAD in the same change; the two crew-only cabins
+started at the scrubber's target.** One consequence, taken as the obvious default and said so to
+the user: the 7-day greenhouse and harvest cabins hold 50 kg of crew water, and four crew members
+drink 122.25 kg in 7 days, so the store would run dry on day 3 (the flows are forced). It becomes
+**200 kg**, today's margin kept (50 kg for 30.24 drunk is 1.65×; 200 for 122.25 is 1.64×).
+
+Rates: food 1.2027304e-3 mol C/s (computed from the loaded `f_resp`), breathed out 1.1413911e-3
+mol/s (4 × 24.654 mol/d exactly), water 2.0212963e-4 kg/s (4.0426× today). The CO₂ offset over the
+target is 0.1141 mol (1295 ppm, −28 ppm from today), the O₂ offset 0.5707 mol. Written before the
+measurement, by the same arithmetic as §6:
+
+| Golden | Stock | Today | Predicted (N = 4) |
+|---|---|---|---|
+| `cabin_gas`, `water_recovery` | `crew.food_store` | 784.000 | **935.0526** |
+| | `boundary.fecal_waste` | 11.016 | **3.31232** |
+| | `eclss.cabin_co2` (started at 12.188502) | 12.568102 | **12.30264** |
+| | `boundary.co2_removed` | 192.416 | **≈ 61.52** |
+| | `eclss.cabin_o2` | 1993.102 | **≈ 1994.429** |
+| | `boundary.o2_supply` | −203.086 | **≈ −61.06** |
+| `cabin_gas` | `crew.water_store` | 17.300 | **9.0850** |
+| `water_recovery` | `crew.water_store` | 19.624250 | **≈ 18.48** (today's net loss × 4.0426, if recovery is linear in throughput) |
+| `greenhouse`, `harvest` | `crew.food_store` | 1580.800 | **3272.589** (harvest a little above) |
+| | `boundary.fecal_waste` | 123.379 | **37.098** |
+| | `crew.water_store` (now from 200) | 19.760 | **77.752** |
+| | `biosphere.carbon_pool` | 12.568105 | **≈ 12.3026** |
+| `sealed_station` | `crew.food_store` | 78 368.000 | **373 222.598** |
+| | `boundary.fecal_waste` | 21 503.232 | **6465.647** |
+| | `boundary.co2_removed` | 400 033.1 | **≈ 120 220** (120 312 breathed out, less the crop and soil's net uptake, ~95 today) |
+| | `boundary.brine` | 527.028 | **≈ 2131** (today brine is 10.0 % of the crew's water, the recovery's 0.9) |
+| | `crew.water_store` | 19 472.854 | **≈ 17 869** — the store holds, about 11 % down over four years |
+| | `biosphere.carbon_pool` | 12.568517 | **≈ 12.303** |
+| | `biosphere.o2_pool` | 1993.099927 | **≈ 1994.43** |
+| | `leaf_c`, `stem_c`, `stem_reserve_c`, `root_c` | | each **about −0.4 %** (−28 ppm at §6's ~0.5 % per 39 ppm) |
+| | yearly grain peak (read by the lab, not in the golden) | | **about −0.4 %** |
+
+The soil-water split (`soil_water`, `subsoil_water`, `condensate`) may move freely; their total
+within 1 %. The cabin stays above its target at every day's end (the crew breathes ~40× the crop's
+peak lit uptake). 15 of 20 goldens byte-identical. The carbon leak test's cabin falls to about
+1.14 mol during the leak (≈ 120 ppm), against ≈ 400 ppm today.
