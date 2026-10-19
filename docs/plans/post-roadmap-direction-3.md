@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `co2-level.md`
+**Re-read against the record's last row:** `crew-size.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -639,6 +639,13 @@ remover, which only takes CO₂ out; the only change is the level it stops at. T
 §2.2 note that "which lever relieves" the whole-crew draw "is not measured" STANDS: this item priced levels
 on the frozen 1 m² station. §2.5's rule stands: a finding (the level is nobody's choice) leans on one value,
 which is how the queue is meant to be taken. §3 holds no CO₂-level item; nothing there is re-proposed.
+
+⚠ *Re-read 2026-10-20* (`log/crew-size.md`: OPENED, a plan with predictions, nothing built). Grepped this plan
+for crew, crew member, food, 13.3 and the crew's area. It discharges nothing here. The §2.2 note that "which lever
+relieves" the whole-crew draw "is not measured" STANDS: that draw is a crop sized to the crew's area, and this item
+changes the crew on the frozen 1 m² station, not a crop's area. At one crew member that station's crop draws a larger
+share of a smaller crew's CO₂, still about a tenth at its lit peak, so the scrubber never idles (predicted, not yet
+measured). §3 holds no crew-size item; nothing there is re-proposed.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
