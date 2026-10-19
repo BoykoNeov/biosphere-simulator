@@ -10,10 +10,10 @@
 # THE LOOP. The crew (eclss.crew_metabolism, forced at the standalone ECLSS scenario's rates)
 # breathes the BED's own air: it takes O2 from `biosphere.o2_pool` and adds CO2 to
 # `biosphere.carbon_pool` and water to `biosphere.water_vapor` — the stocks the plants
-# photosynthesise from and transpire into. The CDRA-style scrubber holds the shared CO2 near its
-# steady state; the O2 regulator holds the shared O2 at 21 % of the bed's air, so it must declare
-# that air (cabin_air_mol: 9500.0 — on the bed's O2 the platform refuses any value but the bed's
-# air). A solar array charges the battery the lamp and the chamber's heater draw on; the chamber's cooler
+# photosynthesise from and transpire into. The scrubber holds the shared CO2 near BVAD's 0.13 kPa
+# of the bed's air and the O2 regulator the shared O2 at 21 % of it, so each must declare that air
+# (cabin_air_mol: 9500.0 — on the bed's CO2 and O2 the platform refuses any value but the bed's
+# air; the scrubber since 2026-10-19). A solar array charges the battery the lamp and the chamber's heater draw on; the chamber's cooler
 # and the solar waste heat land on a thermal node, which radiates to space.
 #
 # COMPOSITION. The bed's carbon pool carries {carbon: 1, oxygen: 2} and its O2 pool {oxygen: 2},
@@ -118,6 +118,7 @@ flows:
       cabin_co2: biosphere.carbon_pool
       co2_removed: boundary.co2_removed
     params: eclss
+    cabin_air_mol: 9500.0  # the bed's air (bed.air_mol's default) — required, and the only value accepted here
   - id: eclss.o2_makeup
     type: eclss.o2_makeup
     wiring:

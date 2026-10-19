@@ -201,7 +201,7 @@ key is a schema error, not a silent drop. The manifest freezes each model's fiel
 | `BundleSpec` | a reusable domain/species bundle: `parameters`/`stocks`/`flows`/`forcings` — **no run config, no nested `includes`** (both rejected by `extra="forbid"`) |
 | `IncludeSpec` | the `{bundle, prefix}` namespaced include form |
 | `StockSpec` | one stock: id/domain/quantity/kind/amount + optional `composition`/`unclamped`/`extinction_threshold` |
-| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params`/`rate_class`, + `cabin_air_mol` (required on `eclss.o2_makeup` and `eclss.condenser`, refused elsewhere; 2026-10-18) |
+| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params`/`rate_class`, + `cabin_air_mol` (required on `eclss.o2_makeup` and `eclss.condenser` since 2026-10-18 and on `eclss.co2_scrubber` since 2026-10-19, refused elsewhere) |
 | `KineticsSpec` | `rate` (the grammar above) × `stoichiometry` |
 | `ForcingSpec` | `const` — **constant forcings only** |
 | `ParamPackRef` | `{pack: …}` — an alternate param file read by the *same* frozen loader |
@@ -286,7 +286,7 @@ how positivity holds, and whether the flow is multi-instanceable:
 | `thermal.heat_input` | `heat_source`, `node` | — | FORCED `heat_load` | — |
 | `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** | — (`τ ≫ dt` is not a predicate) |
 | `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) | — (state-dependent) |
-| `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor, one-sided (`k_scrub·max(0, cabin_co2 − target)`, since 2026-10-19; the target is `co2_partial_pressure` of the cabin's air, `post-roadmap-co2-level.md`; first-order `k_scrub·cabin_co2` before) | `co2_scrub_rate` |
+| `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor, one-sided (`k_scrub·max(0, cabin_co2 − target)`, since 2026-10-19; the target is `co2_partial_pressure` of the flow's declared `cabin_air_mol` (a temporary 9500 mol until slice B, the same day), `post-roadmap-co2-level.md`; first-order `k_scrub·cabin_co2` before) | `co2_scrub_rate` |
 | `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor, one-sided (`k_cond·max(0, cabin_h2o − setpoint)`, since 2026-10-03; the setpoint is `humidity_fraction` of the saturation of the flow's declared `cabin_air_mol` since 2026-10-18, `post-roadmap-authored-plants.md` §15) | `condense_rate` |
 | `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) | `o2_makeup_gain` |
 
@@ -808,9 +808,10 @@ bed:
   composition: its starting CO₂ and O₂ scale with the air by the station's own resize
   (`SealedStationScenario::with_chamber_air`, the separate-air lab's too), and every reader of the
   room's size — the leaf's CO₂ and O₂ shares, the vapour ceiling — reads the new size. A regulator
-  on the bed's air must declare exactly that air: an `eclss.o2_makeup` wired to `biosphere.o2_pool`
-  and an `eclss.condenser` wired to `biosphere.water_vapor` (the condenser checked since the same
-  day) are refused at any other `cabin_air_mol`. No lower bound: measured 2026-10-18, the crop-only
+  on the bed's air must declare exactly that air: an `eclss.o2_makeup` wired to `biosphere.o2_pool`,
+  an `eclss.condenser` wired to `biosphere.water_vapor` (the condenser checked since the same
+  day) and an `eclss.co2_scrubber` wired to `biosphere.carbon_pool` (since 2026-10-19) are refused
+  at any other `cabin_air_mol`. No lower bound: measured 2026-10-18, the crop-only
   bed runs clean for 30 days from the 27.7-mol box of BVAD's 1 m² chamber to 30000 mol — in the
   small rooms the CO₂ climbs (17 000 ppm by day 30 at 27.7 mol), the chamber's respiration (plants and
   soil, not separated) outrunning the crop's uptake under the cold program's dim lamp, not a fault the
@@ -1130,6 +1131,27 @@ moved vector/anchor), so the discipline is enforced, not merely requested — �
 the suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
 
 ### Unfreeze log
+
+- **2026-10-19 — an authored scrubber declares its cabin's air (slice B of
+  `docs/plans/post-roadmap-co2-level.md`, §11; the user's "do it").** `eclss.co2_scrubber`'s
+  `needs_cabin_air` becomes true: `cabin_air_mol` is required on it, no default, and it holds
+  `co2_partial_pressure` (BVAD's 0.13 kPa) of that air; `flow_registry::IMPLICIT_SCRUBBER_AIR_MOL` is
+  deleted. A scrubber on a bed's `biosphere.carbon_pool` must declare `bed.air_mol`. The `eclss`
+  kinetics param set gains `co2_partial_pressure` (130 Pa; no manifest key — it records no param-set
+  key names). The six authored files with a scrubber declare 9500, the air their other regulators
+  already declare. **Manifest diff, predicted and measured: `flow_types["eclss.co2_scrubber"]
+  .needs_cabin_air` false → true, nothing else; the biosphere and station manifests and all 20
+  goldens unchanged.** New tests: a scrubber with no, zero or negative air is refused (naming
+  `co2_partial_pressure`); a 950-mol cabin settles at a tenth of the station's target plus the crew's
+  `P/k`; a bed refuses a scrubber of any other size. `cabin_air_on_any_other_flow_is_refused` moved
+  its example from the scrubber to `eclss.crew_metabolism`.
+- **2026-10-19 — the scrubber holds a cabin CO₂ level (delegated from the station unfreeze of the
+  same day; `docs/station-reference.md` is the record).** `eclss.co2_scrubber` draws
+  `k_scrub·max(0, cabin_co2 − target)`, the target `co2_partial_pressure` (130 Pa) of the cabin's
+  air, at `k_scrub` 1e-2 (was 1e-3, first-order). The authoring side built every scrubber against a
+  named, TEMPORARY 9500 mol (`flow_registry::IMPLICIT_SCRUBBER_AIR_MOL`) until slice B, the entry
+  above. The authoring manifest did not move. `scenarios/bioregenerative_station.yaml` steps its fast
+  set at 60 s (`n_sub: 60`), as its 300 s would put `k·h` at 3.
 
 - **2026-10-18 — a bed may grow potatoes (§17 of `docs/plans/post-roadmap-authored-plants.md`, the
   user's "1").** `bed_crops` is `wheat`, `potato`; each name maps to `station::scenario::Crop`, whose

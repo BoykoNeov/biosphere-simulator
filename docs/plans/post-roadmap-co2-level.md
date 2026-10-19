@@ -444,11 +444,7 @@ is linear there and `Δ(crop flux)/k` is still the offset.
 Final gate: `cargo clippy --all-targets -- -D warnings` clean; `cargo test` 1453 passed, 0 failed;
 `cargo test -- --ignored` 12 of 12 after the above.
 
-**Slice B (next):** `eclss.co2_scrubber` gains `needs_cabin_air: true`; every authored scrubber
-declares `cabin_air_mol` (six files: `eclss_cabin`, `eclss_multirate_cabin`,
-`eclss_thermal_habitat`, `bioregenerative_station`, `lamp_greenhouse`, `potato_greenhouse`);
-`kinetics_param_map` exposes `co2_partial_pressure`; `IMPLICIT_SCRUBBER_AIR_MOL` is deleted; the
-authoring manifest is regenerated. Then the crew-size fix (§9, the user's "option 1").
+**Slice B:** BUILT the same day, §11. Then the crew-size fix (§9, the user's "option 1").
 
 **Follow-up checks after the push (advisor's list).** The swapped `co2_target_lab` was run once:
 all six frozen sides reproduce the new goldens' bytes, and its old-form side lands exactly on the
@@ -460,3 +456,43 @@ the same folder: `probe-main.rs.txt`, `potato-solar-150d.txt`, `potato-solar-14d
 factor (0.250 → 0.600) and regulator (1994.76 mol) read as before, and the O₂ buffer now drains
 500 → 136.4 (was 148.2), corrected there. `lamp_greenhouse.yaml` quotes no measured CO₂ or battery
 figure. The `air_split` example notes that it now runs at a different level from its test.
+
+## 11. Slice B BUILT (2026-10-19) — every authored scrubber declares its cabin's air
+
+**On the user's word** (*"Step B … do it"*). The authoring half of the adoption, in the shape of the
+condenser's slice of 2026-10-18 (`post-roadmap-authored-plants.md` §15c, commit `2278f15`).
+
+**What changed.** `eclss.co2_scrubber`'s `needs_cabin_air` is true: `cabin_air_mol` is required on
+it, with no default, and it holds `co2_partial_pressure` of that air. `flow_registry::
+IMPLICIT_SCRUBBER_AIR_MOL` is deleted, not kept as a fallback. A scrubber with no air is refused
+with a message naming `co2_partial_pressure` (without its own arm it would have named the O₂
+regulator's `o2_fraction`). The crop bed's size check covers it: a scrubber wired to the bed's
+`biosphere.carbon_pool` must declare exactly `bed.air_mol`, as the O₂ regulator and the condenser
+must. The `eclss` kinetics param set carries `co2_partial_pressure` (130 Pa), the stored pressure,
+not a target in mol, as with `o2_fraction` and `humidity_fraction`.
+
+**The six files** each declare `cabin_air_mol: 9500.0`, the same air their own condenser and O₂
+regulator already declare: `rust/data/scenarios/{eclss_cabin, eclss_multirate_cabin,
+eclss_thermal_habitat}.yaml` and `scenarios/{bioregenerative_station, lamp_greenhouse,
+potato_greenhouse}.yaml` (the two greenhouses' 9500 is their bed's air, the only value the bed
+accepts). The three test cabins' prose still quoted the first-order scrubber (`k_scrub·dt` 0.06 /
+3.6, a 3.0 mol steady state); corrected to 0.6 / 36 and the target plus `P/k` (~12.49 mol), each
+with its pre-2026-10-19 value.
+
+**Predicted, then measured.** Every declared value equals the deleted stand-in, so nothing that runs
+could move. Authoring manifest: one value, `flow_types["eclss.co2_scrubber"].needs_cabin_air` false
+→ true, and that is the whole diff. `regen_goldens` (report only): 20 of 20 identical. Biosphere and
+station manifests untouched.
+
+**Tests.** `cabin_air_on_any_other_flow_is_refused` used the scrubber as its example of a type that
+takes no air; it now uses `eclss.crew_metabolism` (re-targeted, same assertion). New: a scrubber with
+no, zero or negative air is refused (`scenario_files.rs`); the anchor at 9500 and at 950 mol settles
+at `co2_target_mol(air) + P/k` to 1e-9 (a tenth of the air holds a tenth of the target); a scrubber
+on a 3000-mol bed declaring 9500, and on the 9500-mol bed declaring 950, is refused, and 3000 on 3000
+builds (`bed.rs`). The multirate probe's inline scrubber declares 9500.
+
+**Gates.** `cargo test --workspace --no-fail-fast` 1455 passed, 0 failed (1453 + the two new);
+`cargo test -- --ignored` 12 of 12; `clippy --all-targets -D warnings` clean; `repo_gates` re-run
+after the doc edits, 27 of 27. Two mutations, each red then restored byte for byte: the bed's
+scrubber arm removed (`a_regulator_on_a_resized_bed_must_declare_the_resized_air` red) and the
+scrubber's message arm removed (`a_scrubber_without_its_cabin_air_is_refused` red).

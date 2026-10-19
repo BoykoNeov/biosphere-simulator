@@ -1112,13 +1112,14 @@ fn a_regulator_without_its_cabin_air_is_refused() {
 
 #[test]
 fn cabin_air_on_any_other_flow_is_refused() {
-    // On a frozen type that does not regulate a cabin.
+    // On a frozen type that does not regulate a cabin. (The scrubber was this test's example
+    // until 2026-10-19, when it began to hold a share of its cabin's air.)
     let text = eclss_anchor_yaml_at("60.0", "4");
-    let scrubber = "    type: eclss.co2_scrubber\n";
-    assert!(text.contains(scrubber), "the anchor's scrubber moved");
+    let crew = "    type: eclss.crew_metabolism\n";
+    assert!(text.contains(crew), "the anchor's crew moved");
     let err = refused(&text.replacen(
-        scrubber,
-        &format!("{scrubber}    cabin_air_mol: 9500.0\n"),
+        crew,
+        &format!("{crew}    cabin_air_mol: 9500.0\n"),
         1,
     ));
     assert!(err.message.contains("takes no 'cabin_air_mol'"), "{}", err.message);
@@ -1197,6 +1198,46 @@ fn the_condenser_holds_a_share_of_its_own_air() {
         assert!(
             (end - expected).abs() < 1e-9,
             "air {air}: cabin vapour {end} vs target + P/k = {expected}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------------
+// The scrubber's air, declared (2026-10-19, slice B of docs/plans/post-roadmap-co2-level.md).
+//
+// `eclss.co2_scrubber` holds `eclss.yaml`'s `co2_partial_pressure` (BVAD's 0.13 kPa) of the air
+// the author declares — required, no default. From slice A until this, every authored scrubber
+// held 0.13 kPa of a named, temporary 9500 mol whatever its cabin held.
+// ---------------------------------------------------------------------------------
+
+#[test]
+fn a_scrubber_without_its_cabin_air_is_refused() {
+    let text = eclss_anchor_yaml_at("60.0", "4");
+    let err = refused(&with_air_on(&text, "eclss.co2_scrubber", None));
+    assert!(err.message.contains("cabin_air_mol"), "{}", err.message);
+    assert!(err.message.contains("co2_partial_pressure"), "{}", err.message);
+    for bad in ["0.0", "-5.0"] {
+        let err = refused(&with_air_on(&text, "eclss.co2_scrubber", Some(bad)));
+        assert!(err.message.contains("cabin_air_mol must be"), "{}", err.message);
+    }
+}
+
+/// A tenth of the air holds a tenth of the CO₂: the anchor's cabin, starting clean at 0 mol,
+/// settles at its own target plus the crew's `P/k` (0.3 mol) — at 950 mol a tenth of the
+/// station's target, where at 9500 it is the station's.
+#[test]
+fn the_scrubber_holds_a_share_of_its_own_air() {
+    let p = domains::params::eclss();
+    let text = eclss_anchor_yaml_at("60.0", "900");
+    for air in [9500.0, 950.0] {
+        let yaml = with_air_on(&text, "eclss.co2_scrubber", Some(&format!("{air:?}")));
+        let result = run_scenario(interpret_str(&yaml).expect("builds")).expect("runs");
+        let end = result.final_state.stocks["eclss.cabin_co2"].amount;
+        let target = p.co2_target_mol(air).expect("the loader's form holds a target");
+        let expected = target + 3.0e-3 / p.co2_scrub_rate;
+        assert!(
+            (end - expected).abs() < 1e-9,
+            "air {air}: cabin CO₂ {end} vs target + P/k = {expected}"
         );
     }
 }

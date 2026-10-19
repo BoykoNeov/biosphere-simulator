@@ -333,6 +333,17 @@ fn o2_regulator(air: &str) -> String {
     )
 }
 
+const CO2_REMOVED: &str = "  - id: boundary.co2_removed\n    domain: boundary\n    quantity: carbon\n    \
+     kind: boundary\n    amount: 0.0\n    composition:\n      carbon: 1.0\n      oxygen: 2.0\n";
+
+fn scrubber(air: &str) -> String {
+    format!(
+        "  - id: eclss.co2_scrubber\n    type: eclss.co2_scrubber\n    wiring:\n      cabin_co2: \
+         biosphere.carbon_pool\n      co2_removed: boundary.co2_removed\n    params: eclss\n    \
+         cabin_air_mol: {air}\n"
+    )
+}
+
 fn condenser(air: &str) -> String {
     format!(
         "  - id: eclss.condenser\n    type: eclss.condenser\n    wiring:\n      cabin_h2o: \
@@ -362,9 +373,10 @@ fn a_bed_of_another_size_is_charged_at_the_references_shares_and_runs_clean() {
     assert_ne!(first, final_bits(&fixture()), "the size changed nothing in the run");
 }
 
-/// A regulator on the bed's air reads the bed's size, not 9500: an O₂ regulator on its O₂ and
-/// a condenser on its vapour must each declare `bed.air_mol` — the condenser was not checked
-/// until 2026-10-18, when the size became the author's to choose.
+/// A regulator on the bed's air reads the bed's size, not 9500: an O₂ regulator on its O₂, a
+/// condenser on its vapour and a scrubber on its CO₂ must each declare `bed.air_mol` — the
+/// condenser was not checked until 2026-10-18, when the size became the author's to choose, and
+/// the scrubber took no air until 2026-10-19.
 #[test]
 fn a_regulator_on_a_resized_bed_must_declare_the_resized_air() {
     let small = resized("3000.0");
@@ -384,6 +396,16 @@ fn a_regulator_on_a_resized_bed_must_declare_the_resized_air() {
     );
     build(&with_air_flow(&small, CONDENSATE, &condenser("3000.0")))
         .expect("a condenser on the bed's own air builds");
+    refused(
+        &with_air_flow(&small, CO2_REMOVED, &scrubber("9500.0")),
+        "the crop bed's CO₂",
+    );
+    refused(
+        &with_air_flow(&fixture(), CO2_REMOVED, &scrubber("950.0")),
+        "the bed's air, 9500 mol",
+    );
+    build(&with_air_flow(&small, CO2_REMOVED, &scrubber("3000.0")))
+        .expect("a scrubber on the bed's own air builds");
 }
 
 #[test]

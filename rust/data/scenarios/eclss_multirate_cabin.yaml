@@ -53,7 +53,7 @@
 # which is itself part of what is being anchored (a cross-port disagreement about the
 # effective step would show up as one port refusing to build):
 #   * fast set: h = dt/n_sub = 1800/30 = 60 s — exactly eclss_cabin.yaml's load-bearing dt,
-#     the frozen sizing. k_scrub*h = 0.06, k_makeup*h = 0.12. Both << 1.
+#     the frozen sizing. k_scrub*h = 0.6 (0.06 until 2026-10-19), k_makeup*h = 0.12. Both < 1.
 #   * slow set: h = dt/2 = 900 s — Strang steps the slow set at dt/2 regardless of n_sub
 #     (multi-rate Step 5's finding; the divisor is `interpreter._effective_step` and is
 #     coupled to `run._SPLIT`). k_cond*h = 0.45 < 1. Deliberately NOT the 3600/60 cadence of
@@ -61,7 +61,7 @@
 #     90 % of the bound for no gain in what this file proves.
 #   * steps = 48 master steps at dt = 1800 = 86400 s = 1 day = ~43 tau of the slowest loop,
 #     so every pool is at its steady state by the end and none of them is where it started
-#     (cabin_o2 1995.0 -> 1993.0 — 10.0 -> 8.0 until 2026-10-18; cabin_co2 0.0 -> 3.0; cabin_h2o 1.786315428255099 -> ~1.786315428255099 + 0.028). A DEAD ANCHOR
+#     (cabin_o2 1995.0 -> 1993.0 — 10.0 -> 8.0 until 2026-10-18; cabin_co2 0.0 -> ~12.49, the target + P/k (3.0 until 2026-10-19); cabin_h2o 1.786315428255099 -> ~1.786315428255099 + 0.028). A DEAD ANCHOR
 #     IS TRIVIALLY BIT-EXACT — the monod_dsl.yaml lesson, applied deliberately here.
 #
 # NO GOLDEN, and not for want of trying: no frozen scenario runs ECLSS multi-rate, so there
@@ -176,7 +176,8 @@ flows:
       metabolic_co2_source: boundary.metabolic_co2_source
       metabolic_h2o_source: boundary.metabolic_h2o_source
 
-  # DONOR-CONTROLLED: R = k_scrub * cabin_co2 * dt. k_scrub * (dt/n_sub) = 0.06 << 1.
+  # DONOR-CONTROLLED: R = k_scrub * max(0, cabin_co2 - target) * dt (one-sided since 2026-10-19).
+  # k_scrub * (dt/n_sub) = 0.6 < 1 (0.06 until 2026-10-19).
   - id: eclss.co2_scrubber
     type: eclss.co2_scrubber
     priority: 0
@@ -184,6 +185,9 @@ flows:
       cabin_co2: eclss.cabin_co2
       co2_removed: boundary.co2_removed
     params: eclss
+    # The cabin's air (mol), declared 2026-10-19 (slice B of docs/plans/post-roadmap-co2-level.md):
+    # the scrubber holds BVAD's 0.13 kPa of it, 12.188502343942758 mol at 9500. No default.
+    cabin_air_mol: 9500.0
 
   # DEMAND-CONTROLLED toward o2_setpoint: S = k_makeup * (o2_setpoint - cabin_o2) * dt.
   # THE ONE RATIONING CANNOT SEE (its draw is proportional to the ERROR, not the stock), so

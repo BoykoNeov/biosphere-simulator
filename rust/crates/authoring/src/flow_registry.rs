@@ -49,16 +49,6 @@ use simcore::flow::Flow;
 
 use crate::errors::AuthoringError;
 
-/// The cabin air (mol) every authored `eclss.co2_scrubber` is built against — **implicitly**.
-///
-/// ⚠⚠ TEMPORARY, and the defect itself, named. Since 2026-10-19 the scrubber holds
-/// `eclss.yaml`'s `co2_partial_pressure` (BVAD's 0.13 kPa) as a share of its cabin's air
-/// (`docs/plans/post-roadmap-co2-level.md`), so it needs that air. This constant keeps the
-/// authoring side on the station's cabin until the next slice makes the author DECLARE it, with
-/// no default — at which point it is deleted, not kept as a fallback. The
-/// `IMPLICIT_CONDENSER_AIR_MOL` of the humidity target's slice A, again.
-pub const IMPLICIT_SCRUBBER_AIR_MOL: f64 = 9500.0;
-
 /// How one authoring flow-type name lowers to a frozen `Flow` constructor: the exact
 /// set of wiring keyword fields (order-significant — it is the constructor's positional
 /// order) and the frozen param set the flow's constructor needs (or `None`).
@@ -99,10 +89,12 @@ pub struct FlowTypeSpec {
     /// be on the wrong side of.
     pub demand_controlled: Option<(&'static str, &'static str)>,
     /// Whether an authored flow of this type must declare `cabin_air_mol` — the air of the
-    /// cabin it regulates. True for the two whose target is a share of that air:
-    /// `eclss.o2_makeup` (`eclss.yaml`'s `o2_fraction` of it, 2026-10-18) and
+    /// cabin it regulates. True for the three whose target is a share of that air:
+    /// `eclss.o2_makeup` (`eclss.yaml`'s `o2_fraction` of it, 2026-10-18),
     /// `eclss.condenser` (`humidity_fraction` of its saturation, 2026-10-18,
-    /// `docs/plans/post-roadmap-authored-plants.md` §15). Every other type refuses the field.
+    /// `docs/plans/post-roadmap-authored-plants.md` §15) and `eclss.co2_scrubber`
+    /// (`co2_partial_pressure` of it, 2026-10-19, `docs/plans/post-roadmap-co2-level.md`).
+    /// Every other type refuses the field.
     pub needs_cabin_air: bool,
 }
 
@@ -186,7 +178,7 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
             wiring_fields: &["cabin_co2", "co2_removed"],
             param_set: Some("eclss"),
             demand_controlled: None,
-            needs_cabin_air: false,
+            needs_cabin_air: true,
             rate_params: &["co2_scrub_rate"],
         }),
         "eclss.condenser" => Some(FlowTypeSpec {
@@ -319,7 +311,7 @@ pub fn build_frozen_flow(
             wire("cabin_co2")?,
             wire("co2_removed")?,
             eclss_params(),
-            IMPLICIT_SCRUBBER_AIR_MOL,
+            require_cabin_air(id, type_name, cabin_air_mol)?,
         ))),
         "eclss.condenser" => Ok(Box::new(Condenser::new(
             id.to_string(),
@@ -407,6 +399,9 @@ pub fn kinetics_param_map(param_set: &str) -> Result<BTreeMap<String, f64>, Auth
         "eclss" => {
             let p = params::eclss();
             map.insert("co2_scrub_rate".to_string(), p.co2_scrub_rate);
+            // The stored pressure, not a target in mol: that depends on a cabin, and a kinetics
+            // rate has none (2026-10-19, `docs/plans/post-roadmap-co2-level.md`).
+            map.insert("co2_partial_pressure".to_string(), p.co2_partial_pressure);
             map.insert("condense_rate".to_string(), p.condense_rate);
             // The stored params, not a target in kg: that depends on a cabin, and a kinetics
             // rate has none (`humidity_setpoint` until 2026-10-18).
@@ -481,6 +476,7 @@ fn require_cabin_air(
         None => {
             let target = match type_name {
                 "eclss.condenser" => "humidity_fraction of that air's saturation vapour",
+                "eclss.co2_scrubber" => "co2_partial_pressure of that air",
                 _ => "o2_fraction of that air",
             };
             Err(AuthoringError::new(format!(

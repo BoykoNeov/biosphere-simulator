@@ -21,8 +21,9 @@
 //!   has no cold program (the cold vernalizes wheat), and it is authored, not validated: its canopy
 //!   reads 2.79× low against WOFOST (`docs/log/potato-crop.md`) and it had never run in a lamp-lit
 //!   room before the bed (`docs/plans/post-roadmap-authored-plants.md` §17);
-//! * the size an author regulator assumes: an O₂ regulator on the bed's O₂ and a condenser on
-//!   its vapour aim at a share of the air they declare, so each must declare exactly the bed's
+//! * the size an author regulator assumes: an O₂ regulator on the bed's O₂, a condenser on its
+//!   vapour and (since 2026-10-19) a scrubber on its CO₂ aim at a share of the air they declare,
+//!   so each must declare exactly the bed's
 //!   air (fixed at 9500 mol until 2026-10-18, when `eclss.yaml`'s humidity target became a
 //!   share and stopped hiding that size);
 //! * the cold program, the chamber's heat params, the soil.
@@ -37,7 +38,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use domains::biosphere::stocks::{O2_POOL, WATER_VAPOR};
+use domains::biosphere::stocks::{CARBON_POOL, O2_POOL, WATER_VAPOR};
 use simcore::environment::{constant, SourceResolver};
 use simcore::error::SimError;
 use simcore::flow::Flow;
@@ -264,12 +265,13 @@ pub(crate) fn interpret_bed(
     // A regulator serving the bed's air must aim at THAT air: its target is a share of the air it
     // declares, so the plants and the regulator must agree on the room's size. The O₂ regulator
     // on the bed's O₂, and (since 2026-10-18, when the bed's air became the author's) the
-    // condenser on the bed's vapour.
+    // condenser on the bed's vapour; since 2026-10-19 the scrubber on the bed's CO₂.
     let bed_air = scenario.bio.chamber_air_capacity_mol;
     for flow_spec in &spec.flows {
         let served = match flow_spec.type_.as_deref() {
             Some("eclss.o2_makeup") => Some(("cabin_o2", O2_POOL, "O₂")),
             Some("eclss.condenser") => Some(("cabin_h2o", WATER_VAPOR, "water vapour")),
+            Some("eclss.co2_scrubber") => Some(("cabin_co2", CARBON_POOL, "CO₂")),
             _ => None,
         };
         let Some((field_name, bed_stock, what)) = served else {

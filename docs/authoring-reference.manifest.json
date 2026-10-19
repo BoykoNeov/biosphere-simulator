@@ -155,7 +155,7 @@
     "eclss.co2_scrubber": {
       "cls": "CO2Scrubber",
       "demand_controlled": null,
-      "needs_cabin_air": false,
+      "needs_cabin_air": true,
       "param_set": "eclss",
       "rate_params": [
         "co2_scrub_rate"

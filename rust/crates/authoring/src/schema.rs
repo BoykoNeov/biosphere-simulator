@@ -180,9 +180,11 @@ pub struct FlowSpec {
     /// nesting level down on the same flow — already owns that key.
     pub rate_class: String,
     /// The air (mol, at reference pressure) of the cabin this flow regulates — **required on
-    /// `eclss.o2_makeup` and refused on every other flow** (the interpreter checks both).
-    /// The regulator aims at `eclss.yaml`'s `o2_fraction` of it. A number or a template
-    /// expression over the scenario's `parameters`, like a stock's `amount`.
+    /// `eclss.o2_makeup`, `eclss.condenser` and `eclss.co2_scrubber`, and refused on every other
+    /// flow** (the interpreter checks both). Each aims at its share of it in `eclss.yaml`:
+    /// `o2_fraction`, `humidity_fraction` of the saturation (2026-10-18), `co2_partial_pressure`
+    /// (2026-10-19). A number or a template expression over the scenario's `parameters`, like a
+    /// stock's `amount`.
     ///
     /// ⚠ No default, on purpose (2026-10-18, `docs/plans/post-roadmap-authored-plants.md`):
     /// until then every authored regulator silently aimed at the station's 1995 mol, and an

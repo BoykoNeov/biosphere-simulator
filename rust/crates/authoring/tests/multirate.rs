@@ -77,6 +77,7 @@ fn cabin_yaml_steps(
          \x20 - id: eclss.humidity_condensate\n    domain: boundary\n    quantity: water\n    kind: boundary\n    amount: 0.0\n\
          flows:\n\
          \x20 - id: eclss.co2_scrubber\n    type: eclss.co2_scrubber\n    params: eclss\n    rate_class: {scrub_class}\n\
+         \x20\x20\x20 cabin_air_mol: 9500.0\n\
          \x20\x20\x20 wiring:\n      cabin_co2: eclss.cabin_co2\n      co2_removed: eclss.co2_removed\n\
          \x20 - id: eclss.condenser\n    type: eclss.condenser\n    params: eclss\n    rate_class: {cond_class}\n\
          \x20\x20\x20 cabin_air_mol: 9500.0\n\

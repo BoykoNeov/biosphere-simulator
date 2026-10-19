@@ -619,7 +619,7 @@ pub(crate) fn build_flow(
     if spec.kinetics.is_some() {
         if spec.cabin_air_mol.is_some() {
             return Err(AuthoringError::new(format!(
-                "flow {:?}: 'cabin_air_mol' belongs to a frozen eclss.o2_makeup; an authored                  'kinetics' flow writes its own rate and takes none",
+                "flow {:?}: 'cabin_air_mol' belongs to a frozen cabin regulator (eclss.o2_makeup, eclss.condenser or eclss.co2_scrubber); an authored                  'kinetics' flow writes its own rate and takes none",
                 spec.id
             )));
         }
@@ -635,7 +635,7 @@ pub(crate) fn build_flow(
     let air = cabin_air(spec, params)?;
     if air.is_some() && !type_spec.needs_cabin_air {
         return Err(AuthoringError::new(format!(
-            "flow {:?} ({type_name}): this flow type takes no 'cabin_air_mol' (only              eclss.o2_makeup and eclss.condenser, whose targets are a share of their              cabin's air)",
+            "flow {:?} ({type_name}): this flow type takes no 'cabin_air_mol' (only              eclss.o2_makeup, eclss.condenser and eclss.co2_scrubber, whose targets are a              share of their cabin's air)",
             spec.id
         )));
     }

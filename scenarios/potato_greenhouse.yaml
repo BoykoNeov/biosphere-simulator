@@ -11,7 +11,7 @@
 #
 # THE LOOP. As in the wheat example: the crew (eclss.crew_metabolism) takes O2 from
 # `biosphere.o2_pool` and adds CO2 to `biosphere.carbon_pool` and water to `biosphere.water_vapor`;
-# the scrubber and the O2 regulator (declaring the bed's 9500 mol) hold the shared air; a solar array
+# the scrubber and the O2 regulator (each declaring the bed's 9500 mol) hold the shared air; a solar array
 # charges the battery the lamp draws on; the chamber's cooler and the solar waste heat land on a
 # thermal node that radiates to space. Composition as there: every boundary paired with a bed pool
 # carries that pool's composition, so each flow balances in carbon and oxygen.
@@ -125,6 +125,7 @@ flows:
       cabin_co2: biosphere.carbon_pool
       co2_removed: boundary.co2_removed
     params: eclss
+    cabin_air_mol: 9500.0  # the bed's air (bed.air_mol's default) — required, and the only value accepted here
   - id: eclss.o2_makeup
     type: eclss.o2_makeup
     wiring:

@@ -76,3 +76,12 @@ and tables: `docs/plans/post-roadmap-co2-level.md`; tool: `station/examples/co2_
 * **Lesson: when a level change takes a pin past its line, ask what the pin's subject needs.** The
   fan pin was about a hungry crop; the honest fix put it back where the crop is hungry, not a looser
   line where it is not.
+* **Slice B BUILT 2026-10-19** on the user's *"do it"* (plan §11). Every authored scrubber now
+  declares its cabin's air, with no default, and the temporary 9500 mol stand-in is deleted. The six
+  files declare 9500, the air their condenser and O₂ regulator already declare, so nothing that runs
+  moved: authoring manifest one value (the scrubber's `needs_cabin_air`), 20 of 20 goldens identical.
+  A crop bed refuses a scrubber of any other size than the bed's. The three test cabins' prose still
+  quoted the first-order scrubber; corrected. One test used the scrubber as its example of a machine
+  that takes no air; it now uses the crew. 1455 tests and 12 slow ones green, clippy clean; two mutations each red.
+* **Lesson: a fall-through message is a claim too.** Without its own arm, the missing-air error
+  would have told a scrubber's author to read the O₂ fraction; the new test asserts the right name.

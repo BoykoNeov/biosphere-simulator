@@ -25,10 +25,10 @@
 # `kinetics` flows only, never frozen `type` flows). Contrast scenarios/algae_habitat.yaml,
 # whose authored respiration REQUIRES the composition fold.
 #
-# dt = 60.0 is LOAD-BEARING, not a default: k_scrub*dt = 0.06 and k_cond*dt = 0.03 (both
-# << 1), so the two donor-controlled draws self-limit and the Euler backstop never fires.
+# dt = 60.0 is LOAD-BEARING, not a default: k_scrub*dt = 0.6 and k_cond*dt = 0.03 (both
+# < 1), so the two donor-controlled draws self-limit and the Euler backstop never fires.
 # The frozen eclss.yaml rates are sized for exactly this dt. At dt = 3600 they would give
-# k*dt = 3.6 / 1.8 > 1, and run_scenario now RAISES RationedError rather than returning
+# k*dt = 36 / 1.8 > 1 (k_scrub*dt 0.06 and 3.6 until 2026-10-19, at k_scrub 1e-3), and run_scenario now RAISES RationedError rather than returning
 # an asphyxiated cabin -- see tests/test_authoring_dt_hazard.py, which drives this very
 # file at both dts. (That path was previously cited here as
 # tests/authoring/test_frozen_flow_dt_hazard.py, which has never existed.)
@@ -44,7 +44,8 @@ rng_seed: 0
 stocks:
   # The three cabin-air POOLs. cabin_o2 starts AT the setpoint (the regulator idles) and
   # the crew draw pulls it down to o2_eq = 1993.0; CO2 starts at 0 (a clean cabin) and rises
-  # to co2_eq = 3.0 mol; H2O starts AT its setpoint and rises to h2o_eq = 1.786315428255099 + 0.04 kg.
+  # to co2_eq = 12.188502343942758 + 0.3 mol, the scrubber's target plus the crew's P/k (3.0 mol,
+  # P/k alone, until 2026-10-19); H2O starts AT its setpoint and rises to h2o_eq = 1.786315428255099 + 0.04 kg.
   # No `composition` — see the note above.
   - id: eclss.cabin_o2
     domain: eclss
@@ -129,7 +130,8 @@ flows:
       metabolic_co2_source: boundary.metabolic_co2_source
       metabolic_h2o_source: boundary.metabolic_h2o_source
 
-  # DONOR-CONTROLLED: R = k_scrub * cabin_co2 * dt. The CO2 restoring force.
+  # DONOR-CONTROLLED: R = k_scrub * max(0, cabin_co2 - target) * dt. The CO2 restoring force —
+  # one-sided about BVAD's 0.13 kPa since 2026-10-19 (k_scrub * cabin_co2 before).
   - id: eclss.co2_scrubber
     type: eclss.co2_scrubber
     priority: 0
@@ -137,6 +139,9 @@ flows:
       cabin_co2: eclss.cabin_co2
       co2_removed: boundary.co2_removed
     params: eclss
+    # The cabin's air (mol), declared 2026-10-19 (slice B of docs/plans/post-roadmap-co2-level.md):
+    # the scrubber holds BVAD's 0.13 kPa of it, 12.188502343942758 mol at 9500. No default.
+    cabin_air_mol: 9500.0
 
   # DONOR-CONTROLLED: R = k_cond * max(0, cabin_h2o - humidity_setpoint) * dt. The humidity
   # restoring force — one-sided since 2026-10-03 (it cannot humidify).

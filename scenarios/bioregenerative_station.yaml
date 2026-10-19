@@ -352,6 +352,9 @@ flows:
       cabin_co2: cabin.co2
       co2_removed: bioreactor.co2_feed
     params: eclss
+    # The cabin's air (mol), declared 2026-10-19 (slice B of docs/plans/post-roadmap-co2-level.md):
+    # the scrubber holds BVAD's 0.13 kPa of it, 12.188502343942758 mol at 9500. No default.
+    cabin_air_mol: 9500.0
 
   # FROZEN, DONOR-CONTROLLED: R = k_cond * max(0, cabin_h2o - humidity_setpoint) * dt, k_cond =
   # 5.0e-4 (k*h = 0.15) — one-sided about BVAD's 40 % RH since 2026-10-03.
