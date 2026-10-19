@@ -81,8 +81,14 @@ before a level is chosen. Recorded, not built.
 
 `cargo run --release -q -p station --example co2_level_price` (from `rust/`, at below-normal
 priority, 2026-10-19). Each run uses the frozen first-order form with `k = P / n_target` and the
-cabin started at `n_target`. That is not the form proposed in §6, but at steady state both
-hold the same level, and the crop reads only the level. Readings are day-boundary values;
+cabin started at `n_target`. That is not the form proposed in §6. At steady state both hold the
+same level, so the crop's response is **expected** to carry over. That is unmeasured: the
+one-sided form stops entirely when the crop pulls the cabin below target, where the first-order
+form only slows. At this crew's 328 mol/day against the crop's ~0.6 that should be negligible,
+and it is owed a measurement at the lab build. Raw output:
+`sources/temp-evidence/co2-level/co2-level-price.txt`. **Baseline reproduced:** the "today" run
+scrubbed 400 073.8 mol C, and the frozen golden's final `boundary.co2_removed` is
+400 073.759 (`rust/data/golden/sealed_station_state.json`), so the tool runs the golden's build. Readings are day-boundary values;
 plant C (leaf + stem + root + grain) and grain are each year's peak, in mol C on the 1 m² bed.
 
 | Level | Cabin CO₂ (ppm, yr 1–4 mean) | Plant C peak | Grain peak | vs today |
@@ -103,9 +109,10 @@ wheat, the 187× of the crew-coupled-loop record.
   to 3951 buys another +11 points, and 5007 two more. The crop model saturates. Its
   photosynthesis (FvCB) has no high-CO₂ penalty; grepped `domains/src/biosphere` for a triose-
   phosphate limit, inhibition and "elevated": nothing.
-* **Above roughly 1200 ppm the model is outside anything it has been checked against.** The one
-  real-world check of the crop's gas exchange (`log/real-world-checks.md`, TM 102788) ran with CO₂
-  held at 1000 ppm and read uptake at 0.98 of the measured value. BVAD's own text says real plants
+* **The model has been checked at one level, 1000 ppm, and nowhere above it.** The one real-world
+  check of the crop's gas exchange (`log/real-world-checks.md`, TM 102788) held CO₂ at 1000 ppm,
+  on the open-field build with a fixed leaf CO₂, not this sealed station. Uptake read 0.98 of the
+  measured value. BVAD's own text says real plants
   lose productivity at CO₂ levels inside the crew range, up to about 1.0 kPa. The model cannot
   show that loss. At 0.40 and 0.507 kPa the extra +17–19 points over 0.13 kPa are therefore the
   model's extrapolation, and the true sign may be the opposite.
@@ -158,8 +165,8 @@ items were. Write the predicted golden moves first, then measure them, then adop
 **Which CO₂ level should the station's cabin hold?** Plants and crew share one air here, so one
 number serves both.
 
-1. **0.13 kPa (≈1280 ppm), the plants' nominal. Recommended.** It is cited. It lies inside the
-   range where the crop model has been checked against a real chamber (≈1000 ppm). It is safe for
+1. **0.13 kPa (≈1280 ppm), the plants' nominal. Recommended.** It is cited. It is near the one level
+   (1000 ppm) where the crop model has been checked against a real chamber. It is safe for
    the crew: below BVAD's lowest crew value, so the scrubber works harder than a real cabin's,
    which is allowed. Grain +49 %.
 2. **0.40 kPa (≈3950 ppm), what the ISS runs to.** Realistic for the crew side. The crop's extra
