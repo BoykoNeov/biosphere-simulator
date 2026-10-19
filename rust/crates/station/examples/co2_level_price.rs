@@ -4,6 +4,7 @@
 //!
 //! ```text
 //! cargo run --release -q -p station --example co2_level_price
+//! cargo run --release -q -p station --example co2_level_price -- above-target  # one row
 //! ```
 //!
 //! Today the cabin's CO₂ is set by nothing anyone chose: the scrubber is first-order, so the
@@ -29,13 +30,14 @@ use station::sealed::{build_sealed_station, run_sealed, sealed_bio_resolver, sea
 /// the model's `STANDARD_ATMOSPHERE_PA`).
 const P_STD_KPA: f64 = 101.325;
 
-/// The levels priced: (label, mole fraction, what names it).
-fn levels() -> Vec<(&'static str, Option<f64>, &'static str)> {
+/// The levels priced: (label, mole fraction, the lab's above-target form?, what names it).
+fn levels() -> Vec<(&'static str, Option<f64>, bool, &'static str)> {
     vec![
-        ("today", None, "P/k with the frozen k = 1e-3 — nobody's choice"),
-        ("plants 0.13 kPa", Some(0.13 / P_STD_KPA), "Table 4-1 p[CO2] for Plants, nominal ('accepted optimum')"),
-        ("ISS cap 0.40 kPa", Some(0.40 / P_STD_KPA), "BVAD §4.1 text: ISS's lower operating maximum"),
-        ("crew 0.507 kPa", Some(0.507 / P_STD_KPA), "Table 4-1 p[CO2] for Crew, nominal"),
+        ("today", None, false, "P/k with the frozen k = 1e-3 — nobody's choice"),
+        ("plants 0.13 kPa", Some(0.13 / P_STD_KPA), false, "Table 4-1 p[CO2] for Plants, nominal ('accepted optimum')"),
+        ("ISS cap 0.40 kPa", Some(0.40 / P_STD_KPA), false, "BVAD §4.1 text: ISS's lower operating maximum"),
+        ("crew 0.507 kPa", Some(0.507 / P_STD_KPA), false, "Table 4-1 p[CO2] for Crew, nominal"),
+        ("plants 0.13 kPa, above-target form", Some(0.13 / P_STD_KPA), true, "the lab build of plan §9: k = 1e-2 on the excess over 130 Pa"),
     ]
 }
 
@@ -53,7 +55,7 @@ struct Price {
     scrubbed: f64,
 }
 
-fn run_at(target: Option<f64>) -> Result<Price, String> {
+fn run_at(target: Option<f64>, above_target: bool) -> Result<Price, String> {
     let charge = params::charge();
     let thermal = params::thermal();
     let crew = params::crew();
@@ -66,6 +68,16 @@ fn run_at(target: Option<f64>) -> Result<Price, String> {
         let n = x * air;
         eclss.co2_scrub_rate = production / n;
         scenario.bio.chamber_co2_mol0 = n;
+        if above_target {
+            // The lab's form (plan §9): remove only the excess over the cited partial pressure.
+            eclss = domains::lab::with_scrubber_above_target(
+                eclss,
+                domains::lab::CO2_TARGET_PA,
+                domains::lab::ABOVE_TARGET_SCRUB_RATE,
+            );
+            scenario.bio.chamber_co2_mol0 =
+                eclss.co2_target_mol(air).expect("an above-target scrubber has a target");
+        }
     }
     let (state, bio_reg, fast_reg) = build_sealed_station(
         &charge,
@@ -113,9 +125,14 @@ fn main() {
     println!("sealed station, 4 years, CO2 held by a first-order scrubber at k = P / n_target");
     println!("(day-boundary readings; plant C and grain are each year's peak, mol)\n");
     let mut base: Option<Price> = None;
-    for (label, x, why) in levels() {
+    let only: Vec<String> = std::env::args().skip(1).collect();
+    for (label, x, above, why) in levels() {
+        // The baseline always runs: every other row is read against it.
+        if !only.is_empty() && x.is_some() && !only.iter().any(|o| label.contains(o.as_str())) {
+            continue;
+        }
         println!("== {label}  ({why})");
-        match run_at(x) {
+        match run_at(x, above) {
             Err(e) => println!("   FAILED: {e}\n"),
             Ok(p) => {
                 println!("   rationed {}  events {}  scrubbed {:.1} mol C", p.rationed, p.events, p.scrubbed);

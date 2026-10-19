@@ -45,6 +45,7 @@ use crate::biosphere::science::{
     NightRule, NightStomata,
     O2Form, SoilEvaporationForm, SurfaceResistanceForm, VpdRead, WateringForm,
 };
+use crate::eclss::{EclssParams, ScrubForm};
 use config::{with_override, ConfigError, ParamFile};
 
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
@@ -224,6 +225,36 @@ pub fn biosphere_with_rs_form(
     let mut p = biosphere_with(subs)?;
     p.transp.rs_form = form;
     Ok(p)
+}
+
+/// The CO₂ partial pressure the lab's above-target scrubber holds (Pa): BVAD Rev 2 Table 4-1,
+/// printed p. 63 (read as the page image, `sources/temp-evidence/bvad/p63-077.png`), row
+/// "p[CO₂] for Plants", nominal 0.13 kPa, footnote (5) "accepted optimum for plant growth".
+/// The user's choice of level, 2026-10-19 (`docs/plans/post-roadmap-co2-level.md` §7).
+pub const CO2_TARGET_PA: f64 = 130.0;
+
+/// The lab's above-target scrub rate (1/s) — `DESIGN`, ten times the frozen first-order rate. A
+/// one-sided remover stands `P / k` above its target (§6): at the station crew's 3.796e-3 mol/s
+/// that is 0.38 mol, 40 ppm, where the frozen 1e-3 would stand 400 ppm off. `k·dt = 0.6 < 1` at
+/// the cabin's 60-s step.
+pub const ABOVE_TARGET_SCRUB_RATE: f64 = 1.0e-2;
+
+/// `p` with the scrubber removing only the CO₂ above `partial_pressure_pa` of its cabin's air,
+/// at `rate` (1/s) — [`ScrubForm::AboveTarget`] (`docs/plans/post-roadmap-co2-level.md`). The
+/// builder must tell each scrubber its cabin's air (`CO2Scrubber::with_cabin_air`), or the run
+/// fails at its first step.
+///
+/// # ⚠ A switch, not an endorsement of the form switched to
+///
+/// [`ScrubForm::FirstOrder`] is the loader's; this is the lab's.
+pub fn with_scrubber_above_target(
+    mut p: EclssParams,
+    partial_pressure_pa: f64,
+    rate: f64,
+) -> EclssParams {
+    p.scrub_form = ScrubForm::AboveTarget { partial_pressure_pa };
+    p.co2_scrub_rate = rate;
+    p
 }
 
 /// `p` with stomata that close in the dark, or not ([`NightStomata`],

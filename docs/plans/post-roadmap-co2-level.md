@@ -188,3 +188,95 @@ between rows 2 and 3 of §5's table, where the curve is already flattening. Meas
   only change is the level it stops at.
 * The crew's 13.3× carbon sizing is not touched; it is the reason the level must be cited rather
   than derived from hardware (§3), not a thing this item fixes.
+
+## 9. The user's answer, and the lab build (2026-10-19)
+
+**The user chose 0.13 kPa, and the crew-size fix as the next item** (*"1300, option 1"*; the crew
+question is in §8 and the record). The crew stays 13.3 crew-members' worth of carbon for this item.
+Order matters: with the level held by a target, correcting the crew later cannot starve the crop. At
+today's first-order rate, a one-crew-member load would settle the cabin at about 30 ppm.
+
+**Built lab-only (stage 1, inert plumbing plus a switch):**
+
+* `domains::eclss::ScrubForm` — `FirstOrder` (the loader's, frozen) or `AboveTarget {
+  partial_pressure_pa }`, a field on `EclssParams` that `eclss.yaml` does not carry.
+* `CO2Scrubber::with_cabin_air(air)`: the three station builders (`cabin.rs`, `water.rs`,
+  `sealed.rs`) now tell the scrubber the station's 9500 mol cabin; the standalone build tells it
+  its scenario's air. Under `FirstOrder` the air is never read (a flow-level test pins this; the
+  goldens pin it end to end). Under `AboveTarget` with no air, the flow refuses at its first step.
+* `domains::lab::with_scrubber_above_target(p, CO2_TARGET_PA = 130.0, ABOVE_TARGET_SCRUB_RATE =
+  1e-2)`.
+* Not touched: `eclss.yaml`, the authoring registry, every scenario. An authored file reads the
+  loader's params, so it cannot reach the switch.
+
+### Predictions, written before the measurement
+
+The six goldens that read the ECLSS params are `eclss` (domains), `cabin_gas`, `water_recovery`,
+`greenhouse`, `harvest` and `sealed_station`. `sealed_energy_drift` builds Power + Thermal only and
+cannot move. In the lab runs the crop-sharing scenarios start at the new target
+(`chamber_co2_mol0 = 12.188`); the crew-only cabins keep their frozen start of 0.
+
+1. **`eclss`, `cabin_gas`, `water_recovery` (crew-only cabins):** only `cabin_co2` and
+   `boundary.co2_removed` move; every other stock is bit-identical, because no other flow reads
+   the cabin's CO₂. The final `cabin_co2` is target + P/k: 12.188 + 0.300 = **12.488** for
+   `eclss` (P = 0.003), and 12.188 + 0.380 = **12.568** for the other two (P = 3.796e-3). Starting
+   from 0, the cabin fills in about 68 steps and then settles with a 100-s time constant, well
+   inside the 900-step horizon. `co2_removed` falls by the rise in the final stock: ~9.49 and
+   ~8.77 mol.
+2. **`greenhouse`, `harvest` (7 days, crop shares the cabin):** `carbon_pool` reads ~12.57. The
+   plant carbon pools rise, by less than the sealed station's +52 % (a seedling, or a crop past
+   flowering, over 7 days). O₂ moves through the regulator, since the crop makes more. Water moves
+   only as far as leaf area does: small, and possibly zero in `harvest`, whose crop is past
+   flowering and sheds leaves rather than grows them.
+3. **`sealed_station`:** within 1 % of §5's first-order price (plant C +51.7 %, grain +48.6 %),
+   since both forms hold the same level to 40 ppm. Water and the chamber's heat move with the
+   larger canopy; how much is not predicted.
+
+### Measured against the predictions (2026-10-19)
+
+`cargo run --release -q -p station --example co2_target_lab` (raw:
+`sources/temp-evidence/co2-level/co2-target-lab.txt`). On each of the six builds the frozen side
+reproduced its committed golden **byte for byte**, before any comparison. Every switched run had
+`rationed 0`, `events 0`.
+
+| Golden | Stocks moved | Graded |
+|---|---|---|
+| `eclss` | 2 of 9: `cabin_co2` 3.0 → **12.488502**, `co2_removed` −9.488 | **1 HELD exactly** |
+| `cabin_gas` | 2 of 10: `cabin_co2` 3.796 → **12.568102**, `co2_removed` −8.772 | **1 HELD exactly** |
+| `water_recovery` | 2 of 10, the same two numbers as `cabin_gas` | **1 HELD exactly** |
+| `greenhouse` | 19 of 30: `carbon_pool` 12.568; leaf +26 %, root +15 %, stem +8 %; condensate +0.32 %, soil water −0.15 %; O₂ supply −0.002 % | **2 HELD.** One move not predicted: `chamber_inert` −0.112 % |
+| `harvest` | 21 of 29: grain (`storage_c`) +47 %, stem +13 %, leaf +9 %; condensate +0.16 %; `crew.food_store` +0.0004 % | **2 HELD, except** the water: predicted "possibly zero", measured +0.16 % condensate. Small, but not zero: the crop past flowering still grew leaf (+9 %) |
+| `sealed_station` | 26 of 36 (final day) | **3 HELD** on the crop, by the like-for-like readout below. Water: see below |
+
+**The `chamber_inert` move was not predicted, and it follows from construction.** The chamber's inert
+gas is charged as "the rest of the air" (`system::chamber_inert_charge_mol`: capacity − CO₂ − O₂),
+stored in kg. Starting the cabin 8.392 mol higher in CO₂ charges 8.392 mol less N₂ = 0.2351 kg, the
+measured 210.134228 → 209.899126. The chamber still starts at exactly reference pressure. This is
+part of moving the start value, in every crop-sharing build. **At adoption it goes into the
+predicted set.**
+
+**Prediction 3, the crop, measured like for like** (`co2_level_price -- above-target`, raw:
+`.../co2-level-price-above-target.txt`): the cabin holds **1323 ppm**, the target's 1283 plus the
+predicted 40-ppm standoff. Plant C peaks +52.5 % and grain +49.4 % on every year, against §5's
+first-order +51.7 % and +48.6 %: 0.5 % apart, inside the 1 % predicted. The final-day stocks in the
+table read higher (root +103 %, leaf +78 %). That is a different readout: one mid-season day,
+where a crop that started faster is further ahead than at its yearly peak.
+
+**The sealed station's water — what moved and what did not.** On the final day, condensate
+86.01 → 19.52 (−77 %) and soil water 79.66 → 135.51 (+70 %), with subsoil +41 %. **Their sum is
+unchanged to six decimals** (191.653614 both sides), and `water_vapor` is unchanged. The chamber's
+water is closed, and only its split between the condensate store and the soil differs on the final
+day. The reference waters a sealed chamber's soil from its condensate in events. Since the
+water-forms adoption (2026-10-10, `post-roadmap-soil-evaporation.md` §16), `EventRecycling`
+fires when the root zone falls to FTSW = 1 − p = 0.45 (`water.yaml`, FAO-56 Table 22). A soil that
+fills in pulses and drains between them has a phase. The larger canopy drains it faster, so the
+pulses shift, and a single final day lands at a different point in the cycle. That is the reading
+the conserved sum supports. ⚠ It is a reading, not a trace: a day-by-day series of the two stocks
+would confirm it, and that is owed with the transpiration total below.
+⚠ **Not measured: the transpiration total over the run**, the readout that would say how much more
+water the larger crop moves. The final state cannot show it. Owed before adoption, and the
+station's water readouts in the TM 102788 scorecard (`real-world-checks.md`) should be re-read with it.
+
+**Also moved in `sealed_station`, not predicted in size:** battery −0.51 %, `boundary.space`
++0.12 %, the thermal node +0.04 %, the chamber's surroundings −0.07 %. The energy books move with
+the crop, presumably through the chamber's heat (lamp, cooling, latent). The path was not traced.

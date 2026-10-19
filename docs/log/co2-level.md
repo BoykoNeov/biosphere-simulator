@@ -24,6 +24,21 @@ and tables: `docs/plans/post-roadmap-co2-level.md`; tool: `station/examples/co2_
   cabin's air. ⚠ A one-sided proportional remover holds `P/k` above its target. That is 400 ppm
   at today's rate, so the form needs a ~10× rate (offset 40 ppm). The authored multirate path
   already breaks `k·dt < 1` when the scrubber is classed slow.
+* **The user chose 0.13 kPa, and the crew-size fix as the next item** (*"1300, option 1"*). The crew
+  breathes 13.3 crew-members' carbon and drinks one's water. Level first: with the level held by a
+  target, a later crew correction cannot starve the crop (at today's rate one crew-member would
+  settle the cabin at ~30 ppm).
+* **BUILT LAB-ONLY and MEASURED the same day.** `ScrubForm::AboveTarget` behind
+  `domains::lab::with_scrubber_above_target` (130 Pa, k = 1e-2). The station builders tell the
+  scrubber its cabin's air, which is inert under the frozen form: the full suite and every golden
+  pass unchanged. `station/examples/co2_target_lab.rs` runs the six goldens that read the scrubber,
+  first checking that its frozen side reproduces each golden's bytes. The crew-only cabins moved
+  exactly as predicted (2 stocks each, to 12.4885 and 12.5681 mol). The cabin holds 1323 ppm;
+  plant +52.5 %, grain +49.4 %, within 0.5 % of the first-order price. One unpredicted move,
+  explained: `chamber_inert` −0.235 kg, because a higher CO₂ start leaves less "rest of the air".
+  The sealed station's final-day water split moved −77 % / +70 % with the sum unchanged: the
+  watering pulses run at a different phase. **Owed before adoption:** the transpiration total, and
+  a day series to confirm the phase reading. Adoption is the user's.
 * **Lesson: a first-order remover's level is the load's, not the equipment's.** "Size it from the
   real machine" sounds like realism, but the level then reports the crew's size. Cite the
   quantity the source actually states, here the level.

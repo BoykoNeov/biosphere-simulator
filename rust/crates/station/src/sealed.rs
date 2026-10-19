@@ -413,12 +413,15 @@ pub(crate) fn sealed_fast_flows(
             RECOVERED_WATER.to_string(), // the Step-4 seam: urine → the recovery buffer
             *crew,
         )),
-        Box::new(CO2Scrubber::new(
-            CO2_SCRUBBER.to_string(),
-            air.co2.to_string(),
-            CO2_REMOVED.to_string(),
-            *eclss,
-        )),
+        Box::new(
+            CO2Scrubber::new(
+                CO2_SCRUBBER.to_string(),
+                air.co2.to_string(),
+                CO2_REMOVED.to_string(),
+                *eclss,
+            )
+            .with_cabin_air(crate::scenario::STATION_CABIN_AIR_MOL),
+        ),
         Box::new(Condenser::new(
             CONDENSER.to_string(),
             CABIN_H2O.to_string(),

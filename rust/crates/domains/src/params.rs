@@ -126,6 +126,7 @@ fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
         saturation_vapour_pressure: require_positive(v[3], "saturation_vapour_pressure", name)?,
         o2_makeup_gain: require_positive(v[4], "o2_makeup_gain", name)?,
         o2_fraction: require_half_open(v[5], 0.0, 1.0, "o2_fraction", name)?,
+        scrub_form: crate::eclss::ScrubForm::FirstOrder,
     })
 }
 
