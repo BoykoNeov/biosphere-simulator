@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `stale-record-cleanup.md`
+**Re-read against the record's last row:** `uncited-triage.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -235,7 +235,11 @@ biosphere and sibling params, plus 4 in `station` (re-counted 2026-09-06; unchan
 2026-09-02). Bucket 3(C) closed the no-oracle set as **blocked on retrieval, not effort**.
 Do not reopen it wholesale. Take a single param only when a *finding* leans on it — which is
 how `carbon_fraction`, the FvCB constants, `specific_leaf_area` and `extinction_coef` were
-all taken, and all four are now closed.
+all taken, and all four are now closed. ⚠ **Ranked 2026-10-19** (`log/uncited-triage.md`): the
+markers are 45 uncited *values* once `DESIGN` ones are counted, and a ±10 % / recorded-range table
+names five that move a gated readout or cross a bound — the scrubber rate, maintenance respiration,
+growth efficiency, quantum yield, the leaf death rate. The rule above stands: the table says *which*
+finding would lean hardest, it does not open the queue.
 
 ---
 
@@ -620,6 +624,13 @@ and the broken habitat is the measured cost of leaving it parked. Nothing in §3
 plan for Python, ruff, pyright, CI, BVAD, monod and test_. Nothing is struck: no item here was a stale comment.
 One fact is added to §4 (the checks S6 deleted that nothing ported). The CI-toolchain bullet in §4 still reads as
 live; it was not re-checked against the 2026-10-10 deletion of the reference's CI job. Nothing in §3 is re-proposed.
+
+⚠ *Re-read 2026-10-19* (`log/uncited-triage.md`, Step 5 item 1 of the 2026-09-29 review BUILT): grepped this
+plan for uncited, scrub, the five shortlisted names and the two unread ones. §2.5 gains the ranking, and its rule
+stands. §2.4 (Bernacchi) is unchanged and still owed; none of its constants is in the roster. The §2.2 note that
+"which lever relieves" the whole-crew draw "is not measured" STANDS: the triage moved the scrubber on the frozen
+1 m² station, not at the crew's area. Nothing in §3 is re-proposed; §3's partition-table verdicts are unchanged
+(the table ranks first at ±10 % and is listed, not proposed).
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
