@@ -415,7 +415,8 @@ suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
   goldens keep their tier. The old form survives as a lab switch
   (`domains::lab::with_first_order_scrubber`). `sibling_params.txt`'s `co2_scrub_rate` row is retired
   by hand (11 → 10), as `o2_setpoint`'s was. The authoring side keeps a named, temporary 9500
-  (`IMPLICIT_SCRUBBER_AIR_MOL`) until the next slice; `scenarios/bioregenerative_station.yaml` steps
+  (`IMPLICIT_SCRUBBER_AIR_MOL`) until the next slice (deleted by that slice the same day: every
+  authored scrubber now declares its air, `docs/authoring-reference.md`'s entry of this date); `scenarios/bioregenerative_station.yaml` steps
   its fast set at 60 s (`n_sub` 12 → 60), because the build refuses `k·h = 3` at 300 s. Measured
   pins re-pinned, as at every adoption: `chamber_walls` (node 188.7014 K at 120 days; the
   four-year reference node mean 170.0607 K; the structure's battery empty by day 1023). One lab

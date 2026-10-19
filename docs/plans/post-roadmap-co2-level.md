@@ -495,4 +495,8 @@ builds (`bed.rs`). The multirate probe's inline scrubber declares 9500.
 `cargo test -- --ignored` 12 of 12; `clippy --all-targets -D warnings` clean; `repo_gates` re-run
 after the doc edits, 27 of 27. Two mutations, each red then restored byte for byte: the bed's
 scrubber arm removed (`a_regulator_on_a_resized_bed_must_declare_the_resized_air` red) and the
-scrubber's message arm removed (`a_scrubber_without_its_cabin_air_is_refused` red).
+scrubber's message arm removed (`a_scrubber_without_its_cabin_air_is_refused` red). A follow-up
+(advisor's review): the kinetics map's `co2_partial_pressure` was read by nothing, so deleting it
+left the suite green; `the_eclss_kinetics_set_carries_each_regulators_stored_share` now pins it,
+and goes red when the line is deleted (1456 tests). `docs/station-reference.md`'s slice-A entry
+notes the stand-in's deletion.

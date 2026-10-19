@@ -572,6 +572,19 @@ mod tests {
     }
 
     #[test]
+    fn the_eclss_kinetics_set_carries_each_regulators_stored_share() {
+        // A kinetics rate has no cabin, so it reads the stored share, never a target in mol:
+        // `o2_fraction` and `humidity_fraction` (2026-10-18), `co2_partial_pressure`
+        // (2026-10-19). Nothing in the tree reads the last one yet, so only this would notice
+        // it gone.
+        let p = params::eclss();
+        let map = kinetics_param_map("eclss").expect("known set");
+        assert_eq!(map["o2_fraction"], p.o2_fraction);
+        assert_eq!(map["humidity_fraction"], p.humidity_fraction);
+        assert_eq!(map["co2_partial_pressure"], p.co2_partial_pressure);
+    }
+
+    #[test]
     fn authored_radiator_reject_reads_the_frozen_thermal_params() {
         // The one sliver no other gate can see. `thermal.radiator_reject` is excluded from
         // the bit-exact cross-port RUN comparison (it is Tier-2 — `powf`), and the
