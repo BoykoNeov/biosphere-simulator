@@ -105,7 +105,12 @@ pub fn greenhouse_bio_scenario() -> SeasonScenario {
         // `o2_setpoint` so the regulator starts AT its target and the run has no
         // start-up transient. The two move together or neither moves.
         chamber_o2_mol0: 1995.0,
-        chamber_co2_mol0: 3.796,
+        // The scrubber's target for this air (`EclssParams::co2_target_mol` of 9500 mol: BVAD's
+        // 0.13 kPa, 1283 ppm), by the same rule. It was 3.796 until 2026-10-19 — the old
+        // first-order scrubber's fixed point `P / k`, 400 ppm, a level nobody chose
+        // (`docs/plans/post-roadmap-co2-level.md`). ⚠ The chamber's N₂ is charged as the rest
+        // of the air, so moving this start moves `chamber_inert` by the same moles.
+        chamber_co2_mol0: 12.188502343942758,
         chamber_air_capacity_mol: 9500.0,
         litter_carbon0: 0.0,
         ..DEFAULT_SCENARIO
@@ -588,6 +593,12 @@ mod cabin_start_tests {
         assert_eq!(
             CABIN_GAS_SCENARIO.cabin_o2_0,
             p.o2_setpoint_mol(STATION_CABIN_AIR_MOL)
+        );
+        // The crop-sharing cabins start at the scrubber's target (the crew-only ones at 0, and
+        // they fill to it in about 68 steps).
+        assert_eq!(
+            Some(greenhouse_bio_scenario().chamber_co2_mol0),
+            p.co2_target_mol(STATION_CABIN_AIR_MOL)
         );
     }
 }

@@ -19,6 +19,11 @@
 # ⚠ The count assertion in `params.rs` goes 12 -> 11 with it. That is a real, if small,
 # WEAKENING of this control's completeness, and it is called that rather than tidied away.
 #
+# ⚠⚠ A SECOND ROW WAS REMOVED BY HAND, 2026-10-19, for the same reason. `co2_scrub_rate` was
+# 0x1.0624dd2f1a9fcp-10 (1.0e-3); eclss.yaml's value deliberately moved to 1.0e-2 when the
+# scrubber began holding a cited CO2 level (0.13 kPa) instead of settling at P/k
+# (docs/plans/post-roadmap-co2-level.md). Retired, not updated; the count goes 11 -> 10.
+#
 # name	hexfloat
 charge_efficiency	0x1.e666666666666p-1
 self_discharge_rate	0x1.5798ee2308c3ap-27
@@ -26,7 +31,6 @@ emissivity	0x1.b333333333333p-1
 radiator_area	0x1.4000000000000p+3
 heat_capacity	0x1.312d000000000p+23
 space_temperature	0x1.599999999999ap+1
-co2_scrub_rate	0x1.0624dd2f1a9fcp-10
 condense_rate	0x1.0624dd2f1a9fcp-11
 o2_makeup_gain	0x1.0624dd2f1a9fcp-9
 respired_carbon_fraction	0x1.e5e353f7ced91p-1

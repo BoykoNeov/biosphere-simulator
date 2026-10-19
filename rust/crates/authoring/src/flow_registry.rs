@@ -49,6 +49,16 @@ use simcore::flow::Flow;
 
 use crate::errors::AuthoringError;
 
+/// The cabin air (mol) every authored `eclss.co2_scrubber` is built against — **implicitly**.
+///
+/// ⚠⚠ TEMPORARY, and the defect itself, named. Since 2026-10-19 the scrubber holds
+/// `eclss.yaml`'s `co2_partial_pressure` (BVAD's 0.13 kPa) as a share of its cabin's air
+/// (`docs/plans/post-roadmap-co2-level.md`), so it needs that air. This constant keeps the
+/// authoring side on the station's cabin until the next slice makes the author DECLARE it, with
+/// no default — at which point it is deleted, not kept as a fallback. The
+/// `IMPLICIT_CONDENSER_AIR_MOL` of the humidity target's slice A, again.
+pub const IMPLICIT_SCRUBBER_AIR_MOL: f64 = 9500.0;
+
 /// How one authoring flow-type name lowers to a frozen `Flow` constructor: the exact
 /// set of wiring keyword fields (order-significant — it is the constructor's positional
 /// order) and the frozen param set the flow's constructor needs (or `None`).
@@ -309,6 +319,7 @@ pub fn build_frozen_flow(
             wire("cabin_co2")?,
             wire("co2_removed")?,
             eclss_params(),
+            IMPLICIT_SCRUBBER_AIR_MOL,
         ))),
         "eclss.condenser" => Ok(Box::new(Condenser::new(
             id.to_string(),

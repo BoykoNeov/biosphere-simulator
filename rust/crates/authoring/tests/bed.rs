@@ -427,6 +427,10 @@ fn the_example_greenhouse_matures_and_resows_over_a_season() {
 ///
 /// Measured 2026-10-19: rationed 0, no reversal, re-sown at plant step 1536 (day 96); the battery
 /// ends at 1.9937e10 J of its 2.0e10 (−0.3 %).
+///
+/// ⚠ The same day the cabin began holding 0.13 kPa CO₂ (`docs/plans/post-roadmap-co2-level.md` §10)
+/// and the larger crop took the battery to −1.7 % at the file's 150 W. The FILE was re-sized (175 W,
+/// the user's call), not this line: measured −0.14 %, re-sown at the same step.
 #[test]
 #[ignore = "slow: a 150-day bed run"]
 fn the_potato_example_resows_and_holds_its_battery_over_a_season() {

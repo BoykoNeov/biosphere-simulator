@@ -1,6 +1,7 @@
 # potato_greenhouse — a crew of one breathing the air of a lamp-lit POTATO bed (2026-10-19, the
 # example offered by §17b of docs/plans/post-roadmap-authored-plants.md). The wheat example,
-# lamp_greenhouse.yaml, with the crop changed; everything below the header is that file's wiring.
+# lamp_greenhouse.yaml, with the crop changed; everything below the header is that file's wiring,
+# except the solar line (175 W since 2026-10-19; see MEASURED below).
 #
 # THE BED IS THE REFERENCE'S CHAMBER, growing potatoes. `bed: crop: potato` builds the sealed
 # station's lamp-lit plant chamber with the station's potato builder: the potato's params and
@@ -16,10 +17,14 @@
 # carries that pool's composition, so each flow balances in carbon and oxygen.
 #
 # MEASURED 2026-10-19. The 150 W solar line was set for the wheat file, whose 14 days run under the
-# cold program's dim lamp; here it meets the full lamp, so it was re-checked. The battery ends
-# 14 days at 2.0007e10 J and 150 days at 1.9937e10 J (−0.3 % from its 2.0e10) — level enough, and
-# nothing rationed, so the lamp never went short. CO2 held at 3.00 mol and O2 at 1993.0, as in the
-# wheat file; the chamber's vapour sits near its 75 % setting (~3.45 kg at 22 °C).
+# cold program's dim lamp; here it meets the full lamp, so it was re-checked: at the cabin's old
+# 400 ppm the battery ended 150 days at 1.9937e10 J (−0.3 % from its 2.0e10). ⚠ RE-SIZED the same
+# day to 175 W, when the cabin began holding BVAD's 0.13 kPa CO2 (docs/plans/post-roadmap-co2-level.md
+# §10): the larger crop draws more, and at 150 W the battery fell 1.7 % in 150 days. Measured at
+# 175 W: 14 days 2.0034e10 J, 150 days 1.9973e10 J (−0.14 %), nothing rationed, so the lamp never
+# went short (180 W: +0.17 %). CO2 held at 12.49 mol (the scrubber's 130 Pa target of the bed's
+# 9500 mol plus the crew's P/k; 3.00 mol at the old first-order scrubber) and O2 at 1993.0, as in
+# the wheat file; the chamber's vapour sits near its 75 % setting (~3.45 kg at 22 °C).
 #
 # THE HORIZON is 14 days, the content test's budget (every file in scenarios/ is run twice to its own
 # horizon). The full season is a slow test (`authoring/tests/bed.rs`, --ignored): the potato matures
@@ -149,4 +154,4 @@ forcings:
   h2o_production:          # kg/s
     const: 2.0e-5
   solar_power:             # W — about the lamp's daily average, so the battery holds roughly level
-    const: 150.0
+    const: 175.0             # 150 until 2026-10-19 (see the header's MEASURED note)

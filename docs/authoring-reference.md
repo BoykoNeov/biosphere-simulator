@@ -286,7 +286,7 @@ how positivity holds, and whether the flow is multi-instanceable:
 | `thermal.heat_input` | `heat_source`, `node` | — | FORCED `heat_load` | — |
 | `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** | — (`τ ≫ dt` is not a predicate) |
 | `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) | — (state-dependent) |
-| `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor (`k_scrub·cabin_co2`) | `co2_scrub_rate` |
+| `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor, one-sided (`k_scrub·max(0, cabin_co2 − target)`, since 2026-10-19; the target is `co2_partial_pressure` of the cabin's air, `post-roadmap-co2-level.md`; first-order `k_scrub·cabin_co2` before) | `co2_scrub_rate` |
 | `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor, one-sided (`k_cond·max(0, cabin_h2o − setpoint)`, since 2026-10-03; the setpoint is `humidity_fraction` of the saturation of the flow's declared `cabin_air_mol` since 2026-10-18, `post-roadmap-authored-plants.md` §15) | `condense_rate` |
 | `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) | `o2_makeup_gain` |
 
@@ -368,7 +368,7 @@ the code. Selecting a flow type hands you the `dt` knob with no guard attached.
 
 | flow | constraint | frozen sizing | breaks at | caught by |
 |---|---|---|---|---|
-| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | **build** + rationing |
+| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.6` (`0.06` until 2026-10-19, at `k_scrub` 1e-3) | `dt = 3600` → **36** (**3.6** until 2026-10-19) | **build**; rationing only once the draw on the excess exceeds the whole stock (one-sided since 2026-10-19, as the condenser) |
 | `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | **build** (rationing no longer, since 2026-10-03: it draws on the excess above its setpoint, so an over-large step overshoots below the setpoint and stops there instead of emptying the cabin) |
 | `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **build ONLY** — rationing sees nothing in `1 ≤ k·dt < 2`; see below |
 | `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol | rationing (**state-dependent — no build check possible**) |
@@ -456,6 +456,8 @@ hatch is `allow_rationing=True` (Rust: `run_scenario_allowing_rationing`) — fo
   sizing are untouched; `k_scrub·dt` is still `3.6` at `dt = 3600` and the cabin still
   asphyxiates — you can still watch it with the escape hatch, and both ports' tests still
   assert that it does, at the same numbers. **You get an exception instead of a corpse.**
+  (⚠ Written at `k_scrub` = 1e-3 on all the cabin's CO₂. Since 2026-10-19 the rate is 1e-2 on
+  the excess above a cited level, so the figure is `36`; the build refuses it the same way.)
   The table above is still the thing you must design around.
 * **It is a consistency fix, not a new policy.** Every other layer had already reached
   this verdict: the goldens assert `rationed == 0`; `simcore.integrator.StepReport` calls
@@ -615,6 +617,9 @@ loop's own cliff. At `dt = 1000` exactly the scrub draw *equals* the stock rathe
 exceeding it, nothing rations, and the measured cabin swings **12 ↔ 4 mol forever** while
 `o2_supply` drains past **−800 mol** — reported as a clean, conserving, unrationed run. An
 author who registers `eclss.o2_makeup` *without* a scrubber never had that coincidence at all.
+(⚠ Measured at the pre-2026-10-19 scrubber. At today's `k_scrub` = 1e-2 its `k·dt = 1` lands at
+`dt = 100`, ten times below the makeup loop's, and it draws only on the excess above its target,
+so the coincidence above no longer holds as written: the build's precondition is what stands.)
 
 **The build-time precondition is what stands here, and in the band that matters it is the
 *only* thing that does.** `eclss.o2_makeup` declares `rate_params = ("o2_makeup_gain",)` and

@@ -7,7 +7,7 @@
 //! ```
 //!
 //! Each golden's own build runs twice: as frozen, and with the scrubber switched to remove only
-//! the CO₂ above 0.13 kPa of the cabin's air (`domains::lab::with_scrubber_above_target`). The
+//! the CO₂ above 0.13 kPa of the cabin's air (the lab switch `with_scrubber_above_target` before the adoption). The
 //! crop-sharing builds start the cabin at the new target, as the frozen ones start at their own
 //! fixed point; the crew-only cabins keep their frozen start of 0. Every stock of the final
 //! state is compared, boundary ones included: bit-identical stocks are counted, and moved ones
@@ -16,11 +16,18 @@
 //! ⚠ **It writes nothing and takes no decision.** The frozen side is checked against the
 //! committed golden's bytes first, so a drift in this tool's copy of a build cannot pass as a
 //! measurement.
+//!
+//! ⚠ **Since the adoption (2026-10-19) the two sides have swapped.** The frozen side is now the
+//! above-target scrubber (the loader's), and the switched side is the pre-adoption first-order
+//! form at 1e-3 (`domains::lab::with_first_order_scrubber`), its crop-sharing cabins started at
+//! that form's fixed point, 3.796 mol. The moves it prints are therefore the plan §9 table's
+//! with the sign reversed. Before the adoption, the switched states were saved and the
+//! regenerated goldens compared against them byte for byte (plan §10).
 
 use std::collections::BTreeMap;
 
 use domains::eclss::{build_eclss, eclss_resolver, EclssParams, STEADY_STATE_SCENARIO, STEADY_STATE_STEPS};
-use domains::lab::{with_scrubber_above_target, ABOVE_TARGET_SCRUB_RATE, CO2_TARGET_PA};
+use domains::lab::{with_first_order_scrubber, FIRST_ORDER_SCRUB_RATE};
 use domains::params;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
@@ -203,12 +210,16 @@ fn amounts(s: &State) -> BTreeMap<String, f64> {
 fn main() {
     let only: Vec<String> = std::env::args().skip(1).collect();
     let frozen = params::eclss();
-    let lab = with_scrubber_above_target(frozen, CO2_TARGET_PA, ABOVE_TARGET_SCRUB_RATE);
-    let target = lab.co2_target_mol(STATION_CABIN_AIR_MOL).expect("a target");
+    let lab = with_first_order_scrubber(frozen, FIRST_ORDER_SCRUB_RATE);
+    let target = frozen.co2_target_mol(STATION_CABIN_AIR_MOL).expect("a target");
+    // The first-order form's fixed point, where the crop-sharing cabins started before.
+    let old_start = 3.796;
     let golden_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/golden");
     println!(
-        "above-target scrubber: {CO2_TARGET_PA} Pa, k = {ABOVE_TARGET_SCRUB_RATE:e} /s; \
-         target {target:.6} mol of the station's {STATION_CABIN_AIR_MOL} mol\n"
+        "frozen: above-target scrubber, {} Pa, k = {:e} /s, target {target:.6} mol of the \
+         station's {STATION_CABIN_AIR_MOL} mol; switched: first-order, k = \
+         {FIRST_ORDER_SCRUB_RATE:e} /s, crop cabins started at {old_start}\n",
+        frozen.co2_partial_pressure, frozen.co2_scrub_rate
     );
     for (name, run, shares_crop) in roster() {
         if !only.is_empty() && !only.iter().any(|o| name.contains(o.as_str())) {
@@ -217,7 +228,7 @@ fn main() {
         let base = run(&frozen, None);
         let committed = std::fs::read_to_string(golden_dir.join(name)).expect("golden file");
         let reproduces = snapshot(&base.last) == committed;
-        let switched = run(&lab, shares_crop.then_some(target));
+        let switched = run(&lab, shares_crop.then_some(old_start));
         let (b, s) = (amounts(&base.last), amounts(&switched.last));
         let mut moved: Vec<(String, f64, f64, f64)> = b
             .iter()

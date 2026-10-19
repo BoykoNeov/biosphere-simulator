@@ -71,10 +71,11 @@
 # decision, not a performance knob.
 #
 # NUMERICS. Every rate is strictly positive by construction (one flow per physical process,
-# never a sign-flipping net term). Fast set h = dt/n_sub = 300 s; slow set h = dt/2 = 1800 s
-# (Strang — NOT dt/n_sub). Every k*h << 1: the tightest is the regulator at k*h = 0.60, and
-# n_sub = 12 is set by it (n_sub = 8 would be legal at 0.90, i.e. 90 % of the bound, for no
-# gain). The (biomass, feed) Jacobian has trace -1.13e-6 < 0, det 2.67e-13 > 0 and
+# never a sign-flipping net term). Fast set h = dt/n_sub = 60 s; slow set h = dt/2 = 1800 s
+# (Strang — NOT dt/n_sub). Every k*h < 1: the tightest is the CO2 scrubber at k*h = 0.60, and
+# n_sub = 60 is set by it. ⚠ Until 2026-10-19 this was n_sub = 12 (h = 300 s), set by the O2
+# regulator at k*h = 0.60; the scrubber's rate rose ten-fold that day (eclss.yaml, the cabin
+# now holds a cited CO2 level), which made k*h = 3 at 300 s and the build refuses that. The (biomass, feed) Jacobian has trace -1.13e-6 < 0, det 2.67e-13 > 0 and
 # discriminant +2.18e-13 > 0: stable, REAL eigenvalues, non-oscillatory, slowest tau ~34.7 d
 # — so a one-year run is ~10.5 tau.
 #
@@ -90,7 +91,7 @@
 name: bioregenerative_station
 integrator: euler
 dt: 3600.0        # THE COUPLING CADENCE (1 h) — the export step, not what ECLSS solves at
-n_sub: 12         # fast set sub-steps at dt/n_sub = 300 s; set by the O2 regulator's k*h
+n_sub: 60         # fast set sub-steps at dt/n_sub = 60 s; set by the CO2 scrubber's k*h (12 until 2026-10-19)
 steps: 8760       # one sealed year ~ 10.5 tau of the slowest matter mode
 rng_seed: 0
 
@@ -110,7 +111,7 @@ stocks:
     domain: cabin
     quantity: carbon
     kind: pool
-    amount: 0.0             # a clean cabin; the scrubber holds it at f*q/k_scrub = 0.4745
+    amount: 0.0             # a clean cabin; the scrubber holds it at its target + f*q/k_scrub = 12.188502 + 0.04745 (0.4745 until 2026-10-19)
     composition:
       carbon: 1.0
       oxygen: 2.0
@@ -269,7 +270,7 @@ forcings:
 
 flows:
   # =========================================================================================
-  # THE FAST SET (h = dt/n_sub = 300 s) — everything touching the cabin air.
+  # THE FAST SET (h = dt/n_sub = 60 s) — everything touching the cabin air.
   # `rate_class` is omitted throughout: `fast` is the default, and leaving it implicit is
   # deliberate (the fixtures' convention) — the default is what makes every pre-multi-rate
   # file lower to its old trajectory by construction, so spelling it would suggest a choice.
@@ -332,11 +333,14 @@ flows:
 
   # --- the frozen cabin-air equipment, RECYCLING instead of discarding --------------------
 
-  # FROZEN, DONOR-CONTROLLED: R = k_scrub * cabin_co2 * dt, k_scrub = 1.0e-3 (k*h = 0.30).
+  # FROZEN, DONOR-CONTROLLED: R = k_scrub * max(0, cabin_co2 - target) * dt, k_scrub = 1.0e-2
+  # (k*h = 0.60), the target 130 Pa of the cabin's air (BVAD's 0.13 kPa; 12.188502 mol at 9500).
   # `co2_removed` is wired to an INTERIOR POOL, so this is a two-leg one-magnitude transfer
   # between two stocks that fold identically: CARBON -R +R = 0 and OXYGEN -2R +2R = 0, both
-  # automatic. It is the throat of the whole carbon loop, and its frozen k is what sets the
-  # cabin's standing CO2 inventory: Cc* = f*q/k_scrub = 0.4745 mol.
+  # automatic. It is the throat of the whole carbon loop: the cabin's standing CO2 inventory is
+  # Cc* = target + f*q/k_scrub = 12.236 mol. ⚠ Until 2026-10-19 the form was first-order,
+  # k_scrub = 1.0e-3, and Cc* = f*q/k_scrub = 0.4745 mol; the prose above that quotes 0.4745
+  # (the slow-classed respiration's 180 % kick) was reasoned on that cabin.
   - id: eclss.co2_scrubber
     type: eclss.co2_scrubber
     priority: 0
@@ -360,7 +364,7 @@ flows:
     cabin_air_mol: 9500.0
 
   # FROZEN, DEMAND-CONTROLLED: S = k_makeup * (o2_setpoint - cabin_o2) * dt, k = 2.0e-3,
-  # setpoint 1995.0 mol (k*h = 0.60 — the constraint that fixes n_sub = 12).
+  # setpoint 1995.0 mol (k*h = 0.12 at h = 60 s; 0.60 at the 300 s it fixed until 2026-10-19).
   #
   # ⚠ RE-SIZED 2026-10-18. This file was written against the old DESIGN setpoint of 10.0 mol
   # with a cabin starting at 8.0. On 2026-09-06 the frozen setpoint became 1995.0 (cited), and
@@ -380,7 +384,9 @@ flows:
   #   * cabin_o2 starts at 1993.0, i.e. below it, and the per-sub-step map Oc <- Oc +
   #     0.6*(1995 - Oc) - 0.14235 is a contraction with factor 1 - k*h = 0.4 > 0, so it
   #     approaches 1994.76275 MONOTONICALLY FROM BELOW and cannot overshoot (measured
-  #     2026-10-18: 1994.76272 after the first hour, 1994.76275 from the second on);
+  #     2026-10-18: 1994.76272 after the first hour, 1994.76275 from the second on). ⚠ That
+  #     map is the 300 s sub-step's; at today's 60 s it is Oc <- Oc + 0.12*(1995 - Oc) -
+  #     0.02847, factor 0.88 > 0, the same fixed point, still approached from below;
   #   * nothing else adds O2 to the cabin — photosynthesis fills the TANK, and this
   #     regulator is the only path from tank to cabin.
   # `o2_supply` is wired to store.o2_tank, an interior finite pool, so unlike every fixture

@@ -43,8 +43,9 @@ const DT: f64 = STEADY_STATE_SCENARIO.dt_seconds;
 /// The emergent per-species cabin steady states `(o2, co2, h2o)`, a closed form.
 ///
 /// At steady state each control loop's removal or supply balances the crew load:
-/// `co2_eq = P_co2 / k_scrub`, `h2o_eq = h2o_set + P_h2o / k_cond` (the condenser acts on the
-/// excess above its setpoint since 2026-10-03), and
+/// `co2_eq = co2_set + P_co2 / k_scrub` (the scrubber acts on the excess above its target since
+/// 2026-10-19; it was `P_co2 / k_scrub` before), `h2o_eq = h2o_set + P_h2o / k_cond` (the
+/// condenser acts on the excess above its setpoint since 2026-10-03), and
 /// `o2_eq = o2_setpoint − Con_o2 / k_makeup` — so cabin O₂ sits just *below* the setpoint,
 /// which is the whole reason the regulator is not idle at rest. Each is algebraic, so
 /// there is nothing to iterate and nothing to read off a run.
@@ -52,7 +53,10 @@ fn steady_state(scenario: &EclssScenario) -> (f64, f64, f64) {
     let p = params::eclss();
     (
         p.o2_setpoint_mol(scenario.cabin_air_mol) - scenario.o2_consumption_rate / p.o2_makeup_gain,
-        scenario.co2_production_rate / p.co2_scrub_rate,
+        // Since 2026-10-19 the scrubber acts on the excess above its target, so the CO₂ steady
+        // state sits P/k ABOVE the target, not at P/k.
+        p.co2_target_mol(scenario.cabin_air_mol).expect("the frozen scrubber has a target")
+            + scenario.co2_production_rate / p.co2_scrub_rate,
         // Since 2026-10-03 the condenser acts on the excess above its setpoint, so the
         // humidity steady state sits P/k ABOVE the setpoint, not at P/k.
         p.humidity_setpoint_kg(scenario.cabin_air_mol)
@@ -119,7 +123,17 @@ fn assert_same_state(a: &State, b: &State) {
 /// `d_n = d_0·(1 − k·dt)^n`, which is what makes this stronger than Thermal's
 /// monotone-contraction claim.
 fn assert_contracts_geometrically(stock: &str, offset: EclssScenario, rate: f64) {
-    let (a, _, _) = euler(&STEADY_STATE_SCENARIO);
+    assert_contracts_geometrically_from(stock, STEADY_STATE_SCENARIO, offset, rate);
+}
+
+/// [`assert_contracts_geometrically`] from a `base` run other than the standalone scenario.
+fn assert_contracts_geometrically_from(
+    stock: &str,
+    base: EclssScenario,
+    offset: EclssScenario,
+    rate: f64,
+) {
+    let (a, _, _) = euler(&base);
     let (b, _, _) = euler(&offset);
     let (sa, sb) = (series(&a, stock), series(&b, stock));
     let d0 = (sb[0] - sa[0]).abs();
@@ -262,11 +276,46 @@ fn eclss_species_move_monotonically_to_steady_state() {
 // --- the restoring forces: two runs contract GEOMETRICALLY, per species -------------------
 #[test]
 fn eclss_co2_contracts_geometrically() {
+    // ⚠ Both runs start AT or ABOVE the scrubber's target (since 2026-10-19), the condenser
+    // test's arrangement: the loop is linear only there. Below the target the scrubber takes
+    // nothing, so an offset from the clean cabin's 0 would carry undecayed until each run
+    // crossed the target — a different regime, and not what this test is about.
+    let p = params::eclss();
+    let target = p
+        .co2_target_mol(STEADY_STATE_SCENARIO.cabin_air_mol)
+        .expect("the frozen scrubber has a target");
+    let base = EclssScenario {
+        cabin_co2_0: target,
+        ..STEADY_STATE_SCENARIO
+    };
+    let offset = EclssScenario {
+        cabin_co2_0: target + 1.0,
+        ..STEADY_STATE_SCENARIO
+    };
+    assert_contracts_geometrically_from(CABIN_CO2, base, offset, p.co2_scrub_rate);
+}
+
+/// ⚠ **The one-sided half, at run level.** Below its target the scrubber is idle: two runs that
+/// both stay below it differ by their starting offset, undecayed, until the higher one crosses.
+#[test]
+fn eclss_co2_below_the_target_is_not_scrubbed() {
+    let (a, _, _) = euler(&STEADY_STATE_SCENARIO);
     let offset = EclssScenario {
         cabin_co2_0: STEADY_STATE_SCENARIO.cabin_co2_0 + 1.0,
         ..STEADY_STATE_SCENARIO
     };
-    assert_contracts_geometrically(CABIN_CO2, offset, params::eclss().co2_scrub_rate);
+    let (b, _, _) = euler(&offset);
+    let target = params::eclss()
+        .co2_target_mol(STEADY_STATE_SCENARIO.cabin_air_mol)
+        .expect("a target");
+    let (sa, sb) = (series(&a, CABIN_CO2), series(&b, CABIN_CO2));
+    let below = sb.iter().take_while(|&&x| x <= target).count();
+    assert!(below > 10, "the offset run crossed the target after {below} steps");
+    for n in 0..below {
+        assert!((sb[n] - sa[n] - 1.0).abs() <= 1e-12, "step {n}: {} - {}", sb[n], sa[n]);
+    }
+    let removed = series(&a, CO2_REMOVED);
+    assert_eq!(removed[below - 1], 0.0, "the scrubber took CO2 below its target");
 }
 
 #[test]
@@ -367,17 +416,23 @@ fn eclss_is_deterministic() {
 fn eclss_rk4_agrees_with_euler_to_tolerance() {
     // The control flows are state-dependent, so RK4 ≢ Euler bit-for-bit — the forced-only
     // identity does not hold. They agree to O(dt²).
+    //
+    // ⚠ Since 2026-10-19 the identity is checked over the TRAJECTORY, not at the last step.
+    // Above its target the scrubber is linear in the excess, and both integrators share the
+    // exact fixed point `target + P/k`; at k·dt = 0.6 each reaches it to the last bit long
+    // before step 900, so the final states are now equal by construction. The break lives in
+    // the relaxation after the cabin first crosses the target.
     let (e, _, _) = euler(&STEADY_STATE_SCENARIO);
     let (r, _, _) = run(&STEADY_STATE_SCENARIO, |reg| {
         Box::new(Rk4Integrator::new(reg))
     });
-    let e_final = e[e.len() - 1].stocks[CABIN_CO2].amount;
-    let r_final = r[r.len() - 1].stocks[CABIN_CO2].amount;
-    assert_ne!(
-        r_final.to_bits(),
-        e_final.to_bits(),
+    let (se, sr) = (series(&e, CABIN_CO2), series(&r, CABIN_CO2));
+    assert!(
+        se.iter().zip(&sr).any(|(a, b)| a.to_bits() != b.to_bits()),
         "the identity did not break"
     );
+    let e_final = se[se.len() - 1];
+    let r_final = sr[sr.len() - 1];
     assert!((r_final - e_final).abs() <= 1e-4 * e_final.abs());
 }
 

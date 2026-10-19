@@ -31,8 +31,17 @@ const DAYS: usize = 90;
 /// small to be hungry (measured on 3b's first run: the BVAD chamber at 0.513 of shared air, not
 /// under 0.5; the fan's 0.1 / 0.4 ratio 0.973, not under 0.97). Not `cold.days = 0`: that would
 /// change the temperature the crop reads as well (a second cause).
+///
+/// ⚠ **And at the cabin's PRE-2026-10-19 CO₂ level, 400 ppm** — the cabin these pins were
+/// measured in. Since 0.13 kPa was adopted (`docs/plans/post-roadmap-co2-level.md` §10) the
+/// cabin holds 1283 ppm, and a chamber fed from it is far less hungry: re-measured there, the
+/// fan's 0.1 / 0.4 ratio is 0.990 (it was ~0.93), past this file's 0.97. Loosening that line
+/// would weaken the pin; its subject is the CO₂ supply to a hungry crop, so the file keeps the
+/// level that made it hungry, through the lab's switch ([`eclss`]) and the old start.
 fn scenario() -> SealedStationScenario {
-    let s = sealed_station_scenario();
+    let mut s = sealed_station_scenario();
+    // The first-order scrubber's own fixed point, where the crop-sharing cabins started before.
+    s.bio.chamber_co2_mol0 = 3.796;
     SealedStationScenario {
         cold: ColdProgram {
             par: s.full_lamp_par(station_params::lamp().photon_efficacy),
@@ -41,6 +50,11 @@ fn scenario() -> SealedStationScenario {
         },
         ..s
     }
+}
+
+/// The ECLSS params with the pre-2026-10-19 first-order scrubber (see [`scenario`]).
+fn eclss() -> domains::eclss::EclssParams {
+    domains::lab::with_first_order_scrubber(params::eclss(), domains::lab::FIRST_ORDER_SCRUB_RATE)
 }
 
 fn plant_c(s: &State) -> f64 {
@@ -114,7 +128,7 @@ fn shared() -> State {
         &params::charge(),
         &params::thermal(),
         &params::crew(),
-        &params::eclss(),
+        &eclss(),
         &station_params::water_recovery(),
         &station_params::lamp(),
         &station_params::harvest(),
@@ -167,7 +181,7 @@ fn split_all(
         &params::charge(),
         &params::thermal(),
         &params::crew(),
-        &params::eclss(),
+        &eclss(),
         &station_params::water_recovery(),
         &station_params::lamp(),
         &station_params::harvest(),
@@ -305,7 +319,7 @@ fn each_room_is_charged_at_its_own_size() {
         &params::charge(),
         &params::thermal(),
         &params::crew(),
-        &params::eclss(),
+        &eclss(),
         &station_params::water_recovery(),
         &station_params::lamp(),
         &station_params::harvest(),
@@ -398,7 +412,7 @@ fn plant_build(
         &params::charge(),
         &params::thermal(),
         &params::crew(),
-        &params::eclss(),
+        &eclss(),
         &station_params::water_recovery(),
         &station_params::lamp(),
         &station_params::harvest(),

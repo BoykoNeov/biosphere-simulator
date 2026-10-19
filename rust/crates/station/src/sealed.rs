@@ -419,8 +419,8 @@ pub(crate) fn sealed_fast_flows(
                 air.co2.to_string(),
                 CO2_REMOVED.to_string(),
                 *eclss,
-            )
-            .with_cabin_air(crate::scenario::STATION_CABIN_AIR_MOL),
+                crate::scenario::STATION_CABIN_AIR_MOL,
+            ),
         ),
         Box::new(Condenser::new(
             CONDENSER.to_string(),

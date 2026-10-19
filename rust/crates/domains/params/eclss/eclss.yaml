@@ -7,16 +7,29 @@
 # The standalone ECLSS domain holds three single-quantity cabin POOLs (cabin_o2 / cabin_co2
 # / cabin_h2o) against a forced crew metabolic load, with three control loops driving each
 # species to a steady state:
-#     CO₂:  cabin_co2 → co2_removed,          R = k_scrub·cabin_co2        ⇒ co2_eq = P_co2/k_scrub
+#     CO₂:  cabin_co2 → co2_removed,          R = k_scrub·max(0, cabin_co2 − co2_set)
+#                                                                          ⇒ co2_eq = co2_set + P_co2/k_scrub
 #     H₂O:  cabin_h2o → humidity_condensate,  R = k_cond·max(0, cabin_h2o − h2o_set)
 #                                                                          ⇒ h2o_eq = h2o_set + P_h2o/k_cond
 #     O₂:   o2_supply → cabin_o2,             S = k_makeup·(o2_setpoint − cabin_o2)
 #                                                                          ⇒ o2_eq = o2_setpoint − Con_o2/k_makeup
 # (P_* the forced crew production rates, Con_o2 the forced crew consumption — scenario data.)
 #
-# co2_scrub_rate (k_scrub) — first-order CO₂ removal rate (1/s), > 0. CDRA/LiOH scrubber.
-#   Structural positivity requires k_scrub·dt < 1 (donor-controlled, self-limiting to 0).
-#   With dt = 60 s here, k_scrub·dt = 0.06 — comfortably < 1.
+# co2_scrub_rate (k_scrub) — CO₂ removal rate (1/s), > 0, on the EXCESS above the CO₂ target.
+#   CDRA/LiOH scrubber. Structural positivity requires k_scrub·dt < 1 (donor-controlled,
+#   self-limiting). With dt = 60 s here, k_scrub·dt = 0.6 < 1. ⚠ UNTIL 2026-10-19 this was
+#   1.0e-3 on ALL the cabin's CO₂ (first-order), which settled every cabin at P/k — 3.796 mol,
+#   400 ppm of the station's cabin, Earth's outdoor air, a level nobody chose. A one-sided
+#   remover stands P/k ABOVE its target, so the rate rose with the form: at 1e-2 the station
+#   crew's 3.796e-3 mol/s stands 0.38 mol (40 ppm) off, where 1e-3 would stand 400 ppm off
+#   (docs/plans/post-roadmap-co2-level.md §6).
+#
+# co2_partial_pressure — the scrubber's target. The cabin CO₂ inventory it holds (mol) is
+#   co2_partial_pressure / P_std x the cabin's air, computed where that air is known
+#   (`EclssParams::co2_target_mol`): the station's 9500 mol cabin gives 12.188502343942758 mol
+#   (1283 ppm), an authored habitat its own air. One-sided: below the target the scrubber takes
+#   nothing (it cannot add CO₂). Plants and crew share one air here, so one level serves both;
+#   the cabin holds the PLANTS' nominal, which is below every cited crew value.
 #
 # condense_rate (k_cond) — first-order humidity-condensation rate (1/s), > 0. Condensing
 #   heat exchanger. Structural positivity requires k_cond·dt < 1 (here 0.03). Since
@@ -71,8 +84,9 @@
 #
 # Clean-room: first-order gas scrubbing/condensation and proportional partial-pressure
 #   control are textbook process-control physics. The three RATES are DESIGN choices —
-#   deliberately NOT NASA BVAD / BioSim life-support numbers; the two SETPOINTS are derived
-#   from BVAD's cabin atmosphere (o2_setpoint 2026-09-06, humidity_setpoint 2026-10-03).
+#   deliberately NOT NASA BVAD / BioSim life-support numbers; the three SETPOINTS are derived
+#   from BVAD's cabin atmosphere (o2_setpoint 2026-09-06, humidity_setpoint 2026-10-03,
+#   co2_partial_pressure 2026-10-19).
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
 #   All four TODO(cite) tags discharged as DESIGN. This file is the CLEAREST case in the
@@ -103,12 +117,14 @@
 #       sits at 0.9995. An uncited value is not an inert one.
 #
 #   REALITY CHECK on k_scrub (context, not a source — see [C]): the ISS CDRA runs a nominal
-#   144-MINUTE bed-swing cycle (≈ 8 640 s) at 34.7 m³/hr. Our τ ≈ 1 000 s cabin time
-#   constant is ~8× SHORTER than the period of the machine that would be doing the
-#   scrubbing, and a volumetric-throughput estimate puts a real cabin's effective k at
-#   ~1e-4 /s or below — so ours is ~1 to 1.5 orders of magnitude fast. Optimistic, same
-#   physical family, not absurd. (The conversion assumes a cabin volume, which [C] does not
-#   state — flagged as our arithmetic, not the source's.)
+#   144-MINUTE bed-swing cycle (≈ 8 640 s) at 34.7 m³/hr. ⚠ Written 2026-07-16 for the old
+#   1e-3: "our τ ≈ 1 000 s is ~8× SHORTER than the machine's period, ~1 to 1.5 orders fast".
+#   The 8× compared a swing PERIOD with a removal time constant, which is the wrong
+#   arithmetic (docs/plans/post-roadmap-co2-level.md §3). A flow-through bed removes
+#   k = Q·η / V: one CDRA in the station's ~230 m³ cabin (9500 mol at 22 °C — our arithmetic,
+#   [C] states no volume) gives k ≈ 4.2e-5 /s before η. Today's 1e-2 is ~240× that. It does
+#   not set the level any more, only how tightly it is held; sizing k from the machine would
+#   have reported the crew's 13.3× carbon oversizing as a cabin level (§3).
 #
 # Sources:
 #   [A] Seader, J.D., Henley, E.J., Roper, D.K. (2011), "Separation Process Principles",
@@ -132,9 +148,13 @@ process: cabin_air_control
 
 parameters:
   co2_scrub_rate:
-    value: 1.0e-3
+    value: 1.0e-2
     unit: "1/s"
-    source: "DESIGN — solver-stability choice, not a literature value: first-order CO₂ scrub τ ≈ 1000 s, picked so k·dt = 0.06 < 1 at dt = 60 s (donor-controlled positivity). First-order form from [A]; the magnitude is ours. No source CAN fix it — real CDRA is cyclic swing adsorption, not first-order decay. CONTRAST: ISS CDRA runs a 144-min bed-swing cycle [C], ~8× our τ, so ours is ~1–1.5 orders fast. Not calibrated."
+    source: "DESIGN — tightness-of-hold choice, not a literature value: the scrubber removes k x the CO₂ ABOVE its target (co2_partial_pressure), so k sets how closely the cabin holds that level, not where it is. A one-sided proportional remover under a constant load stands P/k above its target: at the station crew's 3.796e-3 mol/s, 0.38 mol = 40 ppm (3 % above 0.13 kPa). k·dt = 0.6 < 1 at dt = 60 s (donor-controlled positivity). Form from [A]; the magnitude is ours. No source CAN fix it — real CDRA is cyclic swing adsorption, not a proportional remover. CONTRAST: one CDRA [C] in the station's ~230 m³ cabin gives k ≈ 4.2e-5 /s before capture efficiency (our arithmetic). ⚠ HISTORY: 1.0e-3 until 2026-10-19, first-order on ALL the cabin's CO₂, which settled it at P/k = 400 ppm, a level nobody chose (docs/plans/post-roadmap-co2-level.md). Not calibrated."
+  co2_partial_pressure:
+    value: 130.0
+    unit: "Pa"
+    source: "[D] BVAD Rev 2 Table 4-1 'Typical Steady-State Values for Vehicle Atmospheres', printed p. 63 (read as the page image, sources/temp-evidence/bvad/p63-077.png; the extracted text scrambles this table's columns), row 'p[CO2] for Plants (kPa)': 0.04 lower (Earth normal) / 0.13 NOMINAL ('accepted optimum for plant growth') / 3.4 upper (NASA Std. 3001). Taken: the plants' NOMINAL 0.13 kPa, the user's choice 2026-10-19 (docs/plans/post-roadmap-co2-level.md §7), as the CO₂ partial pressure the cabin scrubber holds. Plants and crew share one air here, so one level serves both: the same table's crew row is 0.267 lower / 0.507 nominal / 1.01 upper kPa (Law 2010), so 0.13 is below every cited crew value — the scrubber works harder than a real cabin's, which is allowed. Stored as a pressure, the unit the table prints; the target in mol is this / 101 325 Pa x the cabin's air (9500 mol gives 12.188502343942758, 1283 ppm). ⚠ The crop model has been checked against a real chamber at one CO₂ level, 1000 ppm (TM 102788, docs/log/real-world-checks.md), near this one; it carries no high-CO₂ penalty. Bounded > 0."
   condense_rate:
     value: 5.0e-4
     unit: "1/s"

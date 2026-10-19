@@ -116,6 +116,7 @@ fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
             ("saturation_vapour_pressure", "Pa"),
             ("o2_makeup_gain", "1/s"),
             ("o2_fraction", "dimensionless"),
+            ("co2_partial_pressure", "Pa"),
         ],
         name,
     )?;
@@ -126,7 +127,8 @@ fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
         saturation_vapour_pressure: require_positive(v[3], "saturation_vapour_pressure", name)?,
         o2_makeup_gain: require_positive(v[4], "o2_makeup_gain", name)?,
         o2_fraction: require_half_open(v[5], 0.0, 1.0, "o2_fraction", name)?,
-        scrub_form: crate::eclss::ScrubForm::FirstOrder,
+        co2_partial_pressure: require_positive(v[6], "co2_partial_pressure", name)?,
+        scrub_form: crate::eclss::ScrubForm::AboveTarget,
     })
 }
 
@@ -266,19 +268,19 @@ mod tests {
         let th = thermal();
         let ec = eclss();
         let cr = crew();
-        // ⚠ ELEVEN, not twelve: `o2_setpoint` was retired from the control table on
-        // 2026-09-06 when its value deliberately moved (see `sibling_params.txt`'s own note).
-        // A row whose value moved cannot be updated here without forging a claim about what
-        // Python's loaders produced, and cannot be regenerated because S6 deleted the
-        // generator. It keeps its manifest hash and its goldens; it loses this check.
-        let pairs: [(&str, f64); 11] = [
+        // ⚠ TEN, not twelve: `o2_setpoint` was retired from the control table on 2026-09-06
+        // and `co2_scrub_rate` on 2026-10-19, each when its value deliberately moved (see
+        // `sibling_params.txt`'s own note). A row whose value moved cannot be updated here
+        // without forging a claim about what Python's loaders produced, and cannot be
+        // regenerated because S6 deleted the generator. It keeps its manifest hash and its
+        // goldens; it loses this check.
+        let pairs: [(&str, f64); 10] = [
             ("charge_efficiency", ch.charge_efficiency),
             ("self_discharge_rate", sd.self_discharge_rate),
             ("emissivity", th.emissivity),
             ("radiator_area", th.radiator_area),
             ("heat_capacity", th.heat_capacity),
             ("space_temperature", th.space_temperature),
-            ("co2_scrub_rate", ec.co2_scrub_rate),
             ("condense_rate", ec.condense_rate),
             ("o2_makeup_gain", ec.o2_makeup_gain),
             ("respired_carbon_fraction", cr.respired_carbon_fraction),
@@ -296,8 +298,8 @@ mod tests {
         }
         assert_eq!(
             t.len(),
-            11,
-            "the control table still names exactly 11 params"
+            10,
+            "the control table still names exactly 10 params"
         );
     }
 
@@ -392,14 +394,27 @@ mod tests {
         makeup: (&str, &str),
         setpoint: (&str, &str),
     ) -> String {
+        eclss_yaml_with_co2(scrub, condense, humidity, pressure, makeup, setpoint, ("130.0", "Pa"))
+    }
+
+    fn eclss_yaml_with_co2(
+        scrub: (&str, &str),
+        condense: (&str, &str),
+        humidity: (&str, &str),
+        pressure: (&str, &str),
+        makeup: (&str, &str),
+        setpoint: (&str, &str),
+        co2: (&str, &str),
+    ) -> String {
         format!(
-            "name: eclss\nprocess: cabin_air_control\nparameters:\n{}{}{}{}{}{}",
+            "name: eclss\nprocess: cabin_air_control\nparameters:\n{}{}{}{}{}{}{}",
             block("co2_scrub_rate", scrub.0, scrub.1),
             block("condense_rate", condense.0, condense.1),
             block("humidity_fraction", humidity.0, humidity.1),
             block("saturation_vapour_pressure", pressure.0, pressure.1),
             block("o2_makeup_gain", makeup.0, makeup.1),
             block("o2_fraction", setpoint.0, setpoint.1),
+            block("co2_partial_pressure", co2.0, co2.1),
         )
     }
 
@@ -675,7 +690,9 @@ mod tests {
     #[test]
     fn eclss_loader_reads_the_committed_params() {
         let p = eclss();
-        assert_eq!(p.co2_scrub_rate, 1.0e-3);
+        assert_eq!(p.co2_scrub_rate, 1.0e-2);
+        assert_eq!(p.co2_partial_pressure, 130.0);
+        assert_eq!(p.scrub_form, crate::eclss::ScrubForm::AboveTarget);
         assert_eq!(p.condense_rate, 5.0e-4);
         assert_eq!(p.humidity_fraction, 0.40);
         assert_eq!(p.saturation_vapour_pressure, 2643.931192210576);
@@ -725,6 +742,25 @@ mod tests {
             eclss_from(&above_one, "eclss.yaml"),
             "o2_fraction must be in (0, 1]",
         );
+        assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
+    }
+
+    /// A zero CO₂ target is the pre-2026-10-19 scrubber's limit (it would draw on ALL the cabin's
+    /// CO₂, as the first-order form did); a negative one is no pressure at all. Both refused.
+    #[test]
+    fn eclss_loader_rejects_a_nonpositive_co2_partial_pressure() {
+        for pressure in ["0.0", "-130.0"] {
+            let bad = eclss_yaml_with_co2(
+                ("1.0e-2", "1/s"),
+                ("5.0e-4", "1/s"),
+                ("0.40", "dimensionless"),
+                ("2643.931192210576", "Pa"),
+                ("2.0e-3", "1/s"),
+                ("0.21", "dimensionless"),
+                (pressure, "Pa"),
+            );
+            rejected(eclss_from(&bad, "eclss.yaml"), "co2_partial_pressure must be > 0");
+        }
         assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
     }
 

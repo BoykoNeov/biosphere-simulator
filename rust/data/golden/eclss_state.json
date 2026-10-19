@@ -4,7 +4,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.3e0000000004ap+7",
+      "amount": "0x1.2b05e305517a0p+7",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -82,7 +82,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.7fffffffffff8p+1",
+      "amount": "0x1.8fa1cfaae81c9p+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },

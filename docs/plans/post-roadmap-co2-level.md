@@ -126,7 +126,10 @@ wheat, the 187× of the crew-coupled-loop record.
 Proposed, following the condenser's precedent: **`eclss.yaml` stores a cited CO₂ share
 (`co2_fraction`). The scrubber removes only what is above that share of the cabin's air:**
 `removed = k · max(0, cabin_co2 − co2_fraction · air) · dt`. The target in mol is computed where
-the air is known, exactly as `o2_setpoint_mol` and `humidity_setpoint_kg` already are. A
+the air is known, exactly as `o2_setpoint_mol` and `humidity_setpoint_kg` already are. (⚠ **As
+built, it is stored as the pressure, `co2_partial_pressure: 130.0 Pa`, not as a fraction** (§10):
+the unit Table 4-1 prints, and the lab's `130 / 101 325 · air` bit for bit, where a decimal
+fraction would have moved the last bits of every crop-sharing golden.) A
 standalone cabin with no air of its own reads `STATION_CABIN_AIR_MOL`, as the humidity target
 does. `max` already sits in the condenser under the Tier-1 claim (`+ − × ÷` and comparisons, no
 transcendental), so the three Tier-1 goldens keep their tier.
@@ -360,3 +363,89 @@ Four of the five files that place one step it at 60 s (`k·h = 0.6` at 1e-2). Th
 `3600 / 12 = 300 s`: at 1e-2 that is `k·h = 3`, so **adoption would make that file refuse to
 build** until its `n_sub` rises to 60 (60 s). That is an authored-content edit, in the adoption's
 batch, with its tests re-run.
+
+## 10. ADOPTED (2026-10-19) — slice A, the station
+
+**On the user's word** (*"1"*, after the summary of §9). The station unfreeze, in the order the
+advisor set: the lab's results saved as bytes first, then the reference changed, then the goldens
+regenerated and compared against the saved bytes.
+
+**What changed.** `eclss.yaml` gains `co2_partial_pressure: 130.0 Pa` (BVAD Table 4-1, plants'
+nominal; stored as the pressure the table prints, not as the fraction §6 proposed — see the note
+there) and `co2_scrub_rate` goes 1e-3 → 1e-2 with a new `DESIGN` source. `ScrubForm::AboveTarget`
+is the loader's form; `FirstOrder` survives as the lab switch
+`domains::lab::with_first_order_scrubber(p, FIRST_ORDER_SCRUB_RATE)`. `CO2Scrubber::new` takes the
+cabin's air with no default (the condenser's and the regulator's rule), so the old "refuses at its
+first step without air" path is gone, not tested. `greenhouse_bio_scenario`'s `chamber_co2_mol0`
+starts at the target, 12.188502343942758 mol, pinned against `co2_target_mol` in
+`the_cabin_starts_at_its_targets`. `sibling_params.txt`'s `co2_scrub_rate` row is retired by hand
+(11 → 10), `o2_setpoint`'s precedent. The authoring side builds every scrubber against a named,
+temporary `IMPLICIT_SCRUBBER_AIR_MOL = 9500` until slice B. `scenarios/bioregenerative_station.yaml`
+moves to `n_sub: 60` (60-s fast step, `k·h = 0.6`), as §9 said it must.
+
+**Measured against the lab, byte for byte.** Before the change, `co2_target_lab` dumped the six
+switched final states (under `W:\temp\claude\co2-adopt\lab\`, deleted at the end of the batch).
+After it, `regen_goldens --write` rewrote exactly six goldens (`eclss`, `cabin_gas`,
+`water_recovery`, `greenhouse`, `harvest`, `sealed_station`), the other 14 identical, and **each of
+the six is `cmp`-identical to its dump.** So §9's tables are the adopted reference's moves, not an
+approximation of them. Station manifest, predicted and measured: `eclss.yaml`'s two fingerprints and
+the six `golden_sha256` rows, nothing else. Biosphere and authoring manifests unchanged.
+
+**The lab tools swapped sides.** `co2_level_price`, `co2_target_lab` and `co2_water_lab` now run the
+loader's form as "frozen" (checked against the new goldens) and the pre-adoption first-order form
+as the switched side, started at its old fixed point 3.796 mol. Nothing runs examples, so this was
+done by hand; they compile under `clippy --all-targets`.
+
+**Tests that went red (12 of 1452), each re-stated, none loosened:**
+
+* `domains/tests/eclss_run.rs` (3). The steady state is `target + P/k`, not `P/k`. The CO₂
+  contraction is linear only above the target, so both runs now start at or above it (the
+  condenser test's arrangement), and a new test pins the one-sided half: below the target an
+  offset carries undecayed and nothing is scrubbed. RK4 against Euler: both reach the exact fixed
+  point to the last bit by step 900, so the "identity breaks" check moved from the final step to
+  the trajectory.
+* `authoring/tests/multirate.rs` (4). Fixture numbers at the old rate: the slow scrubber's true
+  `k·h` is 18 (was 1.8), the deadbeat boundary is `dt = 100` (was 1000), and the probe cabin
+  starts at 20 mol, above the 12.19 mol target, because below it the scrubber is idle and "bit
+  identical" would compare two runs doing nothing.
+* `authoring/tests/scenario_files.rs` (3). `k·h = 36` at `dt = 3600` (was 3.6); the rationing
+  count at that step re-measured 28 → 19, the condenser's 2026-10-03 case again (a one-sided law
+  overshoots below its target and stops rather than clamping at zero). The O₂ "airless cabin"
+  assertion, which says the mechanism is the same one, still holds.
+* `station/tests/chamber_walls.rs` (1). A measured pin, re-pinned as at every earlier adoption:
+  node 188.7373 → 188.7014 K, heater 139.788 → 139.193 W. The tolerances are unchanged.
+* `station/tests/air_split.rs` (1), **not re-pinned.** At 1283 ppm a fan-fed small chamber is far
+  less hungry: the fan's 0.1 / 0.4 ratio reads 0.990 (fans 0.1 / 0.2 / 0.4 → 0.984 / 0.990 / 0.993
+  of shared air's plant carbon at 90 days), past the pin's 0.97. Loosening the line to fit would
+  weaken it (a side note raised exactly this). The file's subject is CO₂ supply to a hungry crop,
+  measured at 400 ppm, so the whole file now runs at that level through the lab switch and the old
+  start, and keeps 0.97. The separate-air option's behaviour at the adopted level is the reading
+  above, recorded and not pinned.
+
+`station/tests/perturbations.rs`, which the advisor flagged (does a spike push the cabin below the
+target, where the one-sided form cannot restore it?), stayed green for the right reason: the
+crew's 3.8e-3 mol/s keeps the cabin above the target through every perturbation, so the scrubber
+is linear there and `Δ(crop flux)/k` is still the offset.
+
+**The slow tests (`cargo test -- --ignored`), 3 red of 12, each handled:**
+
+* `station/tests/chamber_walls.rs`, two four-year measured pins, re-pinned as at every earlier
+  adoption: the reference node's mean 170.0109 → 170.0607 K (min / max inside their 0.01 K), the
+  chamber's end 295.1355095 → 295.1355085 K; the station-structure battery now runs out on day 1023
+  (band 1041–1061 → 1013–1033), 774 543 fast-side rationings, 7 day ends off the band (≤ 18). Earlier
+  and warmer, presumably the larger crop's evaporation paid by the heater; not traced.
+* `authoring/tests/bed.rs`, the potato example's battery: −0.3 % over 150 days at 400 ppm, −1.7 % at
+  the adopted level, against the test's 1 % line. **The user chose to re-size the file, not the
+  line** (*"Raise its solar supply"*). Measured with a throwaway probe outside the tree: 150 W
+  reproduces the test's −1.674 %; 175 W −0.135 %; 180 W +0.173 %. `scenarios/potato_greenhouse.yaml`
+  now reads `solar_power: 175.0`; its 14-day run ends +0.17 %, nothing rationed, re-sown at the same
+  step. The wheat example keeps 150 W: its own 300-day slow test stayed green.
+
+Final gate: `cargo clippy --all-targets -- -D warnings` clean; `cargo test` 1453 passed, 0 failed;
+`cargo test -- --ignored` 12 of 12 after the above.
+
+**Slice B (next):** `eclss.co2_scrubber` gains `needs_cabin_air: true`; every authored scrubber
+declares `cabin_air_mol` (six files: `eclss_cabin`, `eclss_multirate_cabin`,
+`eclss_thermal_habitat`, `bioregenerative_station`, `lamp_greenhouse`, `potato_greenhouse`);
+`kinetics_param_map` exposes `co2_partial_pressure`; `IMPLICIT_SCRUBBER_AIR_MOL` is deleted; the
+authoring manifest is regenerated. Then the crew-size fix (§9, the user's "option 1").

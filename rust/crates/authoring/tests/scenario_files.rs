@@ -781,7 +781,8 @@ fn param_pack_on_a_frozen_type_is_deferred() {
 //
 // The hazard itself: every frozen rate constant was sized against the `dt` of its own
 // frozen scenario, but an author picks `dt`. At dt = 3600 `eclss.co2_scrubber`'s k*dt is
-// 3.6 — it demands 3.6x the whole CO2 pool in one step. The backstop clamps it, so the
+// 3.6 — it demands 3.6x the whole CO2 pool in one step. (⚠ At the pre-2026-10-19 scrubber;
+// since then it is 36, on the excess above a cited CO2 target.) The backstop clamps it, so the
 // run conserves every quantity and completes normally *with an airless cabin*. Nothing
 // was raised; the only signal was the rationed count, which callers discard.
 // ---------------------------------------------------------------------------
@@ -832,7 +833,8 @@ fn at_the_frozen_dt_the_backstop_never_fires() {
 fn the_build_now_refuses_the_unsafe_dt_before_any_step_runs() {
     // The stage that did not exist when this file was written (multi-rate Step 5, now
     // mirrored). The author's natural call is `interpret` WITHOUT the study hatch, and it
-    // refuses: k_scrub * 3600 = 3.6 >= 1 is decidable from the params + dt alone, so
+    // refuses: k_scrub * 3600 = 36 >= 1 (3.6 until 2026-10-19, at k_scrub 1e-3) is
+    // decidable from the params + dt alone, so
     // there is no reason to make an author spend a long run to learn it.
     //
     // This is why every other test in this block passes the hatch: the run-time gate they
@@ -860,7 +862,7 @@ fn the_build_now_refuses_the_unsafe_dt_before_any_step_runs() {
         err.message
     );
     assert!(
-        err.message.contains("3.6"),
+        err.message.contains("k*h = 36"),
         "the k*h value must be named: {}",
         err.message
     );
@@ -891,7 +893,7 @@ fn at_an_unsafe_dt_the_run_is_rejected_not_returned() {
     // sniffing the message) is the point of ErrorKind existing.
     assert_eq!(err.kind, authoring::ErrorKind::Rationed);
     assert!(
-        err.message.contains("28"),
+        err.message.contains("19"),
         "count must be named: {}",
         err.message
     );
@@ -926,8 +928,15 @@ fn the_underlying_hazard_is_unchanged_only_its_silence_was_fixed() {
     // setpoint it overshoots below the setpoint and stops. The O₂ mechanism is the same one —
     // the airless assertion below says so.
     // Re-measured, not re-tuned (docs/authoring-reference.md's 2026-10-03 log entry).
+    // ⚠ 28 until 2026-10-19, when the CO₂ scrubber became one-sided about a cited target
+    // (0.13 kPa) at ten times the rate (docs/plans/post-roadmap-co2-level.md). Nine firings
+    // went, the condenser's case again: the old law drew first-order on ALL the cabin's CO₂ and
+    // over-drew it to the zero clamp; on the excess above a 12.19 mol target it mostly
+    // overshoots below the target and stops. Both moved in one change (the form and the rate),
+    // so the nine are that change's, not split between them. The O₂ mechanism is the same one —
+    // the airless assertion below says so. Re-measured, not re-tuned.
     assert_eq!(
-        result.total_rationed, 28,
+        result.total_rationed, 19,
         "the hazard's mechanism moved — docs are stale"
     );
     assert!(result.events.is_empty());

@@ -71,7 +71,7 @@ fn cabin_yaml_steps(
          steps: {steps}\n\
          n_sub: {n_sub}\n\
          stocks:\n\
-         \x20 - id: eclss.cabin_co2\n    domain: eclss\n    quantity: carbon\n    kind: pool\n    amount: 10.0\n\
+         \x20 - id: eclss.cabin_co2\n    domain: eclss\n    quantity: carbon\n    kind: pool\n    amount: 20.0\n\
          \x20 - id: eclss.co2_removed\n    domain: boundary\n    quantity: carbon\n    kind: boundary\n    amount: 0.0\n\
          \x20 - id: eclss.cabin_h2o\n    domain: eclss\n    quantity: water\n    kind: pool\n    amount: 10.0\n\
          \x20 - id: eclss.humidity_condensate\n    domain: boundary\n    quantity: water\n    kind: boundary\n    amount: 0.0\n\
@@ -202,17 +202,18 @@ fn the_slow_sets_step_ignores_n_sub_entirely() {
 #[test]
 fn a_slow_flow_is_judged_at_dt_over_2_not_the_plans_formula() {
     // The measured false-PASS, as a build verdict. The scrubber classed SLOW at master
-    // dt=3600 / n_sub=60: the plan's formula reports k*h = 1e-3 * 60 = 0.06 and PASSES;
-    // the truth is 1e-3 * 1800 = 1.8, and the run rations 24 times and empties cabin_co2
-    // to exactly 0.0. A false PASS in the unsafe direction is worse than no check,
-    // because it reads as a guarantee.
+    // dt=3600 / n_sub=60: the plan's formula reports k*h = 1e-2 * 60 = 0.6 and PASSES;
+    // the truth is 1e-2 * 1800 = 18. (Measured at the pre-2026-10-19 k_scrub = 1e-3, where
+    // the formula said 0.06 against a true 1.8: that run rationed 24 times and emptied
+    // cabin_co2 to exactly 0.0.) A false PASS in the unsafe direction is worse than no
+    // check, because it reads as a guarantee.
     let err = match build(&cabin_yaml("3600.0", "60", "slow", "fast")) {
-        Ok(_) => panic!("a slow flow at k*dt/2 = 1.8 must be refused, not passed at 0.06"),
+        Ok(_) => panic!("a slow flow at k*dt/2 = 18 must be refused, not passed at 0.6"),
         Err(e) => e,
     };
     assert!(
-        err.message.contains("1.8"),
-        "the TRUE k*h (1.8) must be named, not the formula's 0.06: {}",
+        err.message.contains("k*h = 18.0"),
+        "the TRUE k*h (18) must be named, not the formula's 0.6: {}",
         err.message
     );
     // The remedy must NOT say "raise n_sub" for a slow flow — an author who followed that
@@ -226,15 +227,15 @@ fn a_slow_flow_is_judged_at_dt_over_2_not_the_plans_formula() {
 
 #[test]
 fn the_same_flow_at_the_same_dt_is_fine_as_fast() {
-    // Only `rate_class` moved: 1.8 -> 0.06. The rate class DECIDES the verdict, which is
+    // Only `rate_class` moved: 18 -> 0.6. The rate class DECIDES the verdict, which is
     // the whole reason the effective step must be per-class.
     build(&cabin_yaml("3600.0", "60", "fast", "fast")).expect("the scrubber is safe as fast");
 }
 
 #[test]
 fn the_condenser_is_the_only_eclss_flow_that_may_be_slow_at_dt_3600() {
-    // k_cond = 5e-4 is exactly half the scrubber's, so 5e-4 * 1800 = 0.9 < 1 — it clears
-    // the bound where the scrubber (1.8) does not. Same graph, same dt, same n_sub; only
+    // k_cond = 5e-4, so 5e-4 * 1800 = 0.9 < 1 — it clears the bound where the scrubber
+    // (1e-2 * 1800 = 18; 1.8 at its pre-2026-10-19 1e-3, when it was twice k_cond) does not. Same graph, same dt, same n_sub; only
     // `k` differs, and it decides membership of the slow set.
     let built =
         build(&cabin_yaml("3600.0", "60", "fast", "slow")).expect("the condenser may be slow");
@@ -250,12 +251,14 @@ fn the_condenser_is_the_only_eclss_flow_that_may_be_slow_at_dt_3600() {
 #[test]
 fn the_bound_is_strictly_less_than_one() {
     // `k*h >= 1` is refused: at k*h == 1.0 exactly the update map is DEADBEAT
-    // (x -> x - 1.0*x = 0 in one step). k_scrub = 1e-3 ⇒ dt = 1000 is exactly 1.0.
-    match build(&cabin_yaml("1000.0", "1", "fast", "fast")) {
+    // (x -> x - 1.0*(x - target) = target in one step). k_scrub = 1e-2 ⇒ dt = 100 is exactly
+    // 1.0 (`1e-2 * 100.0 == 1.0` in f64; until 2026-10-19 it was k_scrub = 1e-3 at dt = 1000).
+    assert_eq!(1.0e-2_f64 * 100.0, 1.0, "the boundary case must land on 1.0 exactly");
+    match build(&cabin_yaml("100.0", "1", "fast", "fast")) {
         Ok(_) => panic!("k*h == 1.0 exactly must be refused (the bound is < 1, not <= 1)"),
         Err(e) => assert!(e.message.contains("co2_scrub_rate"), "{}", e.message),
     }
-    build(&cabin_yaml("999.0", "1", "fast", "fast")).expect("k*h just under 1.0 builds");
+    build(&cabin_yaml("99.9", "1", "fast", "fast")).expect("k*h just under 1.0 builds");
 }
 
 // ---------------------------------------------------------------------------
@@ -309,8 +312,10 @@ fn a_multirate_run_reproduces_the_single_rate_trajectory_bitwise() {
     assert_eq!(single.final_state.n, 240);
     // The graph must actually have moved, or "bit-identical" is a statement about two
     // runs that both did nothing.
+    // (The cabin starts at 20 mol, above the scrubber's 12.19 mol target, since 2026-10-19:
+    // below it the one-sided scrubber is idle and this would be two runs doing nothing.)
     assert!(
-        multi.final_state.stocks["eclss.cabin_co2"].amount < 10.0,
+        multi.final_state.stocks["eclss.cabin_co2"].amount < 20.0,
         "the scrubber must have drawn the cabin down"
     );
 }
@@ -338,7 +343,7 @@ fn a_non_empty_slow_set_is_driven_at_dt_over_2() {
         "the SLOW flow must have run (its stock is untouched if the slow set was dropped)"
     );
     assert!(
-        result.final_state.stocks["eclss.cabin_co2"].amount < 10.0,
+        result.final_state.stocks["eclss.cabin_co2"].amount < 20.0,
         "the fast flow must have run too"
     );
     // Conservation is asserted inside `multirate_step` over the whole master step, so a

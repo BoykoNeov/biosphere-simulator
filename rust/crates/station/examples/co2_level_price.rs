@@ -17,6 +17,10 @@
 //!
 //! ⚠ **It writes nothing and takes no decision.** A run that rations, reverses or fails is
 //! printed as that result.
+//!
+//! ⚠ **Since 0.13 kPa was adopted (2026-10-19)** "today" means the pre-adoption reference: the
+//! first-order rows run through `domains::lab::with_first_order_scrubber`, and the
+//! above-target row is the loader's own form.
 
 use domains::biosphere::stocks::{CARBON_POOL, LEAF_C, ROOT_C, STEM_C, STORAGE_C};
 use domains::params;
@@ -33,11 +37,11 @@ const P_STD_KPA: f64 = 101.325;
 /// The levels priced: (label, mole fraction, the lab's above-target form?, what names it).
 fn levels() -> Vec<(&'static str, Option<f64>, bool, &'static str)> {
     vec![
-        ("today", None, false, "P/k with the frozen k = 1e-3 — nobody's choice"),
+        ("today", None, false, "P/k with the pre-adoption k = 1e-3 — nobody's choice"),
         ("plants 0.13 kPa", Some(0.13 / P_STD_KPA), false, "Table 4-1 p[CO2] for Plants, nominal ('accepted optimum')"),
         ("ISS cap 0.40 kPa", Some(0.40 / P_STD_KPA), false, "BVAD §4.1 text: ISS's lower operating maximum"),
         ("crew 0.507 kPa", Some(0.507 / P_STD_KPA), false, "Table 4-1 p[CO2] for Crew, nominal"),
-        ("plants 0.13 kPa, above-target form", Some(0.13 / P_STD_KPA), true, "the lab build of plan §9: k = 1e-2 on the excess over 130 Pa"),
+        ("plants 0.13 kPa, above-target form", Some(0.13 / P_STD_KPA), true, "the adopted form (plan §9-10): k = 1e-2 on the excess over 130 Pa"),
     ]
 }
 
@@ -60,21 +64,24 @@ fn run_at(target: Option<f64>, above_target: bool) -> Result<Price, String> {
     let thermal = params::thermal();
     let crew = params::crew();
     let lamp = station_params::lamp();
-    let mut eclss = params::eclss();
+    // Since the adoption (2026-10-19) the loader's form is the above-target one; every row but
+    // that one runs the pre-adoption first-order form through the lab's switch.
+    let mut eclss = domains::lab::with_first_order_scrubber(
+        params::eclss(),
+        domains::lab::FIRST_ORDER_SCRUB_RATE,
+    );
     let mut scenario = sealed_station_scenario();
     let air = scenario.bio.chamber_air_capacity_mol;
     let production = crew.respired_carbon_fraction * scenario.cabin.food_intake_rate;
+    // The pre-adoption start: the first-order form's own fixed point.
+    scenario.bio.chamber_co2_mol0 = 3.796;
     if let Some(x) = target {
         let n = x * air;
         eclss.co2_scrub_rate = production / n;
         scenario.bio.chamber_co2_mol0 = n;
         if above_target {
-            // The lab's form (plan §9): remove only the excess over the cited partial pressure.
-            eclss = domains::lab::with_scrubber_above_target(
-                eclss,
-                domains::lab::CO2_TARGET_PA,
-                domains::lab::ABOVE_TARGET_SCRUB_RATE,
-            );
+            // The adopted form: remove only the excess over the cited partial pressure.
+            eclss = params::eclss();
             scenario.bio.chamber_co2_mol0 =
                 eclss.co2_target_mol(air).expect("an above-target scrubber has a target");
         }

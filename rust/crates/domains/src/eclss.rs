@@ -58,8 +58,14 @@ pub const O2_MAKEUP: &str = "eclss.o2_makeup";
 /// The ECLSS control-loop coefficients (`eclss.yaml`).
 #[derive(Debug, Clone, Copy)]
 pub struct EclssParams {
-    /// k_scrub — first-order CO₂ removal rate (1/s), > 0.
+    /// k_scrub — CO₂ removal rate (1/s), > 0, on the excess above the CO₂ target
+    /// ([`EclssParams::co2_target_mol`]). ⚠ Until 2026-10-19 it was 1e-3 on ALL the cabin's CO₂,
+    /// which settled every cabin at `P / k`, 400 ppm (`docs/plans/post-roadmap-co2-level.md`).
     pub co2_scrub_rate: f64,
+    /// The CO₂ partial pressure the scrubber holds (Pa), > 0 (`eclss.yaml`'s
+    /// `co2_partial_pressure`, BVAD's 0.13 kPa plant nominal). The target in **moles** depends
+    /// on the cabin, so it is not a param: see [`EclssParams::co2_target_mol`].
+    pub co2_partial_pressure: f64,
     /// k_cond — first-order humidity removal rate (1/s), > 0, on the excess above the
     /// humidity target ([`EclssParams::humidity_setpoint_kg`]).
     pub condense_rate: f64,
@@ -84,27 +90,24 @@ pub struct EclssParams {
     /// (`docs/plans/post-roadmap-authored-plants.md`).
     pub o2_fraction: f64,
     /// How the scrubber removes CO₂ ([`ScrubForm`]). Not in `eclss.yaml`: the loader sets
-    /// [`ScrubForm::FirstOrder`], the frozen form; the other is a lab switch
-    /// (`crate::lab::with_scrubber_above_target`, `docs/plans/post-roadmap-co2-level.md`).
+    /// [`ScrubForm::AboveTarget`], the frozen form since 2026-10-19; the old one is a lab
+    /// switch (`crate::lab::with_first_order_scrubber`, `docs/plans/post-roadmap-co2-level.md`).
     pub scrub_form: ScrubForm,
 }
 
 /// How the CO₂ scrubber removes CO₂ from its cabin.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScrubForm {
-    /// `k · cabin_co2` — the frozen form. The cabin settles where the crew's output equals
-    /// the removal, `P / k`: 3.796 mol, 400 ppm of the station's cabin, a level nobody chose
-    /// (`docs/plans/post-roadmap-co2-level.md` §1).
+    /// `k · max(0, cabin_co2 − target)`, the target being the CO₂ that
+    /// [`EclssParams::co2_partial_pressure`] makes of the cabin's air at reference pressure —
+    /// the condenser's one-sided form, for a cited level. The frozen form since 2026-10-19. It
+    /// holds the cabin at `target + P / k`, not at the target: a one-sided proportional remover
+    /// under a constant load stands off by `P / k` (§6), 40 ppm at the station crew's load.
+    AboveTarget,
+    /// `k · cabin_co2` — the frozen form until 2026-10-19, now **lab-only**. The cabin settles
+    /// where the crew's output equals the removal, `P / k`: at the old 1e-3, 3.796 mol, 400 ppm
+    /// of the station's cabin, a level nobody chose (`docs/plans/post-roadmap-co2-level.md` §1).
     FirstOrder,
-    /// `k · max(0, cabin_co2 − target)`, the target being the CO₂ a partial pressure of
-    /// `partial_pressure_pa` makes of the cabin's air at reference pressure — the
-    /// condenser's one-sided form, for a cited level. **Lab-only.** It holds the cabin at
-    /// `target + P / k`, not at the target: a one-sided proportional remover under a
-    /// constant load stands off by `P / k` (§6).
-    AboveTarget {
-        /// The CO₂ partial pressure held (Pa).
-        partial_pressure_pa: f64,
-    },
 }
 
 impl EclssParams {
@@ -128,14 +131,15 @@ impl EclssParams {
     }
 
     /// The scrubber's target cabin CO₂ (mol) for a cabin holding `cabin_air_mol` of air at
-    /// reference pressure, under [`ScrubForm::AboveTarget`]: `p_co2 / P_std · air`. `None`
-    /// under [`ScrubForm::FirstOrder`], which has no target.
+    /// reference pressure, under [`ScrubForm::AboveTarget`]: `p_co2 / P_std · air`. The
+    /// station's 9500 mol gives 12.188502343942758 mol (1283 ppm). `None` under the lab's
+    /// [`ScrubForm::FirstOrder`], which has no target.
     pub fn co2_target_mol(&self, cabin_air_mol: f64) -> Option<f64> {
         match self.scrub_form {
-            ScrubForm::FirstOrder => None,
-            ScrubForm::AboveTarget { partial_pressure_pa } => {
-                Some(partial_pressure_pa / STANDARD_ATMOSPHERE_PA * cabin_air_mol)
+            ScrubForm::AboveTarget => {
+                Some(self.co2_partial_pressure / STANDARD_ATMOSPHERE_PA * cabin_air_mol)
             }
+            ScrubForm::FirstOrder => None,
         }
     }
 }
@@ -186,13 +190,15 @@ pub const STEADY_STATE_SCENARIO: EclssScenario = EclssScenario {
 /// The steady-state-run horizon (steps) — ~27 slowest-loop time constants.
 pub const STEADY_STATE_STEPS: u64 = 900;
 
-/// Instantaneous CO₂ scrub rate `k_scrub · cabin_co2` (mol/s). Op-order mirrors Python.
+/// Instantaneous CO₂ scrub rate `k_scrub · cabin_co2` (mol/s) — the lab's
+/// [`ScrubForm::FirstOrder`], the frozen form until 2026-10-19. Op-order mirrors Python.
 fn scrub_flux(cabin_co2: f64, co2_scrub_rate: f64) -> f64 {
     co2_scrub_rate * cabin_co2
 }
 
 /// Instantaneous CO₂ removal above a target, `k_scrub · max(0, cabin_co2 − target)` (mol/s) —
-/// [`ScrubForm::AboveTarget`], the op order of [`condense_flux`]. Lab-only.
+/// [`ScrubForm::AboveTarget`], the op order of [`condense_flux`]. One-sided: a scrubber cannot
+/// add CO₂, so below the target it stops.
 fn scrub_above_target_flux(cabin_co2: f64, co2_scrub_rate: f64, target: f64) -> f64 {
     co2_scrub_rate * (cabin_co2 - target).max(0.0)
 }
@@ -305,41 +311,43 @@ impl Flow for CrewMetabolism {
     }
 }
 
-/// CARBON flow `cabin_co2 → boundary.co2_removed` — the scrubber (2-leg), first-order unless
-/// its params carry the lab's [`ScrubForm::AboveTarget`].
+/// CARBON flow `cabin_co2 → boundary.co2_removed` — the scrubber (2-leg): it removes the CO₂
+/// above its target ([`ScrubForm::AboveTarget`]), or, under the lab's switch, first-order.
 pub struct CO2Scrubber {
     id: String,
     cabin_co2: String,
     co2_removed: String,
     params: EclssParams,
-    /// The air of the cabin `cabin_co2` belongs to (mol), when the builder supplies it. Read
-    /// only under [`ScrubForm::AboveTarget`], which fails at its first step without it.
-    cabin_air_mol: Option<f64>,
+    /// The target cabin CO₂ (mol): [`EclssParams::co2_target_mol`] of the cabin's air. `None`
+    /// under the lab's [`ScrubForm::FirstOrder`].
+    target: Option<f64>,
 }
 
 impl CO2Scrubber {
     /// Construct a `CO2Scrubber` with the given ids — the station re-points `cabin_co2` at
-    /// the shared cabin/biosphere CO₂ pool (the reverse greenhouse seam).
-    pub fn new(id: String, cabin_co2: String, co2_removed: String, params: EclssParams) -> Self {
+    /// the shared cabin/biosphere CO₂ pool (the reverse greenhouse seam). `cabin_air_mol` is
+    /// the air of the cabin that pool belongs to: the scrubber holds
+    /// [`EclssParams::co2_partial_pressure`] of it. There is no default, on purpose (the
+    /// condenser's and the regulator's rule).
+    pub fn new(
+        id: String,
+        cabin_co2: String,
+        co2_removed: String,
+        params: EclssParams,
+        cabin_air_mol: f64,
+    ) -> Self {
         CO2Scrubber {
             id,
             cabin_co2,
             co2_removed,
             params,
-            cabin_air_mol: None,
+            target: params.co2_target_mol(cabin_air_mol),
         }
     }
 
-    /// This scrubber, told its cabin's air (mol) — what [`ScrubForm::AboveTarget`]'s partial
-    /// pressure is a share OF. Inert under the frozen [`ScrubForm::FirstOrder`].
-    pub fn with_cabin_air(mut self, cabin_air_mol: f64) -> Self {
-        self.cabin_air_mol = Some(cabin_air_mol);
-        self
-    }
-
-    /// The target cabin CO₂ (mol), when the form has one and the air is known.
+    /// The target cabin CO₂ (mol), when the form has one.
     pub fn target(&self) -> Option<f64> {
-        self.cabin_air_mol.and_then(|air| self.params.co2_target_mol(air))
+        self.target
     }
 }
 
@@ -357,19 +365,12 @@ impl Flow for CO2Scrubber {
         dt: f64,
     ) -> Result<FlowResult, SimError> {
         let cabin_co2 = donor_amount(snapshot, &self.cabin_co2)?;
-        let removed = match self.params.scrub_form {
-            // Op-order mirrors Python: scrub_flux(cabin_co2) * dt = (k_scrub * cabin_co2) * dt.
-            ScrubForm::FirstOrder => scrub_flux(cabin_co2, self.params.co2_scrub_rate) * dt,
-            ScrubForm::AboveTarget { .. } => {
-                let target = self.target().ok_or_else(|| {
-                    SimError::Reference(format!(
-                        "{}: the above-target scrubber needs its cabin's air \
-                         (CO2Scrubber::with_cabin_air)",
-                        self.id
-                    ))
-                })?;
+        let removed = match self.target {
+            Some(target) => {
                 scrub_above_target_flux(cabin_co2, self.params.co2_scrub_rate, target) * dt
             }
+            // Op-order mirrors Python: scrub_flux(cabin_co2) * dt = (k_scrub * cabin_co2) * dt.
+            None => scrub_flux(cabin_co2, self.params.co2_scrub_rate) * dt,
         };
         FlowResult::new(vec![
             Leg::new(self.cabin_co2.clone(), -removed)?,
@@ -562,13 +563,13 @@ pub fn build_eclss(
             metabolic_co2_source: METABOLIC_CO2_SOURCE.to_string(),
             metabolic_h2o_source: METABOLIC_H2O_SOURCE.to_string(),
         }),
-        Box::new(CO2Scrubber {
-            id: CO2_SCRUBBER.to_string(),
-            cabin_co2: CABIN_CO2.to_string(),
-            co2_removed: CO2_REMOVED.to_string(),
-            params: *params,
-            cabin_air_mol: Some(scenario.cabin_air_mol),
-        }),
+        Box::new(CO2Scrubber::new(
+            CO2_SCRUBBER.to_string(),
+            CABIN_CO2.to_string(),
+            CO2_REMOVED.to_string(),
+            *params,
+            scenario.cabin_air_mol,
+        )),
         Box::new(Condenser::new(
             CONDENSER.to_string(),
             CABIN_H2O.to_string(),
@@ -623,13 +624,14 @@ mod tests {
     /// The hand ECLSS params — the committed `eclss.yaml` values, restated so the hand
     /// arithmetic stays meaningful. The loader is exercised in [`crate::params`].
     const HAND: EclssParams = EclssParams {
-        co2_scrub_rate: 1.0e-3,
+        co2_scrub_rate: 1.0e-2,
+        co2_partial_pressure: 130.0,
         condense_rate: 5.0e-4,
         humidity_fraction: 0.40,
         saturation_vapour_pressure: 2643.931192210576,
         o2_makeup_gain: 2.0e-3,
         o2_fraction: 0.21,
-        scrub_form: ScrubForm::FirstOrder,
+        scrub_form: ScrubForm::AboveTarget,
     };
 
     /// The hand cabin's air (mol) — the station's.
@@ -700,6 +702,7 @@ mod tests {
             CABIN_CO2.to_string(),
             CO2_REMOVED.to_string(),
             HAND,
+            HAND_AIR,
         )
     }
 
@@ -890,111 +893,92 @@ mod tests {
         }
     }
 
-    // --- flow level: CO2Scrubber ---------------------------------------------------
+    // --- flow level: CO2Scrubber (the frozen above-target form since 2026-10-19) -----
+    /// The hand cabin's CO₂ target (mol): 130 Pa / 101 325 Pa × 9500 mol.
+    fn hand_target() -> f64 {
+        HAND.co2_target_mol(HAND_AIR).expect("the frozen form has a target")
+    }
+
+    #[test]
+    fn co2_target_is_the_partial_pressure_share_of_the_air() {
+        // 130 Pa / 101 325 Pa × 9500 mol = 12.188 mol (1283 ppm) — the greenhouse cabins' start
+        // (`station::scenario`, pinned there bit for bit).
+        close(hand_target(), 130.0 / 101_325.0 * 9500.0);
+        assert_eq!(scrubber().target(), Some(hand_target()));
+        // A tenth of the air, a tenth of the target: the level is a share, not an amount.
+        close(HAND.co2_target_mol(950.0).expect("a target"), hand_target() / 10.0);
+    }
+
     #[test]
     fn co2_scrubber_balances_carbon_only() {
-        let s = state(10.0, 3.0, 0.04);
+        let s = state(10.0, hand_target() + 2.0, 0.04);
         let result = evaluated(&scrubber(), &s, &crew_forcing(), DT);
         assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
         assert_eq!(touched(&result, &s), vec![Quantity::Carbon]);
     }
 
     #[test]
-    fn co2_scrubber_removes_first_order_and_dt_linear() {
-        let s = state(10.0, 3.0, 0.04);
+    fn co2_scrubber_removes_only_the_excess_and_dt_linear() {
+        let s = state(10.0, hand_target() + 2.0, 0.04);
         let l = legs(&scrubber(), &s, &crew_forcing(), DT);
-        let expected = HAND.co2_scrub_rate * 3.0 * DT;
+        let expected = HAND.co2_scrub_rate * 2.0 * DT;
         close(l[CABIN_CO2], -expected);
         close(l[CO2_REMOVED], expected);
+        let half = legs(&scrubber(), &s, &crew_forcing(), DT / 2.0);
+        close(half[CO2_REMOVED], expected / 2.0);
     }
 
+    /// ⚠ **The one-sided half.** A scrubber cannot add CO₂, so at and below its target it
+    /// takes NOTHING — where the pre-2026-10-19 form took `k · co2` here and held every cabin
+    /// at `P / k`, 400 ppm.
     #[test]
-    fn co2_scrubber_self_limits_at_floor() {
-        let s = state(10.0, 0.0, 0.04);
-        for (_, amount) in legs(&scrubber(), &s, &crew_forcing(), DT) {
-            assert_eq!(amount, 0.0);
-        }
-    }
-
-    // --- the lab's above-target form (docs/plans/post-roadmap-co2-level.md) -----------
-    /// The hand params under the lab's switch: 130 Pa, k = 1e-2.
-    fn above_target() -> EclssParams {
-        crate::lab::with_scrubber_above_target(
-            HAND,
-            crate::lab::CO2_TARGET_PA,
-            crate::lab::ABOVE_TARGET_SCRUB_RATE,
-        )
-    }
-
-    fn above_target_scrubber() -> CO2Scrubber {
-        CO2Scrubber::new(
-            CO2_SCRUBBER.to_string(),
-            CABIN_CO2.to_string(),
-            CO2_REMOVED.to_string(),
-            above_target(),
-        )
-        .with_cabin_air(HAND_AIR)
-    }
-
-    #[test]
-    fn co2_target_is_the_partial_pressure_share_of_the_air() {
-        // 130 Pa / 101 325 Pa × 9500 mol = 12.188 mol (1283 ppm). FirstOrder has no target,
-        // with or without the air.
-        let target = above_target().co2_target_mol(HAND_AIR).expect("a target");
-        close(target, 130.0 / 101_325.0 * 9500.0);
-        assert_eq!(HAND.co2_target_mol(HAND_AIR), None);
-        assert_eq!(scrubber().with_cabin_air(HAND_AIR).target(), None);
-        assert_eq!(above_target_scrubber().target(), Some(target));
-    }
-
-    #[test]
-    fn co2_scrubber_above_target_removes_only_the_excess() {
-        let target = above_target().co2_target_mol(HAND_AIR).expect("a target");
-        let s = state(10.0, target + 2.0, 0.04);
-        let result = evaluated(&above_target_scrubber(), &s, &crew_forcing(), DT);
-        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
-        assert_eq!(touched(&result, &s), vec![Quantity::Carbon]);
-        let l = legs(&above_target_scrubber(), &s, &crew_forcing(), DT);
-        let expected = crate::lab::ABOVE_TARGET_SCRUB_RATE * 2.0 * DT;
-        close(l[CABIN_CO2], -expected);
-        close(l[CO2_REMOVED], expected);
-    }
-
-    #[test]
-    fn co2_scrubber_above_target_takes_nothing_at_or_below_it() {
-        // One-sided: a scrubber cannot add CO₂, so below the target it simply stops.
-        let target = above_target().co2_target_mol(HAND_AIR).expect("a target");
-        for co2 in [0.0, 3.0, target] {
+    fn co2_scrubber_takes_nothing_at_or_below_its_target() {
+        for co2 in [0.0, 3.0, hand_target()] {
             let s = state(10.0, co2, 0.04);
-            for (_, amount) in legs(&above_target_scrubber(), &s, &crew_forcing(), DT) {
+            for (_, amount) in legs(&scrubber(), &s, &crew_forcing(), DT) {
                 assert_eq!(amount, 0.0, "cabin CO2 {co2}");
             }
         }
     }
 
-    #[test]
-    fn co2_scrubber_above_target_refuses_to_run_without_its_cabin_air() {
-        let no_air = CO2Scrubber::new(
+    // --- the lab's first-order form, the frozen one until 2026-10-19 -----------------
+    fn first_order_scrubber(air: f64) -> CO2Scrubber {
+        CO2Scrubber::new(
             CO2_SCRUBBER.to_string(),
             CABIN_CO2.to_string(),
             CO2_REMOVED.to_string(),
-            above_target(),
-        );
-        let s = state(10.0, 20.0, 0.04);
-        let env = crew_forcing();
-        let bound = env.bind(&s, DT);
-        let err = no_air.evaluate(&s, &bound, DT).expect_err("refused");
-        assert!(format!("{err:?}").contains("needs its cabin's air"), "{err:?}");
+            crate::lab::with_first_order_scrubber(HAND, crate::lab::FIRST_ORDER_SCRUB_RATE),
+            air,
+        )
     }
 
     #[test]
-    fn the_cabin_air_is_inert_under_the_frozen_form() {
-        // The station builders now tell every scrubber its air; under FirstOrder that must
-        // change no bit (the goldens hold it end to end; this holds it at the flow).
+    fn co2_scrubber_first_order_removes_k_times_the_stock() {
         let s = state(10.0, 3.0, 0.04);
-        let bare = legs(&scrubber(), &s, &crew_forcing(), DT);
-        let told = legs(&scrubber().with_cabin_air(HAND_AIR), &s, &crew_forcing(), DT);
-        assert_eq!(bare, told);
+        let l = legs(&first_order_scrubber(HAND_AIR), &s, &crew_forcing(), DT);
+        let expected = crate::lab::FIRST_ORDER_SCRUB_RATE * 3.0 * DT;
+        close(l[CABIN_CO2], -expected);
+        close(l[CO2_REMOVED], expected);
+        assert_eq!(first_order_scrubber(HAND_AIR).target(), None);
+    }
+
+    #[test]
+    fn co2_scrubber_self_limits_at_floor() {
+        let s = state(10.0, 0.0, 0.04);
+        for scrubber in [scrubber(), first_order_scrubber(HAND_AIR)] {
+            for (_, amount) in legs(&scrubber, &s, &crew_forcing(), DT) {
+                assert_eq!(amount, 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn the_cabin_air_is_inert_under_the_first_order_form() {
+        // The first-order form has no target, so the air it is told changes no bit.
+        let s = state(10.0, 3.0, 0.04);
+        let station = legs(&first_order_scrubber(HAND_AIR), &s, &crew_forcing(), DT);
+        let tenth = legs(&first_order_scrubber(HAND_AIR / 10.0), &s, &crew_forcing(), DT);
+        assert_eq!(station, tenth);
     }
 
     // --- flow level: Condenser -----------------------------------------------------

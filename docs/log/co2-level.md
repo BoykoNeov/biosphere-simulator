@@ -56,3 +56,23 @@ and tables: `docs/plans/post-roadmap-co2-level.md`; tool: `station/examples/co2_
   quantity the source actually states, here the level.
 * **Lesson: a review's "the source is on the shelf" is a claim to grep.** BVAD was on the shelf;
   the equipment figures were not in it.
+* **ADOPTED 2026-10-19, slice A (the station)** on the user's *"1"* (plan §10). `eclss.yaml` stores
+  `co2_partial_pressure: 130.0 Pa` (BVAD's plant nominal, as the pressure the table prints) and
+  `co2_scrub_rate` 1e-2; the scrubber removes only the excess above that share of its cabin's air,
+  and the old first-order form is a lab switch. The lab's six switched end states were saved first;
+  `regen_goldens` rewrote exactly those six goldens and each is **byte-identical** to its saved file,
+  the other 14 identical. Station manifest: two fingerprints and six golden hashes, as predicted.
+  12 tests went red and each was re-stated for the new law, none loosened. The rationing count of
+  the authored cabin at `dt = 3600` fell 28 → 19, re-measured. One lab file (`air_split.rs`, a
+  fan-fed small chamber) now runs at the old 400 ppm it was measured at: at 1283 ppm the fan matters
+  far less (0.990 against the pin's 0.97), and loosening the line would have weakened it. The
+  authoring side keeps a temporary 9500 mol until slice B; `bioregenerative_station.yaml` steps its
+  fast set at 60 s. The slow tests: two four-year temperature/battery pins re-pinned (the structure's
+  battery now empties on day 1023, was ~1051); the potato example's battery fell 1.7 % in 150 days
+  against its 1 % line, and on the user's call the FILE was re-sized (solar 150 → 175 W, −0.14 %),
+  not the line. Final gate: clippy clean, 1453 tests and 12 slow ones green.
+* **Lesson: save the lab's result as bytes before adopting it.** The `cmp` against the dump says
+  the adopted arithmetic is the measured one, which a re-run of the predictions cannot say.
+* **Lesson: when a level change takes a pin past its line, ask what the pin's subject needs.** The
+  fan pin was about a hungry crop; the honest fix put it back where the crop is hungry, not a looser
+  line where it is not.

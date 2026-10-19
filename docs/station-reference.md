@@ -78,7 +78,9 @@ re-captured event. Several frozen coefficients are deliberately **illustrative**
 as such, not hidden:
 - The **ECLSS** rate-constants (`k_scrub` / `k_cond` / `k_makeup`; the O₂ target was here until it
   was cited on 2026-09-06, and is stored as `o2_fraction` = 0.21 since 2026-10-18; the humidity
-  target likewise, as `humidity_fraction` = 0.40 since the same day) and the
+  target likewise, as `humidity_fraction` = 0.40 since the same day; the CO₂ level since 2026-10-19,
+  as `co2_partial_pressure` = 130 Pa, which turned `k_scrub` from where the level sits into how
+  tightly it is held) and the
   **station** `harvest_rate` / `recovery_rate` / `recovery_efficiency` / `photon_efficacy`
   are illustrative sizing — BVAD publishes no first-order τ, only steady-state throughput
   (which the closure checks validate). Step 9 explicitly kept them illustrative.
@@ -390,6 +392,35 @@ suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
 
 ### Unfreeze log
 
+- **2026-10-19 — the cabin's CO₂ is held at a cited level: the scrubber removes `k · max(0, co2 −
+  target)`, the target `co2_partial_pressure: 130.0 Pa` of the cabin's air (BVAD Rev 2 Table 4-1,
+  p[CO₂] for Plants, nominal), and `co2_scrub_rate` rises 1e-3 → 1e-2 with the form
+  (`docs/plans/post-roadmap-co2-level.md` §10, the user's choice in §7). 6 station goldens move;
+  their 6 `golden_sha256` rows and `eclss.yaml`'s two fingerprints are the whole manifest diff.**
+  Until now the scrubber was first-order on all the cabin's CO₂, so the cabin sat at `P / k` = 3.796
+  mol, 400 ppm — a level nobody chose, which the crop shared. A one-sided remover stands `P / k`
+  above its target, so the rate rose with the form: 40 ppm at the station crew's load, against
+  400 at the old rate. `CO2Scrubber::new` takes the cabin's air, no default; every station build
+  passes `STATION_CABIN_AIR_MOL`; the station's target is 12.188502343942758 mol (1283 ppm), and
+  `greenhouse_bio_scenario`'s `chamber_co2_mol0` starts at it (3.796 before; pinned by
+  `the_cabin_starts_at_its_targets`). The crew-only cabins keep their start of 0 and fill in about
+  68 steps. **Measured in the lab first, then adopted byte for byte:** the six switched final states
+  were saved before the change, and each regenerated golden is `cmp`-identical to its saved file.
+  What moved (plan §9's table): `eclss`, `cabin_gas`, `water_recovery` in two stocks each (the
+  cabin's CO₂ and the scrubbed total); `greenhouse`, `harvest` in their crop carbon (leaf +26 %
+  over 7 days; grain +47 % in `harvest`), the chamber's N₂ (charged as the rest of the air, so
+  −8.392 mol by construction) and water at a few tenths of a percent; `sealed_station` plant carbon
+  peaks +52.5 %, grain +49.4 %, crop transpiration +13.7 % over the four years, never water-stressed.
+  The other 14 goldens are identical. `max` and `÷` are inside the Tier-1 claim, so the three Tier-1
+  goldens keep their tier. The old form survives as a lab switch
+  (`domains::lab::with_first_order_scrubber`). `sibling_params.txt`'s `co2_scrub_rate` row is retired
+  by hand (11 → 10), as `o2_setpoint`'s was. The authoring side keeps a named, temporary 9500
+  (`IMPLICIT_SCRUBBER_AIR_MOL`) until the next slice; `scenarios/bioregenerative_station.yaml` steps
+  its fast set at 60 s (`n_sub` 12 → 60), because the build refuses `k·h = 3` at 300 s. Measured
+  pins re-pinned, as at every adoption: `chamber_walls` (node 188.7014 K at 120 days; the
+  four-year reference node mean 170.0607 K; the structure's battery empty by day 1023). One lab
+  file (`air_split.rs`) runs at the old level instead, and the potato example's solar line went
+  150 → 175 W on the user's call (plan §10). Advisor-reviewed before code.
 - **2026-10-18 — the cabin condenser's target is stored as a relative humidity, `humidity_fraction:
   0.40`, plus the saturation pressure it is a fraction of (`saturation_vapour_pressure:
   2643.931192210576 Pa`), not as `humidity_setpoint: 1.7863 kg` (§15 of

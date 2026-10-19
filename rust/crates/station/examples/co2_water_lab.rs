@@ -9,7 +9,7 @@
 //! ```
 //!
 //! The sealed station runs twice, as frozen and with the scrubber switched to remove only the
-//! CO₂ above 0.13 kPa (`domains::lab::with_scrubber_above_target`, the cabin started at that
+//! CO₂ above 0.13 kPa (the lab switch `with_scrubber_above_target` before the adoption, the cabin started at that
 //! target, as `co2_target_lab` does). It runs through the lab's two-rate driver in the
 //! reference's interleaved order, which is the reference day operation for operation; the
 //! frozen side's final state is checked against the committed golden's bytes before anything
@@ -18,6 +18,11 @@
 //!
 //! ⚠ **It writes nothing and takes no decision.** `--series` writes the day series to the path
 //! given, and only there.
+//!
+//! ⚠ **Since the adoption (2026-10-19) the two sides have swapped**: "frozen" is the
+//! above-target scrubber, "switched" the pre-adoption first-order one at 1e-3 started at its
+//! fixed point (`domains::lab::with_first_order_scrubber`). Its tables are plan §9's with the
+//! columns exchanged.
 
 use std::collections::BTreeMap;
 
@@ -26,7 +31,7 @@ use domains::biosphere::stocks::{
     CONDENSATE, ROOTED_DEPTH, SOIL_EVAP_TODAY, SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR,
 };
 use domains::eclss::EclssParams;
-use domains::lab::{with_scrubber_above_target, ABOVE_TARGET_SCRUB_RATE, CO2_TARGET_PA};
+use domains::lab::{with_first_order_scrubber, FIRST_ORDER_SCRUB_RATE};
 use domains::params;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
@@ -197,8 +202,9 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let series = args.iter().position(|a| a == "--series").and_then(|i| args.get(i + 1));
     let frozen = params::eclss();
-    let lab = with_scrubber_above_target(frozen, CO2_TARGET_PA, ABOVE_TARGET_SCRUB_RATE);
-    let target = lab.co2_target_mol(STATION_CABIN_AIR_MOL).expect("a target");
+    let lab = with_first_order_scrubber(frozen, FIRST_ORDER_SCRUB_RATE);
+    // The first-order form's fixed point, where the crop-sharing cabins started before.
+    let old_start = 3.796;
 
     let base = run(&frozen, None);
     let golden = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -210,9 +216,13 @@ fn main() {
         simcore::snapshot::from_engine(last).to_json() == committed,
         "the frozen side does not reproduce sealed_station_state.json byte for byte"
     );
-    let switched = run(&lab, Some(target));
+    let switched = run(&lab, Some(old_start));
 
-    println!("sealed station, 4 years: frozen scrubber vs above-target {CO2_TARGET_PA} Pa (k = {ABOVE_TARGET_SCRUB_RATE:e} /s)");
+    println!(
+        "sealed station, 4 years: frozen above-target scrubber ({} Pa of {STATION_CABIN_AIR_MOL} mol, \
+         k = {:e} /s) vs the pre-adoption first-order one (k = {FIRST_ORDER_SCRUB_RATE:e} /s)",
+        frozen.co2_partial_pressure, frozen.co2_scrub_rate
+    );
     println!("frozen side reproduces the golden bytes: true (asserted)");
     for (name, r) in [("frozen", &base), ("switched", &switched)] {
         println!(

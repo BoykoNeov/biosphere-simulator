@@ -458,6 +458,13 @@ fn a_cabin_hotter_or_colder_than_the_chamber() {
 /// sign: the plants evaporate less, which lowers what the coil hands the node, but this heater
 /// figure is the battery's fall LESS the outdoor reference's, so it moves with both runs — not
 /// traced.
+///
+/// ⚠ **Re-pinned 2026-10-19** (`docs/plans/post-roadmap-co2-level.md` §10; the cabin holds 0.13 kPa
+/// CO₂, 1283 ppm, where it sat at 400), measured by this tree: the node **188.7014 K** (was
+/// 188.7373), the heater **139.193 W** (was 139.788). Direction: the crop grows faster at the
+/// higher CO₂ and evaporates more, which moves the chamber's heat books; the lab run before the
+/// adoption already showed the thermal node moving (+0.04 % on the sealed station's final day).
+/// Size not predicted; the chain was not traced.
 #[test]
 fn walls_onto_the_station_structure_run_the_heater_continuously() {
     let days = 120;
@@ -470,10 +477,10 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
         |run: &Run| amount(&run.states[days - span], BATTERY) - amount(&run.states[days], BATTERY);
     let heater_w = (fall(&r) - fall(&reference)) / (span as f64 * 86_400.0);
     eprintln!("L4: node {t} K, heater {heater_w} W");
-    assert!((t - 188.7373).abs() < 0.01, "node {t} K, measured 188.7373");
+    assert!((t - 188.7014).abs() < 0.01, "node {t} K, measured 188.7014");
     assert!(
-        (heater_w - 139.788).abs() < 0.05,
-        "heater {heater_w} W, measured 139.788"
+        (heater_w - 139.193).abs() < 0.05,
+        "heater {heater_w} W, measured 139.193"
     );
     // A day end is dark, so the heater holds the room against the walls' whole loss to the node
     // and the deadbeat controller leaves it one step's loss below the setpoint — derived since
@@ -556,8 +563,13 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
 fn the_structures_heater_empties_the_battery_within_the_horizon() {
     // Measured 2026-10-16: the battery runs out by day 1051, the fast side rations 672 003 times,
     // and before that 8 day ends fall off the held band — the nights the heater saturates.
-    const EMPTY_DAY_LO: usize = 1041;
-    const EMPTY_DAY_HI: usize = 1061;
+    // ⚠ Re-pinned 2026-10-19 (`docs/plans/post-roadmap-co2-level.md` §10; the cabin holds 0.13 kPa
+    // CO₂, where it sat at 400 ppm), measured by this tree: the battery runs out by day 1023, 774 543
+    // fast-side rationings, 7 day ends off the band. Earlier, presumably because the larger crop
+    // evaporates more and the heater pays that heat (the latent-heat books) — a reading, not traced.
+    // Not predicted.
+    const EMPTY_DAY_LO: usize = 1013;
+    const EMPTY_DAY_HI: usize = 1033;
     const OFF_MAX: usize = 18;
     let days = sealed_station_scenario().days();
     let r = run_rationing(days, ChamberSurroundings::Structure, None, 1.0);
@@ -638,6 +650,12 @@ fn the_structures_heater_empties_the_battery_within_the_horizon() {
 /// (colder: 8.5 % less evaporation, so less of its heat reaches the node by the coil); the run
 /// ends at **295.1355095 K**; 9 day ends between the bands, as before. Direction from the change,
 /// size not predicted.
+///
+/// ⚠ **Re-pinned 2026-10-19** (`docs/plans/post-roadmap-co2-level.md` §10; the cabin holds 0.13 kPa
+/// CO₂, where it sat at 400 ppm), measured by this tree: the node **162.4702 / 175.3236 / 170.0607 K**
+/// (warmer on the mean by 0.05 K: the larger crop evaporates more, and that heat reaches the node by
+/// the coil, the 2026-10-15 direction); the run still ends at **295.1355085 K** (was 295.1355095);
+/// 9 day ends between the bands, as before. Size not predicted.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -681,15 +699,15 @@ fn the_reference_node_and_chamber_follow_the_weather() {
         "chamber daily min {clo} max {chi}; {outside} day-end states between the bands; ends {end} K"
     );
     assert!(
-        (lo - 162.4715).abs() < 0.01 && (hi - 175.3180).abs() < 0.01,
+        (lo - 162.4702).abs() < 0.01 && (hi - 175.3236).abs() < 0.01,
         "{lo} {hi}"
     );
-    assert!((mean - 170.0109).abs() < 0.01, "{mean}");
+    assert!((mean - 170.0607).abs() < 0.01, "{mean}");
     assert!(
         clo >= cold_set - 0.015 && chi <= warm_set + 0.015,
         "{clo} {chi}"
     );
     // One mid-warm-up and one mid-cool-down day-end state per crop at most: 9 crops (§25g).
     assert!(outside <= 2 * 9, "{outside}");
-    assert!((end - 295.1355095).abs() < 1e-6, "chamber ends {end} K");
+    assert!((end - 295.1355085).abs() < 1e-6, "chamber ends {end} K");
 }
