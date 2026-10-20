@@ -280,3 +280,40 @@ tests of §6, read at adoption. **Adoption is the user's call**, a station unfre
 the station manifest's hashes, and the scenario's form (§4: the crew count and the loaded `f_resp`,
 the BVAD constants in one module, the 200 kg crop-cabin store, the crew-only cabins started at
 the target).
+
+## 11. Trial run against the whole suite (2026-10-20) — undone afterwards, nothing committed
+
+The four crew members' values were put into `station::scenario` by hand (the constants as the lab
+computes them, `CABIN_GAS_SCENARIO.cabin_co2_0 = 12.188502343942758`, the crop cabins' store 200 kg),
+the whole suite run, and the file restored (`git status` clean). The point: find what fails that is
+**not** a saved result moving, before the user decides.
+
+**`cargo test --no-fail-fast`: four targets red.** Three are the saved results moving, as they must:
+
+* `station --test golden_regression` (cheap goldens): stops at `cabin_gas_state.json` line 7.
+* `station --test tier_contract` (cheap bands): `cabin_gas` is bit-exact tier, 192.416 against 61.521.
+* `godot_bridge --test cross_boundary`: the two tests that compare the bridge's run with the
+  `cabin_gas` golden (same line 7).
+
+**The fourth is not a saved result.** `station --test air_split`,
+`on_the_minute_step_the_chamber_is_fed_and_the_fan_rate_matters`: the fan's 0.1 / 0.4 ratio is
+0.8599 / 0.8808 = 0.976, against the pin's `< 0.97`. Its other two claims held (the chamber fed,
+the fan's order). This file already keeps the old cabin (the first-order scrubber and the old start,
+`post-roadmap-co2-level.md` §10) because its subject is the CO₂ supply to a **hungry** crop.
+**Cause, measured:** with the four crew members' water and start level kept and only the old food
+rate (4.0e-3) put back in the file's `scenario()`, all ten of its tests pass. So the smaller crew's
+CO₂ output fed the crop less, and the fan stopped being what limits it. Proposed, the CO₂ item's
+precedent: the file keeps the old food rate as it keeps the old scrubber, said in its doc comment.
+Loosening 0.97 would weaken the pin. **The user's call.**
+
+**Passed, including every test §6 named as at risk:** `perturbations.rs` (the carbon leak still
+`rationed == 0`), `science_gates`, `tier_sensitivity`, the session tests, the other `cross_boundary`
+tests. 103 test targets ran.
+
+**`cargo test --no-fail-fast -- --ignored`: two targets red, both expected.** The sealed station's
+golden (`the_sealed_station_golden_is_still_this_reference_s_output`, line 3 `rooted_depth`) and its
+band (`every_expensive_station_golden_is_inside_its_measured_band`, worst 3.76 at `stocks[29]`).
+Every other slow test passed, the 10-minute soil-evaporation and the chamber-wall runs among them.
+
+**So adoption costs:** five goldens and their bands (expected), the bridge's two `cabin_gas`
+comparisons (they follow the golden), and one decision on the fan test.

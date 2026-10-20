@@ -42,3 +42,10 @@ predictions; no value, golden, manifest or `source:` string moved. Plan: `docs/p
   carbon −69.9 %: that build sends the feces into its soil. The sealed station's energy about 0.01 %: by
   elimination the plant room's heater (four flows on the battery; solar, load and lamp read fixed forcings).
 * **Adoption is the user's call**: a station unfreeze, five goldens and the scenario's form.
+* **Trial run against the whole suite** (plan §11; the four crew members' values put in by hand, run, restored). Four
+  targets red in the normal run: three are the saved results moving (the cheap goldens, their bands, the bridge's two
+  `cabin_gas` comparisons). ⚠ The fourth is not: `air_split`'s fan pin reads 0.976 against `< 0.97`. Measured: with
+  only the old food rate put back in that file, all ten of its tests pass, so the smaller crew's CO₂ fed the crop less
+  and the fan stopped limiting it. Proposed: the file keeps the old food rate as it already keeps the old scrubber (the
+  CO₂ item's precedent); loosening 0.97 would weaken it. The slow run: only the sealed golden and its band red. Every
+  test §6 named at risk passed.
