@@ -58,12 +58,9 @@ pub const GATE_SOURCE_FILE: &str = "rust/crates/station/src/science_gates.rs";
 // Gate 1's run: the BVAD-calibrated cabin.
 // ---------------------------------------------------------------------------------
 
-/// NASA BVAD Table 3-31 (Rev 2, Feb 2022, p. 58) — the nominal per-crewmember-per-day
-/// metabolic interface values, and the arithmetic that turns them into this model's mol
-/// accounting.
-///
-/// Verbatim from `docs/bvad-reference.md`, which is the primary source; we cite the
-/// document and copy no dataset (`docs/reuse-and-licenses.md`).
+/// NASA BVAD Table 3-31 (Rev 2, Feb 2022, p. 58) — the per-crewmember-per-day values live in
+/// [`crate::bvad`], one copy the station's scenarios read too (since 2026-10-20); this module
+/// re-exports them and adds the gate's own validation cabin.
 ///
 /// ⚠ **Calibration ≠ validation, and this module ports only the validation half.** The
 /// Python file this came from keeps three columns visibly separate: calibration
@@ -74,33 +71,8 @@ pub const GATE_SOURCE_FILE: &str = "rust/crates/station/src/science_gates.rs";
 /// `tests/test_bvad_validation.py` as the checker's conformance half.
 #[cfg(test)]
 mod bvad {
+    pub use crate::bvad::*;
     use crate::scenario::CabinScenario;
-
-    /// −m Carbon Dioxide Load (kg/CM-d).
-    pub const CO2_LOAD_KG: f64 = 1.085;
-    /// +m Oxygen Consumed (kg/CM-d).
-    pub const O2_CONSUMED_KG: f64 = 0.895;
-    /// −m Respiration and Perspiration Water (kg/CM-d).
-    pub const RESP_PERSP_WATER_KG: f64 = 2.946;
-    /// −m Urine Water (kg/CM-d).
-    pub const URINE_WATER_KG: f64 = 1.420;
-
-    /// Molar masses (g/mol) for the CARBON/OXYGEN mol accounting our stocks use.
-    pub const M_CO2: f64 = 44.009;
-    pub const M_O2: f64 = 31.998;
-
-    pub const SECONDS_PER_DAY: f64 = 86_400.0;
-
-    /// BVAD's CO₂ load in mol — and, because `CrewRespiration` fixes RQ = 1, also what
-    /// the model's O₂ consumption must equal.
-    pub const CO2_MOL: f64 = CO2_LOAD_KG * 1000.0 / M_CO2;
-    /// BVAD's O₂ consumption in mol.
-    pub const O2_MOL: f64 = O2_CONSUMED_KG * 1000.0 / M_O2;
-    /// The daily-effective molar RQ, blending BVAD's nominal + exercise periods.
-    pub const RQ_EFFECTIVE: f64 = CO2_MOL / O2_MOL;
-    /// The two modeled water fates (humidity + urine); metabolic + fecal water are not
-    /// modeled.
-    pub const MODELED_WATER_KG: f64 = RESP_PERSP_WATER_KG + URINE_WATER_KG;
 
     /// One crew configuration: a 4-crewmember complement. Everything is linear in the
     /// crew count, so the per-CM comparison is N-invariant; 4 keeps every cabin stock
@@ -115,16 +87,14 @@ mod bvad {
     /// touches no golden and appears in no manifest roster, and putting it beside
     /// `CABIN_GAS_SCENARIO` would invite exactly that confusion.
     ///
-    /// **Carbon is calibrated to BVAD's directly-measured CO₂ load, not to the derived
-    /// food-carbon total** — the latter also depends on the 44–55 % feces-carbon
-    /// assumption. That keeps the O₂ headline a clean number: model O₂ = model CO₂ =
-    /// BVAD CO₂ exactly, at RQ = 1.
+    /// The rates are [`crate::bvad::food_intake_rate`]'s and
+    /// [`crate::bvad::water_intake_rate`]'s: carbon calibrated to BVAD's measured CO₂ load.
     pub fn cabin_scenario(respired_carbon_fraction: f64) -> CabinScenario {
         CabinScenario {
             food_store0: 2000.0,
             water_store0: 60.0,
-            food_intake_rate: N_CREW * CO2_MOL / respired_carbon_fraction / SECONDS_PER_DAY,
-            water_intake_rate: N_CREW * MODELED_WATER_KG / SECONDS_PER_DAY,
+            food_intake_rate: food_intake_rate(N_CREW, respired_carbon_fraction),
+            water_intake_rate: water_intake_rate(N_CREW),
             ..crate::scenario::CABIN_GAS_SCENARIO
         }
     }

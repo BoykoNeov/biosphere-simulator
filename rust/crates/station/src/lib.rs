@@ -22,6 +22,7 @@
 
 pub mod air_split;
 pub mod builder;
+pub mod bvad;
 pub mod cabin;
 pub mod chamber;
 pub mod display;

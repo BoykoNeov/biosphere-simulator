@@ -6,7 +6,12 @@
 //! cargo run --release -q -p station --example crew_size_lab              # all five, N = 4
 //! cargo run --release -q -p station --example crew_size_lab -- greenhouse # by name
 //! CREW_N=1 cargo run --release -q -p station --example crew_size_lab     # another count
+//! CREW_SAVE=<dir> cargo run --release -q -p station --example crew_size_lab # also save
 //! ```
+//!
+//! `CREW_SAVE` writes each switched final state to `<dir>/<golden name>`, in the golden's own
+//! bytes (the frozen side's `snapshot` is checked equal to the committed file), so an adoption
+//! can `cmp` each regenerated golden against what was measured here.
 //!
 //! Each golden's own build runs twice: as frozen, and with the cabin scenario's crew switched to
 //! `N` crew members of BVAD Table 3-31 — the food rate `N × CO₂ load ÷ f_resp` from the LOADED
@@ -16,8 +21,8 @@
 //!
 //! ⚠ **It writes nothing and takes no decision.** The frozen side is checked against the
 //! committed golden's bytes first, so a drift in this tool's copy of a build cannot pass as a
-//! measurement. ⚠ The BVAD numbers below are a lab copy of `science_gates::bvad` (test-only
-//! there); adoption moves them to one module both read (§4).
+//! measurement. The rates are [`station::bvad`]'s, the one copy the science gate reads too (§4;
+//! the lab carried its own copy until 2026-10-20).
 
 use std::collections::BTreeMap;
 
@@ -26,6 +31,7 @@ use domains::eclss::EclssParams;
 use domains::params;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
+use station::bvad;
 use station::cabin::{build_cabin, cabin_resolver};
 use station::greenhouse::{
     build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver, run_greenhouse,
@@ -41,13 +47,6 @@ use station::scenario::{
 use station::sealed::{build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver};
 use station::water::{build_water_recovery, water_recovery_resolver};
 
-/// BVAD Table 3-31, per crew member per day (`docs/bvad-reference.md`).
-const CO2_LOAD_KG: f64 = 1.085;
-const RESP_PERSP_WATER_KG: f64 = 2.946;
-const URINE_WATER_KG: f64 = 1.420;
-const M_CO2: f64 = 44.009;
-const SECONDS_PER_DAY: f64 = 86_400.0;
-
 /// The 7-day crop cabins' crew water store under the switch (plan §9).
 const CROP_CABIN_WATER_STORE_KG: f64 = 200.0;
 
@@ -62,9 +61,8 @@ struct Crew {
 impl Crew {
     fn bvad(n: f64, crew: &CrewParams, eclss: &EclssParams) -> Crew {
         Crew {
-            food_intake_rate: n * CO2_LOAD_KG * 1000.0 / M_CO2 / crew.respired_carbon_fraction
-                / SECONDS_PER_DAY,
-            water_intake_rate: n * (RESP_PERSP_WATER_KG + URINE_WATER_KG) / SECONDS_PER_DAY,
+            food_intake_rate: bvad::food_intake_rate(n, crew.respired_carbon_fraction),
+            water_intake_rate: bvad::water_intake_rate(n),
             co2_target_mol: eclss.co2_target_mol(STATION_CABIN_AIR_MOL).expect("a target"),
         }
     }
@@ -326,6 +324,7 @@ fn main() {
     let crew = params::crew();
     let eclss = params::eclss();
     let sw = Crew::bvad(n, &crew, &eclss);
+    let save = std::env::var("CREW_SAVE").ok();
     let golden_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/golden");
     println!(
         "frozen: food {:e} mol C/s, water {:e} kg/s; switched: {n} BVAD crew members, food {:e} \
@@ -346,6 +345,10 @@ fn main() {
         let committed = std::fs::read_to_string(golden_dir.join(name)).expect("golden file");
         let reproduces = snapshot(&base.last) == committed;
         let switched = run(Some(sw));
+        if let Some(dir) = &save {
+            std::fs::write(std::path::Path::new(dir).join(name), snapshot(&switched.last))
+                .expect("save the switched state");
+        }
         let (b, s) = (amounts(&base.last), amounts(&switched.last));
         let mut moved: Vec<(String, f64, f64, f64)> = b
             .iter()
