@@ -58,7 +58,8 @@ pub enum Thermostat {
     /// The plant window's recorded value of the plants' water temperature: ONE thermostat with
     /// the plants' condenser. Lags the room when it changes inside a plant step (plan §8).
     Window,
-    /// The chamber's live heat-store temperature, every minute (a build with a chamber only).
+    /// The chamber's live heat-store temperature, every minute (a build with a chamber only; the
+    /// greenhouses' outdoor air curve could be read live too, and is not built — plan §10).
     LiveChamber,
 }
 

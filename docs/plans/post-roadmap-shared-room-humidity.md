@@ -289,9 +289,13 @@ rationed 0 / 0 in every case. Against two stocks:
 * **40 % is not a free choice: it drains the battery.** The extra evaporation is paid by the chamber's
   heater from the battery: the lowest charge over the run is 16 % of the starting 2.0e10 J against two
   stocks' 51 %, and the end charge is 69 % below the two-stock run's. Whether it would run out on a
-  longer run is not measured. Grain peaks rise again (up to +4.4 %); the cause is still not measured.
-  The end-of-run plant carbon (−34 % / −41 %) is a snapshot mid-way through the ninth season, not a
-  harvest, and is not read as a loss.
+  longer run is not measured, nor whether it had stopped falling: the lowest charge may be the run's
+  end. Grain peaks rise again (up to +4.4 %); the cause is still not measured.
+* **⚠ Open at 40 %: the crop is a third smaller on the run's last day.** Plant carbon on day 1220 is 34 %
+  (window) / 41 % (live) below two stocks, while both 75 % cases sit at −0.002 % on the same day — so the
+  day alone does not explain it. A later ninth sowing (maturity moved; P4's re-sow days were not logged)
+  or slower growth would each produce it; neither is measured. It stands beside the grain rise and the
+  battery drain. A rerun logging each re-sow step and each season's lowest battery charge would answer it.
 
 ## 10. The greenhouses, read minute by minute
 
@@ -313,7 +317,8 @@ room below saturation. Water and carbon readouts repeat §7's to the digit.
 §5 P9 ("≤ 1e-4 or not at all") rested on the sealed run's energy. The golden is
 `goldens::sealed_energy_drift`, the 15-year `HEAT_CLOSURE_SCENARIO` (Power → Thermal, built by
 `build_station` with no crew, plants or vapour). **Prediction: byte-identical at adoption.** If it
-moves, the adoption reached a build it should not, and that is a finding.
+moves, the adoption reached a build it should not, and that is a finding. So P9 becomes: `greenhouse`,
+`harvest` and `sealed_station` move; the other 18 goldens are byte-identical.
 
 **What the user decides (adoption):** the setting, 75 % or 40 % (40 % costs the sealed station's battery,
 §9); and the sealed station's thermostat — live (never above saturation over 1220 days) or the window

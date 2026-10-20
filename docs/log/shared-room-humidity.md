@@ -35,7 +35,9 @@ no value, golden, manifest or `source:` string moved. Plan: `docs/plans/post-roa
   caught 159.7 kg (predicted 160); every minute above "setting + one minute's breath" had the chamber
   cooling, which supports (not isolates) the cooling-inside-the-minute cause of the 0.7601 miss. The window
   thermostat passed saturation 573 minutes. **40 % drains the battery**: lowest charge 16 % of the start,
-  against 51 % with two stocks. Grain rose again at 40 %; still not explained.
+  against 51 % with two stocks, and it may still be falling at the end. Grain rose again at 40 %; still not
+  explained. ⚠ Open: at 40 % the crop on the last day is 34 % / 41 % below two stocks while both 75 % cases
+  are unmoved that day; a later sowing or slower growth, neither measured.
 * **Corrected (plan §7, §10):** the greenhouses' "never above 0.754" read the same temperature the
   condensers enforce. Read minute by minute off the outdoor air curve, the max is 0.821, never above 1. A
   live greenhouse thermostat is buildable (an earlier line here said it was not); not built.

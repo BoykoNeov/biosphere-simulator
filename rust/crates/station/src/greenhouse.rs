@@ -162,7 +162,8 @@ pub(crate) fn require_room_readable(
     if scenario.room_vapour.thermostat() == Some(Thermostat::LiveChamber) {
         return Err(SimError::Validation(
             "a greenhouse has no chamber heat store for its room's condenser to read live: \
-             its thermostat is the plant window's"
+             its thermostat is the plant window's (a live read of the outdoor air curve is \
+             possible but not built)"
                 .into(),
         ));
     }
