@@ -51,8 +51,9 @@ predictions; no value, golden, manifest or `source:` string moved. Plan: `docs/p
   test §6 named at risk passed.
 * **ADOPTED 2026-10-20** on the user's *"adopt the four crew, about the test - do as you recommend"* (plan §12). The
   scenario carries a crew count (4) instead of two rates. The food rate is computed at run time from BVAD's CO₂ load and
-  the loaded `f_resp`, and the BVAD values live once in `station::bvad`, moved there first in a commit that moved no byte.
-  The crew-only cabins start at the target; the crop cabins' water store is 200 kg. The five regenerated goldens are
-  each byte-identical to the lab's saved states, the other 15 identical; the manifest moved only their 5 hashes. The fan
-  test keeps the old CO₂ load as a crew count of about 13.3 (so its water is 13.3 crew members' too, which the trial
-  did not run). Re-run: all ten pass, 0.97 not loosened. Full suite 1456 passed.
+  the loaded `f_resp`, and the BVAD values live once in `station::bvad`, moved there first in a commit that moved
+  no byte. The crew-only cabins start at the target; the crop cabins' water store is 200 kg. The five regenerated
+  goldens are each byte-identical to the lab's saved states, the other 15 identical; the manifest moved only their
+  5 hashes. The fan test keeps the old CO₂ load as a crew count of about 13.3 (so its water is 13.3 crew members'
+  too, which the trial did not run). Re-run: all ten pass, 0.97 not loosened. Full suite 1456 passed; the slow
+  tests 12 passed; clippy clean.
