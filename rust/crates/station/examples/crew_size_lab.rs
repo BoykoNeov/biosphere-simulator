@@ -267,15 +267,19 @@ fn crop_readings(name: &str, base: &Run, switched: &Run, target: f64) {
         100.0 * (ws / wb - 1.0)
     );
     if name.starts_with("sealed_station") {
+        // Per 305-day year, as `co2_level_price` read it: a year holds about two crops (the
+        // re-sow on maturity comes every ~140 days), so this is the larger of their peaks.
         let peaks = |r: &Run| -> Vec<f64> {
             r.days
-                .chunks(SEALED_STATION_SEASON_DAYS)
+                .as_chunks::<SEALED_STATION_SEASON_DAYS>()
+                .0
+                .iter()
                 .map(|c| c.iter().map(|s| get(s, "biosphere.storage_c")).fold(0.0, f64::max))
                 .collect()
         };
         for (y, (b, s)) in peaks(base).iter().zip(peaks(switched)).enumerate() {
             println!(
-                "   season {} grain peak: {b:.6} -> {s:.6} mol C ({:+.4} %)",
+                "   year {} grain peak: {b:.6} -> {s:.6} mol C ({:+.4} %)",
                 y + 1,
                 100.0 * (s / b - 1.0)
             );
@@ -293,6 +297,26 @@ fn crop_readings(name: &str, base: &Run, switched: &Run, target: f64) {
                 .collect()
         };
         println!("   re-sow days: frozen {:?} / switched {:?}", resows(base), resows(switched));
+        // The final day's crop is `age` days from its sowing; the leaf at that same age after
+        // every earlier sowing says whether the final leaf's small move is the crop's stage.
+        let last_day = base.days.len() - 1;
+        let sowings = resows(base);
+        if let Some(&final_sow) = sowings.last() {
+            let age = last_day - final_sow;
+            for &d in &sowings {
+                let day = d + age;
+                if day < base.days.len() && day < switched.days.len() {
+                    let (b, s) = (
+                        get(&base.days[day], "biosphere.leaf_c"),
+                        get(&switched.days[day], "biosphere.leaf_c"),
+                    );
+                    println!(
+                        "   leaf at age {age} d (day {day}): {b:.6} -> {s:.6} ({:+.4} %)",
+                        100.0 * (s / b - 1.0)
+                    );
+                }
+            }
+        }
     }
 }
 

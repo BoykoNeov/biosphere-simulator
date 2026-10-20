@@ -135,7 +135,8 @@ their total holds**, as it did in the CO₂ item (−77 % / +70 %, sum unchanged
 triggered watering fires on different steps once the crop changes at all. Predicted: the three-way
 total within 1 %, the split unpredicted. The crew's breathing (2.85e-4 mol/s) stays about 10× the
 crop's peak lit uptake, so **the cabin never falls below the target** and the one-sided scrubber
-never idles; the lab run will count the steps where it does.
+never idles; the lab run will count the steps where it does. ⚠ *It counted day ends, not steps
+(§10): the claim is checked at 1221 day boundaries, not at every minute.*
 
 **Every other golden (15 of 20) byte-identical**: the standalone crew, ECLSS and biosphere
 goldens do not read the station's scenario. **The authored bed does not read the station's crew,
@@ -231,38 +232,48 @@ peak lit uptake). 15 of 20 goldens byte-identical. The carbon leak test's cabin 
 
 `cargo run --release -q -p station --example crew_size_lab` (from `rust/`, below-normal priority;
 `station/examples/crew_size_lab.rs`). Raw output:
-`sources/temp-evidence/crew-size/crew-size-lab-n4.txt` (all five) and `crew-size-lab-n4-sealed.txt`
-(the sealed station again, with the re-sow days). **All five frozen sides reproduce their golden's
+`sources/temp-evidence/crew-size/crew-size-lab-n4.txt` (all five; re-run after the review below
+added the re-sow days and the same-age leaf, with identical numbers). **All five frozen sides reproduce their golden's
 bytes.** Every switched run: `rationed 0`, `events 0`.
 
-**Every predicted number held.** To the printed figures: food stores 935.0526 / 3272.589 /
+**Every predicted number held but one, the final leaf (below).** To the printed figures: food stores 935.0526 / 3272.589 /
 373 222.598; fecal 3.31232 / 37.098 / 6465.647; the cabin 12.30264 (crop cabins 12.3026, sealed
 12.303); `co2_removed` 61.521 and sealed 120 216.8 (predicted ≈ 120 220); `cabin_o2` 1994.4293;
 `o2_supply` −61.064; crew water 9.0850, 18.481 (predicted ≈ 18.48), 77.752, sealed 17 869.0
 (≈ 17 869); brine 2130.56 (≈ 2131). No day ends with the cabin below its target (0 of 8, 8, 1221).
 The soil-water total is unchanged to the fourth decimal while its split moved freely, as flagged
-(condensate +55 %, subsoil −9.7 %, soil −5.3 %). The sealed grain peak, read per season by the
-lab: **−0.33 % to −0.35 %** in all four seasons (predicted about −0.4 %). Re-sow days identical
+(condensate +55 %, subsoil −9.7 %, soil −5.3 %). The sealed grain peak, read per 305-day year
+by the lab (each year holds about two crops): **−0.33 % to −0.35 %** in all four years (predicted about −0.4 %). Re-sow days identical
 (141, 281, … 1121).
 
-**The plant stocks, against "each about −0.4 %":** root −0.59 %, stem reserve −0.52 %, stem −0.50 %,
-**leaf −0.06 %**. Three in range; the leaf moved less than predicted. The final day's leaf belongs
-to a crop re-sown on day 1121, 99 days old, so it says more about that crop's stage than about the
-CO₂ slope. Recorded as a miss of the size, not of the sign.
+**The plant stocks, against "each about −0.4 %" (band 0.2–1.5 %):** root −0.59 %, stem reserve
+−0.52 %, stem −0.50 %, **leaf −0.06 %, outside the band: a MISS** of size, not of sign. A first
+draft of this section explained it as the final crop's stage (re-sown day 1121, 99 days old). **That
+was tested and is wrong as stated:** the lab reads the leaf at age 99 days after every sowing, and it
+moves −0.058 % to −0.071 % all eight times. So it is not one day's chance: at that age the leaf is
+about six times less sensitive to the cabin's CO₂ than the other organs. Why is not measured.
 
 **Three moves not predicted, each explained:**
 
 * **The cabin's humidity, +11.1 % (1.8538 → 2.0592 kg), in every build.** The condenser holds the
   vapour above its target by the crew's humidity over its rate, and that output is ×4.04. Same
   mechanism as the CO₂ and O₂ offsets; it was left out of the table, not out of the model.
+  ⚠ **It deepens a recorded defect.** The sealed station's cabin and plant chamber share one air,
+  but their two vapour stocks are held separately and nothing reads their sum (`docs/log/` cabin
+  humidity record). Saturation for the 9500 mol at 22 °C is 4.4658 kg (40 % RH = 1.7863). The sum
+  is 3.3464 + 1.8538 = 5.2002 kg today (116 % of saturation) and 3.3464 + 2.0592 = 5.4056 kg at
+  four crew members (121 %). Not this item's to fix; it does not block adoption.
 * **The harvest build's soil carbon, −69.9 %** (litter, microbes, humus). That build sends the
   crew's feces into the soil (`build_harvest(…, close_feces = true)`), so the soil's carbon input
   is the fecal carbon, ÷3.33 like it.
 * **The sealed station's energy, by about 0.01 %** (battery +1.2 MJ over four years, the node and
-  the two boundaries with it). By elimination it is the plant room's heater, the one flow on the
-  battery that is not fixed: the lamp follows the same re-sow days, and the base load and the solar
-  charge are constants. A slightly smaller crop transpires a little differently, which changes
-  the heat the heater makes up.
+  the two boundaries with it). **By elimination, the plant room's heater.** Four flows are built on
+  the battery (`sealed.rs`'s `SolarCharge` and `LoadDraw`; `plant_chamber::chamber_flows`'s `Lamp`
+  and `ChamberHeater` through the power port); the latent-heat coil, the cooler and water recovery
+  are not. `SolarCharge` and `LoadDraw` read constant forcings, the `Lamp` reads only its program
+  (`env.get(LAMP_POWER_VAR)`), and the re-sow days that set the program are identical. That leaves
+  the heater. *Why* the heater's work moved (the crop's water use, through the chamber's heat books)
+  is not measured.
 
 **Unchanged and not run:** the 15 other goldens (none reads the station's crew); the non-golden
 tests of §6, read at adoption. **Adoption is the user's call**, a station unfreeze: five goldens,

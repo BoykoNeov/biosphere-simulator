@@ -30,12 +30,15 @@ predictions; no value, golden, manifest or `source:` string moved. Plan: `docs/p
   at the target.** Four crew members drink 122 kg in the 7-day crop cabins' 50 kg store, so it becomes 200 kg
   (today's margin). Predictions at four were committed before measuring (`5edcd6e`).
 * **MEASURED, lab-only** (`station/examples/crew_size_lab.rs`; plan §10). All five frozen sides reproduce their
-  goldens' bytes; every switched run `rationed 0`, `events 0`. Every predicted number held: the sealed station's
+  goldens' bytes; every switched run `rationed 0`, `events 0`. Every predicted number held but one: the sealed station's
   food store 373 222.598, CO₂ scrubbed 120 216.8, crew water 17 869.0 (the store holds), brine 2130.6, the cabin
-  12.303 mol (1295 ppm) and no day ending below the target. Sealed grain peak −0.33 to −0.35 % in each season;
-  re-sow days identical. The final leaf moved −0.06 % against about −0.4 %: a miss of size, not sign.
+  12.303 mol (1295 ppm) and no day ending below the target (day ends, not steps). Sealed grain peak −0.33 to
+  −0.35 % in each 305-day year; re-sow days identical. **The miss: the final leaf, −0.06 % against about −0.4 %.**
+  A draft blamed the final crop's stage; tested, the leaf at that age moves −0.06 to −0.07 % after all eight
+  sowings, so it is the leaf's own low sensitivity at that age, not chance. Why is not measured.
 * **Three unpredicted moves, explained.** Cabin humidity +11.1 %: the condenser's offset scales with the crew's
-  humidity, the same mechanism as the CO₂ offset, left out of the table. The harvest build's soil carbon −69.9 %:
-  that build sends the feces into its soil. The sealed station's energy about 0.01 %: by elimination the plant
-  room's heater, the only battery flow not fixed.
+  humidity, the same mechanism as the CO₂ offset, left out of the table; ⚠ it deepens the recorded defect that
+  the shared air's two vapour stocks are never summed (116 % → 121 % of saturation). The harvest build's soil
+  carbon −69.9 %: that build sends the feces into its soil. The sealed station's energy about 0.01 %: by
+  elimination the plant room's heater (four flows on the battery; solar, load and lamp read fixed forcings).
 * **Adoption is the user's call**: a station unfreeze, five goldens and the scenario's form.
