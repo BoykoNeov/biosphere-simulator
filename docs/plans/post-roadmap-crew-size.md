@@ -285,7 +285,9 @@ the target).
 
 The four crew members' values were put into `station::scenario` by hand (the constants as the lab
 computes them, `CABIN_GAS_SCENARIO.cabin_co2_0 = 12.188502343942758`, the crop cabins' store 200 kg),
-the whole suite run, and the file restored (`git status` clean). The point: find what fails that is
+the whole suite run, and the file restored (`git status` clean). Setting the start on the shared
+constant is the lab's change: only the two crew-only builds read `cabin_co2_0` (`cabin.rs`, `water.rs`;
+grepped), and the lab sets it for exactly those. The point: find what fails that is
 **not** a saved result moving, before the user decides.
 
 **`cargo test --no-fail-fast`: four targets red.** Three are the saved results moving, as they must:
