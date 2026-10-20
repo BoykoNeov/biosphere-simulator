@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `shared-room-humidity.md`
+**Re-read against the record's last row:** `big-station.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -651,6 +651,17 @@ measured). §3 holds no crew-size item; nothing there is re-proposed.
 plan for shared, cabin_h2o, vapour stock, supersaturation and 116. It carries no shared-room humidity item (its
 only `cabin_h2o` mention lists the `cabin_gas` golden's stocks, which this does not touch), so this discharges nothing
 and adds nothing to §2 or §3. The flaw was a user decision of 2026-10-03 kept in the room-temperature record, not here.
+
+⚠ *Re-read 2026-10-21* (`log/big-station.md`: OPENED, a plan with predictions, nothing built). **This one is a
+direction, not an item.** The user restated the project (realistic parts, reasonable speed, combined at different
+scales, big closed and open biospheres) and set a floor: 4 crew and 200 m² of crops, the aim a whole ecosystem bigger
+than Biosphere 2. Every item in this plan was priced on the frozen 1 m² station, which the floor makes a test rig, so
+their rankings are about the rig; read them that way. Grepped for crew's area, 187.45, 14.09, scale and §2.2: the
+§2.2 note that "which lever relieves" the whole-crew draw "is not measured" is what the big station's Step 1 measures
+(its prediction B3: CO₂-starved, closure share 20–50 %), and §2.2's chamber CO₂ controller is one candidate for its
+"CO₂ to the plants" step; neither is decided by this. Discharges nothing; §3 holds no scale item, nothing re-proposed.
+The rule-5 trigger is a byte count, not met by this, so no successor is written here; whether this plan should give
+way to one built around the big station is the user's call.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
