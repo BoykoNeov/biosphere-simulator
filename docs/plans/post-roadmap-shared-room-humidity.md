@@ -474,7 +474,8 @@ started there and the plants' water settled at the first cycle's end less 7.7 kg
 soil and subsoil end identical to `Off`'s to 4 decimals: the water that leaves is the tank's surplus, which
 no watering reached. The tank now swings 0.2–103.7 kg each cycle; its two last waterings are short by
 0.1–1.0 kg, the top-up's whole work. `--save` wrote the sealed golden's predicted bytes
-(`W:\temp\claude\water-reserve\save`); `Off` reproduced the committed golden first.
+(to a temp folder, since deleted: its file is `cmp`-identical to the committed
+`rust/data/golden/sealed_station_state.json`, §14); `Off` reproduced the committed golden first.
 
 ## 14. ADOPTED 2026-10-21 — the station's water reserve
 
