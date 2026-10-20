@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `crew-size.md`
+**Re-read against the record's last row:** `shared-room-humidity.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -646,6 +646,11 @@ relieves" the whole-crew draw "is not measured" STANDS: that draw is a crop size
 changes the crew on the frozen 1 m² station, not a crop's area. At one crew member that station's crop draws a larger
 share of a smaller crew's CO₂, still about a tenth at its lit peak, so the scrubber never idles (predicted, not yet
 measured). §3 holds no crew-size item; nothing there is re-proposed.
+
+⚠ *Re-read 2026-10-20* (`log/shared-room-humidity.md`: OPENED, a plan with predictions, nothing built). Grepped this
+plan for shared, cabin_h2o, vapour stock, supersaturation and 116. It carries no shared-room humidity item (its
+only `cabin_h2o` mention lists the `cabin_gas` golden's stocks, which this does not touch), so this discharges nothing
+and adds nothing to §2 or §3. The flaw was a user decision of 2026-10-03 kept in the room-temperature record, not here.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
