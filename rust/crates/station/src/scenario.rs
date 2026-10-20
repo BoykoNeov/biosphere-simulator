@@ -14,6 +14,7 @@ use domains::crew::CrewParams;
 use simcore::error::SimError;
 use simcore::state::State;
 use crate::room_vapour::{shared_room, RoomVapour, Thermostat};
+use crate::water_reserve::WaterReserve;
 
 // --- Step 1 (P6.1): the Power → Thermal heat-closure station --------------------------
 
@@ -426,6 +427,9 @@ pub struct SealedStationScenario {
     /// room's setting is the plants' `humidity_setpoint` ([`Self::plant_params`]), so the re-sow
     /// reads it too.
     pub room_vapour: RoomVapour,
+    /// Where the plants get water their own tank cannot give, and where their extra goes
+    /// ([`crate::water_reserve`]).
+    pub water_reserve: WaterReserve,
 }
 
 /// The crop a plant chamber grows.
@@ -611,6 +615,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         cold: crate::params::cold_period(),
         crop: Crop::Wheat,
         room_vapour: shared_room(Thermostat::LiveChamber),
+        water_reserve: WaterReserve::Off,
     }
 }
 

@@ -53,6 +53,7 @@ pub mod stocks;
 pub mod system;
 pub mod ulp_probe;
 pub mod water;
+pub mod water_reserve;
 
 use simcore::environment::SourceResolver;
 use simcore::error::SimError;

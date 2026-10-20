@@ -397,3 +397,81 @@ the two-stock form and the separate-air lab read it. No start value moved in thi
   two-stock scenarios, as their records were measured; nothing runs examples, so these were found by
   grep, not by a red.
 
+
+## 13. One water reserve for the station (opened 2026-10-20)
+
+**How it was asked.** The decision summary for §12 said that at 75 % "nothing else moved", leaving out
+§2 F3a's ~40 kg a season of the crew's water reaching the plants' soil; the user was told. Asked "keep,
+remove the drift, or undo", the user first chose *"Add the missing pipe: send the plants' collected water
+to the crew's water recovery — do it"*. That pipe (the plants' `Condensation` booked to `RECOVERED_WATER`,
+`room_vapour::Repointed`) was built lab-only and **replaced before any of its results was read**: the
+user's next message was *"i want system that balanced water needs. also - i think it is reasonable for the
+station to have a tank with xtra water to serve as a buffer for all needs"*. Its code was reverted, its
+runs stopped, its saved bytes deleted.
+
+**The user's three answers (2026-10-20):**
+1. The reserve is the crew's existing clean-water tank (`crew.water_store`, 20 t). No new tank.
+2. The plants' extra goes through the crew's recycler (`RECOVERED_WATER`, η 0.9) on its way there.
+3. The plants' own tank (`biosphere.condensate`) keeps **one full watering**; above that it drains.
+
+**The form (sealed station only):**
+* *Top-up* (plant step): when the plants' own watering triggers (`EventRecycling`'s trigger, the same
+  builder) and their tank holds less than the watering's gross `deficit / ea`, the rest is drawn from the
+  crew's store, split as the plants' watering splits (`ea` to the root zone, the rest below it). Counted by
+  the soil account (`soil_surface_account_with`), as the separate-air watering is.
+* *Drain* (minute step, so it never shares a snapshot with the watering): everything in the plants' tank
+  above the level goes to `RECOVERED_WATER`.
+* *The level* — a DESIGN value derived from existing settings, no new number: `depletion_fraction ×
+  transpirable_capacity(min(max_rooted_depth, soil_depth)) / drip_efficiency` = 0.55 × 1.3 m × 0.13 ×
+  1000 kg m⁻³ × 1 m² / 0.9 = **103.3 kg** (one watering of the deepest root zone, trigger to full).
+  ⚠ Amended after the probe below: first written from the soil's depth (1.5 m, 119.2 kg), but the roots
+  stop at 1.3 m (`root_depth.yaml`), so no watering can be bigger than ~103.8 kg.
+* Not the greenhouses (their crew water goes to a sink) and not the separate-air lab (it already waters
+  from the crew's store).
+
+**Measure before building (advisor, 2026-10-20).** The plants' tank held 33.9 kg after the first season
+under two stocks (§1). If it rarely passes 119 kg, the drain returns little and the crew's breath is not
+"returned", only capped; if the tank is rarely short, the top-up is insurance the reference never uses. On
+today's reference, over 1220 days: what the top-up would supply, what the drain would return, the largest
+watering delivered, the deepest roots, the plants' tank over time.
+
+**The probe** (`station/examples/water_reserve.rs` as first written, today's reference, 1220 days, 9 crop
+cycles; rationed 0 / 0). Every watering trigger (4 a cycle) found the plants' tank holding enough: **the
+top-up would never fire**. The plants' water climbs every cycle — 216.6 kg at the first cycle's end, then
+234.9, 253.1, … 357.6 kg: **+18.3 kg a cycle**, the crew's minute residue (0.131 kg/d × ~140 days). The
+tank's peak passes one watering in every cycle from the second on (111.2, 129.3, 148.0, … 242.7 kg). So
+the drain returns the drift, and the top-up is insurance the reference does not use. Largest watering
+103.8 kg; roots 1.30 m (hence the level's amendment above).
+
+**Predictions** for `CrewStore` against `Off` (today's reference), 1220 days, committed before the run:
+* P1. The drain returns **130 ± 30 kg** in all (from the first or second cycle on); the crew store ends
+  **+117 ± 27 kg** (η 0.9), brine **+13 ± 3 kg**.
+* P2. The plants' water **levels off**: no cycle-to-cycle rise of its end value above 5 kg after the
+  second cycle; it ends near the second cycle's end (~235 ± 20 kg) against `Off`'s 357.6.
+* P3. The top-up: **0–30 kg** in all. With the tank's peaks clipped its troughs fall too, so a late
+  watering in a cycle may find it short; no prediction of which.
+* P4. Carbon within 0.1 %; grain peaks as `Off`'s to the third digit; rationed 0 / 0; re-sow days
+  identical.
+* P5. Goldens: **exactly `sealed_station` changes**. Station manifest: its `golden_sha256`, and `flow_set`
+  gains **`ReserveTopUp` and `TankDrain`** (station flow types; the completeness gate may ask each to be
+  exercised).
+* P6. `chamber_walls`' pins move (less water in the plants' loop), size not predicted.
+
+**Measured, lab-only** (`water_reserve` example, 1220 days, 9 crop cycles; both rationed 0 / 0):
+
+| | predicted | measured | |
+|---|---|---|---|
+| P1 drain, in all | 130 ± 30 kg | **143.70 kg** (8.4 in cycle 0, then 18.4–19.2 a cycle) | ✓ |
+| P1 crew store, end | +117 ± 27 kg | **+125.03 kg** | ✓ |
+| P1 brine, end | +13 ± 3 kg | **+14.37 kg** | ✓ |
+| P2 plants' water levels off | rise ≤ 5 kg a cycle | 208.874, 208.885, 208.907, 208.885, 208.906, 208.884, 208.909, 208.883 kg | ✓ |
+| P2 … near the second cycle's end | ~235 ± 20 kg | **208.9 kg** | ✗ |
+| P3 top-up, in all | 0–30 kg | **4.30 kg** (2 of 4 waterings a cycle find the tank short) | ✓ |
+| P4 carbon; grain peaks | within 0.1 %; as `Off` | plant carbon +0.0000 %; grain peaks identical to 4 digits | ✓ |
+
+P2's level missed: the tank's peak (111.2 kg) passed the level already in the first cycle, so the drain
+started there and the plants' water settled at the first cycle's end less 7.7 kg, not the second's. The
+soil and subsoil end identical to `Off`'s to 4 decimals: the water that leaves is the tank's surplus, which
+no watering reached. The tank now swings 0.2–103.7 kg each cycle; its two last waterings are short by
+0.1–1.0 kg, the top-up's whole work. `--save` wrote the sealed golden's predicted bytes
+(`W:\temp\claude\water-reserve\save`); `Off` reproduced the committed golden first.

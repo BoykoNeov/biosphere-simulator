@@ -55,6 +55,7 @@ use crate::gas_exchange::{
     OnFastStep, PLANT_WINDOW_RECORDER,
 };
 use crate::room_vapour::RoomVapour;
+use crate::water_reserve::WaterReserve;
 use crate::scenario::SealedStationScenario;
 use crate::sealed::{build_sealed_station_unread, sealed_fast_flows, CabinAir};
 use crate::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
@@ -324,10 +325,13 @@ fn amount(state: &State, id: &str) -> Result<f64, SimError> {
 ///
 /// Two rooms, so two vapour stocks: the cabin keeps its own `cabin_h2o` and the chamber its
 /// plants' `water_vapor` ([`RoomVapour::TwoStocks`]), whatever the shared room's form — one store
-/// is a SHARED room's (the reference since 2026-10-20, [`crate::room_vapour`]).
+/// is a SHARED room's (the reference since 2026-10-20, [`crate::room_vapour`]). And no station
+/// water reserve ([`WaterReserve::Off`]): this lab waters the plants from the crew's store by its
+/// own rule ([`TriggeredWatering`]), and a reserve would water them twice.
 pub fn split_scenario(scenario: &SealedStationScenario, split: &AirSplit) -> SealedStationScenario {
     SealedStationScenario {
         room_vapour: RoomVapour::TwoStocks,
+        water_reserve: WaterReserve::Off,
         ..scenario.with_chamber_air(split.chamber_air_mol)
     }
 }
