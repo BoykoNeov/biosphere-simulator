@@ -143,7 +143,7 @@ stay **day-indexed** while biosphere trajectories are **step-indexed**. That asy
 load-bearing: slicing a station trajectory works in days, and "fixing" those sites to use
 steps introduces the bug it looks like it removes.
 
-### The flow set — sibling + station flow classes (derived; 20 since 2026-10-15, with the 4 biosphere types below 24 since 2026-10-20)
+### The flow set — sibling + station flow classes (derived; 21 since 2026-10-21, with the 4 biosphere types below 25)
 
 The frozen flow taxonomy of the coupled station, **derived from freshly assembled
 registries** (never hand-listed): the union over the four standalone sibling registries
@@ -157,7 +157,11 @@ it. The classes (16 when this section was written; the count is the manifest's `
 - **eclss** — `CrewMetabolism`, `CO2Scrubber`, `Condenser`, `O2Makeup`
 - **crew** — `OxygenConsumption`, `FoodMetabolism`, `WaterBalance`
 - **station seams** — `CrewRespiration`, `WaterRecovery`, `Lamp`, `Harvest`, `ChamberCooling`,
-  `ChamberWall`, `ChamberHeater`, `ChamberLatentHeat`
+  `ChamberWall`, `ChamberHeater`, `ChamberLatentHeat`, `TankDrain`
+  (since 2026-10-21: the station's water reserve, `crate::water_reserve` — the plants' tank above one
+  full watering drains to the crew's recycler each minute; its partner `ReserveTopUp`, the crew's tank
+  topping up a short watering, runs on the plant step, in the excluded slow registry, so no freeze record
+  lists it — like `PlantWindowRecorder`)
   (since 2026-10-15: the heat the plants' evaporation takes from the chamber, chamber →
   `thermal.node`, drawn minute by minute at the rate the plant step's `WindowEvaporationRecorder`
   records — that recorder is in the excluded slow registry, like `PlantWindowRecorder`)
@@ -397,6 +401,7 @@ suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
 
 ### Unfreeze log
 
+- **2026-10-21 — the sealed station has one water reserve, the crew's 20 t store (`docs/plans/post-roadmap-shared-room-humidity.md` §13–§14, the user's choice: the crew's tank as the reserve, the plants' extra through the crew's recycler, the plants' tank kept at one full watering). 1 station golden moves; the manifest diff is its `golden_sha256` row and `flow_set` + `TankDrain`.** Until now the plants watered only from their own tank, and the crew's breath they collected (~40 kg a season) piled up in the plants' tank. Now `SealedStationScenario::water_reserve` is `WaterReserve::CrewStore` in `sealed_station_scenario()` (`water_reserve::with_water_reserve`): on the plant step `ReserveTopUp` makes a short watering whole from `crew.water_store`, and on the minute step `TankDrain` sends the plants' tank above its working level (0.55 × the transpirable water to the deepest roots, 1.3 m, ÷ 0.9 drip = 103.28 kg) to the crew's recycler. `ReserveTopUp` sits in the plant-step registry, which `flow_set` does not list, so only `TankDrain` appears. **Measured in the lab first, then adopted byte for byte** (`examples/water_reserve.rs --save` first reproduced the committed golden from `sealed_station_scenario().water_reserve`, then wrote the reserve's; the regenerated golden is `cmp`-identical; the other 19 are identical). Over 1220 days against no reserve: 143.70 kg drained to the recycler, crew store +125.03 kg, brine +14.37 kg, plant tank −139.40 kg, soil and subsoil unchanged (+0.0000), 4.30 kg topped up from the reserve, plant carbon +0.0000 %, rationed 0. The plants' water per cycle is now flat (208.87–208.91 kg). Not predicted: with the coolers dead the hot room keeps drawing on the reserve and evaporating it (140 kg over 60 days), so `chamber_heat.rs`'s dead-cooler node bound is pinned to no reserve and a new test pins the drawing. The separate-air lab and the two-stock baselines carry no reserve. No `--ignored` pin moved (all 12 slow tests pass unchanged; P6 had expected the `chamber_walls` pins might). Advisor-reviewed before code.
 - **2026-10-20 — a room the crew and the plants share holds ONE water-vapour store
   (`docs/plans/post-roadmap-shared-room-humidity.md` §12, the user's choice: 75 %, the sealed station's
   thermostat live). 3 station goldens move; the manifest diff is their 3 `golden_sha256` rows and

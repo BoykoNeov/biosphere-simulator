@@ -91,6 +91,7 @@
     "RadiatorReject",
     "SelfDischarge",
     "SolarCharge",
+    "TankDrain",
     "WaterBalance",
     "WaterRecovery"
   ],
@@ -210,7 +211,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "8164a647ea2913ca9b2d30b2890e8dfab4dcfa57d3690848c1d60592f7952d64",
+      "golden_sha256": "ebb036cb65809dddc30a45fc7ce403358f45608f3bfbceac0081078b8096b161",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

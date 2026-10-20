@@ -21,6 +21,7 @@ use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScena
 use station::sealed::{
     build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
 };
+use station::water_reserve::WaterReserve;
 
 /// Long enough for the crop to be well past seedling (the starvation is visible by day 30).
 const DAYS: usize = 90;
@@ -54,6 +55,11 @@ const DAYS: usize = 90;
 /// plants' water, so [`vapour_crossing_moves_water_between_the_plants_and_the_crew`]'s "vapour off
 /// holds the shared plants' loop exactly" measured 195.0 kg against 237.5 — a claim about the
 /// two-stock shared room, which this file's baseline therefore stays.
+///
+/// ⚠ **And without the station's water reserve** (2026-10-20, the plan's §13): the split side never
+/// carries one (`split_scenario`), and with it the shared side's short waterings are topped up from
+/// the crew's tank — the same pin measured 195.0 kg against 204.5. A claim about two rooms that each
+/// keep their own water, so this baseline keeps the plants' tank alone too.
 fn scenario() -> SealedStationScenario {
     let mut s = sealed_station_scenario();
     // The first-order scrubber's own fixed point, where the crop-sharing cabins started before.
@@ -68,6 +74,7 @@ fn scenario() -> SealedStationScenario {
             ..s.cold
         },
         room_vapour: RoomVapour::TwoStocks,
+        water_reserve: WaterReserve::Off,
         ..s
     }
 }

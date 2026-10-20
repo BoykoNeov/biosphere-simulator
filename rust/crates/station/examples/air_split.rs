@@ -336,6 +336,9 @@ fn print(name: &str, r: &Reading, base: &Reading) {
 fn two_stock_sealed() -> station::scenario::SealedStationScenario {
     station::scenario::SealedStationScenario {
         room_vapour: station::room_vapour::RoomVapour::TwoStocks,
+        // And the plants' tank alone, as the records were measured (2026-10-20, the shared-room
+        // plan's §14).
+        water_reserve: station::water_reserve::WaterReserve::Off,
         ..sealed_station_scenario()
     }
 }

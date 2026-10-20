@@ -398,7 +398,7 @@ pub fn build_sealed_station_unread(
         }
     };
     let bio_reg = record_room_air(room, &scenario.plant_params(), bio_reg, &stocks)?;
-    // The station's water reserve (2026-10-20, `water_reserve`): before `wrap_last`.
+    // The station's water reserve (reference since 2026-10-21, `water_reserve`): before `wrap_last`.
     let (bio_reg, fast_reg) = with_water_reserve(
         scenario.water_reserve,
         &scenario.bio,

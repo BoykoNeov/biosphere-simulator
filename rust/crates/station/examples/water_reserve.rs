@@ -7,7 +7,7 @@
 //! cargo run --release -q -p station --example water_reserve -- --save <dir>  # adoption's bytes
 //! ```
 //!
-//! The sealed station at [`WaterReserve::Off`] (the form until 2026-10-20) and
+//! The sealed station at [`WaterReserve::Off`] (the form until 2026-10-21) and
 //! [`WaterReserve::CrewStore`], crop cycle by crop cycle. For each it reads what the top-up and the
 //! drain move, evaluated on each step's own snapshot. For `Off`, which has neither, it reads what
 //! they WOULD move: the tank's shortfall against each watering's gross (`deficit / ea`), and each

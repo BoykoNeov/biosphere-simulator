@@ -37,6 +37,7 @@ use station::sealed::{
     build_sealed_station, full_lamp_heat_input_w, sealed_bio_resolver, sealed_fast_resolver,
     sealed_node_heat, sealed_reset_hook,
 };
+use station::water_reserve::WaterReserve;
 
 const DAYS: usize = 60;
 const COOLER_HEALTH: &str = "test.chamber_cooler_health";
@@ -44,10 +45,17 @@ const COOLER_HEALTH: &str = "test.chamber_cooler_health";
 const WALL_HEALTH: &str = "test.chamber_wall_health";
 
 /// The sealed scenario without the cold period: the chamber held warm from day 0.
+///
+/// ⚠ And without the station's water reserve (2026-10-20,
+/// `docs/plans/post-roadmap-shared-room-humidity.md` §13): with it, the crew's tank keeps watering
+/// the dead cooler's soil, so the hot room never stops evaporating within the run, and this file's
+/// node bound is derived from the day evaporation stops. The reserve's side of a dead cooler is
+/// its own test, [`a_dead_coolers_room_keeps_drawing_on_the_reserve`].
 fn warm_scenario() -> SealedStationScenario {
     let s = sealed_station_scenario();
     SealedStationScenario {
         cold: ColdProgram { days: 0, ..s.cold },
+        water_reserve: WaterReserve::Off,
         ..s
     }
 }
@@ -61,7 +69,12 @@ fn run(health: f64) -> (Vec<State>, u64) {
 /// [`run`], with the chamber's latent-heat books on (the reference since 2026-10-15) or off (the
 /// lab switch, `station::latent_heat::without_latent_heat`).
 fn run_with(health: f64, books: bool) -> (Vec<State>, u64) {
-    let scenario = warm_scenario();
+    run_in(&warm_scenario(), health, books)
+}
+
+/// [`run_with`] on `scenario`.
+fn run_in(scenario: &SealedStationScenario, health: f64, books: bool) -> (Vec<State>, u64) {
+    let scenario = *scenario;
     let charge = domains::params::charge();
     let lamp = station::params::lamp();
     let (state, bio_reg, fast_reg) = build_sealed_station(
@@ -366,5 +379,32 @@ fn a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop() {
     assert!(
         v_failed < v_nominal,
         "the overheated crop's leaf + stem + root {v_failed} is not below the nominal {v_nominal}"
+    );
+}
+
+/// The reserve's side of a dead cooler (2026-10-20, `docs/plans/post-roadmap-shared-room-humidity.md`
+/// §13): the station keeps watering the hot room from the crew's tank, as a watering system on a
+/// soil-dryness trigger would, so the room is still evaporating on its last day — where without the
+/// reserve its soil dries and evaporation stops (measured: by day ~15) — and the crew's tank pays.
+#[test]
+fn a_dead_coolers_room_keeps_drawing_on_the_reserve() {
+    let scenario = SealedStationScenario {
+        water_reserve: WaterReserve::CrewStore,
+        ..warm_scenario()
+    };
+    let (failed, _) = run_in(&scenario, 0.0, true);
+    let total = |d: usize| failed[d].aux[station::latent_heat::EVAPORATED_TOTAL_AUX];
+    let store = |d: usize| failed[d].stocks[domains::crew::WATER_STORE].amount;
+    eprintln!(
+        "dead cooler with the reserve: evaporated {} kg over {DAYS} days, {} kg on the last; \
+         crew store {} → {} kg",
+        total(DAYS),
+        total(DAYS) - total(DAYS - 1),
+        store(0),
+        store(DAYS)
+    );
+    assert!(
+        total(DAYS) > total(DAYS - 1),
+        "the reserve's hot room stopped evaporating by day {DAYS}"
     );
 }

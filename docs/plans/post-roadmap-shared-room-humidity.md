@@ -475,3 +475,25 @@ soil and subsoil end identical to `Off`'s to 4 decimals: the water that leaves i
 no watering reached. The tank now swings 0.2–103.7 kg each cycle; its two last waterings are short by
 0.1–1.0 kg, the top-up's whole work. `--save` wrote the sealed golden's predicted bytes
 (`W:\temp\claude\water-reserve\save`); `Off` reproduced the committed golden first.
+
+## 14. ADOPTED 2026-10-21 — the station's water reserve
+
+**The flip:** `sealed_station_scenario()` takes `WaterReserve::CrewStore`. The full suite with
+`--no-fail-fast` before any fix: **1458 passed, 3 red**, each read first:
+* `manifest_writer` — the station manifest's `flow_set` gains `ReserveTopUp` and `TankDrain` (P5); cleared
+  by regenerating it.
+* `chamber_heat.rs` `a_dead_cooler_heats_the_chamber_cools_the_node_and_overheats_the_crop` — *"the hot
+  room's crop never stopped evaporating"*. **A behaviour change, not predicted:** with the cooler dead the
+  room overheats and the crop dies; without the reserve the plants' tank runs dry, the soil dries and
+  evaporation stops (day ~15), and the test's node bound is derived from that day. With the reserve the
+  crew's tank keeps watering the hot room's soil on its dryness trigger, as a real watering system would,
+  so it never stops within 60 days. The file's subject is the node, so `warm_scenario()` is pinned to
+  `Off` (⚠ doc), and the reserve's side is a test of its own,
+  `a_dead_coolers_room_keeps_drawing_on_the_reserve` (still evaporating on day 60).
+* `air_split.rs` `vapour_crossing_moves_water_between_the_plants_and_the_crew` — "vapour off holds the
+  shared plants' loop exactly" read 195.0 kg against 204.5: the shared side's two-stock baseline now has
+  its short waterings topped up from the crew's tank (two stocks leave the plants' tank shorter). A claim
+  about two rooms that each keep their own water; the file's baseline is pinned to `Off` beside its
+  `TwoStocks` (⚠ doc).
+
+**After the fixes:** clippy clean; the full suite 1462 passed, 0 failed; `--ignored` 12 passed, 0 failed. **P6 missed:** no `chamber_walls` pin moved. Consistent with §13's table (soil and subsoil +0.0000: the reserve moves the plants' tank, not the water that evaporates), not traced further.

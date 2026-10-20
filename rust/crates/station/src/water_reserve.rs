@@ -33,11 +33,12 @@ use crate::water::RECOVERED_WATER;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaterReserve {
     /// The plants' tank alone: short waterings stay short, the extra stays in the tank — the form
-    /// until 2026-10-20 (plan §13), kept for the lab's records and the separate-air lab, which
+    /// until 2026-10-21 (plan §13), kept for the lab's records and the separate-air lab, which
     /// waters from the crew's store by its own rule.
     Off,
     /// The crew's clean-water tank is the station's reserve: the plants' tank keeps one full
-    /// watering, drains the rest to the crew's recycler, and is topped up from the crew's tank.
+    /// watering, drains the rest to the crew's recycler, and is topped up from the crew's tank —
+    /// the sealed station's reference since 2026-10-21 (plan §14).
     CrewStore,
 }
 

@@ -53,3 +53,23 @@ no value, golden, manifest or `source:` string moved. Plan: `docs/plans/post-roa
   Separate air builds two stocks itself; the plant-step tests and `air_split.rs`'s shared baseline keep two
   stocks (a plant-step build cannot hold one); two node pins re-pinned as measured, bands unchanged (the
   structure walls 188.70 → 188.59 K; the 1220-day run's mean 170.06 → 170.03 K, found by `--ignored`).
+* **The decision summary left something out.** It said that at 75 % "nothing else moved"; a side note
+  pointed out the ~40 kg a season of crew breath the plants' condenser catches, which ends in the plants'
+  soil. The user was told, and asked to keep it, remove it or undo.
+* **A pipe, built and reverted unread:** the user first chose "send the plants' collected water to the
+  crew's recovery" (the plants' condenser booked to the recycler); before any result, the user asked
+  instead for *"a system that balanced water needs"* with *"a tank with xtra water to serve as a buffer"*.
+* **The user's design (plan §13):** the crew's 20 t tank is the station's reserve; the plants' tank keeps
+  one full watering and drains the rest through the crew's recycler; a short watering is topped up from
+  the crew's tank. The level was first written from the soil's depth (119 kg) and amended to the deepest
+  roots' (103.3 kg) after the probe: no watering can be bigger.
+* **The probe before building:** on the reference the top-up would never fire (the tank always held
+  enough) and the plants' water climbed 18.3 kg a cycle. **Measured, lab-only:** 143.7 kg returned, the
+  plants' water flat at 208.9 kg, top-up 4.3 kg, carbon unmoved; missed: the level it settles at (the
+  drain starts in the first cycle, not the second).
+* **ADOPTED 2026-10-21** (plan §14): only `sealed_station` moved, `cmp`-identical to the lab's save;
+  `flow_set` + `TankDrain`. ⚠ `ReserveTopUp` runs on the plant step, in the slow registry the station
+  manifest excludes, so no freeze record lists it (predicted to appear: half-missed). Found at the flip, not
+  predicted: a dead cooler's hot room keeps being watered from the reserve and never stops evaporating
+  (140 kg over 60 days); `chamber_heat.rs`'s node bound pins `Off`, and that behaviour has its own test.
+  `air_split.rs`'s two-room baseline pins `Off` too.

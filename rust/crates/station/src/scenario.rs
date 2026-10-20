@@ -428,7 +428,7 @@ pub struct SealedStationScenario {
     /// reads it too.
     pub room_vapour: RoomVapour,
     /// Where the plants get water their own tank cannot give, and where their extra goes
-    /// ([`crate::water_reserve`]).
+    /// ([`crate::water_reserve`]; the crew's store in the sealed station since 2026-10-21).
     pub water_reserve: WaterReserve,
 }
 
@@ -615,7 +615,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         cold: crate::params::cold_period(),
         crop: Crop::Wheat,
         room_vapour: shared_room(Thermostat::LiveChamber),
-        water_reserve: WaterReserve::Off,
+        water_reserve: WaterReserve::CrewStore,
     }
 }
 
