@@ -22,3 +22,14 @@ no value, golden, manifest or `source:` string moved. Plan: `docs/plans/post-roa
   within-day air. Accepted as two coils in one room.
 * **The setting is the user's:** 75 % (the plants' value, already in the tree; BVAD's top crew limit)
   or 40 % (the crew's nominal; drier air, more transpiration). Priced lab-only first.
+* **MEASURED, lab-only** (`station/examples/shared_room_humidity.rs`; plan §7–§8). A `RoomVapour` switch on the
+  greenhouse and sealed scenarios, default two stocks (the suite's goldens pass unchanged). At 75 % on the
+  window thermostat the room still passed saturation 143 minutes a season (max 1.23), at the warm ↔ cold
+  switches: the chamber cools inside a plant step while the target keeps the step's start. With the crew's
+  condenser on the chamber's LIVE temperature: max 0.7601, never above 1, and only the minute's residue
+  crosses (39.9 kg a season, as predicted). Carbon +0.0000 %; crew store −36.5 kg; transpiration −1.5 %.
+* **Missed:** the leak lands in the soil and subsoil (+22 %, +19 %, small stores), not the condensate; the
+  battery moved 0.04 % (bound 0.01 %). At 40 %: transpiration +112 %, yet grain peaks ROSE 1.6–3.6 % and the
+  soil was not drawn down; the heater pays the evaporation (battery −9.9 %). Why grain rose is not measured.
+* **The user's call:** 75 % or 40 %, and the sealed station's thermostat (live or window). The greenhouses
+  can only take the window: their weather has no clock finer than the plant step.

@@ -347,6 +347,13 @@ pub fn build_split_station(
             scenario.bio.chamber_air_capacity_mol
         )));
     }
+    if !scenario.room_vapour.has_cabin_vapour() {
+        return Err(SimError::Validation(
+            "build_split_station: separate air gives the cabin its own vapour stock; one vapour \
+             store is a shared room's (crate::room_vapour)"
+                .into(),
+        ));
+    }
     let resized = split_scenario(scenario, split);
     // ⚠ The PLANT-STEP base, always: this build discards the shared fast registry and keeps the
     // plant one, so a minute-step base would throw the crop's carbon budget away with it. The
@@ -444,7 +451,9 @@ pub fn build_split_station(
         CabinAir {
             co2: CABIN_CO2,
             o2: CABIN_O2,
+            h2o: CABIN_H2O,
         },
+        crate::cabin::eclss_condenser(eclss, CABIN_H2O, crate::water::RECOVERED_WATER),
         FECAL_WASTE,
         false,
     );

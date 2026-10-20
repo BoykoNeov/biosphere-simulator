@@ -13,6 +13,7 @@ use domains::biosphere::params::PhenologyParams;
 use domains::crew::CrewParams;
 use simcore::error::SimError;
 use simcore::state::State;
+use crate::room_vapour::RoomVapour;
 
 // --- Step 1 (P6.1): the Power → Thermal heat-closure station --------------------------
 
@@ -167,6 +168,9 @@ pub struct GreenhouseScenario {
     pub bio_dt: f64,
     /// Slow (biosphere) sub-steps per master day — mirrors `STEPS_PER_DAY`.
     pub bio_steps_per_day: u64,
+    /// The shared room's water vapour: two stocks (the reference) or one (the lab,
+    /// [`crate::room_vapour`]).
+    pub room_vapour: RoomVapour,
 }
 
 /// `GREENHOUSE_SCENARIO`: the frozen sealed biosphere breathing the crew's cabin air.
@@ -179,6 +183,7 @@ pub fn greenhouse_scenario() -> GreenhouseScenario {
         cabin_dt: 60.0,
         bio_dt: BIO_DT,
         bio_steps_per_day: STEPS_PER_DAY as u64,
+        room_vapour: RoomVapour::TwoStocks,
     }
 }
 
@@ -414,6 +419,10 @@ pub struct SealedStationScenario {
     /// potato chamber cannot re-sow on wheat's maturity (`docs/plans/post-roadmap-authored-plants.md`
     /// §17).
     pub crop: Crop,
+    /// The shared room's water vapour: two stocks (the reference) or one (the lab,
+    /// [`crate::room_vapour`]). Under one stock the room's setting is the plants'
+    /// `humidity_setpoint` ([`Self::plant_params`]), so the re-sow reads it too.
+    pub room_vapour: RoomVapour,
 }
 
 /// The crop a plant chamber grows.
@@ -436,10 +445,11 @@ impl SealedStationScenario {
     /// ([`crate::lighting::room_form`]). The season is built from these and every re-sow resets
     /// with them.
     pub fn plant_params(&self) -> domains::biosphere::params::BiosphereParams {
-        crate::lighting::room_form(match self.crop {
-            Crop::Wheat => domains::biosphere::params::biosphere(),
-            Crop::Potato => domains::biosphere::params::potato(),
-        })
+        self.room_vapour
+            .plant_params(crate::lighting::room_form(match self.crop {
+                Crop::Wheat => domains::biosphere::params::biosphere(),
+                Crop::Potato => domains::biosphere::params::potato(),
+            }))
     }
 
     /// The crop's phenology — the re-sow hook's maturity threshold (DVS 2,
@@ -597,6 +607,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         bio_steps_per_day: STEPS_PER_DAY as u64,
         cold: crate::params::cold_period(),
         crop: Crop::Wheat,
+        room_vapour: RoomVapour::TwoStocks,
     }
 }
 

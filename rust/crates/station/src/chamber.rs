@@ -463,6 +463,16 @@ impl Flow for PlantsReadChamberFlow {
     }
 }
 
+/// One flow reading the chamber's temperature as `temp`, as [`plants_read_chamber`] wraps a
+/// plant-step flow — for a fast-step flow that must read the room's live temperature (the lab's
+/// one-store shared room, [`crate::room_vapour::Thermostat::LiveChamber`]).
+pub fn reads_chamber(inner: Box<dyn Flow>, params: &ChamberParams) -> Box<dyn Flow> {
+    Box::new(PlantsReadChamberFlow {
+        inner,
+        heat_capacity: params.heat_capacity,
+    })
+}
+
 /// A plant-step aux process that reads the chamber's temperature ([`plants_read_chamber`]).
 /// Keeps the inner process's type name and id.
 pub struct PlantsReadChamberAux {

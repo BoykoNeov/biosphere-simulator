@@ -33,8 +33,7 @@ use domains::crew::{
     WATER_INTAKE_VAR, WATER_STORE,
 };
 use domains::eclss::{
-    CO2Scrubber, Condenser, EclssParams, O2Makeup, CABIN_H2O, CO2_REMOVED, CO2_SCRUBBER, CONDENSER,
-    O2_MAKEUP, O2_SUPPLY,
+    CO2Scrubber, EclssParams, O2Makeup, CO2_REMOVED, CO2_SCRUBBER, O2_MAKEUP, O2_SUPPLY,
 };
 use domains::power::{
     balanced_load_w, battery_stock, daily_solar_energy, ChargeParams, LoadDraw, SolarCharge,
@@ -54,6 +53,7 @@ use simcore::quantities::Quantity;
 use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
+use crate::cabin::eclss_condenser;
 use crate::chamber::{
     chamber_heat0, plants_read_chamber, require_step_within_response, ChamberParams,
     ChamberSurroundings, CHAMBER, CHAMBER_SETPOINT_VAR,
@@ -71,6 +71,7 @@ use crate::plant_chamber::{
     chamber_fast_forcings, chamber_flows, chamber_latent_heat_flow, chamber_plants,
     chamber_reset_hook, chamber_start_stocks, ChamberPorts, ResowRule,
 };
+use crate::room_vapour::{record_room_air, room_condenser, Thermostat};
 use crate::scenario::{Phase, SealedStationScenario};
 use crate::sowing::{insert_twins, on_sowing_clock, PLANT_PROGRAM_VARS};
 use crate::stocks::{
@@ -286,15 +287,27 @@ pub fn build_sealed_station_unread(
     let node0 = sealed_node_heat(charge, thermal_params, lamp, scenario);
     let chamber = crate::params::chamber();
     require_step_within_response(scenario.cabin_dt, &chamber)?;
+    let room = scenario.room_vapour;
+    if !room.has_cabin_vapour() && gas != GasExchangeStep::Minute {
+        return Err(SimError::Validation(
+            "one vapour store for a shared room needs the gas exchange on the minute step: its \
+             condenser reads the plant window's temperature"
+                .into(),
+        ));
+    }
     let mut fast_seq = vec![
         food_store_stock(scenario.cabin.food_store0)?,
         water_store_stock(scenario.cabin.water_store0)?,
-        cabin_h2o_stock(scenario.cabin.cabin_h2o_0)?,
+    ];
+    if room.has_cabin_vapour() {
+        fast_seq.push(cabin_h2o_stock(scenario.cabin.cabin_h2o_0)?);
+    }
+    fast_seq.extend([
         gas_boundary(O2_SUPPLY, Quantity::Oxygen, o2_composition(), true)?,
         gas_boundary(CO2_REMOVED, Quantity::Carbon, co2_composition(), false)?,
         recovered_water_pool()?,
         boundary::sink(BRINE.to_string(), Quantity::Water, 0.0)?,
-    ];
+    ]);
     if !close_feces {
         fast_seq.push(boundary::sink(
             FECAL_WASTE.to_string(),
@@ -341,6 +354,18 @@ pub fn build_sealed_station_unread(
     let (state, bio_reg) = crate::latent_heat::book_latent_heat(state, bio_reg)?;
 
     // --- fast flows (the crew breathes the biosphere's own gas pools: shared air) ---
+    // The crew's breath: its own vapour stock held by the ECLSS condenser (the reference), or
+    // the plants' held by the room's minute condenser (the lab's one store, `room_vapour`).
+    let condenser = if room.has_cabin_vapour() {
+        eclss_condenser(eclss, room.crew_vapour(), RECOVERED_WATER)
+    } else {
+        room_condenser(
+            &scenario.plant_params(),
+            scenario.bio.chamber_air_capacity_mol,
+            RECOVERED_WATER,
+            room.thermostat().unwrap_or(Thermostat::Window),
+        )
+    };
     let fast_flows = sealed_fast_flows(
         charge,
         thermal_params,
@@ -354,7 +379,9 @@ pub fn build_sealed_station_unread(
         CabinAir {
             co2: CARBON_POOL, // the greenhouse seam: crew exhales into the bio CO₂
             o2: O2_POOL,      // the greenhouse seam: crew breathes the bio O₂
+            h2o: room.crew_vapour(),
         },
+        condenser,
         fecal_target,
         with_harvest,
     );
@@ -368,16 +395,20 @@ pub fn build_sealed_station_unread(
             gas_exchange_on_fast_step(&stocks, bio_reg, fast_reg, &weather_shared(&scenario.bio))?
         }
     };
+    let bio_reg = record_room_air(room, &scenario.plant_params(), bio_reg, &stocks)?;
     Ok((state, bio_reg, fast_reg))
 }
 
 /// The two gas pools the crew, the CO₂ scrubber and the O₂ makeup act on. In the frozen
 /// sealed station they ARE the biosphere's (`CARBON_POOL` / `O2_POOL`, shared air); the lab
-/// separate-air build ([`crate::air_split`]) points them at the cabin's own.
+/// separate-air build ([`crate::air_split`]) points them at the cabin's own. `h2o` is where the
+/// crew's breath goes: the cabin's own vapour, or the plants' in a one-store shared room
+/// ([`crate::room_vapour`]).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct CabinAir<'a> {
     pub co2: &'a str,
     pub o2: &'a str,
+    pub h2o: &'a str,
 }
 
 /// The sealed station's fast registry, in its one canonical order. Extracted so the lab
@@ -394,6 +425,7 @@ pub(crate) fn sealed_fast_flows(
     chamber: &ChamberParams,
     surroundings: ChamberSurroundings,
     air: CabinAir<'_>,
+    condenser: Box<dyn Flow>,
     fecal_target: &str,
     with_harvest: bool,
 ) -> Vec<Box<dyn Flow>> {
@@ -409,7 +441,7 @@ pub(crate) fn sealed_fast_flows(
         Box::new(WaterBalance::new(
             WATER_BALANCE.to_string(),
             WATER_STORE.to_string(),
-            CABIN_H2O.to_string(),
+            air.h2o.to_string(),
             RECOVERED_WATER.to_string(), // the Step-4 seam: urine → the recovery buffer
             *crew,
         )),
@@ -422,13 +454,7 @@ pub(crate) fn sealed_fast_flows(
                 crate::scenario::STATION_CABIN_AIR_MOL,
             ),
         ),
-        Box::new(Condenser::new(
-            CONDENSER.to_string(),
-            CABIN_H2O.to_string(),
-            RECOVERED_WATER.to_string(), // the Step-4 seam: condensate → the buffer
-            *eclss,
-            crate::scenario::STATION_CABIN_AIR_MOL,
-        )),
+        condenser, // the Step-4 seam: condensate → the buffer
         Box::new(O2Makeup::new(
             O2_MAKEUP.to_string(),
             O2_SUPPLY.to_string(),

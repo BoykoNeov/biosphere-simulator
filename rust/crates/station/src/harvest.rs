@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 
 use domains::biosphere::science;
 use domains::biosphere::stocks::{
-    CARBON_POOL, LITTER_CARBON, O2_POOL, ROOTED_DEPTH, SOIL_WATER, STORAGE_C, SUBSOIL_WATER,
+    LITTER_CARBON, ROOTED_DEPTH, SOIL_WATER, STORAGE_C, SUBSOIL_WATER,
     THERMAL_TIME, VERNALIZATION_DAYS,
 };
 use domains::biosphere::system::{soil_surface_start, weather_shared};
@@ -25,13 +25,16 @@ use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
 
-use crate::cabin::build_cabin_flows;
 use crate::driver::run_master_day;
 use crate::flows::{Harvest, HarvestParams, HARVEST};
 use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
 };
-use crate::greenhouse::{build_greenhouse_at, greenhouse_bio_resolver, greenhouse_cabin_resolver};
+use crate::greenhouse::{
+    build_greenhouse_any_room, greenhouse_bio_resolver, greenhouse_cabin_resolver,
+    greenhouse_plant_params, require_room_readable, shared_room_cabin_flows,
+};
+use crate::room_vapour::record_room_air;
 use crate::scenario::HarvestScenario;
 
 /// Assemble the harvest greenhouse: `(state, bio_reg, cabin_reg)`.
@@ -73,6 +76,7 @@ pub fn build_harvest_at(
     close_feces: bool,
     gas: GasExchangeStep,
 ) -> Result<(State, Registry, Registry), SimError> {
+    require_room_readable(&scenario.greenhouse, gas == GasExchangeStep::Minute)?;
     let fecal_target = if close_feces {
         LITTER_CARBON
     } else {
@@ -83,7 +87,7 @@ pub fn build_harvest_at(
     // carbon budget away with the discarded cabin registry — measured 2026-10-03: the crop
     // grew nothing and the golden's plant carbon fell 17.6 %. The minute step is applied at
     // the end, onto the rebuilt registry.
-    let (gh_state, bio_reg, _gh_cabin_reg) = build_greenhouse_at(
+    let (gh_state, bio_reg, _gh_cabin_reg) = build_greenhouse_any_room(
         crew,
         eclss,
         &scenario.greenhouse,
@@ -119,9 +123,10 @@ pub fn build_harvest_at(
     // The soil account's starting values for THIS root zone, not the greenhouse's sowing zone.
     // ⚠ The crop starts past the stage where the soil-shade value stops following the canopy,
     // so the value seeded here holds for the whole run (§18 of the soil-evaporation plan).
+    let plant_params = greenhouse_plant_params(&scenario.greenhouse);
     let soil_start = soil_surface_start(
         bio,
-        &domains::biosphere::params::biosphere(),
+        &plant_params,
         atsw,
         scenario.rooted_depth0,
     );
@@ -142,7 +147,8 @@ pub fn build_harvest_at(
 
     // (2) Rebuild the cabin flows (the Rust Registry does not lend out owned flows) and
     // append Harvest — mirroring Python's `list(cabin_reg.flows) + [Harvest(...)]`.
-    let mut cabin_flows = build_cabin_flows(crew, eclss, CARBON_POOL, O2_POOL, fecal_target);
+    let mut cabin_flows =
+        shared_room_cabin_flows(crew, eclss, &scenario.greenhouse, fecal_target);
     if with_harvest {
         cabin_flows.push(Box::new(Harvest::new(
             HARVEST.to_string(),
@@ -160,7 +166,14 @@ pub fn build_harvest_at(
         GasExchangeStep::Minute => {
             let g = &scenario.greenhouse;
             require_one_plant_step_per_group(g.steps_per_day, g.bio_steps_per_day)?;
-            gas_exchange_on_fast_step(&state.stocks, bio_reg, cabin_reg, &weather_shared(&g.bio))?
+            let (bio_reg, cabin_reg) = gas_exchange_on_fast_step(
+                &state.stocks,
+                bio_reg,
+                cabin_reg,
+                &weather_shared(&g.bio),
+            )?;
+            let bio_reg = record_room_air(g.room_vapour, &plant_params, bio_reg, &state.stocks)?;
+            (bio_reg, cabin_reg)
         }
     };
     Ok((state, bio_reg, cabin_reg))

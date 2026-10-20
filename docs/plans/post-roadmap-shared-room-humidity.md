@@ -180,3 +180,76 @@ the default flipping and the goldens regenerated — is the user's call, after t
 * A crew breathing a room that drops to 4 °C for 8 weeks: the model does not hold the crew's
   temperature, so this item holds the shared room's humidity at the temperature it HAS. Separate rooms
   (the separate-air lab) are the form that would answer it; not taken here.
+
+## 7. Measured, lab-only (2026-10-20; `station/examples/shared_room_humidity.rs`)
+
+The switch is `RoomVapour` on `GreenhouseScenario` / `SealedStationScenario`, default `TwoStocks`;
+with it the suite's golden, separate-air, tier and builder-parity tests pass unchanged, and the lab's
+two-stock runs reproduce the probe's §1 numbers to the printed digit. Every run below rationed 0 / 0.
+"Caught" is read off each condenser's legs, evaluated on each step's own snapshot.
+
+**Sealed station, one season, `OneStock { 0.75 }` (window thermostat) against two stocks:**
+
+| # | Predicted | Measured | |
+|---|---|---|---|
+| 1 | never above real saturation; max ≤ 0.85 | **max 1.234, above 1 on 143 of 439 200 minutes**; the max falls in the 926 minutes whose live chamber temperature is > 1 °C off its window's (the warm ↔ cold switches) — that all 143 do was not counted on this run | ✗ |
+| 2 | transpiration −2 … 0 % | −1.54 % (674.3 vs 684.8 kg) | ✓ |
+| 2 | soil, subsoil, condensate within 2 % | soil +22.5 %, subsoil +19.0 %, condensate +41.1 % (+5.8, +25.5, +13.9 kg) | ✗ |
+| 3 | crew store 45 ± 10 kg lower; ~10 % of it less brine | −40.5 kg; brine −4.5 kg | ✓ |
+| 3 | plants' condenser catches the leaks, 39.9 + ≤ 5.7 kg | 44.5 kg against 5.66 (+38.9) | ✓ |
+| 4 | carbon within 0.1 %; grain peaks | plant carbon +0.0000 %; peaks 22.440 / 22.447 (22.440 / 22.445) | ✓ |
+| 5 | energy within 0.01 % | node −1.1e-5, chamber +5e-9, **battery +3.7e-4** | ✗ |
+
+* **Miss 2 is a placement, not an amount.** The leak's 40 kg was predicted into the condensate; the
+  plants' watering then carries most of it into the root zone and subsoil, which are small stores.
+* **Miss 5:** the battery holds 0.04 % more — 10.5 kg less transpiration is ~26 MJ less evaporation
+  heat for the chamber's heater to make up. The direction was predicted (only via transpiration);
+  the size against a 0.01 % bound was not checked against the battery's own small denominator.
+* **Miss 1 is the finding (§8).**
+
+**`OneStock { 0.40 }`:** room max 0.658 of real saturation, never above 1 (✓ 7: ≈ 0.40 away from the
+switches). Transpiration **+111.8 %** (1450.1 kg; predicted +30 … +140 %, ✓). ✗ 8: the plants' soil
+was NOT drawn down — soil +1.4 %, subsoil +9.5 %, condensate +90 % — and plant carbon rose +0.17 %, grain
+peaks 23.244 / 22.812 (+3.6 %, +1.6 %; predicted 0 … −10 %). The chamber's heater pays for the extra
+evaporation: battery −9.9 %, node +1.4 %. Why grain rose is **not measured**; no cause is asserted.
+
+**Greenhouse and harvest, 7 days** (the water reads the within-day air; the "real" temperature there
+is that air, at the plant window's resolution, so a switch lag cannot show): at 0.75 the room never
+passes 0.754 of saturation (two stocks: 1.78 max, above 1 on 9180 of 10 080 minutes); the crew's
+`humidity_condensate` −3.09 / −3.10 kg and the plants' `condensate` +3.23 / +3.25 kg (predicted 1–15,
+✓); plant carbon +0.0000 %. At 0.40: room ≤ 0.404, crew condensate −1.87 kg, condensate +3.5 / +3.3
+kg, soil −2.4 % / −0.2 %, plant carbon +0.0000 %.
+
+## 8. The thermostat lags the room at the switches
+
+Both condensers hold a target set at the plant window's temperature. When the chamber's program
+switches 22 → 4 °C, the chamber cools inside a 90-minute window while the target stays at the
+window's start: the room holds 75 % of a saturation the air no longer has. 143 minutes a season pass
+saturation, up to 1.23×. The shared room's crew condenser runs every minute and the sealed build has the
+room's live temperature (the chamber's heat store), so a fourth case reads it: `Thermostat::LiveChamber`
+(the plants' `Condensation` law, through the plants' own chamber wrapper `chamber::reads_chamber`, on
+the fast step). The greenhouses have no heat store and refuse it. Predicted before the run: room max
+≤ 0.76 of real saturation (one minute's breath above the live target); the lag's water now goes the
+other way at a cooling switch (the minute condenser takes the room's excess to the crew's recovery
+before the plants' condenser sees it), so the plants' condenser catches less than the window case's
+44.5 kg, and the crew store ends nearer the two-stock run.
+
+**Measured (same day, same tool; the first three cases repeat to the digit):**
+
+| Case | Room ÷ real saturation, max | Minutes above 1 | Plants' condenser | Crew store vs two stocks | Grain peaks |
+|---|---|---|---|---|---|
+| window @ 0.75 | 1.234 | 143 | 44.5 kg | −40.5 kg | 22.440 / 22.447 |
+| **live @ 0.75** | **0.7601** | **0** | **39.9 kg** | **−36.5 kg** | 22.440 / 22.447 |
+| window @ 0.40 | 0.658 | 0 | 60.4 kg | −38.6 kg | 23.244 / 22.812 |
+| live @ 0.40 | 0.408 | 0 | 40.1 kg | −36.3 kg | 23.180 / 22.778 |
+
+Every prediction for the live case held, the ceiling only just: 0.7601 against "≤ 0.76" (one minute's
+breath above a 4 °C target is 0.6 % of saturation, so 0.756 + the target's own drift within the minute).
+The plants' condenser now catches the minute's residue and nothing else — 39.9 kg, the §2 F3a figure to
+the digit — so the switch leak is gone in both directions. Plant water, carbon and energy are the window
+case's within its own digits (battery +3.77e-4, the same transpiration cause). At 0.40 the live
+thermostat brings the room to its setting (0.408) where the window one reached 0.658 at the switches.
+
+**What the user decides (adoption):** the setting, 75 % or 40 %; and the thermostat for the sealed
+station — live (passes saturation never) or the window (143 minutes a season, at the switches). The
+greenhouses can only take the window: their weather has no finer clock than the plant step.

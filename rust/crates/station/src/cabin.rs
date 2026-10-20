@@ -64,14 +64,34 @@ fn cabin_stocks(scenario: &CabinScenario) -> Result<BTreeMap<String, Stock>, Sim
     Ok(stocks)
 }
 
+/// The ECLSS condenser on `cabin_h2o` into `condensate`: first order on the vapour above the
+/// cabin's 40 % target.
+pub(crate) fn eclss_condenser(
+    eclss: &EclssParams,
+    cabin_h2o: &str,
+    condensate: &str,
+) -> Box<dyn Flow> {
+    Box::new(Condenser::new(
+        CONDENSER.to_string(),
+        cabin_h2o.to_string(),
+        condensate.to_string(),
+        *eclss,
+        crate::scenario::STATION_CABIN_AIR_MOL,
+    ))
+}
+
 /// The five coupled cabin flows (`CrewRespiration` + crew `WaterBalance` + the three ECLSS
-/// control loops), over the cabin's own gas ids.
+/// control loops), over the cabin's own gas ids. The crew's breath goes to `crew_vapour`, held
+/// by `condenser` ([`eclss_condenser`] on the cabin's own vapour; in a one-store shared room,
+/// [`crate::room_vapour::room_condenser`] on the plants').
 pub(crate) fn build_cabin_flows(
     crew: &CrewParams,
     eclss: &EclssParams,
     cabin_co2: &str,
     cabin_o2: &str,
     fecal_waste: &str,
+    crew_vapour: &str,
+    condenser: Box<dyn Flow>,
 ) -> Vec<Box<dyn Flow>> {
     vec![
         Box::new(CrewRespiration::new(
@@ -85,7 +105,7 @@ pub(crate) fn build_cabin_flows(
         Box::new(WaterBalance::new(
             WATER_BALANCE.to_string(),
             WATER_STORE.to_string(),
-            domains::eclss::CABIN_H2O.to_string(), // the seam: crew humidity → the cabin
+            crew_vapour.to_string(), // the seam: crew humidity → the cabin
             URINE.to_string(),
             *crew,
         )),
@@ -98,13 +118,7 @@ pub(crate) fn build_cabin_flows(
                 crate::scenario::STATION_CABIN_AIR_MOL,
             ),
         ),
-        Box::new(Condenser::new(
-            CONDENSER.to_string(),
-            domains::eclss::CABIN_H2O.to_string(),
-            HUMIDITY_CONDENSATE.to_string(),
-            *eclss,
-            crate::scenario::STATION_CABIN_AIR_MOL,
-        )),
+        condenser,
         Box::new(O2Makeup::new(
             O2_MAKEUP.to_string(),
             O2_SUPPLY.to_string(),
@@ -123,7 +137,15 @@ pub fn build_cabin(
 ) -> Result<(State, Registry), SimError> {
     let stocks = cabin_stocks(scenario)?;
     let state = State::new(0, stocks.clone(), 0, BTreeMap::new())?;
-    let flows = build_cabin_flows(crew, eclss, CABIN_CO2, CABIN_O2, FECAL_WASTE);
+    let flows = build_cabin_flows(
+        crew,
+        eclss,
+        CABIN_CO2,
+        CABIN_O2,
+        FECAL_WASTE,
+        domains::eclss::CABIN_H2O,
+        eclss_condenser(eclss, domains::eclss::CABIN_H2O, HUMIDITY_CONDENSATE),
+    );
     let registry = Registry::flows_only(flows, &stocks)?;
     Ok((state, registry))
 }
