@@ -5,7 +5,15 @@
 //! cargo run --release -q -p station --example shared_room_humidity            # one season + 7-day runs
 //! cargo run --release -q -p station --example shared_room_humidity -- --full  # the 1220-day sealed run
 //! cargo run --release -q -p station --example shared_room_humidity -- --greenhouses  # 7-day runs only
+//! cargo run --release -q -p station --example shared_room_humidity -- --save <dir>  # adoption's bytes
 //! ```
+//!
+//! `--save <dir>` runs the three goldens' own builds (`station::goldens`), each first as the
+//! reference (two stocks, checked against the committed golden's bytes, so a drift in this tool's
+//! copy of a build cannot pass) and then at the room the user chose on 2026-10-20 — 75 %, the
+//! sealed station's thermostat live, the greenhouses' the plant window's (they have no chamber) —
+//! and writes that final state to `<dir>/<golden file>`, so the regenerated goldens can be `cmp`'d
+//! against what was measured here.
 //!
 //! Each shared-room build (the sealed station, the greenhouse, the harvest greenhouse) at
 //! [`RoomVapour::TwoStocks`] (the reference), `OneStock { 0.75 }` and `OneStock { 0.40 }`. It reads,
@@ -13,7 +21,7 @@
 //! against saturation at the room's REAL temperature: the chamber's live heat-store temperature on
 //! every minute (sealed), the weather's within-day air curve read over each minute (the
 //! greenhouses). It writes nothing
-//! and takes no decision.
+//! but `--save`'s files and takes no decision.
 
 use domains::biosphere::science::saturation_vapour_kg;
 use domains::biosphere::stocks::{
@@ -30,13 +38,15 @@ use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
 use simcore::state::State;
 use station::driver::{DayOrder, OwnedResetHook, Side, TwoRate};
-use station::greenhouse::{build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver};
-use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver};
+use station::greenhouse::{
+    build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver, run_greenhouse,
+};
+use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver, run_harvest};
 use station::params as sp;
 use station::room_vapour::{RoomVapour, Thermostat, ROOM_CONDENSER};
 use station::scenario::{greenhouse_scenario, harvest_scenario, sealed_station_scenario};
 use station::sealed::{
-    build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
+    build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
 };
 use station::water::{BRINE, RECOVERED_WATER};
 
@@ -441,7 +451,133 @@ fn report(build: &str, readings: &[(&str, Reading)]) {
     }
 }
 
+fn snapshot(state: &State) -> String {
+    simcore::snapshot::from_engine(state).to_json()
+}
+
+/// `station::goldens::greenhouse`, at `room`.
+fn greenhouse_golden(room: RoomVapour) -> String {
+    let (crew, eclss) = (params::crew(), params::eclss());
+    let sc = station::scenario::GreenhouseScenario {
+        room_vapour: room,
+        ..greenhouse_scenario()
+    };
+    let (state, bio, cabin) =
+        build_greenhouse(&crew, &eclss, &sc, true, FECAL_WASTE).expect("build");
+    let bio_r = greenhouse_bio_resolver(&sc).expect("bio resolver");
+    let cabin_r = greenhouse_cabin_resolver(&crew, &sc).expect("cabin resolver");
+    let (states, rationed, events) = run_greenhouse(
+        &EulerIntegrator::new(bio),
+        &EulerIntegrator::new(cabin),
+        state,
+        &bio_r,
+        &cabin_r,
+        &sc,
+    )
+    .expect("run greenhouse");
+    assert!(
+        rationed == 0 && events.is_empty(),
+        "greenhouse: rationed or events"
+    );
+    snapshot(states.last().expect("a day"))
+}
+
+/// `station::goldens::harvest`, at `room`.
+fn harvest_golden(room: RoomVapour) -> String {
+    let (crew, eclss) = (params::crew(), params::eclss());
+    let mut sc = harvest_scenario();
+    sc.greenhouse.room_vapour = room;
+    let (state, bio, cabin) =
+        build_harvest(&crew, &eclss, &sp::harvest(), &sc, true, true).expect("build");
+    let bio_r = harvest_bio_resolver(&sc).expect("bio resolver");
+    let cabin_r = harvest_cabin_resolver(&crew, &sc).expect("cabin resolver");
+    let (states, rationed, events) = run_harvest(
+        &EulerIntegrator::new(bio),
+        &EulerIntegrator::new(cabin),
+        state,
+        &bio_r,
+        &cabin_r,
+        &sc,
+    )
+    .expect("run harvest");
+    assert!(
+        rationed == 0 && events.is_empty(),
+        "harvest: rationed or events"
+    );
+    snapshot(states.last().expect("a day"))
+}
+
+/// `station::goldens::sealed_station`, at `room`.
+fn sealed_golden(room: RoomVapour) -> String {
+    let sc = station::scenario::SealedStationScenario {
+        room_vapour: room,
+        ..sealed_station_scenario()
+    };
+    let (state, bio, fast) = build_sealed_station(
+        &params::charge(),
+        &params::thermal(),
+        &params::crew(),
+        &params::eclss(),
+        &sp::water_recovery(),
+        &sp::lamp(),
+        &sp::harvest(),
+        &sc,
+        false,
+        false,
+    )
+    .expect("build sealed");
+    let bio_r = sealed_bio_resolver(&sp::lamp(), &sc).expect("bio resolver");
+    let fast_r = sealed_fast_resolver(&params::charge(), &params::crew(), &sc).expect("fast");
+    let (states, rationed, events) = run_sealed(
+        &EulerIntegrator::new(bio),
+        &EulerIntegrator::new(fast),
+        state,
+        &bio_r,
+        &fast_r,
+        &sc,
+    )
+    .expect("run sealed");
+    assert!(
+        rationed == 0 && events.is_empty(),
+        "sealed: rationed or events"
+    );
+    snapshot(states.last().expect("a day"))
+}
+
+/// `--save <dir>`: each golden at two stocks (checked against the committed bytes), then at the
+/// chosen room, saved.
+fn save(dir: &str) {
+    let golden_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/golden");
+    let window = one(0.75, Thermostat::Window);
+    let live = one(0.75, Thermostat::LiveChamber);
+    let runs: [(&str, fn(RoomVapour) -> String, RoomVapour); 3] = [
+        ("greenhouse_state.json", greenhouse_golden, window),
+        ("harvest_state.json", harvest_golden, window),
+        ("sealed_station_state.json", sealed_golden, live),
+    ];
+    for (name, run, chosen) in runs {
+        let committed = std::fs::read_to_string(golden_dir.join(name)).expect("golden file");
+        let reproduces = run(RoomVapour::TwoStocks) == committed;
+        assert!(
+            reproduces,
+            "{name}: the two-stock side does not reproduce the golden"
+        );
+        let adopted = run(chosen);
+        std::fs::write(std::path::Path::new(dir).join(name), &adopted).expect("save");
+        println!(
+            "== {name}: two stocks reproduce the golden: {reproduces}; {chosen:?} saved, \
+             differs from the golden: {}",
+            adopted != committed
+        );
+    }
+}
+
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--save") {
+        save(args.get(i + 1).expect("--save <dir>"));
+        return;
+    }
     let full = std::env::args().any(|a| a == "--full");
     let greenhouses_only = std::env::args().any(|a| a == "--greenhouses");
     let sc = sealed_station_scenario();
