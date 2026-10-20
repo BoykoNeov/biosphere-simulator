@@ -347,7 +347,7 @@ mod tests {
         let crew = domains::params::crew();
         let eclss = domains::params::eclss();
         let (state, registry) = build_cabin(&crew, &eclss, &CABIN_GAS_SCENARIO).unwrap();
-        let resolver = cabin_resolver(&CABIN_GAS_SCENARIO).unwrap();
+        let resolver = cabin_resolver(&crew, &CABIN_GAS_SCENARIO).unwrap();
         SimSession::single_rate(
             EulerIntegrator::new(registry),
             state,

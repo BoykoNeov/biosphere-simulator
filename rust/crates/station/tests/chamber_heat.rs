@@ -104,7 +104,7 @@ fn run_with(health: f64, books: bool) -> (Vec<State>, u64) {
     );
     let fast_reg = Registry::new(flows, &state.stocks, aux).unwrap();
     let fast_resolver = with_forcing(
-        sealed_fast_resolver(&charge, &scenario).unwrap(),
+        sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).unwrap(),
         COOLER_HEALTH,
         window_override(constant(1.0).unwrap(), 0, u64::MAX, health),
     )

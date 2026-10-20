@@ -407,7 +407,7 @@ fn build_sealed_perturbed(
         &charge, &thermal, &crew, &eclss, &recovery, &lamp, &harvest, &scenario, false, false,
     )?;
     let bio_res = station::sealed::sealed_bio_resolver(&lamp, &scenario)?;
-    let fast_res = station::sealed::sealed_fast_resolver(&charge, &scenario)?;
+    let fast_res = station::sealed::sealed_fast_resolver(&charge, &crew, &scenario)?;
 
     let (state, bio_reg, fast_reg, bio_res, fast_res) = match kind {
         "carbon_leak" => {

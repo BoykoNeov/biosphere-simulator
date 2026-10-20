@@ -188,8 +188,11 @@ pub fn harvest_bio_resolver(scenario: &HarvestScenario) -> Result<SourceResolver
 }
 
 /// The cabin forcing resolver — the greenhouse's two constant crew intake rates.
-pub fn harvest_cabin_resolver(scenario: &HarvestScenario) -> Result<SourceResolver, SimError> {
-    greenhouse_cabin_resolver(&scenario.greenhouse)
+pub fn harvest_cabin_resolver(
+    crew: &CrewParams,
+    scenario: &HarvestScenario,
+) -> Result<SourceResolver, SimError> {
+    greenhouse_cabin_resolver(crew, &scenario.greenhouse)
 }
 
 /// The two-rate driver: one day per step (biosphere-slow / cabin-fast).

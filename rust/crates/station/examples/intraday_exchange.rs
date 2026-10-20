@@ -415,7 +415,7 @@ fn sealed_measure(sc: &SealedStationScenario, with_harvest: bool, order: DayOrde
     let (s0, bio, fast) =
         station::latent_heat::without_latent_heat(s0, bio, fast).expect("books off");
     let bio_res = sealed_bio_resolver(&lamp, sc).expect("bio resolver");
-    let fast_res = sealed_fast_resolver(&charge, sc).expect("fast resolver");
+    let fast_res = sealed_fast_resolver(&charge, &crew, sc).expect("fast resolver");
     let reset = sealed_reset_hook(sc);
     let (slow, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let two = TwoRate {
@@ -467,7 +467,7 @@ fn control_full_sealed(interleaved: &State) {
         &EulerIntegrator::new(fast),
         s0,
         &sealed_bio_resolver(&lamp, &sc).expect("bio"),
-        &sealed_fast_resolver(&charge, &sc).expect("fast"),
+        &sealed_fast_resolver(&charge, &crew, &sc).expect("fast"),
         &sc,
     )
     .expect("reference run");
@@ -545,7 +545,7 @@ fn main() {
     let eclss = params::eclss();
     let exhale_per_day = {
         let sc = sealed_station_scenario();
-        crew.respired_carbon_fraction * sc.cabin.food_intake_rate * 86400.0
+        crew.respired_carbon_fraction * sc.cabin.food_intake_rate(&crew) * 86400.0
     };
     // Sections by name (`roster`, `sealed`, `similarity`, `crew`); none given runs all.
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -556,7 +556,7 @@ fn main() {
         {
             let sc = greenhouse_scenario();
             let bio_res = greenhouse_bio_resolver(&sc).expect("bio");
-            let cabin_res = greenhouse_cabin_resolver(&sc).expect("cabin");
+            let cabin_res = greenhouse_cabin_resolver(&crew, &sc).expect("cabin");
             let build = || {
                 let (s, b, c) = build_greenhouse_at(
                     &crew,
@@ -609,7 +609,7 @@ fn main() {
             let sc = harvest_scenario();
             let gh = sc.greenhouse;
             let bio_res = harvest_bio_resolver(&sc).expect("bio");
-            let cabin_res = harvest_cabin_resolver(&sc).expect("cabin");
+            let cabin_res = harvest_cabin_resolver(&crew, &sc).expect("cabin");
             let build = || {
                 let (s, b, c) = build_harvest_at(
                     &crew,

@@ -319,7 +319,7 @@ fn main() {
     let averaged = std::env::args().any(|a| a == "--averaged");
     let chamber = station::params::chamber();
     let thermal = domains::params::thermal();
-    let fast_r = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
+    let fast_r = sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).expect("fast resolver");
     let (state, fast_r) = if averaged {
         (
             with_averaged_chamber_start(state, &scenario).expect("averaged start"),

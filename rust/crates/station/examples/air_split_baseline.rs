@@ -103,7 +103,7 @@ fn main() {
     let (state, bio, fast) = build();
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("sealed_bio_resolver");
-    let fast_r = sealed_fast_resolver(&charge, &scenario).expect("sealed_fast_resolver");
+    let fast_r = sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).expect("sealed_fast_resolver");
     let reset = sealed_reset_hook(&scenario);
     let two = TwoRate {
         slow: &bio,

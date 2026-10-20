@@ -41,7 +41,7 @@ fn run(scn: &SealedStationScenario, blackout: bool, shed: bool) -> (Vec<State>, 
     )
     .unwrap();
     let bio = sealed_bio_resolver(&station::params::lamp(), scn).unwrap();
-    let mut fast = sealed_fast_resolver(&domains::params::charge(), scn).unwrap();
+    let mut fast = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), scn).unwrap();
     if blackout {
         fast = with_brownout(fast, 2 * STEPS, 5 * STEPS, 0.0).unwrap();
     }

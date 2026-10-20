@@ -59,7 +59,7 @@ fn the_heat_drawn_over_a_window_is_lambda_times_its_water() {
     let (state, bio, fast) = build();
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
-    let fast_r = sealed_fast_resolver(&domains::params::charge(), &scenario).expect("fast");
+    let fast_r = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scenario).expect("fast");
     let reset = sealed_reset_hook(&scenario);
     let two = TwoRate {
         slow: &bio,
@@ -186,7 +186,7 @@ fn a_save_without_the_rate_key_resumes_at_a_group_boundary() {
     state.aux.remove(EVAPORATED_TOTAL_AUX);
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
-    let fast_r = sealed_fast_resolver(&domains::params::charge(), &scenario).expect("fast");
+    let fast_r = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scenario).expect("fast");
     let reset = sealed_reset_hook(&scenario);
     let two = TwoRate {
         slow: &bio,
@@ -231,7 +231,7 @@ fn the_slow_first_day_refuses_the_books() {
         .expect("build")
     };
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
-    let fast_r = sealed_fast_resolver(&domains::params::charge(), &scenario).expect("fast");
+    let fast_r = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scenario).expect("fast");
     for books in [true, false] {
         let (state, bio, fast) = build_plant_step();
         let (_, bio, fast) = if books {

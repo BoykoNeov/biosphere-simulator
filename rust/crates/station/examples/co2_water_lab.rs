@@ -93,7 +93,7 @@ fn run(eclss: &EclssParams, start: Option<f64>) -> Run {
     )
     .expect("build_sealed_station");
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
-    let fast_r = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
+    let fast_r = sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).expect("fast resolver");
     let reset = sealed_reset_hook(&scenario);
     let (bio, fast) = (EulerIntegrator::new(bio_reg), EulerIntegrator::new(fast_reg));
     let two = TwoRate {

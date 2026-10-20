@@ -38,10 +38,21 @@ const DAYS: usize = 90;
 /// fan's 0.1 / 0.4 ratio is 0.990 (it was ~0.93), past this file's 0.97. Loosening that line
 /// would weaken the pin; its subject is the CO₂ supply to a hungry crop, so the file keeps the
 /// level that made it hungry, through the lab's switch ([`eclss`]) and the old start.
+///
+/// ⚠ **And with the station's PRE-2026-10-20 crew CO₂ load**, for the same reason. Since four BVAD
+/// crew members were adopted (`docs/plans/post-roadmap-crew-size.md` §11–12) the crew breathes
+/// out 3.3× less CO₂, the crop is no longer hungry, and the fan's 0.1 / 0.4 ratio was measured at
+/// 0.976 — past this file's 0.97 again. So the file keeps the old load ([`OLD_FOOD_INTAKE_RATE`]),
+/// written as the crew count that eats it under the loaded `f_resp` (about 13.3): the scenario
+/// carries a crew count, not a rate. Its water follows the count (13.3 crew members' water, not
+/// the old 0.99's), which the trial of §11 did not run; the ten tests were re-run under it (§12).
 fn scenario() -> SealedStationScenario {
     let mut s = sealed_station_scenario();
     // The first-order scrubber's own fixed point, where the crop-sharing cabins started before.
     s.bio.chamber_co2_mol0 = 3.796;
+    s.cabin.crew_count = OLD_FOOD_INTAKE_RATE * params::crew().respired_carbon_fraction
+        * station::bvad::SECONDS_PER_DAY
+        / station::bvad::CO2_MOL;
     SealedStationScenario {
         cold: ColdProgram {
             par: s.full_lamp_par(station_params::lamp().photon_efficacy),
@@ -51,6 +62,10 @@ fn scenario() -> SealedStationScenario {
         ..s
     }
 }
+
+/// The station crew's food-carbon intake before 2026-10-20 (mol C/s): 13.3 BVAD crew members'
+/// CO₂ (see [`scenario`]).
+const OLD_FOOD_INTAKE_RATE: f64 = 4.0e-3;
 
 /// The ECLSS params with the pre-2026-10-19 first-order scrubber (see [`scenario`]).
 fn eclss() -> domains::eclss::EclssParams {
@@ -101,7 +116,7 @@ fn run_all(
     let (state, bio, fast) = built;
     let lamp = station_params::lamp();
     let bio_r = sealed_bio_resolver(&lamp, scenario).expect("bio resolver");
-    let fast_r = sealed_fast_resolver(&params::charge(), scenario).expect("fast resolver");
+    let fast_r = sealed_fast_resolver(&params::charge(), &domains::params::crew(), scenario).expect("fast resolver");
     let reset = sealed_reset_hook(scenario);
     let (states, rationed, events) = run_master_day(
         &EulerIntegrator::new(bio),

@@ -47,7 +47,7 @@ fn main() {
         &EulerIntegrator::new(fast_reg),
         state,
         &sealed_bio_resolver(&lamp, &scenario).unwrap(),
-        &sealed_fast_resolver(&charge, &scenario).unwrap(),
+        &sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).unwrap(),
         &scenario,
     )
     .unwrap();

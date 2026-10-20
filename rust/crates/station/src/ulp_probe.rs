@@ -95,7 +95,7 @@ pub fn greenhouse_snapshot(nudge: Nudge) -> String {
     let bio_resolver = greenhouse_bio_resolver(&scenario).expect("bio_resolver");
     let bio_resolver =
         nudge_forcing(bio_resolver, domains::biosphere::stocks::PAR_VAR, nudge).expect("nudge par");
-    let cabin_resolver = greenhouse_cabin_resolver(&scenario).expect("cabin_resolver");
+    let cabin_resolver = greenhouse_cabin_resolver(&crew, &scenario).expect("cabin_resolver");
     let (states, _, _) = run_greenhouse(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(cabin_reg),

@@ -72,7 +72,7 @@ fn run_at(target: Option<f64>, above_target: bool) -> Result<Price, String> {
     );
     let mut scenario = sealed_station_scenario();
     let air = scenario.bio.chamber_air_capacity_mol;
-    let production = crew.respired_carbon_fraction * scenario.cabin.food_intake_rate;
+    let production = crew.respired_carbon_fraction * scenario.cabin.food_intake_rate(&crew);
     // The pre-adoption start: the first-order form's own fixed point.
     scenario.bio.chamber_co2_mol0 = 3.796;
     if let Some(x) = target {
@@ -100,7 +100,7 @@ fn run_at(target: Option<f64>, above_target: bool) -> Result<Price, String> {
     )
     .map_err(|e| format!("{e:?}"))?;
     let bio = sealed_bio_resolver(&lamp, &scenario).map_err(|e| format!("{e:?}"))?;
-    let fast = sealed_fast_resolver(&charge, &scenario).map_err(|e| format!("{e:?}"))?;
+    let fast = sealed_fast_resolver(&charge, &crew, &scenario).map_err(|e| format!("{e:?}"))?;
     let removed0 = state.stocks[domains::eclss::CO2_REMOVED].amount;
     let (states, rationed, events) = run_sealed(
         &EulerIntegrator::new(bio_reg),

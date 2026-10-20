@@ -2,7 +2,7 @@
 
 **Opened 2026-10-20** on the user's *"yes"* to taking the crew-size fix, the item they chose on
 2026-10-19 as the one after the cabin CO₂ level (`post-roadmap-co2-level.md` §9, *"1300, option 1"*).
-**This doc is the plan and its predictions. Nothing is built and nothing frozen has moved.**
+**This doc is the plan, its predictions, and (§12) the adoption of four crew members on 2026-10-20.**
 
 ## 1. What today is, measured
 
@@ -319,3 +319,47 @@ Every other slow test passed, the 10-minute soil-evaporation and the chamber-wal
 
 **So adoption costs:** five goldens and their bands (expected), the bridge's two `cabin_gas`
 comparisons (they follow the golden), and one decision on the fan test.
+
+## 12. ADOPTED (2026-10-20) — four BVAD crew members, a station unfreeze
+
+The user's words: *"adopt the four crew, about the test - do as you recommend"*. So the fan test keeps the old
+crew CO₂ load (§11's proposal), never a looser 0.97. Advisor-reviewed before code: two commits, so that the
+expression the lab measured is the one adopted. Both arithmetic orders in the tree (the lab's
+`n × 1.085 × 1000 ÷ 44.009` and the gate's `n × (1.085 × 1000 ÷ 44.009)`) give the same bits at n = 4, since
+multiplying by 4 is exact. The split settled that question rather than relied on the argument.
+
+1. **The refactor commit (no byte moved).** The BVAD values moved from `science_gates.rs`'s test-only module
+   to `station::bvad`, with `food_intake_rate(n, f_resp)` and `water_intake_rate(n)` defined once. The gate
+   and the lab read them; the lab gained `CREW_SAVE=<dir>`. The lab's output was **identical** to
+   `crew-size-lab-n4.txt`, all five frozen sides reproduced their goldens, clippy was clean and the
+   science gates passed (checked on that commit's own tree).
+2. **The saved states.** That run wrote the five switched final states in the goldens' own bytes.
+3. **The unfreeze.** `CabinScenario` carries `crew_count` (`STATION_CREW_COUNT` = 4) in place of its two
+   rates; `CabinScenario::food_intake_rate(&CrewParams)` and `water_intake_rate()` compute them; the five crew
+   resolvers (`cabin`, `water_recovery`, `greenhouse_cabin`, `harvest_cabin`, `sealed_fast`) take the loaded
+   `CrewParams`, which every caller passes (the one it built with, or `domains::params::crew()` where it held
+   none). `CABIN_GAS_SCENARIO.cabin_co2_0` is the target, pinned in `the_cabin_starts_at_its_targets`;
+   `GREENHOUSE_CABIN_SCENARIO.water_store0` is 200. The science gate's validation cabin names `crew_count: 4`.
+
+**Measured:**
+* `regen_goldens -- --write` rewrote exactly the five (`cabin_gas`, `water_recovery`, `greenhouse`, `harvest`,
+  `sealed_station`). **Each is `cmp`-identical to its saved lab state.** The other 15 are identical.
+* The manifest moved exactly as predicted: the 5 `golden_sha256` rows and nothing else.
+* `git diff rust/crates/simcore/` is empty.
+* `cargo test --workspace --no-fail-fast`: 1456 passed, 0 failed, the bridge's two `cabin_gas` comparisons
+  among them.
+* **`air_split.rs`: all ten pass** with the crew count that eats the old 4.0e-3 under the loaded `f_resp`
+  (`OLD_FOOD_INTAKE_RATE × f_resp × 86 400 ÷ BVAD's CO₂ mol`, about 13.3). ⚠ This is not quite §11's trial.
+  The trial kept four crew members' water with the old food rate; the adopted form has one count for both,
+  so this file's crew drinks 13.3 crew members' water. It was re-run under that, not assumed. The pin
+  prints no ratio, so the figure is not recorded, only that it is under 0.97.
+* `cargo clippy --all-targets --workspace -- -D warnings`: clean. `cargo test --workspace --no-fail-fast --
+  --ignored` (the slow tests, which no CI runs): 12 passed, 0 failed.
+
+**Left as they were:**
+* The three other sizings of §2.
+* The pre-adoption lab tools (`co2_target_lab`, `co2_level_price`, `co2_water_lab`). They were only re-typed
+  to compile, and their frozen side is now the four-crew station.
+* `crew_size_lab.rs` is flipped. Its frozen side is now four crew members and its default switch one (`CREW_N`).
+  The old 13.3-CO₂ / 0.99-water crew cannot be written as a crew count, so what the tool measured before
+  adoption is the tool at the refactor commit.

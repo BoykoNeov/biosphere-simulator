@@ -123,7 +123,7 @@ fn the_sunlit_greenhouse_keeps_the_weathers_net_radiation() {
 fn a_lighting_failure_darkens_the_crops_net_radiation_too() {
     let scn = sealed_station_scenario();
     let bio = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
-    let fast = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
+    let fast = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap();
     let (bio, _) = with_lighting_failure(bio, fast, 2 * STEPS, 5 * STEPS).unwrap();
     assert_eq!(sealed_rn(&bio, midday(3)), 0.0, "the failed lamp still radiates");
     // Day 6 is in the cold period: the lamp comes back DIMMED (slice 3b).

@@ -48,7 +48,7 @@ fn single_rate_session_matches_run_station_bit_exact() {
 
     // Reference: run-to-completion.
     let (ref_state, ref_reg) = build_cabin(&crew, &eclss, &scenario).unwrap();
-    let ref_resolver = cabin_resolver(&scenario).unwrap();
+    let ref_resolver = cabin_resolver(&crew, &scenario).unwrap();
     let ref_integrator = EulerIntegrator::new(ref_reg);
     let mut noop = |_: &State| {};
     let (ref_final, ref_rationed, ref_events) = run_station(
@@ -63,7 +63,7 @@ fn single_rate_session_matches_run_station_bit_exact() {
 
     // Session: caller-driven, same build, stepped the same count.
     let (sess_state, sess_reg) = build_cabin(&crew, &eclss, &scenario).unwrap();
-    let sess_resolver = cabin_resolver(&scenario).unwrap();
+    let sess_resolver = cabin_resolver(&crew, &scenario).unwrap();
     let mut session = SimSession::single_rate(
         EulerIntegrator::new(sess_reg),
         sess_state,
@@ -102,7 +102,7 @@ fn two_rate_greenhouse_session_matches_run_greenhouse_bit_exact() {
         &EulerIntegrator::new(ref_cabin),
         ref_state,
         &greenhouse_bio_resolver(&scenario).unwrap(),
-        &greenhouse_cabin_resolver(&scenario).unwrap(),
+        &greenhouse_cabin_resolver(&crew, &scenario).unwrap(),
         &scenario,
     )
     .unwrap();
@@ -116,7 +116,7 @@ fn two_rate_greenhouse_session_matches_run_greenhouse_bit_exact() {
         EulerIntegrator::new(sess_cabin),
         sess_state,
         greenhouse_bio_resolver(&scenario).unwrap(),
-        greenhouse_cabin_resolver(&scenario).unwrap(),
+        greenhouse_cabin_resolver(&crew, &scenario).unwrap(),
         scenario.steps_per_day,
         scenario.bio_steps_per_day,
         scenario.bio_dt,
@@ -182,7 +182,7 @@ fn parity_sealed(days: u64) {
         &EulerIntegrator::new(ref_fast),
         ref_state,
         &sealed_bio_resolver(&lamp, &scenario).unwrap(),
-        &sealed_fast_resolver(&charge, &scenario).unwrap(),
+        &sealed_fast_resolver(&charge, &crew, &scenario).unwrap(),
         days as usize,
         scenario.steps_per_day,
         scenario.bio_steps_per_day,
@@ -203,7 +203,7 @@ fn parity_sealed(days: u64) {
         EulerIntegrator::new(sess_fast),
         sess_state,
         sealed_bio_resolver(&lamp, &scenario).unwrap(),
-        sealed_fast_resolver(&charge, &scenario).unwrap(),
+        sealed_fast_resolver(&charge, &crew, &scenario).unwrap(),
         scenario.steps_per_day,
         scenario.bio_steps_per_day,
         scenario.bio_dt,

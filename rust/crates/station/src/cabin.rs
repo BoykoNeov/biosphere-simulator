@@ -130,20 +130,23 @@ pub fn build_cabin(
 
 /// The merged cabin forcing: the two constant crew intake rates (O₂ intake is derived via
 /// RQ = 1 inside `CrewRespiration`, so it is not a forcing var).
-pub fn cabin_resolver(scenario: &CabinScenario) -> Result<SourceResolver, SimError> {
+pub fn cabin_resolver(
+    crew: &CrewParams,
+    scenario: &CabinScenario,
+) -> Result<SourceResolver, SimError> {
     let mut forcings = std::collections::HashMap::new();
     forcings.insert(
         FOOD_INTAKE_VAR.to_string(),
-        constant(scenario.food_intake_rate)?,
+        constant(scenario.food_intake_rate(crew))?,
     );
     forcings.insert(
         WATER_INTAKE_VAR.to_string(),
-        constant(scenario.water_intake_rate)?,
+        constant(scenario.water_intake_rate())?,
     );
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }
 
 /// The default cabin-gas resolver (the module's canonical scenario).
 pub fn default_cabin_resolver() -> Result<SourceResolver, SimError> {
-    cabin_resolver(&CABIN_GAS_SCENARIO)
+    cabin_resolver(&domains::params::crew(), &CABIN_GAS_SCENARIO)
 }

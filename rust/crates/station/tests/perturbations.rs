@@ -331,7 +331,7 @@ fn sealed_baseline() -> &'static State {
         let scn = matter_scenario();
         let (state, bio_reg, fast_reg) = sealed_build();
         let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
-        let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
+        let fast_res = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap();
         let (states, rationed, events) = sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
         assert_eq!(rationed, 0);
         assert!(events.is_empty());
@@ -376,7 +376,7 @@ fn assert_returns_to_setpoint(perturbed: &State, baseline: &State, pool: &str, k
 fn run_carbon_leak(pool: &str) -> State {
     let scn = matter_scenario();
     let (state, bio_reg, fast_reg) = sealed_build();
-    let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
+    let fast_res = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap();
     let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
     let (state, bio_reg, fast_reg, fast_res) = with_station_leak(
         &state,
@@ -489,7 +489,7 @@ fn crew_spike_raises_regulator_effort_and_drains_food() {
     let scn = matter_scenario();
     let (state, bio_reg, fast_reg) = sealed_build();
     let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
-    let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
+    let fast_res = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap();
     let fast_res = with_crew_load_spike(fast_res, m_start(), m_end(), 2.0).unwrap();
     let (states, rationed, events) = sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
     assert_eq!(rationed, 0);
@@ -514,7 +514,7 @@ fn lighting_failure_stalls_growth_and_spares_battery() {
     let scn = matter_scenario();
     let (state, bio_reg, fast_reg) = sealed_build();
     let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
-    let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
+    let fast_res = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap();
     let (bio_res, fast_res) = with_lighting_failure(bio_res, fast_res, m_start(), m_end()).unwrap();
     let (states, rationed, events) = sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
     assert_eq!(rationed, 0);

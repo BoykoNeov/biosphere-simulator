@@ -578,16 +578,17 @@ pub fn sealed_bio_resolver(
 /// twins (slice 4, [`crate::sowing`]); the fast registry's sowing clock selects between them.
 pub fn sealed_fast_resolver(
     charge: &ChargeParams,
+    crew: &CrewParams,
     scenario: &SealedStationScenario,
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = std::collections::HashMap::new();
     forcings.insert(
         FOOD_INTAKE_VAR.to_string(),
-        constant(scenario.cabin.food_intake_rate)?,
+        constant(scenario.cabin.food_intake_rate(crew))?,
     );
     forcings.insert(
         WATER_INTAKE_VAR.to_string(),
-        constant(scenario.cabin.water_intake_rate)?,
+        constant(scenario.cabin.water_intake_rate())?,
     );
     forcings.insert(
         SOLAR_POWER_VAR.to_string(),

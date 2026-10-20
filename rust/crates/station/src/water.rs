@@ -131,11 +131,14 @@ pub fn build_water_recovery(
 }
 
 /// The forcing — the two constant crew intake rates (reused from the cabin).
-pub fn water_recovery_resolver(scenario: &CabinScenario) -> Result<SourceResolver, SimError> {
-    cabin_resolver(scenario)
+pub fn water_recovery_resolver(
+    crew: &CrewParams,
+    scenario: &CabinScenario,
+) -> Result<SourceResolver, SimError> {
+    cabin_resolver(crew, scenario)
 }
 
 /// The default water-recovery resolver (the module's canonical scenario).
 pub fn default_water_recovery_resolver() -> Result<SourceResolver, SimError> {
-    water_recovery_resolver(&WATER_RECOVERY_SCENARIO)
+    water_recovery_resolver(&domains::params::crew(), &WATER_RECOVERY_SCENARIO)
 }

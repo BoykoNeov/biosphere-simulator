@@ -607,7 +607,7 @@ fn cabin_gas() -> Measured {
     let scenario = CABIN_GAS_SCENARIO;
     let (state, registry) =
         build_cabin(&params::crew(), &params::eclss(), &scenario).expect("build_cabin");
-    let resolver = cabin_resolver(&scenario).expect("cabin_resolver");
+    let resolver = cabin_resolver(&domains::params::crew(), &scenario).expect("cabin_resolver");
     single(
         "cabin_gas",
         &EulerIntegrator::new(registry),
@@ -628,7 +628,7 @@ fn water_recovery() -> Measured {
         &scenario,
     )
     .expect("build_water_recovery");
-    let resolver = water_recovery_resolver(&scenario).expect("water_recovery_resolver");
+    let resolver = water_recovery_resolver(&domains::params::crew(), &scenario).expect("water_recovery_resolver");
     single(
         "water_recovery",
         &EulerIntegrator::new(registry),
@@ -682,7 +682,7 @@ fn greenhouse() -> Measured {
     .expect("build_greenhouse");
     let (bio, cabin) = (EulerIntegrator::new(bio), EulerIntegrator::new(cabin));
     let bio_r = greenhouse_bio_resolver(&scenario).expect("bio_resolver");
-    let cabin_r = greenhouse_cabin_resolver(&scenario).expect("cabin_resolver");
+    let cabin_r = greenhouse_cabin_resolver(&domains::params::crew(), &scenario).expect("cabin_resolver");
     let two = TwoRate {
         slow: &bio,
         fast: &cabin,
@@ -743,7 +743,7 @@ fn harvest() -> Measured {
     .expect("build_harvest");
     let (bio, cabin) = (EulerIntegrator::new(bio), EulerIntegrator::new(cabin));
     let bio_r = harvest_bio_resolver(&scenario).expect("bio_resolver");
-    let cabin_r = harvest_cabin_resolver(&scenario).expect("cabin_resolver");
+    let cabin_r = harvest_cabin_resolver(&domains::params::crew(), &scenario).expect("cabin_resolver");
     let gh = &scenario.greenhouse;
     let two = TwoRate {
         slow: &bio,
@@ -778,7 +778,7 @@ fn sealed_station() -> Measured {
     .expect("build_sealed_station");
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, &scenario).expect("sealed_bio_resolver");
-    let fast_r = sealed_fast_resolver(&charge, &scenario).expect("sealed_fast_resolver");
+    let fast_r = sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).expect("sealed_fast_resolver");
     let reset = sealed_reset_hook(&scenario);
     let two = TwoRate {
         slow: &bio,

@@ -67,7 +67,7 @@ fn run(scn: &SealedStationScenario, warm: bool) -> Result<Vec<State>, simcore::e
         false,
     )?;
     let bio = sealed_bio_resolver(&station::params::lamp(), scn)?;
-    let fast = sealed_fast_resolver(&domains::params::charge(), scn)?;
+    let fast = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), scn)?;
     let (states, _rationed, _events) = run_sealed(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(fast_reg),

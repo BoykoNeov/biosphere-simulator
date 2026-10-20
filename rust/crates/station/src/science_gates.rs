@@ -88,13 +88,16 @@ mod bvad {
     /// `CABIN_GAS_SCENARIO` would invite exactly that confusion.
     ///
     /// The rates are [`crate::bvad::food_intake_rate`]'s and
-    /// [`crate::bvad::water_intake_rate`]'s: carbon calibrated to BVAD's measured CO₂ load.
-    pub fn cabin_scenario(respired_carbon_fraction: f64) -> CabinScenario {
+    /// [`crate::bvad::water_intake_rate`]'s, through the scenario's crew count: carbon
+    /// calibrated to BVAD's measured CO₂ load. ⚠ Since 2026-10-20 the station's own crew is
+    /// also four BVAD crew members, so this cabin differs from `CABIN_GAS_SCENARIO` only in its
+    /// stores; it names its count rather than inherit it, because its subject is BVAD, not
+    /// the station's choice of crew.
+    pub fn cabin_scenario() -> CabinScenario {
         CabinScenario {
             food_store0: 2000.0,
             water_store0: 60.0,
-            food_intake_rate: food_intake_rate(N_CREW, respired_carbon_fraction),
-            water_intake_rate: water_intake_rate(N_CREW),
+            crew_count: N_CREW,
             ..crate::scenario::CABIN_GAS_SCENARIO
         }
     }
@@ -127,10 +130,10 @@ mod runs {
         *CELL.get_or_init(|| {
             let crew = params::crew();
             let eclss = params::eclss();
-            let scenario = bvad::cabin_scenario(crew.respired_carbon_fraction);
+            let scenario = bvad::cabin_scenario();
             let (state, registry) =
                 crate::cabin::build_cabin(&crew, &eclss, &scenario).expect("build_cabin");
-            let resolver = crate::cabin::cabin_resolver(&scenario).expect("cabin_resolver");
+            let resolver = crate::cabin::cabin_resolver(&crew, &scenario).expect("cabin_resolver");
             let integrator = EulerIntegrator::new(registry);
             let mut o2_supply: Vec<f64> = Vec::new();
             let (_final, rationed, events) = crate::run_station(

@@ -107,7 +107,7 @@ fn run_rationing(
     let fast_reg = Registry::new(flows, &state.stocks, aux).unwrap();
     let mut bio = sealed_bio_resolver(&lamp, &scenario).unwrap();
     let mut fast = with_forcing(
-        sealed_fast_resolver(&charge, &scenario).unwrap(),
+        sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).unwrap(),
         HEATER_HEALTH,
         window_override(
             constant(1.0).unwrap(),
@@ -215,7 +215,7 @@ fn veg(s: &State) -> f64 {
 #[test]
 fn the_walls_read_the_plants_day_on_the_fast_step() {
     let scenario = sealed_station_scenario();
-    let fast = sealed_fast_resolver(&domains::params::charge(), &scenario).unwrap();
+    let fast = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scenario).unwrap();
     let bio = SourceResolver::new(
         weather_forcings(&scenario.bio, scenario.years).unwrap(),
         std::collections::HashMap::new(),

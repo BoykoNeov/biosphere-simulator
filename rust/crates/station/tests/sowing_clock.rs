@@ -52,7 +52,7 @@ fn built() -> (State, Registry, Registry) {
 fn resolvers(scenario: &SealedStationScenario) -> (SourceResolver, SourceResolver) {
     (
         sealed_bio_resolver(&station::params::lamp(), scenario).expect("bio resolver"),
-        sealed_fast_resolver(&domains::params::charge(), scenario).expect("fast resolver"),
+        sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), scenario).expect("fast resolver"),
     )
 }
 

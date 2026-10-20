@@ -104,7 +104,7 @@ fn cabin_gas_resume_after_save_is_bit_identical() {
         let eclss = params::eclss();
         let scenario = CABIN_GAS_SCENARIO;
         let (state, registry) = build_cabin(&crew, &eclss, &scenario).unwrap();
-        let resolver = cabin_resolver(&scenario).unwrap();
+        let resolver = cabin_resolver(&crew, &scenario).unwrap();
         SimSession::single_rate(
             EulerIntegrator::new(registry),
             state,
@@ -132,7 +132,7 @@ fn greenhouse_resume_after_save_preserves_aux_phenology() {
             EulerIntegrator::new(cabin),
             state,
             greenhouse_bio_resolver(&scenario).unwrap(),
-            greenhouse_cabin_resolver(&scenario).unwrap(),
+            greenhouse_cabin_resolver(&crew, &scenario).unwrap(),
             scenario.steps_per_day,
             scenario.bio_steps_per_day,
             scenario.bio_dt,
@@ -169,7 +169,7 @@ fn load_state_rejects_a_mismatched_stock_set() {
     let mut cabin_session = SimSession::single_rate(
         EulerIntegrator::new(cabin_reg),
         cabin_state,
-        cabin_resolver(&CABIN_GAS_SCENARIO).unwrap(),
+        cabin_resolver(&crew, &CABIN_GAS_SCENARIO).unwrap(),
         CABIN_GAS_SCENARIO.dt_seconds,
     );
 
@@ -218,7 +218,7 @@ fn sealed_resume_across_a_season_boundary_is_bit_identical() {
             EulerIntegrator::new(fast),
             state,
             sealed_bio_resolver(&lamp, &scenario).unwrap(),
-            sealed_fast_resolver(&charge, &scenario).unwrap(),
+            sealed_fast_resolver(&charge, &crew, &scenario).unwrap(),
             scenario.steps_per_day,
             scenario.bio_steps_per_day,
             scenario.bio_dt,

@@ -245,7 +245,7 @@ fn a_change_to_the_plant_side_light_reaches_the_minute_step() {
             map_program_or_plain(&mut forcings, PAR_VAR, |_| constant(0.0).unwrap()).unwrap();
             plant_r = SourceResolver::new(forcings, shared).unwrap();
         }
-        let fast_r = sealed_fast_resolver(&params::charge(), &scenario).unwrap();
+        let fast_r = sealed_fast_resolver(&params::charge(), &domains::params::crew(), &scenario).unwrap();
         let c0 = plant_c(&state);
         let (states, rationed, _) = run_master_day(
             &EulerIntegrator::new(bio),

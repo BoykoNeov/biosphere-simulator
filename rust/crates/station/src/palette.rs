@@ -63,7 +63,7 @@ fn build_cabin_gas() -> Result<(SimSession, DisplayContext), SimError> {
     let eclss = domains::params::eclss();
     let scenario = crate::scenario::CABIN_GAS_SCENARIO;
     let (state, registry) = crate::cabin::build_cabin(&crew, &eclss, &scenario)?;
-    let resolver = crate::cabin::cabin_resolver(&scenario)?;
+    let resolver = crate::cabin::cabin_resolver(&crew, &scenario)?;
     let session = SimSession::single_rate(
         EulerIntegrator::new(registry),
         state,
@@ -133,7 +133,7 @@ fn build_greenhouse_session() -> Result<(SimSession, DisplayContext), SimError> 
         EulerIntegrator::new(cabin_registry),
         state,
         crate::greenhouse::greenhouse_bio_resolver(&scenario)?,
-        crate::greenhouse::greenhouse_cabin_resolver(&scenario)?,
+        crate::greenhouse::greenhouse_cabin_resolver(&crew, &scenario)?,
         scenario.steps_per_day,
         scenario.bio_steps_per_day,
         scenario.bio_dt,
@@ -176,7 +176,7 @@ fn build_sealed_session() -> Result<(SimSession, DisplayContext), SimError> {
         EulerIntegrator::new(fast_registry),
         state,
         crate::sealed::sealed_bio_resolver(&lamp, &scenario)?,
-        crate::sealed::sealed_fast_resolver(&charge, &scenario)?,
+        crate::sealed::sealed_fast_resolver(&charge, &crew, &scenario)?,
         scenario.steps_per_day,
         scenario.bio_steps_per_day,
         scenario.bio_dt,

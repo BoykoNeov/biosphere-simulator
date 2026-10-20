@@ -123,7 +123,7 @@ fn season(
     let lamp = station_params::lamp();
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let bio_r = sealed_bio_resolver(&lamp, scenario).expect("bio resolver");
-    let fast_r = sealed_fast_resolver(&charge, scenario).expect("fast resolver");
+    let fast_r = sealed_fast_resolver(&charge, &domains::params::crew(), scenario).expect("fast resolver");
     let reset = sealed_reset_hook(scenario);
     let two = TwoRate {
         slow: &bio,

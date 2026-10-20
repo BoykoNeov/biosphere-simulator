@@ -135,7 +135,7 @@ fn season(case: Case) -> (State, State, Reading) {
     let scenario = split_scenario(&base, &split);
     let start = state.clone();
     let bio_r = sealed_bio_resolver(&station_params::lamp(), &scenario).expect("bio");
-    let fast_r = sealed_fast_resolver(&params::charge(), &scenario).expect("fast");
+    let fast_r = sealed_fast_resolver(&params::charge(), &domains::params::crew(), &scenario).expect("fast");
     let reset = sealed_reset_hook(&scenario);
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let two = TwoRate {

@@ -392,6 +392,29 @@ suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
 
 ### Unfreeze log
 
+- **2026-10-20 — the station's crew is four BVAD crew members, defined once
+  (`docs/plans/post-roadmap-crew-size.md` §9–12, the user's choice). 5 station goldens move; their 5
+  `golden_sha256` rows are the whole manifest diff.** Until now `CABIN_GAS_SCENARIO` ate 4.0e-3 mol C/s
+  and drank 5.0e-5 kg/s, which against BVAD Table 3-31 is 13.3 crew members' CO₂ and 0.99 of one's
+  water, a size nobody chose. `CabinScenario` now carries `crew_count` (the station's
+  `STATION_CREW_COUNT` = 4) in place of the two rates. The food rate is computed at run time,
+  `crew_count × BVAD's CO₂ load ÷ the loaded f_resp` (`station::bvad::food_intake_rate`), so the crew
+  breathes out BVAD's CO₂ exactly and `f_resp` has one copy, in `crew.yaml`; the water is
+  `crew_count × (humidity + urine)`. So the five crew resolvers take the loaded `CrewParams`. The BVAD
+  values moved out of the science gate's test-only module into `station::bvad`, which the gate's
+  validation cabin reads too (a separate refactor commit first, which moved no byte). Two store changes
+  ride with it: the crew-only cabins (`cabin_gas`, `water_recovery`) start at the scrubber's target,
+  12.188502343942758 mol, not 0 (at four crew members they would have reached it at step ~180 of 900;
+  pinned by `the_cabin_starts_at_its_targets`), and the 7-day crop cabins' crew water store is 200 kg,
+  not 50 (four crew members drink 122 kg in 7 days). **Measured in the lab first, then adopted byte for
+  byte:** the five switched final states were saved, and each regenerated golden is `cmp`-identical to
+  its saved file; the other 15 are identical. What moved (plan §10): food draw and fecal carbon ÷3.33;
+  the cabin 1323 → 1295 ppm; the sealed station's food store ends at 373 222.6 of 500 000, its crew water
+  at 17 869 of 20 000; its grain peaks −0.33 to −0.35 %; cabin humidity +11 % (the condenser's offset).
+  One test file keeps the old load instead of loosening its pin: `air_split.rs` (its subject is a
+  hungry crop) sets the crew count that eats 4.0e-3 under the loaded `f_resp`, about 13.3. The other
+  three crew sizings in the tree (the standalone crew, the ECLSS stand-in, the authored files' "one crew
+  member") are recorded in the plan's §2 and not touched. Advisor-reviewed before code.
 - **2026-10-19 — the cabin's CO₂ is held at a cited level: the scrubber removes `k · max(0, co2 −
   target)`, the target `co2_partial_pressure: 130.0 Pa` of the cabin's air (BVAD Rev 2 Table 4-1,
   p[CO₂] for Plants, nominal), and `co2_scrub_rate` rises 1e-3 → 1e-2 with the form

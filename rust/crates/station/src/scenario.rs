@@ -10,6 +10,7 @@ use domains::biosphere::{
 };
 use domains::power::{PowerScenario, BOUNDED_SOC_SCENARIO};
 use domains::biosphere::params::PhenologyParams;
+use domains::crew::CrewParams;
 use simcore::error::SimError;
 use simcore::state::State;
 
@@ -45,13 +46,33 @@ pub struct CabinScenario {
     pub food_store0: f64,
     /// Finite provisioned water store (kg).
     pub water_store0: f64,
-    /// Forced food-carbon intake rate (mol/s).
-    pub food_intake_rate: f64,
-    /// Forced water intake rate (kg/s).
-    pub water_intake_rate: f64,
+    /// How many crew members of BVAD Table 3-31 ([`crate::bvad`]) eat and drink: both forced
+    /// intake rates are computed from it ([`CabinScenario::food_intake_rate`],
+    /// [`CabinScenario::water_intake_rate`]). It replaced the two rates themselves on 2026-10-20
+    /// (`docs/plans/post-roadmap-crew-size.md`), which breathed 13.3 crew members' CO₂ and drank
+    /// 0.99's water. Not an integer: a lab cabin may carry a load measured under the old rates.
+    pub crew_count: f64,
     /// Integration step (s) — 60 s, ECLSS's binding `k_scrub·dt < 1`.
     pub dt_seconds: f64,
 }
+
+impl CabinScenario {
+    /// The forced food-carbon intake (mol C/s): `crew_count` × BVAD's CO₂ load ÷ the LOADED
+    /// `respired_carbon_fraction`, so the crew breathes out BVAD's CO₂ exactly and `f_resp` has
+    /// one copy, in `crew.yaml` ([`crate::bvad::food_intake_rate`]).
+    pub fn food_intake_rate(&self, crew: &CrewParams) -> f64 {
+        crate::bvad::food_intake_rate(self.crew_count, crew.respired_carbon_fraction)
+    }
+
+    /// The forced water intake (kg/s): `crew_count` × BVAD's humidity + urine water.
+    pub fn water_intake_rate(&self) -> f64 {
+        crate::bvad::water_intake_rate(self.crew_count)
+    }
+}
+
+/// The station's crew: four crew members, the ISS's usual complement (the user's choice,
+/// 2026-10-20, `docs/plans/post-roadmap-crew-size.md` §9).
+pub const STATION_CREW_COUNT: f64 = 4.0;
 
 /// The air (mol, at reference pressure) of the station's cabin — the one cabin every station
 /// build's O₂ regulator serves. `eclss.yaml` stores the regulator's target as a mole fraction
@@ -68,7 +89,11 @@ pub const CABIN_GAS_SCENARIO: CabinScenario = CabinScenario {
     // NO air inventory — nothing here converts the pool to a concentration — so the number
     // is the setpoint's, carried for the transient-free start, not a composition of its own.
     cabin_o2_0: 1995.0,
-    cabin_co2_0: 0.0,
+    // Starts at the scrubber's target for this cabin (`EclssParams::co2_target_mol` of
+    // `STATION_CABIN_AIR_MOL`: BVAD's 0.13 kPa), by the `cabin_o2_0` rule. It was 0.0 until
+    // 2026-10-20; at four crew members the cabin would have reached its target only at step
+    // ~180 of 900 (at one, step 712), leaving the scrubber idle for much of the run.
+    cabin_co2_0: 12.188502343942758,
     // Starts at the condenser's target for this cabin (`EclssParams::humidity_setpoint_kg` of
     // `STATION_CABIN_AIR_MOL`, BVAD's nominal 40 % RH), by the `cabin_o2_0` rule: the
     // condenser's dynamics live in `h2o − setpoint`, so a matched start leaves its flux what it
@@ -78,8 +103,7 @@ pub const CABIN_GAS_SCENARIO: CabinScenario = CabinScenario {
     cabin_h2o_0: 1.786315428255099,
     food_store0: 1000.0,
     water_store0: 20.0,
-    food_intake_rate: 4.0e-3,
-    water_intake_rate: 5.0e-5,
+    crew_count: STATION_CREW_COUNT,
     dt_seconds: 60.0,
 };
 
@@ -118,10 +142,11 @@ pub fn greenhouse_bio_scenario() -> SeasonScenario {
 }
 
 /// The greenhouse crew stores, re-sized for the multi-day horizon
-/// (`GREENHOUSE_CABIN_SCENARIO`).
+/// (`GREENHOUSE_CABIN_SCENARIO`). The water store was 50 kg until 2026-10-20; four crew members
+/// drink 122.25 kg in the 7 days, so it is 200 kg, the old margin kept (1.64× what is drunk).
 pub const GREENHOUSE_CABIN_SCENARIO: CabinScenario = CabinScenario {
     food_store0: 4000.0,
-    water_store0: 50.0,
+    water_store0: 200.0,
     ..CABIN_GAS_SCENARIO
 };
 
@@ -594,10 +619,14 @@ mod cabin_start_tests {
             CABIN_GAS_SCENARIO.cabin_o2_0,
             p.o2_setpoint_mol(STATION_CABIN_AIR_MOL)
         );
-        // The crop-sharing cabins start at the scrubber's target (the crew-only ones at 0, and
-        // they fill to it in about 68 steps).
+        // Every cabin starts at the scrubber's target: the crop-sharing ones since 2026-10-19,
+        // the crew-only ones since 2026-10-20 (they started at 0 before).
         assert_eq!(
             Some(greenhouse_bio_scenario().chamber_co2_mol0),
+            p.co2_target_mol(STATION_CABIN_AIR_MOL)
+        );
+        assert_eq!(
+            Some(CABIN_GAS_SCENARIO.cabin_co2_0),
             p.co2_target_mol(STATION_CABIN_AIR_MOL)
         );
     }

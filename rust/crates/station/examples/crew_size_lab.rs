@@ -2,10 +2,16 @@
 //! build of `docs/plans/post-roadmap-crew-size.md` §8, measured against its written predictions
 //! (§6 for one crew member, §9 for four, the user's choice).
 //!
+//! ⚠ **Since the adoption (2026-10-20, plan §12) the frozen side IS four crew members**, so the
+//! default switch is now one crew member. What this tool measured BEFORE the adoption (the old
+//! 13.3-CO₂ / 0.99-water crew, start 0, 50 kg store, against four) is the tool at the commit
+//! before it (`git log -- rust/crates/station/examples/crew_size_lab.rs`): the old crew is not
+//! a crew count, so the adopted form cannot express it.
+//!
 //! ```text
-//! cargo run --release -q -p station --example crew_size_lab              # all five, N = 4
+//! cargo run --release -q -p station --example crew_size_lab              # all five, N = 1
 //! cargo run --release -q -p station --example crew_size_lab -- greenhouse # by name
-//! CREW_N=1 cargo run --release -q -p station --example crew_size_lab     # another count
+//! CREW_N=2 cargo run --release -q -p station --example crew_size_lab     # another count
 //! CREW_SAVE=<dir> cargo run --release -q -p station --example crew_size_lab # also save
 //! ```
 //!
@@ -13,11 +19,10 @@
 //! bytes (the frozen side's `snapshot` is checked equal to the committed file), so an adoption
 //! can `cmp` each regenerated golden against what was measured here.
 //!
-//! Each golden's own build runs twice: as frozen, and with the cabin scenario's crew switched to
-//! `N` crew members of BVAD Table 3-31 — the food rate `N × CO₂ load ÷ f_resp` from the LOADED
-//! `crew.yaml` (§4: no typed copy of `f_resp`), the water `N × (humidity + urine)`. The two
-//! crew-only cabins start at the scrubber's target; the 7-day crop cabins' crew water store is
-//! 200 kg (§9). Every stock of the final state is compared, boundary ones included.
+//! Each golden's own build runs twice: as frozen, and with the cabin scenario's `crew_count`
+//! switched to `N` crew members of BVAD Table 3-31 — the food rate `N × CO₂ load ÷ f_resp` from the
+//! LOADED `crew.yaml` (§4: no typed copy of `f_resp`), the water `N × (humidity + urine)`. Every
+//! stock of the final state is compared, boundary ones included.
 //!
 //! ⚠ **It writes nothing and takes no decision.** The frozen side is checked against the
 //! committed golden's bytes first, so a drift in this tool's copy of a build cannot pass as a
@@ -26,7 +31,6 @@
 
 use std::collections::BTreeMap;
 
-use domains::crew::CrewParams;
 use domains::eclss::EclssParams;
 use domains::params;
 use simcore::integrator::EulerIntegrator;
@@ -47,36 +51,24 @@ use station::scenario::{
 use station::sealed::{build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver};
 use station::water::{build_water_recovery, water_recovery_resolver};
 
-/// The 7-day crop cabins' crew water store under the switch (plan §9).
-const CROP_CABIN_WATER_STORE_KG: f64 = 200.0;
-
 /// The switched crew: `None` is the frozen scenario.
 #[derive(Clone, Copy)]
 struct Crew {
-    food_intake_rate: f64,
-    water_intake_rate: f64,
+    n: f64,
     co2_target_mol: f64,
 }
 
 impl Crew {
-    fn bvad(n: f64, crew: &CrewParams, eclss: &EclssParams) -> Crew {
+    fn bvad(n: f64, eclss: &EclssParams) -> Crew {
         Crew {
-            food_intake_rate: bvad::food_intake_rate(n, crew.respired_carbon_fraction),
-            water_intake_rate: bvad::water_intake_rate(n),
+            n,
             co2_target_mol: eclss.co2_target_mol(STATION_CABIN_AIR_MOL).expect("a target"),
         }
     }
 
-    /// The switched cabin: rates replaced; `crew_only` cabins start at the target, the crop
-    /// cabins' water store is resized when `crop_store` is given.
-    fn cabin(&self, base: CabinScenario, crew_only: bool, crop_store: Option<f64>) -> CabinScenario {
-        CabinScenario {
-            food_intake_rate: self.food_intake_rate,
-            water_intake_rate: self.water_intake_rate,
-            cabin_co2_0: if crew_only { self.co2_target_mol } else { base.cabin_co2_0 },
-            water_store0: crop_store.unwrap_or(base.water_store0),
-            ..base
-        }
+    /// The switched cabin: the crew count replaced, the stores and starts as frozen.
+    fn cabin(&self, base: CabinScenario) -> CabinScenario {
+        CabinScenario { crew_count: self.n, ..base }
     }
 }
 
@@ -98,9 +90,9 @@ fn snapshot(state: &State) -> String {
 fn cabin_gas_run(sw: Option<Crew>) -> Run {
     let crew = params::crew();
     let eclss = params::eclss();
-    let scenario = sw.map_or(CABIN_GAS_SCENARIO, |c| c.cabin(CABIN_GAS_SCENARIO, true, None));
+    let scenario = sw.map_or(CABIN_GAS_SCENARIO, |c| c.cabin(CABIN_GAS_SCENARIO));
     let (state, registry) = build_cabin(&crew, &eclss, &scenario).expect("build_cabin");
-    let resolver = cabin_resolver(&scenario).expect("cabin_resolver");
+    let resolver = cabin_resolver(&crew, &scenario).expect("cabin_resolver");
     let (last, rationed, events) = run_station(
         &EulerIntegrator::new(registry),
         state,
@@ -118,10 +110,10 @@ fn water_recovery_run(sw: Option<Crew>) -> Run {
     let eclss = params::eclss();
     let recovery = station_params::water_recovery();
     let scenario =
-        sw.map_or(WATER_RECOVERY_SCENARIO, |c| c.cabin(WATER_RECOVERY_SCENARIO, true, None));
+        sw.map_or(WATER_RECOVERY_SCENARIO, |c| c.cabin(WATER_RECOVERY_SCENARIO));
     let (state, registry) =
         build_water_recovery(&crew, &eclss, &recovery, &scenario).expect("build_water_recovery");
-    let resolver = water_recovery_resolver(&scenario).expect("water_recovery_resolver");
+    let resolver = water_recovery_resolver(&crew, &scenario).expect("water_recovery_resolver");
     let (last, rationed, events) = run_station(
         &EulerIntegrator::new(registry),
         state,
@@ -139,13 +131,13 @@ fn greenhouse_run(sw: Option<Crew>) -> Run {
     let eclss = params::eclss();
     let mut scenario = greenhouse_scenario();
     if let Some(c) = sw {
-        scenario.cabin = c.cabin(scenario.cabin, false, Some(CROP_CABIN_WATER_STORE_KG));
+        scenario.cabin = c.cabin(scenario.cabin);
     }
     let (state, bio_reg, cabin_reg) =
         build_greenhouse(&crew, &eclss, &scenario, true, domains::crew::FECAL_WASTE)
             .expect("build_greenhouse");
     let bio = greenhouse_bio_resolver(&scenario).expect("bio_resolver");
-    let cabin = greenhouse_cabin_resolver(&scenario).expect("cabin_resolver");
+    let cabin = greenhouse_cabin_resolver(&crew, &scenario).expect("cabin_resolver");
     let (states, rationed, events) = run_greenhouse(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(cabin_reg),
@@ -166,12 +158,12 @@ fn harvest_run(sw: Option<Crew>) -> Run {
     let mut scenario = harvest_scenario();
     if let Some(c) = sw {
         scenario.greenhouse.cabin =
-            c.cabin(scenario.greenhouse.cabin, false, Some(CROP_CABIN_WATER_STORE_KG));
+            c.cabin(scenario.greenhouse.cabin);
     }
     let (state, bio_reg, cabin_reg) =
         build_harvest(&crew, &eclss, &harvest, &scenario, true, true).expect("build_harvest");
     let bio = harvest_bio_resolver(&scenario).expect("bio_resolver");
-    let cabin = harvest_cabin_resolver(&scenario).expect("cabin_resolver");
+    let cabin = harvest_cabin_resolver(&crew, &scenario).expect("cabin_resolver");
     let (states, rationed, events) = run_harvest(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(cabin_reg),
@@ -193,7 +185,7 @@ fn sealed_station_run(sw: Option<Crew>) -> Run {
     let lamp = station_params::lamp();
     let mut scenario = sealed_station_scenario();
     if let Some(c) = sw {
-        scenario.cabin = c.cabin(scenario.cabin, false, None);
+        scenario.cabin = c.cabin(scenario.cabin);
     }
     let (state, bio_reg, fast_reg) = build_sealed_station(
         &charge,
@@ -209,7 +201,7 @@ fn sealed_station_run(sw: Option<Crew>) -> Run {
     )
     .expect("build_sealed_station");
     let bio = sealed_bio_resolver(&lamp, &scenario).expect("sealed_bio_resolver");
-    let fast = sealed_fast_resolver(&charge, &scenario).expect("sealed_fast_resolver");
+    let fast = sealed_fast_resolver(&charge, &crew, &scenario).expect("sealed_fast_resolver");
     let (states, rationed, events) = run_sealed(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(fast_reg),
@@ -320,21 +312,22 @@ fn crop_readings(name: &str, base: &Run, switched: &Run, target: f64) {
 
 fn main() {
     let only: Vec<String> = std::env::args().skip(1).collect();
-    let n: f64 = std::env::var("CREW_N").ok().map_or(4.0, |v| v.parse().expect("CREW_N a number"));
+    let n: f64 = std::env::var("CREW_N").ok().map_or(1.0, |v| v.parse().expect("CREW_N a number"));
     let crew = params::crew();
     let eclss = params::eclss();
-    let sw = Crew::bvad(n, &crew, &eclss);
+    let sw = Crew::bvad(n, &eclss);
     let save = std::env::var("CREW_SAVE").ok();
     let golden_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/golden");
     println!(
-        "frozen: food {:e} mol C/s, water {:e} kg/s; switched: {n} BVAD crew members, food {:e} \
-         mol C/s (f_resp {} loaded), water {:e} kg/s; crew-only cabins start at {:.6} mol; crop \
-         cabins' water store {CROP_CABIN_WATER_STORE_KG} kg\n",
-        CABIN_GAS_SCENARIO.food_intake_rate,
-        CABIN_GAS_SCENARIO.water_intake_rate,
-        sw.food_intake_rate,
+        "frozen: {} crew members, food {:e} mol C/s, water {:e} kg/s; switched: {n} BVAD crew \
+         members, food {:e} mol C/s (f_resp {} loaded), water {:e} kg/s; the scrubber's target \
+         {:.6} mol\n",
+        CABIN_GAS_SCENARIO.crew_count,
+        CABIN_GAS_SCENARIO.food_intake_rate(&crew),
+        CABIN_GAS_SCENARIO.water_intake_rate(),
+        bvad::food_intake_rate(n, crew.respired_carbon_fraction),
         crew.respired_carbon_fraction,
-        sw.water_intake_rate,
+        bvad::water_intake_rate(n),
         sw.co2_target_mol
     );
     for (name, run) in roster() {

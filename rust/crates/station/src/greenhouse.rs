@@ -184,16 +184,17 @@ pub fn greenhouse_bio_resolver(scenario: &GreenhouseScenario) -> Result<SourceRe
 
 /// The cabin forcing resolver — the two constant crew intake rates.
 pub fn greenhouse_cabin_resolver(
+    crew: &CrewParams,
     scenario: &GreenhouseScenario,
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = std::collections::HashMap::new();
     forcings.insert(
         FOOD_INTAKE_VAR.to_string(),
-        constant(scenario.cabin.food_intake_rate)?,
+        constant(scenario.cabin.food_intake_rate(crew))?,
     );
     forcings.insert(
         WATER_INTAKE_VAR.to_string(),
-        constant(scenario.cabin.water_intake_rate)?,
+        constant(scenario.cabin.water_intake_rate())?,
     );
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }

@@ -178,7 +178,7 @@ fn the_plant_step_records_the_windows_net_radiation_and_nothing_twice() {
 fn the_wrapped_pair_is_the_raw_pair_on_a_minute_in_days() {
     let (scenario, state, bio, fast) = minute_build();
     let plant_r = plant_resolver(&scenario);
-    let fast_r = sealed_fast_resolver(&params::charge(), &scenario).unwrap();
+    let fast_r = sealed_fast_resolver(&params::charge(), &domains::params::crew(), &scenario).unwrap();
     let (states, rationed, _) = run_master_day(
         &EulerIntegrator::new(bio),
         &EulerIntegrator::new(fast),

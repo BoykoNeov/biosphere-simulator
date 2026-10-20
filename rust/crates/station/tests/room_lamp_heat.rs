@@ -34,7 +34,7 @@ fn setup() -> (SealedStationScenario, State, SourceResolver, SourceResolver) {
     )
     .expect("build");
     let bio = sealed_bio_resolver(&lamp, &scenario).expect("bio resolver");
-    let fast = sealed_fast_resolver(&charge, &scenario).expect("fast resolver");
+    let fast = sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).expect("fast resolver");
     (scenario, state, bio, fast)
 }
 

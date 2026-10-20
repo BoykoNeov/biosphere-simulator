@@ -97,7 +97,7 @@ fn build(scn: &SealedStationScenario) -> (State, Registry, Registry) {
 
 fn resolvers(scn: &SealedStationScenario, blackout: bool) -> (SourceResolver, SourceResolver) {
     let bio = sealed_bio_resolver(&station::params::lamp(), scn).unwrap();
-    let mut fast = sealed_fast_resolver(&domains::params::charge(), scn).unwrap();
+    let mut fast = sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), scn).unwrap();
     if blackout {
         fast = with_brownout(fast, BLACKOUT.0, BLACKOUT.1, 0.0).unwrap();
     }
@@ -274,7 +274,7 @@ fn a_run_resumed_from_a_saved_day_is_the_continuous_run_bit_for_bit() {
     let (bio, _) = resolvers(&scn, false);
     let cut = || {
         with_lamp_power_cut(
-            sealed_fast_resolver(&domains::params::charge(), &scn).unwrap(),
+            sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap(),
             BLACKOUT.0,
             BLACKOUT.1,
         )
@@ -419,7 +419,7 @@ fn cutting_only_the_lamps_power_darkens_the_lab_crop() {
     let scn = full_lamp_scenario(sealed_station_scenario().battery0);
     let (bio, fast) = resolvers(&scn, false);
     let cut = with_lamp_power_cut(
-        sealed_fast_resolver(&domains::params::charge(), &scn).unwrap(),
+        sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap(),
         BLACKOUT.0,
         BLACKOUT.1,
     )
@@ -533,7 +533,7 @@ fn a_lamp_failure_with_a_healthy_battery_keeps_its_heater() {
     let (bio, _) = resolvers(&scn, false);
     let cut = || {
         with_lamp_power_cut(
-            sealed_fast_resolver(&domains::params::charge(), &scn).unwrap(),
+            sealed_fast_resolver(&domains::params::charge(), &domains::params::crew(), &scn).unwrap(),
             BLACKOUT.0,
             BLACKOUT.1,
         )

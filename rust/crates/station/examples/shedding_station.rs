@@ -68,7 +68,7 @@ fn run(form: Option<SheddingForm>) -> (Vec<State>, u64, usize) {
     };
     let (bio_reg, fast_reg) = wrap_last(bio_reg, fast_reg, &state.stocks, &scenario).unwrap();
     let bio = sealed_bio_resolver(&lamp, &scenario).unwrap();
-    let fast = sealed_fast_resolver(&charge, &scenario).unwrap();
+    let fast = sealed_fast_resolver(&charge, &domains::params::crew(), &scenario).unwrap();
     let (states, rationed, events) = run_sealed(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(fast_reg),

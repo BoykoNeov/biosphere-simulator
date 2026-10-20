@@ -4,7 +4,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.80d4f0899e7c1p+7",
+      "amount": "0x1.ec2af8132bc27p+5",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -18,7 +18,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.6083126e97916p+3",
+      "amount": "0x1.a7fa15240107bp+1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -31,7 +31,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.c147ae147af99p+0",
+      "amount": "0x1.c610624dd309ep+2",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -44,7 +44,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.962c0831265b4p+7",
+      "amount": "-0x1.e883f1026543ap+5",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },
@@ -57,7 +57,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.c147ae147ad6dp-1",
+      "amount": "0x1.c610624dd2e8bp+1",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -70,7 +70,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.87fffffffffb8p+9",
+      "amount": "0x1.d386ba4d66284p+9",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -83,7 +83,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.14cccccccccb0p+4",
+      "amount": "0x1.22b851eb85200p+3",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -96,7 +96,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.922de4f7807bap+3",
+      "amount": "0x1.89af3d2212848p+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -110,7 +110,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.da93a5dd2cef2p+0",
+      "amount": "0x1.07938d4ccb932p+1",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -123,7 +123,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.f246872b020c8p+10",
+      "amount": "0x1.f29b79b958583p+10",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },

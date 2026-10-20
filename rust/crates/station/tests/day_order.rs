@@ -64,7 +64,7 @@ fn greenhouse_both(order: DayOrder, with_plants: bool) -> (String, String, u64, 
     let build =
         || build_greenhouse_at(&crew, &eclss, &scenario, with_plants, FECAL_WASTE, PLANT).unwrap();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
-    let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
+    let cabin_res = greenhouse_cabin_resolver(&crew, &scenario).unwrap();
 
     let (s0, bio, cabin) = build();
     let (ref_states, ref_rationed, ref_events) = run_master_day(
@@ -121,7 +121,7 @@ fn interleaved_is_the_reference_day_bit_for_bit_on_the_harvest_ring() {
     let scenario = harvest_scenario();
     let gh = &scenario.greenhouse;
     let bio_res = harvest_bio_resolver(&scenario).unwrap();
-    let cabin_res = harvest_cabin_resolver(&scenario).unwrap();
+    let cabin_res = harvest_cabin_resolver(&crew, &scenario).unwrap();
     let build = || build_harvest(&crew, &eclss, &hp, &scenario, true, true).unwrap();
 
     let (s0, bio, cabin) = build();
@@ -189,7 +189,7 @@ fn interleaved_is_the_reference_day_bit_for_bit_across_a_resow() {
         .unwrap()
     };
     let bio_res = sealed_bio_resolver(&lamp, &scenario).unwrap();
-    let fast_res = sealed_fast_resolver(&charge, &scenario).unwrap();
+    let fast_res = sealed_fast_resolver(&charge, &crew, &scenario).unwrap();
 
     let (s0, bio, fast) = build();
     let (ref_states, ref_rationed, _) = run_master_day(
@@ -313,7 +313,7 @@ fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
     let (_, bio, cabin) =
         build_greenhouse_at(&crew, &eclss, &scenario, true, FECAL_WASTE, PLANT).unwrap();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
-    let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
+    let cabin_res = greenhouse_cabin_resolver(&crew, &scenario).unwrap();
     let (slow, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(cabin));
     let with = |steps_per_day: u64, slow_steps_per_day: u64, slow_dt: f64, fast_dt: f64| TwoRate {
         slow: &slow,
@@ -366,7 +366,7 @@ fn the_reference_refuses_an_uneven_split_on_every_entry() {
     let eclss = params::eclss();
     let scenario = greenhouse_scenario();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
-    let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
+    let cabin_res = greenhouse_cabin_resolver(&crew, &scenario).unwrap();
     let build = || build_greenhouse_at(&crew, &eclss, &scenario, true, FECAL_WASTE, PLANT).unwrap();
     let divide = |e: SimError| {
         let msg = e.to_string();
@@ -418,7 +418,7 @@ fn the_reference_refuses_an_uneven_split_on_every_entry() {
             EulerIntegrator::new(cabin),
             s0,
             greenhouse_bio_resolver(&scenario).unwrap(),
-            greenhouse_cabin_resolver(&scenario).unwrap(),
+            greenhouse_cabin_resolver(&crew, &scenario).unwrap(),
             1440,
             7,
             1.0 / 7.0,
@@ -464,7 +464,7 @@ fn the_retired_order_is_refused_on_a_minute_step_build() {
     let scenario = greenhouse_scenario();
     let (s0, bio, cabin) = build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
-    let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
+    let cabin_res = greenhouse_cabin_resolver(&crew, &scenario).unwrap();
     let (slow, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(cabin));
     let two = TwoRate {
         slow: &slow,

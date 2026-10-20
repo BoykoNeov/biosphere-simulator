@@ -136,7 +136,7 @@ fn run_sealed_with(inputs: &SealedInputs) -> Outcome {
         Err(e) => return failed(e),
     };
     let bio = sealed_bio_resolver(&lamp, &scenario).expect("sealed_bio_resolver");
-    let fast = sealed_fast_resolver(&charge, &scenario).expect("sealed_fast_resolver");
+    let fast = sealed_fast_resolver(&charge, &crew, &scenario).expect("sealed_fast_resolver");
     match run_sealed(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(fast_reg),
@@ -161,7 +161,7 @@ fn run_harvest_with(harvest: &HarvestParams) -> Outcome {
             Err(e) => return failed(e),
         };
     let bio = harvest_bio_resolver(&scenario).expect("harvest_bio_resolver");
-    let cabin = harvest_cabin_resolver(&scenario).expect("harvest_cabin_resolver");
+    let cabin = harvest_cabin_resolver(&crew, &scenario).expect("harvest_cabin_resolver");
     match run_harvest(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(cabin_reg),

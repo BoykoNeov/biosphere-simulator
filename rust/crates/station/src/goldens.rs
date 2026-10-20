@@ -45,7 +45,7 @@ pub fn cabin_gas() -> String {
     let eclss = params::eclss();
     let scenario = CABIN_GAS_SCENARIO;
     let (state, registry) = build_cabin(&crew, &eclss, &scenario).expect("build_cabin");
-    let resolver = cabin_resolver(&scenario).expect("cabin_resolver");
+    let resolver = cabin_resolver(&crew, &scenario).expect("cabin_resolver");
     let integrator = EulerIntegrator::new(registry);
     let mut noop = |_: &State| {};
     let (final_state, rationed, events) = run_station(
@@ -74,7 +74,7 @@ pub fn water_recovery() -> String {
     let scenario = WATER_RECOVERY_SCENARIO;
     let (state, registry) =
         build_water_recovery(&crew, &eclss, &recovery, &scenario).expect("build_water_recovery");
-    let resolver = water_recovery_resolver(&scenario).expect("water_recovery_resolver");
+    let resolver = water_recovery_resolver(&crew, &scenario).expect("water_recovery_resolver");
     let integrator = EulerIntegrator::new(registry);
     let mut noop = |_: &State| {};
     let (final_state, rationed, events) = run_station(
@@ -141,7 +141,7 @@ pub fn greenhouse() -> String {
     )
     .expect("build_greenhouse");
     let bio_resolver = greenhouse_bio_resolver(&scenario).expect("bio_resolver");
-    let cabin_resolver = greenhouse_cabin_resolver(&scenario).expect("cabin_resolver");
+    let cabin_resolver = greenhouse_cabin_resolver(&crew, &scenario).expect("cabin_resolver");
     let (states, rationed, events) = run_greenhouse(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(cabin_reg),
@@ -190,7 +190,7 @@ pub fn harvest() -> String {
         build_harvest(&crew, &eclss, &harvest_params, &scenario, true, true)
             .expect("build_harvest");
     let bio_resolver = harvest_bio_resolver(&scenario).expect("bio_resolver");
-    let cabin_resolver = harvest_cabin_resolver(&scenario).expect("cabin_resolver");
+    let cabin_resolver = harvest_cabin_resolver(&crew, &scenario).expect("cabin_resolver");
     let (states, rationed, events) = run_harvest(
         &EulerIntegrator::new(bio_reg),
         &EulerIntegrator::new(cabin_reg),
@@ -238,7 +238,7 @@ pub fn sealed_station() -> String {
     )
     .expect("build_sealed_station");
     let bio_resolver = sealed_bio_resolver(&lamp, &scenario).expect("sealed_bio_resolver");
-    let fast_resolver = sealed_fast_resolver(&charge, &scenario).expect("sealed_fast_resolver");
+    let fast_resolver = sealed_fast_resolver(&charge, &crew, &scenario).expect("sealed_fast_resolver");
 
     let (states, rationed, events) = run_sealed(
         &EulerIntegrator::new(bio_reg),
