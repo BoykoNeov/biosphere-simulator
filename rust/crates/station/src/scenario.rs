@@ -13,7 +13,7 @@ use domains::biosphere::params::PhenologyParams;
 use domains::crew::CrewParams;
 use simcore::error::SimError;
 use simcore::state::State;
-use crate::room_vapour::RoomVapour;
+use crate::room_vapour::{shared_room, RoomVapour, Thermostat};
 
 // --- Step 1 (P6.1): the Power → Thermal heat-closure station --------------------------
 
@@ -41,7 +41,9 @@ pub struct CabinScenario {
     pub cabin_o2_0: f64,
     /// Initial cabin CO₂ (mol).
     pub cabin_co2_0: f64,
-    /// Initial cabin H₂O (kg).
+    /// Initial cabin H₂O (kg). ⚠ Unread by a one-store shared room (the reference greenhouse,
+    /// harvest and sealed builds since 2026-10-20), which builds no `cabin_h2o`; kept for the
+    /// crew-only cabins, the two-stock form and the separate-air lab, which do.
     pub cabin_h2o_0: f64,
     /// Finite provisioned food store (mol carbon).
     pub food_store0: f64,
@@ -168,8 +170,8 @@ pub struct GreenhouseScenario {
     pub bio_dt: f64,
     /// Slow (biosphere) sub-steps per master day — mirrors `STEPS_PER_DAY`.
     pub bio_steps_per_day: u64,
-    /// The shared room's water vapour: two stocks (the reference) or one (the lab,
-    /// [`crate::room_vapour`]).
+    /// The shared room's water vapour: one stock on the plant window's thermostat (the reference
+    /// since 2026-10-20) or two (the form until then; [`crate::room_vapour`]).
     pub room_vapour: RoomVapour,
 }
 
@@ -183,7 +185,7 @@ pub fn greenhouse_scenario() -> GreenhouseScenario {
         cabin_dt: 60.0,
         bio_dt: BIO_DT,
         bio_steps_per_day: STEPS_PER_DAY as u64,
-        room_vapour: RoomVapour::TwoStocks,
+        room_vapour: shared_room(Thermostat::Window),
     }
 }
 
@@ -419,9 +421,10 @@ pub struct SealedStationScenario {
     /// potato chamber cannot re-sow on wheat's maturity (`docs/plans/post-roadmap-authored-plants.md`
     /// §17).
     pub crop: Crop,
-    /// The shared room's water vapour: two stocks (the reference) or one (the lab,
-    /// [`crate::room_vapour`]). Under one stock the room's setting is the plants'
-    /// `humidity_setpoint` ([`Self::plant_params`]), so the re-sow reads it too.
+    /// The shared room's water vapour: one stock on the chamber's live thermostat (the reference
+    /// since 2026-10-20) or two (the form until then; [`crate::room_vapour`]). Under one stock the
+    /// room's setting is the plants' `humidity_setpoint` ([`Self::plant_params`]), so the re-sow
+    /// reads it too.
     pub room_vapour: RoomVapour,
 }
 
@@ -607,7 +610,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         bio_steps_per_day: STEPS_PER_DAY as u64,
         cold: crate::params::cold_period(),
         crop: Crop::Wheat,
-        room_vapour: RoomVapour::TwoStocks,
+        room_vapour: shared_room(Thermostat::LiveChamber),
     }
 }
 

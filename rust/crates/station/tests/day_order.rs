@@ -37,8 +37,10 @@ use station::lighting::{
     lighting_power_resolver_averaged, LIGHT_USED,
 };
 use station::params as station_params;
+use station::room_vapour::RoomVapour;
 use station::scenario::{
     greenhouse_scenario, harvest_scenario, lighting_scenario, sealed_station_scenario,
+    GreenhouseScenario,
 };
 use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
 use station::session::SimSession;
@@ -53,6 +55,16 @@ fn snap(state: &State) -> String {
 /// greenhouse is minute-step; the day-order machinery these tests pin does not depend on which.
 const PLANT: GasExchangeStep = GasExchangeStep::PlantStep;
 
+/// The greenhouse for those plant-step builds, at TWO vapour stocks: a plant-step build cannot
+/// hold the one-store shared room (the reference since 2026-10-20), whose condenser reads the
+/// minute step's recorded window — and the day-order machinery is the same on either form.
+fn plant_step_greenhouse() -> GreenhouseScenario {
+    GreenhouseScenario {
+        room_vapour: RoomVapour::TwoStocks,
+        ..greenhouse_scenario()
+    }
+}
+
 fn ignore(_: Side, _: &State, _: &State) {}
 
 /// The greenhouse, run `days` both by the reference runner and by `TwoRate` in `order`.
@@ -60,7 +72,7 @@ fn ignore(_: Side, _: &State, _: &State) {}
 fn greenhouse_both(order: DayOrder, with_plants: bool) -> (String, String, u64, u64) {
     let crew = params::crew();
     let eclss = params::eclss();
-    let scenario = greenhouse_scenario();
+    let scenario = plant_step_greenhouse();
     let build =
         || build_greenhouse_at(&crew, &eclss, &scenario, with_plants, FECAL_WASTE, PLANT).unwrap();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
@@ -309,7 +321,7 @@ fn interleaving_cannot_move_a_scenario_whose_sides_share_no_stock() {
 fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
     let crew = params::crew();
     let eclss = params::eclss();
-    let scenario = greenhouse_scenario();
+    let scenario = plant_step_greenhouse();
     let (_, bio, cabin) =
         build_greenhouse_at(&crew, &eclss, &scenario, true, FECAL_WASTE, PLANT).unwrap();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
@@ -364,7 +376,7 @@ fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
 fn the_reference_refuses_an_uneven_split_on_every_entry() {
     let crew = params::crew();
     let eclss = params::eclss();
-    let scenario = greenhouse_scenario();
+    let scenario = plant_step_greenhouse();
     let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
     let cabin_res = greenhouse_cabin_resolver(&crew, &scenario).unwrap();
     let build = || build_greenhouse_at(&crew, &eclss, &scenario, true, FECAL_WASTE, PLANT).unwrap();

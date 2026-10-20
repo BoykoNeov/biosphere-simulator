@@ -465,6 +465,14 @@ fn a_cabin_hotter_or_colder_than_the_chamber() {
 /// higher CO₂ and evaporates more, which moves the chamber's heat books; the lab run before the
 /// adoption already showed the thermal node moving (+0.04 % on the sealed station's final day).
 /// Size not predicted; the chain was not traced.
+///
+/// ⚠ **Re-pinned 2026-10-20** (`docs/plans/post-roadmap-shared-room-humidity.md` §12; the shared
+/// room holds one vapour store at 75 % on the chamber's live temperature), measured by this tree:
+/// the node **188.5947 K** (was 188.7014), the heater **139.163 W** (was 139.193, inside its band
+/// before the re-pin). The lab's season showed transpiration −1.5 % and the battery +0.04 %;
+/// neither this size nor its sign was predicted — the previous re-pins moved the node DOWN both
+/// when the plants evaporated less (2026-10-16) and when they evaporated more (2026-10-19), so no
+/// direction is claimed. The chain was not traced.
 #[test]
 fn walls_onto_the_station_structure_run_the_heater_continuously() {
     let days = 120;
@@ -477,10 +485,10 @@ fn walls_onto_the_station_structure_run_the_heater_continuously() {
         |run: &Run| amount(&run.states[days - span], BATTERY) - amount(&run.states[days], BATTERY);
     let heater_w = (fall(&r) - fall(&reference)) / (span as f64 * 86_400.0);
     eprintln!("L4: node {t} K, heater {heater_w} W");
-    assert!((t - 188.7014).abs() < 0.01, "node {t} K, measured 188.7014");
+    assert!((t - 188.5947).abs() < 0.01, "node {t} K, measured 188.5947");
     assert!(
-        (heater_w - 139.193).abs() < 0.05,
-        "heater {heater_w} W, measured 139.193"
+        (heater_w - 139.163).abs() < 0.05,
+        "heater {heater_w} W, measured 139.163"
     );
     // A day end is dark, so the heater holds the room against the walls' whole loss to the node
     // and the deadbeat controller leaves it one step's loss below the setpoint — derived since
@@ -656,6 +664,13 @@ fn the_structures_heater_empties_the_battery_within_the_horizon() {
 /// (warmer on the mean by 0.05 K: the larger crop evaporates more, and that heat reaches the node by
 /// the coil, the 2026-10-15 direction); the run still ends at **295.1355085 K** (was 295.1355095);
 /// 9 day ends between the bands, as before. Size not predicted.
+///
+/// ⚠ **Re-pinned 2026-10-20** (`docs/plans/post-roadmap-shared-room-humidity.md` §12; the shared
+/// room holds one vapour store at 75 % on the chamber's live temperature), measured by this tree
+/// (found by the `--ignored` run, after the adoption's goldens): the node **162.4686 / 175.3114 /
+/// 170.0318 K** (colder on the mean by 0.03 K: the plants evaporate 1.3 % less over the run, so less
+/// heat reaches the node by the coil — the 2026-10-16 direction); the run ends at **295.1355778 K**
+/// (was 295.1355085); 9 day ends between the bands, as before. Size not predicted.
 #[test]
 #[ignore = "the full 1220-day sealed horizon; run with --ignored"]
 fn the_reference_node_and_chamber_follow_the_weather() {
@@ -699,15 +714,15 @@ fn the_reference_node_and_chamber_follow_the_weather() {
         "chamber daily min {clo} max {chi}; {outside} day-end states between the bands; ends {end} K"
     );
     assert!(
-        (lo - 162.4702).abs() < 0.01 && (hi - 175.3236).abs() < 0.01,
+        (lo - 162.4686).abs() < 0.01 && (hi - 175.3114).abs() < 0.01,
         "{lo} {hi}"
     );
-    assert!((mean - 170.0607).abs() < 0.01, "{mean}");
+    assert!((mean - 170.0318).abs() < 0.01, "{mean}");
     assert!(
         clo >= cold_set - 0.015 && chi <= warm_set + 0.015,
         "{clo} {chi}"
     );
     // One mid-warm-up and one mid-cool-down day-end state per crop at most: 9 crops (§25g).
     assert!(outside <= 2 * 9, "{outside}");
-    assert!((end - 295.1355085).abs() < 1e-6, "chamber ends {end} K");
+    assert!((end - 295.1355778).abs() < 1e-6, "chamber ends {end} K");
 }

@@ -16,6 +16,7 @@ use station::air_split::{build_split_station, split_scenario, AirSplit, BVAD_CHA
 use station::driver::run_master_day;
 use station::gas_exchange::GasExchangeStep;
 use station::params as station_params;
+use station::room_vapour::RoomVapour;
 use station::scenario::{sealed_station_scenario, ColdProgram, SealedStationScenario};
 use station::sealed::{
     build_sealed_station, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
@@ -46,6 +47,13 @@ const DAYS: usize = 90;
 /// written as the crew count that eats it under the loaded `f_resp` (about 13.3): the scenario
 /// carries a crew count, not a rate. Its water follows the count (13.3 crew members' water, not
 /// the old 0.99's), which the trial of §11 did not run; the ten tests were re-run under it (§12).
+///
+/// ⚠ **And with the shared room's PRE-2026-10-20 two vapour stocks** (the split side builds two
+/// rooms anyway, `split_scenario`). Since one store was adopted
+/// (`docs/plans/post-roadmap-shared-room-humidity.md`) the shared room's crew breath reaches the
+/// plants' water, so [`vapour_crossing_moves_water_between_the_plants_and_the_crew`]'s "vapour off
+/// holds the shared plants' loop exactly" measured 195.0 kg against 237.5 — a claim about the
+/// two-stock shared room, which this file's baseline therefore stays.
 fn scenario() -> SealedStationScenario {
     let mut s = sealed_station_scenario();
     // The first-order scrubber's own fixed point, where the crop-sharing cabins started before.
@@ -59,6 +67,7 @@ fn scenario() -> SealedStationScenario {
             photoperiod_hours: s.photoperiod_hours,
             ..s.cold
         },
+        room_vapour: RoomVapour::TwoStocks,
         ..s
     }
 }

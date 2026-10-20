@@ -54,6 +54,7 @@ use crate::gas_exchange::{
     gas_exchange_on_fast_step, require_one_plant_step_per_group, window_key, GasExchangeStep,
     OnFastStep, PLANT_WINDOW_RECORDER,
 };
+use crate::room_vapour::RoomVapour;
 use crate::scenario::SealedStationScenario;
 use crate::sealed::{build_sealed_station_unread, sealed_fast_flows, CabinAir};
 use crate::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
@@ -320,8 +321,15 @@ fn amount(state: &State, id: &str) -> Result<f64, SimError> {
 
 /// The sealed-station scenario with the plants' chamber resized to `chamber_air_mol`, charged
 /// at the cabin's composition (CO₂ and O₂ scaled by `chamber_air_mol / CABIN_AIR_MOL`).
+///
+/// Two rooms, so two vapour stocks: the cabin keeps its own `cabin_h2o` and the chamber its
+/// plants' `water_vapor` ([`RoomVapour::TwoStocks`]), whatever the shared room's form — one store
+/// is a SHARED room's (the reference since 2026-10-20, [`crate::room_vapour`]).
 pub fn split_scenario(scenario: &SealedStationScenario, split: &AirSplit) -> SealedStationScenario {
-    scenario.with_chamber_air(split.chamber_air_mol)
+    SealedStationScenario {
+        room_vapour: RoomVapour::TwoStocks,
+        ..scenario.with_chamber_air(split.chamber_air_mol)
+    }
 }
 
 /// Build the separate-air station: `(state, bio_reg, fast_reg)`, from `scenario` (the
@@ -347,12 +355,16 @@ pub fn build_split_station(
             scenario.bio.chamber_air_capacity_mol
         )));
     }
-    if !scenario.room_vapour.has_cabin_vapour() {
-        return Err(SimError::Validation(
-            "build_split_station: separate air gives the cabin its own vapour stock; one vapour \
-             store is a shared room's (crate::room_vapour)"
-                .into(),
-        ));
+    // Separate air builds two rooms ([`split_scenario`]), so the shared room's vapour form does not
+    // apply; a one-store setting other than the plants' own would be dropped, so it is refused.
+    if let RoomVapour::OneStock { setting, .. } = scenario.room_vapour {
+        let own = domains::biosphere::params::water_cycle().humidity_setpoint;
+        if setting != own {
+            return Err(SimError::Validation(format!(
+                "build_split_station: separate air gives each room its own vapour stock at the \
+                 plants' own setting ({own}); a shared room's setting of {setting} would be dropped"
+            )));
+        }
     }
     let resized = split_scenario(scenario, split);
     // ⚠ The PLANT-STEP base, always: this build discards the shared fast registry and keeps the

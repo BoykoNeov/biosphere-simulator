@@ -377,7 +377,7 @@ fn similarity(a: f64) {
 /// and every extensive plant and soil amount × a, NOT the air; lamp, solar and battery × a;
 /// one season.
 fn crew_sized(a: f64) -> SealedStationScenario {
-    let mut sc = sealed_station_scenario();
+    let mut sc = two_stock_sealed();
     sc.bio = scale_area(&sc.bio, a, false);
     sc.lamp_power_w *= a;
     sc.power.solar_peak_w *= a;
@@ -442,7 +442,7 @@ fn control_full_sealed(interleaved: &State) {
     let recovery = station_params::water_recovery();
     let lamp = station_params::lamp();
     let hp = station_params::harvest();
-    let sc = sealed_station_scenario();
+    let sc = two_stock_sealed();
     let (s0, bio, fast) = build_sealed_station_at(
         &charge,
         &thermal,
@@ -540,11 +540,32 @@ fn two_rate_final(
     (states.last().expect("day").clone(), totals)
 }
 
+/// ⚠ This instrument records the shared room's PRE-2026-10-20 form, two vapour stocks
+/// (`docs/plans/post-roadmap-shared-room-humidity.md` §12): its plant-step builds cannot hold the
+/// one-store room adopted then, and its numbers were measured on two stocks.
+fn two_stock_sealed() -> station::scenario::SealedStationScenario {
+    station::scenario::SealedStationScenario {
+        room_vapour: station::room_vapour::RoomVapour::TwoStocks,
+        ..sealed_station_scenario()
+    }
+}
+fn two_stock_greenhouse() -> station::scenario::GreenhouseScenario {
+    station::scenario::GreenhouseScenario {
+        room_vapour: station::room_vapour::RoomVapour::TwoStocks,
+        ..greenhouse_scenario()
+    }
+}
+fn two_stock_harvest() -> station::scenario::HarvestScenario {
+    let mut h = harvest_scenario();
+    h.greenhouse.room_vapour = station::room_vapour::RoomVapour::TwoStocks;
+    h
+}
+
 fn main() {
     let crew = params::crew();
     let eclss = params::eclss();
     let exhale_per_day = {
-        let sc = sealed_station_scenario();
+        let sc = two_stock_sealed();
         crew.respired_carbon_fraction * sc.cabin.food_intake_rate(&crew) * 86400.0
     };
     // Sections by name (`roster`, `sealed`, `similarity`, `crew`); none given runs all.
@@ -554,7 +575,7 @@ fn main() {
     if want("roster") {
         println!("== slice 2: the frozen roster, slow-first → interleaved ==");
         {
-            let sc = greenhouse_scenario();
+            let sc = two_stock_greenhouse();
             let bio_res = greenhouse_bio_resolver(&sc).expect("bio");
             let cabin_res = greenhouse_cabin_resolver(&crew, &sc).expect("cabin");
             let build = || {
@@ -606,7 +627,7 @@ fn main() {
         }
         {
             let hp = station_params::harvest();
-            let sc = harvest_scenario();
+            let sc = two_stock_harvest();
             let gh = sc.greenhouse;
             let bio_res = harvest_bio_resolver(&sc).expect("bio");
             let cabin_res = harvest_cabin_resolver(&crew, &sc).expect("cabin");
@@ -673,7 +694,7 @@ fn main() {
         }
     }
     if want("sealed") {
-        let sealed = sealed_station_scenario();
+        let sealed = two_stock_sealed();
         let runs: Vec<Measured> = ORDERS
             .iter()
             .map(|o| sealed_measure(&sealed, false, *o))

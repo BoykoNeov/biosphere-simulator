@@ -354,8 +354,9 @@ pub fn build_sealed_station_unread(
     let (state, bio_reg) = crate::latent_heat::book_latent_heat(state, bio_reg)?;
 
     // --- fast flows (the crew breathes the biosphere's own gas pools: shared air) ---
-    // The crew's breath: its own vapour stock held by the ECLSS condenser (the reference), or
-    // the plants' held by the room's minute condenser (the lab's one store, `room_vapour`).
+    // The crew's breath: the plants' vapour held by the room's minute condenser (one store, the
+    // reference since 2026-10-20, `room_vapour`), or its own stock held by the ECLSS condenser
+    // (two stocks, the form until then).
     let condenser = if room.has_cabin_vapour() {
         eclss_condenser(eclss, room.crew_vapour(), RECOVERED_WATER)
     } else {

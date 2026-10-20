@@ -79,11 +79,21 @@ fn day_of(days: &mut Vec<Day>, d: usize) {
     }
 }
 
+/// ⚠ This instrument records the shared room's PRE-2026-10-20 form, two vapour stocks
+/// (`docs/plans/post-roadmap-shared-room-humidity.md` §12): its plant-step builds cannot hold the
+/// one-store room adopted then, and its numbers were measured on two stocks.
+fn two_stock_sealed() -> station::scenario::SealedStationScenario {
+    station::scenario::SealedStationScenario {
+        room_vapour: station::room_vapour::RoomVapour::TwoStocks,
+        ..sealed_station_scenario()
+    }
+}
+
 fn main() {
     let charge = params::charge();
     let eclss = params::eclss();
     let lamp = station_params::lamp();
-    let scenario = sealed_station_scenario();
+    let scenario = two_stock_sealed();
     let build = || {
         build_sealed_station_at(
             &charge,

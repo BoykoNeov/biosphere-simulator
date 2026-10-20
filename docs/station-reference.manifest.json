@@ -75,6 +75,7 @@
     "ChamberHeater",
     "ChamberLatentHeat",
     "ChamberWall",
+    "Condensation",
     "Condenser",
     "CrewMetabolism",
     "CrewRespiration",
@@ -179,12 +180,12 @@
     },
     "greenhouse": {
       "golden": "greenhouse_state.json",
-      "golden_sha256": "6ff4ea0b247fb4b02ff753fdb2d53088fef4289bcbb4b22e58694dc9c01476ad",
+      "golden_sha256": "d3c9e0e5afaadb3be709191c0d3626f6845baf30dfd0c6ec3eded2da246002ad",
       "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
     },
     "harvest": {
       "golden": "harvest_state.json",
-      "golden_sha256": "39b7e2a1bfedc0e4b3ab2f1b5e6146b8b496c150d2b087a0b69f509fff3edbd8",
+      "golden_sha256": "71156bdf72b036309b47e59e0888c9512de53523173e7572149d8946632fb740",
       "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
     },
     "lighting": {
@@ -209,7 +210,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "03ab687bf5c6731ce5c192436c0049ec89cdd6fcfaa6792eb597962bf2b15326",
+      "golden_sha256": "8164a647ea2913ca9b2d30b2890e8dfab4dcfa57d3690848c1d60592f7952d64",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

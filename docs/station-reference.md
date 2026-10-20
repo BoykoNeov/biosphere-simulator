@@ -143,7 +143,7 @@ stay **day-indexed** while biosphere trajectories are **step-indexed**. That asy
 load-bearing: slicing a station trajectory works in days, and "fixing" those sites to use
 steps introduces the bug it looks like it removes.
 
-### The flow set — sibling + station flow classes (derived; 20 since 2026-10-15, with the 3 biosphere types below 23)
+### The flow set — sibling + station flow classes (derived; 20 since 2026-10-15, with the 4 biosphere types below 24 since 2026-10-20)
 
 The frozen flow taxonomy of the coupled station, **derived from freshly assembled
 registries** (never hand-listed): the union over the four standalone sibling registries
@@ -174,7 +174,12 @@ no biosphere flow stepped on the plant step (`MicrobialRespiration` / …) appea
 2026-10-03 three biosphere types DO: `Allocation`, `GrowthRespiration` and
 `MaintenanceRespiration` are stepped on the sealed station's fast registry (the exception
 above). The plant-step `PlantWindowRecorder` that feeds them is in the excluded slow registry,
-so no freeze record lists it. The `aux_set`
+so no freeze record lists it. ⚠ Since 2026-10-20 a fourth: `Condensation`, the plants' frozen
+all-of-the-excess law instantiated a second time as the shared room's minute condenser
+(`station.room_condenser`, `crate::room_vapour`) — the crew's condenser in a room with one vapour
+store. `Condenser` stays, from the standalone ECLSS sibling (and the crew-only cabins). The
+`WithinDayAirRecorder` the greenhouses' minute condenser reads is in their excluded slow registry,
+so no freeze record lists it either. The `aux_set`
 is empty because every aux process lives in the excluded slow registry — the biosphere's
 `ThermalTimeAccumulation` and, since 2026-10-03, the station's own `PlantWindowRecorder` —
 not because the station carries none (it carries that one). The *set* is frozen so a future
@@ -392,6 +397,34 @@ suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
 
 ### Unfreeze log
 
+- **2026-10-20 — a room the crew and the plants share holds ONE water-vapour store
+  (`docs/plans/post-roadmap-shared-room-humidity.md` §12, the user's choice: 75 %, the sealed station's
+  thermostat live). 3 station goldens move; the manifest diff is their 3 `golden_sha256` rows and
+  `flow_set` + `Condensation`.** Until now `greenhouse`, `harvest` and `sealed_station` gave the room two
+  vapour stocks, the crew's `eclss.cabin_h2o` (40 % of a stored 22 °C saturation, the ECLSS first-order
+  condenser) and the plants' `biosphere.water_vapor` (75 % at the plants' temperature); together they
+  sat at 1.21 of saturation in warm weeks and 2.23 in the 4 °C cold weeks. Now the crew breathes into
+  `water_vapor` and `cabin_h2o` is not built; the crew's condenser takes the plants' law (everything
+  above the target, every minute) at the plants' own setting, read from `water_cycle.yaml`
+  (`room_vapour::shared_room`), and its water still goes where the crew's condensate went. The
+  thermostat differs by build, and "live" is the sealed station's only: its minute condenser reads the
+  chamber's heat store every minute (`Thermostat::LiveChamber`; over the 1220-day run the room never
+  passed saturation, max 0.7603); the greenhouses have no chamber and read the plant window's
+  within-day air (`Thermostat::Window`; max 0.821 read minute by minute). **Measured in the lab first,
+  then adopted byte for byte:** the lab's `--save` ran the three goldens' own builds, the two-stock side
+  first reproducing each committed golden, and each regenerated golden is `cmp`-identical to its saved
+  file; the other 17 are identical (`sealed_energy_drift_summary` included, as predicted). What moved:
+  greenhouse / harvest crew condensate −3.09 / −3.10 kg and plant condensate +3.23 / +3.25 kg, no carbon
+  bit; sealed crew store −146.1 kg, soil +14.9 %, subsoil +27.0 %, battery +0.29 % on the last day, plant
+  carbon within 0.003 %. Not predicted: the sealed top-layer reading on the last day, 8.8 → 28.5 kg (not
+  traced). `CabinScenario::cabin_h2o_0` is kept, unread by these three builds (the crew-only cabins and
+  the separate-air lab read it); no start value moved. The separate-air lab builds two rooms and so two
+  stocks itself (`air_split::split_scenario`). Tests whose subject is the plant-step machinery are
+  pinned to two stocks (a plant-step build cannot hold one store) and `air_split.rs` keeps the two-stock
+  shared baseline. Two `chamber_walls.rs` pins re-pinned as measured, bands unchanged: the
+  structure-walls node 188.7014 → 188.5947 K, and the 1220-day outdoor run's node min / max / mean
+  162.4686 / 175.3114 / 170.0318 K and chamber end 295.1355778 K (the `--ignored` run found it).
+  Advisor-reviewed before code.
 - **2026-10-20 — the station's crew is four BVAD crew members, defined once
   (`docs/plans/post-roadmap-crew-size.md` §9–12, the user's choice). 5 station goldens move; their 5
   `golden_sha256` rows are the whole manifest diff.** Until now `CABIN_GAS_SCENARIO` ate 4.0e-3 mol C/s
@@ -824,7 +857,7 @@ suite is run, by hand since 2026-10-10 (this read "fails CI" until 2026-10-19).
   targets sum to ≈ 116 %. No flow reads the sum (nothing reacts to it, and no display shows a
   room humidity), so no simulated value changes; it is a bookkeeping flaw of two stocks in one
   room, which the crew-only cabin, the standalone ECLSS cabin and the lab's separate air do not
-  have.
+  have. ⚠ *Fixed 2026-10-20* (one store, the entry at the top of this log).
 
 
 - **2026-10-01 — the biosphere's crop transpires against the chamber's own air; 4 station

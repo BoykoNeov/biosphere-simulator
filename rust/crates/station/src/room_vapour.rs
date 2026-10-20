@@ -1,12 +1,14 @@
-//! **LAB-ONLY** — one moisture store for a room the crew and the plants share
-//! (`docs/plans/post-roadmap-shared-room-humidity.md`).
+//! One moisture store for a room the crew and the plants share
+//! (`docs/plans/post-roadmap-shared-room-humidity.md`) — **the reference since 2026-10-20**
+//! ([`shared_room`]: the user's 75 %, the sealed station's thermostat live, the greenhouses' the
+//! plant window's).
 //!
 //! Three station builds put the crew and the plants in one room (`greenhouse`, `harvest`,
-//! `sealed_station`): the crew breathes the plants' CO₂ and O₂ pools. Their water vapour is not
-//! shared in the reference ([`RoomVapour::TwoStocks`]): the crew's breath goes to `cabin_h2o`, held
-//! at 40 % of a stored 22 °C saturation by the ECLSS condenser, and the plants' transpiration to
-//! `water_vapor`, held at 75 % of saturation at the plants' temperature. Counted together the room
-//! is above saturation on almost every step (plan §1).
+//! `sealed_station`): the crew breathes the plants' CO₂ and O₂ pools. Until 2026-10-20 their water
+//! vapour was not shared ([`RoomVapour::TwoStocks`], kept for the lab's records): the crew's breath
+//! went to `cabin_h2o`, held at 40 % of a stored 22 °C saturation by the ECLSS condenser, and the
+//! plants' transpiration to `water_vapor`, held at 75 % of saturation at the plants' temperature.
+//! Counted together the room was above saturation on almost every step (plan §1).
 //!
 //! [`RoomVapour::OneStock`] gives the room one vapour stock, the plants' `water_vapor`, and both
 //! condensers one target: `setting` × saturation at the temperature the plants' water reads
@@ -39,10 +41,13 @@ use simcore::state::{State, Stock};
 
 use crate::gas_exchange::{window_key, OnFastStep, PLANT_WINDOW_RECORDER};
 
-/// The shared room's water vapour: two stocks (the reference) or one.
+/// The shared room's water vapour: one stock (the reference since 2026-10-20, [`shared_room`]) or
+/// two (the form until then).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RoomVapour {
-    /// The crew's `cabin_h2o` and the plants' `water_vapor`, each held by its own condenser.
+    /// The crew's `cabin_h2o` and the plants' `water_vapor`, each held by its own condenser — the
+    /// form until 2026-10-20, kept for the lab's records (and the separate-air lab, whose cabin is
+    /// a room of its own).
     TwoStocks,
     /// One stock, `water_vapor`, held at `setting` (a fraction of saturation) by both condensers;
     /// the minute one reads `thermostat`.
@@ -61,6 +66,17 @@ pub enum Thermostat {
     /// The chamber's live heat-store temperature, every minute (a build with a chamber only; the
     /// greenhouses' outdoor air curve could be read live too, and is not built — plan §10).
     LiveChamber,
+}
+
+/// The reference's shared room (2026-10-20, the user's choice): one stock at the plants' own
+/// setting — `water_cycle.yaml`'s 75 %, read here rather than copied — with the minute condenser on
+/// `thermostat` (the sealed station's chamber live; the greenhouses, which have no chamber, the
+/// plant window's).
+pub fn shared_room(thermostat: Thermostat) -> RoomVapour {
+    RoomVapour::OneStock {
+        setting: domains::biosphere::params::water_cycle().humidity_setpoint,
+        thermostat,
+    }
 }
 
 impl RoomVapour {

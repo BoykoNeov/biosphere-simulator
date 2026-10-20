@@ -3,7 +3,8 @@
 **Opened 2026-10-20** on the user's *"3"* (the shared room's humidity over 100 %) and then *"1"* (one
 moisture store, held at the room's own temperature). ⚠ **This reverses a decision the user took on
 2026-10-03** (`post-roadmap-room-temperature.md` §19.1: *keep two stocks, record the flaw*); the user
-was told so before choosing. **This doc is the plan and its predictions. Nothing is built.**
+was told so before choosing. The plan and its predictions (§1–§11), then the measurement; **ADOPTED
+2026-10-20** (§12: 75 %, the sealed station's thermostat live).
 
 ## 1. What today is, measured (2026-10-20, on `75c0ca9`)
 
@@ -324,3 +325,75 @@ moves, the adoption reached a build it should not, and that is a finding. So P9 
 §9); and the sealed station's thermostat — live (never above saturation over 1220 days) or the window
 (573 minutes above it, at the switches). The greenhouses stay on the window (max 0.821, §10) unless the
 user asks for a live one.
+
+## 12. ADOPTED 2026-10-20 — 75 %, the sealed station's thermostat live
+
+**The user's answer:** *"75%, live"*. Live is the sealed station's only (the greenhouses have no
+chamber heat store, §8); they keep the plant window's thermostat, as §11 said.
+
+**The form, as built.** `room_vapour::shared_room(thermostat)` is the reference: one stock at the
+plants' own setting, read from `water_cycle.yaml` (0.75, not a second copy). `greenhouse_scenario()` (and
+so `harvest_scenario()`) takes `shared_room(Window)`, `sealed_station_scenario()` takes
+`shared_room(LiveChamber)`. `TwoStocks` stays, as the lab's record of the form until today.
+
+**Order (advisor-reviewed before code):**
+1. Lab first: `shared_room_humidity -- --save <dir>` runs the three goldens' own builds; the two-stock
+   side reproduced each committed golden's bytes, then the chosen room's final state was saved
+   (committed alone, `c94bd63`).
+2. The default flipped; the full suite run with `--no-fail-fast` to see every red before fixing any.
+3. `regen_goldens` report: **exactly `greenhouse`, `harvest`, `sealed_station` CHANGED; the other 17
+   identical**, `sealed_energy_drift_summary` included (§11's fresh prediction ✓). ⚠ §5 P9 and §11 said
+   "the other 18": the roster runs 20 goldens (the 21st file in `rust/data/golden/` is not in it).
+4. `--write`; each regenerated golden is **`cmp`-identical** to the lab's saved file.
+5. The station manifest: the 3 `golden_sha256` rows and `flow_set` + `Condensation` — **exactly §4 / P9's
+   prediction**. The authoring manifest did not move (its writer test passed).
+
+**What the goldens moved** (old → new, final day):
+
+| | greenhouse | harvest | sealed station |
+|---|---|---|---|
+| `eclss.cabin_h2o` | removed | removed | removed |
+| crew condensate (`humidity_condensate` / crew store) | −3.09 kg | −3.10 kg | crew store −146.1 kg; brine −16.2 kg |
+| plants' `condensate` | +3.23 kg | +3.25 kg | +134.4 kg |
+| soil / subsoil | +0.58 % / — | +0.07 % / — | +14.9 % / +27.0 % |
+| carbon | no bit | no bit | plant stocks within 0.003 % |
+| energy | — | — | battery +0.29 %, node −9.8e-5, chamber +2.3e-7 |
+| aux | + `station.plant_window.air_temp_within_day` (the recorder §2 F2 named) | the same | evaporation total −1.34 % |
+
+Every row repeats the lab's §7–§9 readouts to their printed digits. **Not predicted, not traced:** the
+sealed station's top soil layer on the last day, 8.8 → 28.5 kg (+223 %); the lab never printed it. The
+watering's timing on that day is a candidate (the CO₂ item saw the final-day water split move with its
+sum unchanged), not a measured cause.
+
+**`cabin_h2o_0`:** kept, unread by the three shared builds (documented on the field). The crew-only cabins,
+the two-stock form and the separate-air lab read it. No start value moved in this batch (the plants'
+`water_vapor0` stays 0), so the saved states stayed the prediction.
+
+**The reds, and what each became** (31 tests in 9 binaries, all read before any fix):
+* `golden_regression`, `tier_contract`, `manifest_writer` — the reference moving; cleared by steps 4–5.
+* `air_split.rs` (10) and `minute_transpiration.rs` (4) — `build_split_station` refused the new default.
+  Separate air builds two rooms, so `split_scenario` now sets `TwoStocks` itself; the refusal now stands
+  only for a one-store setting other than the plants' own, which separate air would drop. Then one
+  `air_split` pin read against the one-store shared baseline: "vapour off holds the shared plants' water
+  loop exactly" measured 195.0 against 237.5 kg — the crew's breath now reaches the shared plants' water,
+  so the claim is about the two-stock room. The file's baseline (`scenario()`) is pinned to two stocks,
+  beside its old crew load and old scrubber; all ten pass, the 0.97 fan pin untouched.
+* `day_order.rs` (5), `gas_exchange.rs` (7), `latent_heat.rs` (1) — plant-step (or no-plant) builds
+  refused: a one-store condenser reads the minute step's recorded window. Their subject is the step
+  machinery, the same on either form, so their plant-step builds are pinned to two stocks;
+  `every_crop_build_steps_the_carbon_budget_exactly_once` keeps its minute-step builds on the reference's
+  one store.
+* `chamber_walls.rs` — `walls_onto_the_station_structure_run_the_heater_continuously`: the node
+  188.7014 → **188.5947 K**, the heater 139.193 → 139.163 W (inside its band already). Re-pinned as
+  measured, band unchanged; neither size nor sign predicted (earlier re-pins moved the node down both when
+  the plants evaporated less and when they evaporated more).
+* Found only by the `--ignored` run, after the goldens: `chamber_walls.rs`'s 1220-day
+  `the_reference_node_and_chamber_follow_the_weather` — node min / max / mean 162.4702 / 175.3236 /
+  170.0607 → **162.4686 / 175.3114 / 170.0318 K** (max and mean past their 0.01 bands), the chamber's end
+  295.1355085 → **295.1355778 K**; 9 day ends between the bands, as before. Re-pinned as measured, bands
+  unchanged. Colder on the mean: the run's evaporation total is −1.34 %, and this test's own history has
+  less evaporation → a colder node (2026-10-16). Size not predicted.
+* Examples built on plant-step shared rooms (`air_split`, `air_split_baseline`, `intraday_exchange`) take
+  two-stock scenarios, as their records were measured; nothing runs examples, so these were found by
+  grep, not by a red.
+

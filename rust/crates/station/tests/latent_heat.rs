@@ -209,10 +209,15 @@ fn a_save_without_the_rate_key_resumes_at_a_group_boundary() {
 
 /// The retired slow-first day refuses the books: every minute would draw the day's last window's
 /// rate, and the heat drawn would part from the ledger without an error. With them switched off it
-/// runs (a plant-step gas exchange, so the gas refusal does not answer first).
+/// runs (a plant-step gas exchange, so the gas refusal does not answer first). At two vapour
+/// stocks: a plant-step build cannot hold the one-store shared room (the reference since
+/// 2026-10-20), whose condenser reads the minute step's recorded window.
 #[test]
 fn the_slow_first_day_refuses_the_books() {
-    let scenario = sealed_station_scenario();
+    let scenario = station::scenario::SealedStationScenario {
+        room_vapour: station::room_vapour::RoomVapour::TwoStocks,
+        ..sealed_station_scenario()
+    };
     let lamp = station::params::lamp();
     let build_plant_step = || {
         station::sealed::build_sealed_station_at(

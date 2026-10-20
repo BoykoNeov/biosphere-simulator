@@ -330,8 +330,18 @@ fn print(name: &str, r: &Reading, base: &Reading) {
     );
 }
 
+/// ⚠ This instrument records the shared room's PRE-2026-10-20 form, two vapour stocks
+/// (`docs/plans/post-roadmap-shared-room-humidity.md` §12): its plant-step builds cannot hold the
+/// one-store room adopted then, and its numbers were measured on two stocks.
+fn two_stock_sealed() -> station::scenario::SealedStationScenario {
+    station::scenario::SealedStationScenario {
+        room_vapour: station::room_vapour::RoomVapour::TwoStocks,
+        ..sealed_station_scenario()
+    }
+}
+
 fn main() {
-    let scenario = sealed_station_scenario();
+    let scenario = two_stock_sealed();
     let days = scenario.season_days;
     let setpoint = bio_params::biosphere().water.humidity_setpoint;
     println!(

@@ -23,6 +23,7 @@ use station::gas_exchange::{
     GasExchangeStep, OnFastStep, CARBON_BUDGET_FLOWS, PLANT_WINDOW_RECORDER, WINDOW_VARS,
 };
 use station::params as station_params;
+use station::room_vapour::RoomVapour;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
     build_sealed_station, build_sealed_station_at, build_sealed_station_unread,
@@ -36,7 +37,15 @@ use station::sowing::{
 /// The PLANT-STEP sealed build, **unread** — its plants not yet wrapped to read the chamber —
 /// because this file moves the gas exchange itself, and the wrap must come after the move
 /// (slice 3a, §24b; [`a_wrap_before_the_move_is_refused`]).
+///
+/// ⚠ At TWO vapour stocks, whatever `scenario` says: a plant-step base cannot hold the one-store
+/// shared room (the reference since 2026-10-20), whose condenser reads the minute step's recorded
+/// window — and this file's subject, the move, is the same on either form.
 fn built(scenario: &SealedStationScenario) -> (State, Registry, Registry) {
+    let scenario = &SealedStationScenario {
+        room_vapour: RoomVapour::TwoStocks,
+        ..*scenario
+    };
     build_sealed_station_unread(
         &params::charge(),
         &params::thermal(),
@@ -439,11 +448,10 @@ fn every_crop_build_steps_the_carbon_budget_exactly_once() {
     use station::air_split::{build_split_station, AirSplit, BVAD_CHAMBER_AIR_MOL};
     use station::greenhouse::build_greenhouse_at;
     use station::harvest::build_harvest;
-    use station::scenario::{greenhouse_scenario, harvest_scenario};
+    use station::scenario::{greenhouse_scenario, harvest_scenario, GreenhouseScenario};
 
     let crew = params::crew();
     let eclss = params::eclss();
-    let sealed = sealed_station_scenario();
     let check = |name: &str, bio: &Registry, fast: &Registry, minute: bool| {
         for id in CARBON_BUDGET_FLOWS {
             let on_bio = bio.flows().iter().filter(|f| f.id() == id).count();
@@ -459,10 +467,27 @@ fn every_crop_build_steps_the_carbon_budget_exactly_once() {
     };
     for gas in [GasExchangeStep::PlantStep, GasExchangeStep::Minute] {
         let minute = gas == GasExchangeStep::Minute;
+        // The minute builds are the reference's own (one vapour store since 2026-10-20); a
+        // plant-step build cannot hold one store, so it is the two-stock form's.
+        let room = |reference: RoomVapour| {
+            if minute {
+                reference
+            } else {
+                RoomVapour::TwoStocks
+            }
+        };
+        let greenhouse = GreenhouseScenario {
+            room_vapour: room(greenhouse_scenario().room_vapour),
+            ..greenhouse_scenario()
+        };
+        let sealed = SealedStationScenario {
+            room_vapour: room(sealed_station_scenario().room_vapour),
+            ..sealed_station_scenario()
+        };
         let (_, bio, fast) = build_greenhouse_at(
             &crew,
             &eclss,
-            &greenhouse_scenario(),
+            &greenhouse,
             true,
             domains::crew::FECAL_WASTE,
             gas,

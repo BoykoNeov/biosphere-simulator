@@ -5,10 +5,11 @@
     "soil_evap_today": "0x1.fc599ae8828a9p+0",
     "soil_potential_today": "0x1.06a45554d203fp+1",
     "soil_shade_lai": "0x1.281c70aefbc0ap-4",
+    "station.plant_window.air_temp_within_day": "0x1.7532455b3ba40p+3",
     "station.plant_window.par": "0x0.0p+0",
     "station.plant_window.temp": "0x1.a147ae147ae14p+3",
     "thermal_time": "0x0.0p+0",
-    "top_soil_water": "0x1.c0ec23db74526p+2",
+    "top_soil_water": "0x1.c929855be8105p+2",
     "vernalization_days": "0x0.0p+0"
   },
   "n": 112,
@@ -42,7 +43,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.57ef7cc104e37p+3",
+      "amount": "0x1.bf48a6d45831cp+3",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -198,7 +199,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.6271441c4d105p+4",
+      "amount": "0x1.64809c7c6a002p+4",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -263,7 +264,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.bcd38a8a07a93p+0",
+      "amount": "0x1.beec09060e8adp+0",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -303,7 +304,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.48fa64c2f8222p+6",
+      "amount": "0x1.3c9a73f9d9ff2p+6",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -388,19 +389,6 @@
       "domain": "crew",
       "extinction_threshold": "0x0.0p+0",
       "id": "crew.water_store",
-      "kind": "pool",
-      "quantity": "water",
-      "unclamped": false,
-      "unit": "kg"
-    },
-    {
-      "amount": "0x1.07938d4ccbc1ep+1",
-      "composition": {
-        "water": "0x1.0000000000000p+0"
-      },
-      "domain": "eclss",
-      "extinction_threshold": "0x0.0p+0",
-      "id": "eclss.cabin_h2o",
       "kind": "pool",
       "quantity": "water",
       "unclamped": false,

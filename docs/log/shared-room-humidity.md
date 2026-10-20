@@ -43,4 +43,13 @@ no value, golden, manifest or `source:` string moved. Plan: `docs/plans/post-roa
   live greenhouse thermostat is buildable (an earlier line here said it was not); not built.
 * **Corrected (plan §4, §11):** `sealed_energy_drift_summary` runs Power → Thermal with no room in it;
   fresh prediction: byte-identical at adoption.
-* **The user's call:** 75 % or 40 %, and the sealed station's thermostat (live or window).
+* **The user's call:** *"75%, live"* (live is the sealed station's only; the greenhouses have no chamber).
+* **ADOPTED 2026-10-20** (plan §12): a station unfreeze. The lab saved the three goldens' own builds at the
+  chosen room, after the two-stock side reproduced each committed golden; the regenerated `greenhouse`,
+  `harvest` and `sealed_station` are `cmp`-identical to those files, the other 17 identical (the energy-drift
+  golden included, as predicted). Manifest: 3 hashes and `flow_set` + `Condensation`, as predicted. Moved:
+  crew condensate −3.1 kg in the greenhouses, the sealed crew store −146 kg; no carbon bit in the
+  greenhouses. Not predicted: the sealed top soil layer on the last day, 8.8 → 28.5 kg (not traced).
+  Separate air builds two stocks itself; the plant-step tests and `air_split.rs`'s shared baseline keep two
+  stocks (a plant-step build cannot hold one); two node pins re-pinned as measured, bands unchanged (the
+  structure walls 188.70 → 188.59 K; the 1220-day run's mean 170.06 → 170.03 K, found by `--ignored`).

@@ -544,13 +544,16 @@ fn sealed_golden(room: RoomVapour) -> String {
     snapshot(states.last().expect("a day"))
 }
 
+/// One golden's own build and run at a room, to its snapshot.
+type GoldenRun = fn(RoomVapour) -> String;
+
 /// `--save <dir>`: each golden at two stocks (checked against the committed bytes), then at the
 /// chosen room, saved.
 fn save(dir: &str) {
     let golden_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/golden");
     let window = one(0.75, Thermostat::Window);
     let live = one(0.75, Thermostat::LiveChamber);
-    let runs: [(&str, fn(RoomVapour) -> String, RoomVapour); 3] = [
+    let runs: [(&str, GoldenRun, RoomVapour); 3] = [
         ("greenhouse_state.json", greenhouse_golden, window),
         ("harvest_state.json", harvest_golden, window),
         ("sealed_station_state.json", sealed_golden, live),
