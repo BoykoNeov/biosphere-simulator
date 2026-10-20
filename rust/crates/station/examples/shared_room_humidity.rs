@@ -8,15 +8,17 @@
 //! cargo run --release -q -p station --example shared_room_humidity -- --save <dir>  # adoption's bytes
 //! ```
 //!
-//! `--save <dir>` runs the three goldens' own builds (`station::goldens`), each first as the
-//! reference (two stocks, checked against the committed golden's bytes, so a drift in this tool's
-//! copy of a build cannot pass) and then at the room the user chose on 2026-10-20 — 75 %, the
-//! sealed station's thermostat live, the greenhouses' the plant window's (they have no chamber) —
-//! and writes that final state to `<dir>/<golden file>`, so the regenerated goldens can be `cmp`'d
-//! against what was measured here.
+//! `--save <dir>` runs the three goldens' own builds (`station::goldens`) at the room the user
+//! chose on 2026-10-20 — 75 %, the sealed station's thermostat live, the greenhouses' the plant
+//! window's (they have no chamber) — checks it against the committed golden's bytes (so a drift in
+//! this tool's copy of a build cannot pass), writes that final state to `<dir>/<golden file>`, and
+//! prints whether two stocks differ. ⚠ Until the adoption (2026-10-20, plan §12) the check ran the
+//! other way: two stocks were the reference and had to reproduce the golden, and the chosen room's
+//! state was saved as the prediction the regenerated goldens were `cmp`'d against.
 //!
 //! Each shared-room build (the sealed station, the greenhouse, the harvest greenhouse) at
-//! [`RoomVapour::TwoStocks`] (the reference), `OneStock { 0.75 }` and `OneStock { 0.40 }`. It reads,
+//! [`RoomVapour::TwoStocks`] (the form until 2026-10-20), `OneStock { 0.75 }` (the reference
+//! since, on the live thermostat for the sealed station) and `OneStock { 0.40 }`. It reads,
 //! directly rather than from end stores, what each condenser catches, and the room's whole vapour
 //! against saturation at the room's REAL temperature: the chamber's live heat-store temperature on
 //! every minute (sealed), the weather's within-day air curve read over each minute (the
@@ -547,8 +549,8 @@ fn sealed_golden(room: RoomVapour) -> String {
 /// One golden's own build and run at a room, to its snapshot.
 type GoldenRun = fn(RoomVapour) -> String;
 
-/// `--save <dir>`: each golden at two stocks (checked against the committed bytes), then at the
-/// chosen room, saved.
+/// `--save <dir>`: each golden at the chosen room (checked against the committed bytes), saved,
+/// and at two stocks for the contrast.
 fn save(dir: &str) {
     let golden_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/golden");
     let window = one(0.75, Thermostat::Window);
@@ -560,17 +562,17 @@ fn save(dir: &str) {
     ];
     for (name, run, chosen) in runs {
         let committed = std::fs::read_to_string(golden_dir.join(name)).expect("golden file");
-        let reproduces = run(RoomVapour::TwoStocks) == committed;
+        let adopted = run(chosen);
+        let reproduces = adopted == committed;
         assert!(
             reproduces,
-            "{name}: the two-stock side does not reproduce the golden"
+            "{name}: the chosen room ({chosen:?}) does not reproduce the golden"
         );
-        let adopted = run(chosen);
         std::fs::write(std::path::Path::new(dir).join(name), &adopted).expect("save");
         println!(
-            "== {name}: two stocks reproduce the golden: {reproduces}; {chosen:?} saved, \
-             differs from the golden: {}",
-            adopted != committed
+            "== {name}: {chosen:?} reproduces the golden: {reproduces}, saved; two stocks differ \
+             from it: {}",
+            run(RoomVapour::TwoStocks) != committed
         );
     }
 }
