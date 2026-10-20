@@ -16,7 +16,8 @@ is not shared: the room holds two vapour stocks, each held by its own condenser.
 | `biosphere.water_vapor` | the plants' transpiration | the plants' `Condensation`, plant step, takes everything above target | 0.75 × saturation at the plants' temperature (`water_cycle.yaml`, BVAD p. 130) |
 | `eclss.cabin_h2o` | the crew's `WaterBalance` (4 × 2.946 kg/d) | the ECLSS `Condenser`, minute step, first order `k·max(0, h − target)`, k = 5e-4 /s | 0.40 × saturation at a **stored 22 °C** (`eclss.yaml`, BVAD Table 4-1) |
 
-Measured with a throwaway probe (`W:\temp\claude\humidity_probe\`, outside the repo): one 305-day season
+Measured with a throwaway probe (since deleted; `station/examples/shared_room_humidity.rs`'s two-stock
+case reproduces every number below to the printed digit, §7): one 305-day season
 of the reference sealed station, the room's whole vapour (both stocks) against saturation at the plants'
 temperature, at every plant-step start:
 
@@ -59,6 +60,11 @@ reference recorder, `gas_exchange::PlantWindowRecorder`, records `TEMP_VAR` only
 reads the within-day air needs that name recorded too), so the two condensers read ONE thermostat. Two
 condensers with different targets on one stock would mean the drier one takes the other's water every
 step.
+⚠ *Amended after §8:* the measured live thermostat gives the two condensers DIFFERENT temperatures on
+purpose (the minute one the chamber's, the plants' the window's), and the harm argued above did not
+appear: over one season the two catches sum to the crew's emission plus 0.35 kg (crew condenser
+3554.56 + plants' 39.92 = 3594.48 against 3594.13 kg breathed), so the plants lose ~0.35 kg a season
+to the crew's side. One thermostat is not required; one target LAW (all of the excess) is.
 
 **F3. The crew's condenser takes everything above the target, every minute** — the plants' frozen
 `Condensation` law, instantiated a second time on the fast step, not the ECLSS first-order law. ⚠ Why,
@@ -119,7 +125,9 @@ the default flipping and the goldens regenerated — is the user's call, after t
 
 * Goldens holding `eclss.cabin_h2o`: `cabin_gas`, `eclss`, `water_recovery` (own cabin; unchanged) and
   `greenhouse`, `harvest`, `sealed_station` (shared; the key disappears on adoption).
-  `lighting` has no crew. `sealed_energy_drift_summary` reads the sealed run's energy.
+  `lighting` has no crew. ⚠ Corrected 2026-10-20 (§11): `sealed_energy_drift_summary` was listed here
+  as reading the sealed run's energy; it runs `HEAT_CLOSURE_SCENARIO` (Power → Thermal, no plants, no
+  crew, no vapour stock), so this item cannot reach it.
 * Manifests: `cabin_h2o` appears only in the authoring manifest (the `eclss.condenser` wiring field) —
   untouched. The station manifest names no vapour stock; its golden hashes move on adoption, and its
   `flow_set` (type names across the station's registries — it already lists the biosphere's
@@ -168,6 +176,8 @@ the default flipping and the goldens regenerated — is the user's call, after t
 **Across the suite (at adoption):**
 9. Goldens: `greenhouse`, `harvest`, `sealed_station` move (water stocks; `cabin_h2o` gone);
    `sealed_energy_drift_summary` moves at ≤ 1e-4 relative or not at all; the other 17 byte-identical.
+   ⚠ Superseded before any adoption run by §11's fresh prediction (the battery's 3.7e-4 already broke
+   the ≤ 1e-4 premise, and the golden turned out to hold no room at all).
    In the 7-day `greenhouse` / `harvest` at 75 %: the crew's `humidity_condensate` sink 1–15 kg lower,
    the plants' `condensate` the same amount higher (F3a); no carbon value moves by more than 0.1 %.
    The station manifest: 3 golden hashes and `flow_set += Condensation`, nothing else.
@@ -219,6 +229,9 @@ passes 0.754 of saturation (two stocks: 1.78 max, above 1 on 9180 of 10 080 minu
 `humidity_condensate` −3.09 / −3.10 kg and the plants' `condensate` +3.23 / +3.25 kg (predicted 1–15,
 ✓); plant carbon +0.0000 %. At 0.40: room ≤ 0.404, crew condensate −1.87 kg, condensate +3.5 / +3.3
 kg, soil −2.4 % / −0.2 %, plant carbon +0.0000 %.
+⚠ **The "never passes 0.754" check proved itself**: it read the same plant-window temperature the
+condensers enforce. The within-day air is a continuous curve, evaluable over any minute, so §10 re-reads
+it minute by minute — and the premise "a switch lag cannot show" was wrong.
 
 ## 8. The thermostat lags the room at the switches
 
@@ -243,13 +256,66 @@ before the plants' condenser sees it), so the plants' condenser catches less tha
 | window @ 0.40 | 0.658 | 0 | 60.4 kg | −38.6 kg | 23.244 / 22.812 |
 | live @ 0.40 | 0.408 | 0 | 40.1 kg | −36.3 kg | 23.180 / 22.778 |
 
-Every prediction for the live case held, the ceiling only just: 0.7601 against "≤ 0.76" (one minute's
-breath above a 4 °C target is 0.6 % of saturation, so 0.756 + the target's own drift within the minute).
+Every prediction for the live case held **but one, by 1e-4: the ceiling, 0.7601 against "≤ 0.76"**.
+One minute's breath above a 4 °C target is 0.6 % of saturation (0.756); what carries it past 0.76 is
+**not measured** on this run (a candidate, the chamber cooling inside the minute, is counted by the
+`--full` run's "above setting + one minute's breath" readout, §9).
 The plants' condenser now catches the minute's residue and nothing else — 39.9 kg, the §2 F3a figure to
 the digit — so the switch leak is gone in both directions. Plant water, carbon and energy are the window
 case's within its own digits (battery +3.77e-4, the same transpiration cause). At 0.40 the live
 thermostat brings the room to its setting (0.408) where the window one reached 0.658 at the switches.
 
-**What the user decides (adoption):** the setting, 75 % or 40 %; and the thermostat for the sealed
-station — live (passes saturation never) or the window (143 minutes a season, at the switches). The
-greenhouses can only take the window: their weather has no finer clock than the plant step.
+## 9. The 1220-day sealed run (`--full`, 2026-10-20)
+
+All five cases, the whole run (1 756 800 minutes, eight full seasons and the start of a ninth);
+rationed 0 / 0 in every case. Against two stocks:
+
+| Case | Room ÷ real saturation, max | Minutes above 1 | Plants' condenser | Crew store | Battery, lowest | Grain peaks |
+|---|---|---|---|---|---|---|
+| two stocks | 2.554 | 1 747 351 | 22.9 kg | — | 1.025e10 J (51 % of start) | 22.437 … 22.446 |
+| window @ 0.75 | 1.261 | 573 | 178.1 kg | −161.7 kg | 1.028e10 J | 22.437 … 22.448 |
+| **live @ 0.75** | **0.7603** | **0** | **159.7 kg** | **−146.1 kg** | **1.028e10 J** | 22.437 … 22.448 |
+| window @ 0.40 | 0.662 | 0 | 245.0 kg | −154.0 kg | **3.17e9 J (16 %)** | 22.476 … 23.385 |
+| live @ 0.40 | 0.408 | 0 | 160.4 kg | −145.7 kg | **3.18e9 J (16 %)** | 22.595 … 23.425 |
+
+* **Live @ 0.75 holds over the long run.** Never above saturation; the plants' condenser catches 159.7
+  kg against §2 F3a's 160 kg; the crew store −146.1 kg = 4 × the season's −36.5. Soil +14.9 %, subsoil
+  +27.0 % (the leak's placement, as in §7), battery +2.9e-3, node −9.8e-5, chamber +2e-7.
+* **The 0.7601 ceiling miss (§8):** over the run the live room passed "setting + one minute's breath"
+  on 33 504 minutes, and on **every one of them** the chamber was cooler than the minute before. That is
+  what the candidate (the chamber cooling inside the minute, after the condenser set its target)
+  requires; it supports the candidate, it does not isolate it.
+* **The window thermostat's switch leak recurs every season**: 573 minutes above saturation (143 a season).
+* **40 % is not a free choice: it drains the battery.** The extra evaporation is paid by the chamber's
+  heater from the battery: the lowest charge over the run is 16 % of the starting 2.0e10 J against two
+  stocks' 51 %, and the end charge is 69 % below the two-stock run's. Whether it would run out on a
+  longer run is not measured. Grain peaks rise again (up to +4.4 %); the cause is still not measured.
+  The end-of-run plant carbon (−34 % / −41 %) is a snapshot mid-way through the ninth season, not a
+  harvest, and is not read as a loss.
+
+## 10. The greenhouses, read minute by minute
+
+`RealTemp::OutdoorAir` re-reads the weather's within-day air curve over each MINUTE (the plants' water
+reads the same curve averaged over the plant window). Seven days, the same three cases:
+
+| Build | two stocks | window @ 0.75 | window @ 0.40 |
+|---|---|---|---|
+| greenhouse: max, minutes above 1 | 1.829, 9180 of 10 080 | **0.821**, 0 | 0.439, 0 |
+| harvest | 1.829, 9180 | **0.821**, 0 | 0.439, 0 |
+
+The window thermostat lags the outdoor air too (0.821, not 0.754), but by a 7 % margin, not past
+saturation. A live thermostat for the greenhouses is buildable (the curve is evaluable per minute,
+which §8's "refuse it" premise missed) and is NOT built; at these numbers it is not needed to keep the
+room below saturation. Water and carbon readouts repeat §7's to the digit.
+
+## 11. A fresh prediction for `sealed_energy_drift_summary` (committed before any adoption run)
+
+§5 P9 ("≤ 1e-4 or not at all") rested on the sealed run's energy. The golden is
+`goldens::sealed_energy_drift`, the 15-year `HEAT_CLOSURE_SCENARIO` (Power → Thermal, built by
+`build_station` with no crew, plants or vapour). **Prediction: byte-identical at adoption.** If it
+moves, the adoption reached a build it should not, and that is a finding.
+
+**What the user decides (adoption):** the setting, 75 % or 40 % (40 % costs the sealed station's battery,
+§9); and the sealed station's thermostat — live (never above saturation over 1220 days) or the window
+(573 minutes above it, at the switches). The greenhouses stay on the window (max 0.821, §10) unless the
+user asks for a live one.

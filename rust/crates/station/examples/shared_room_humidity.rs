@@ -4,13 +4,15 @@
 //! ```text
 //! cargo run --release -q -p station --example shared_room_humidity            # one season + 7-day runs
 //! cargo run --release -q -p station --example shared_room_humidity -- --full  # the 1220-day sealed run
+//! cargo run --release -q -p station --example shared_room_humidity -- --greenhouses  # 7-day runs only
 //! ```
 //!
 //! Each shared-room build (the sealed station, the greenhouse, the harvest greenhouse) at
 //! [`RoomVapour::TwoStocks`] (the reference), `OneStock { 0.75 }` and `OneStock { 0.40 }`. It reads,
 //! directly rather than from end stores, what each condenser catches, and the room's whole vapour
 //! against saturation at the room's REAL temperature: the chamber's live heat-store temperature on
-//! every minute (sealed), the plant window's within-day air (the greenhouses). It writes nothing
+//! every minute (sealed), the weather's within-day air curve read over each minute (the
+//! greenhouses). It writes nothing
 //! and takes no decision.
 
 use domains::biosphere::science::saturation_vapour_kg;
@@ -18,10 +20,11 @@ use domains::biosphere::stocks::{
     AIR_TEMP_WITHIN_DAY_VAR, CONDENSATE, LEAF_C, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C,
     SUBSOIL_WATER, WATER_VAPOR,
 };
+use domains::biosphere::system::weather_forcings;
 use domains::crew::{FECAL_WASTE, FOOD_STORE, WATER_STORE};
 use domains::eclss::{CABIN_H2O, CONDENSER, HUMIDITY_CONDENSATE};
 use domains::params;
-use simcore::environment::SourceResolver;
+use simcore::environment::{Schedule, SourceResolver};
 use simcore::flow::FlowResult;
 use simcore::integrator::EulerIntegrator;
 use simcore::registry::Registry;
@@ -37,16 +40,27 @@ use station::sealed::{
 };
 use station::water::{BRINE, RECOVERED_WATER};
 
+const SECONDS_PER_DAY: f64 = 86400.0;
 const TRANSPIRATION: &str = "biosphere.transpiration";
 const PLANT_CONDENSATION: &str = "biosphere.condensation";
 
 /// Where the room's temperature comes from.
-#[derive(Clone, Copy)]
 enum RealTemp {
     /// The chamber's heat store, every minute.
     Chamber,
-    /// The plant window's within-day air (the weather's), read at each plant step.
-    WithinDayAir,
+    /// The weather's within-day air curve, read over each MINUTE (the plants' water reads the
+    /// same curve averaged over the plant window).
+    OutdoorAir(Schedule),
+}
+
+/// The weather's within-day air curve, as the greenhouses' plant resolver builds it.
+fn outdoor_air(bio: &domains::biosphere::SeasonScenario) -> RealTemp {
+    let mut forcings = weather_forcings(bio, 1).expect("weather");
+    RealTemp::OutdoorAir(
+        forcings
+            .remove(AIR_TEMP_WITHIN_DAY_VAR)
+            .expect("within-day air"),
+    )
 }
 
 #[derive(Default)]
@@ -67,6 +81,13 @@ struct Reading {
     max_cold: f64,
     switch_steps: u64,
     max_switch: f64,
+    /// One store only: minutes whose room is above the setting plus one minute's crew breath
+    /// (the ceiling a live thermostat predicts), and how many of those had the room cooling
+    /// since the previous minute.
+    above_ceiling: u64,
+    above_ceiling_cooling: u64,
+    /// The battery's lowest charge on any fast step (J), where the build has one.
+    battery_min: f64,
     /// The largest crop grain store in each season (between re-sows).
     grain_peaks: Vec<f64>,
     rationed: (u64, u64),
@@ -103,9 +124,11 @@ fn observed_run(
     reset: Option<&OwnedResetHook>,
     (steps_per_day, slow_steps_per_day, slow_dt, fast_dt): (u64, u64, f64, f64),
     air_mol: f64,
-    real: RealTemp,
+    real: &RealTemp,
     crew_dest: &str,
     days: usize,
+    // One store: (the room's setting, the crew's breath per fast step, kg).
+    ceiling: Option<(f64, f64)>,
 ) -> Reading {
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let two = TwoRate {
@@ -121,20 +144,26 @@ fn observed_run(
     };
     let mut r = Reading {
         grain_peaks: vec![0.0],
+        battery_min: f64::INFINITY,
         ..Reading::default()
     };
     let mut window_temp = f64::NAN;
+    let mut prev_t = f64::NAN;
+    // The minute's index on the fast clock: the window's plant step × minutes per window + k.
+    let per_window = steps_per_day / slow_steps_per_day;
+    let (mut window_n, mut k) = (0u64, 0u64);
     let mut observe = |side: Side, before: &State, after: &State| match side {
         Side::Reset => r.grain_peaks.push(0.0),
         Side::Slow => {
             let bound = bio_r.bind(before, slow_dt);
             window_temp = match real {
                 RealTemp::Chamber => chamber_c(before),
-                RealTemp::WithinDayAir => {
+                RealTemp::OutdoorAir(_) => {
                     use simcore::environment::Environment;
                     bound.get(AIR_TEMP_WITHIN_DAY_VAR).expect("within-day air")
                 }
             };
+            (window_n, k) = (before.n, 0);
             for f in bio.registry().flows() {
                 if f.id() == PLANT_CONDENSATION || f.id() == TRANSPIRATION {
                     let res = f.evaluate(before, &bound, slow_dt).expect("plant flow");
@@ -157,8 +186,11 @@ fn observed_run(
         Side::Fast => {
             let t = match real {
                 RealTemp::Chamber => chamber_c(before),
-                RealTemp::WithinDayAir => window_temp,
+                RealTemp::OutdoorAir(air) => {
+                    air(window_n * per_window + k, fast_dt / SECONDS_PER_DAY)
+                }
             };
+            k += 1;
             let ratio = room_vapour_kg(before) / saturation_vapour_kg(t, air_mol);
             r.fast_steps += 1;
             r.over += u64::from(ratio > 1.0);
@@ -171,6 +203,17 @@ fn observed_run(
             if (t - window_temp).abs() > 1.0 {
                 r.switch_steps += 1;
                 r.max_switch = r.max_switch.max(ratio);
+            }
+            if let Some((setting, breath)) = ceiling {
+                let sat = saturation_vapour_kg(t, air_mol);
+                if room_vapour_kg(before) > setting * sat + breath {
+                    r.above_ceiling += 1;
+                    r.above_ceiling_cooling += u64::from(t < prev_t);
+                }
+            }
+            prev_t = t;
+            if let Some(b) = after.stocks.get(domains::power::BATTERY) {
+                r.battery_min = r.battery_min.min(b.amount);
             }
             let bound = fast_r.bind(before, fast_dt);
             for f in fast.registry().flows() {
@@ -245,9 +288,10 @@ fn sealed(room: RoomVapour, days: usize) -> Reading {
             sc.cabin_dt,
         ),
         sc.bio.chamber_air_capacity_mol,
-        RealTemp::Chamber,
+        &RealTemp::Chamber,
         RECOVERED_WATER,
         days,
+        ceiling(room, sc.cabin, sc.cabin_dt),
     )
 }
 
@@ -275,9 +319,10 @@ fn greenhouse(room: RoomVapour) -> Reading {
             sc.cabin_dt,
         ),
         sc.bio.chamber_air_capacity_mol,
-        RealTemp::WithinDayAir,
+        &outdoor_air(&sc.bio),
         HUMIDITY_CONDENSATE,
         sc.days,
+        ceiling(room, sc.cabin, sc.cabin_dt),
     )
 }
 
@@ -300,10 +345,26 @@ fn harvest(room: RoomVapour) -> Reading {
         None,
         (g.steps_per_day, g.bio_steps_per_day, g.bio_dt, g.cabin_dt),
         g.bio.chamber_air_capacity_mol,
-        RealTemp::WithinDayAir,
+        &outdoor_air(&g.bio),
         HUMIDITY_CONDENSATE,
         g.days,
+        ceiling(room, g.cabin, g.cabin_dt),
     )
+}
+
+/// A one-store room's live ceiling inputs: its setting and the crew's breath per fast step.
+fn ceiling(
+    room: RoomVapour,
+    cabin: station::scenario::CabinScenario,
+    cabin_dt: f64,
+) -> Option<(f64, f64)> {
+    match room {
+        RoomVapour::TwoStocks => None,
+        RoomVapour::OneStock { setting, .. } => Some((
+            setting,
+            cabin.water_intake_rate() * params::crew().insensible_water_fraction * cabin_dt,
+        )),
+    }
 }
 
 fn plant_c(s: &State) -> f64 {
@@ -327,6 +388,11 @@ fn report(build: &str, readings: &[(&str, Reading)]) {
             "{:11} room ÷ real saturation: max {:.4} (warm {:.4}, cold {:.4}), over 1 on {} of {} \
              minutes; off-window minutes {} (max {:.4})",
             "", r.max, r.max_warm, r.max_cold, r.over, r.fast_steps, r.switch_steps, r.max_switch
+        );
+        println!(
+            "{:11} above setting + one minute's breath: {} minutes ({} with the room cooling since \
+             the minute before); battery min {:.6e} J",
+            "", r.above_ceiling, r.above_ceiling_cooling, r.battery_min
         );
         let peaks: Vec<String> = r.grain_peaks.iter().map(|g| format!("{g:.3}")).collect();
         println!("{:11} grain peaks per season [{}]", "", peaks.join(", "));
@@ -377,18 +443,21 @@ fn report(build: &str, readings: &[(&str, Reading)]) {
 
 fn main() {
     let full = std::env::args().any(|a| a == "--full");
+    let greenhouses_only = std::env::args().any(|a| a == "--greenhouses");
     let sc = sealed_station_scenario();
     let days = if full {
         sc.years as usize * sc.season_days
     } else {
         sc.season_days
     };
-    let sealed_runs: Vec<(&str, Reading)> = ROOMS
-        .iter()
-        .chain(LIVE_ROOMS.iter())
-        .map(|(n, room)| (*n, sealed(*room, days)))
-        .collect();
-    report(&format!("sealed station, {days} days"), &sealed_runs);
+    if !greenhouses_only {
+        let sealed_runs: Vec<(&str, Reading)> = ROOMS
+            .iter()
+            .chain(LIVE_ROOMS.iter())
+            .map(|(n, room)| (*n, sealed(*room, days)))
+            .collect();
+        report(&format!("sealed station, {days} days"), &sealed_runs);
+    }
     if full {
         return;
     }

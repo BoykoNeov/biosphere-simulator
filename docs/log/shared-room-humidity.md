@@ -31,5 +31,14 @@ no value, golden, manifest or `source:` string moved. Plan: `docs/plans/post-roa
 * **Missed:** the leak lands in the soil and subsoil (+22 %, +19 %, small stores), not the condensate; the
   battery moved 0.04 % (bound 0.01 %). At 40 %: transpiration +112 %, yet grain peaks ROSE 1.6–3.6 % and the
   soil was not drawn down; the heater pays the evaporation (battery −9.9 %). Why grain rose is not measured.
-* **The user's call:** 75 % or 40 %, and the sealed station's thermostat (live or window). The greenhouses
-  can only take the window: their weather has no clock finer than the plant step.
+* **1220 days** (plan §9): the live thermostat never passed saturation (max 0.7603); the plants' condenser
+  caught 159.7 kg (predicted 160); every minute above "setting + one minute's breath" had the chamber
+  cooling, which supports (not isolates) the cooling-inside-the-minute cause of the 0.7601 miss. The window
+  thermostat passed saturation 573 minutes. **40 % drains the battery**: lowest charge 16 % of the start,
+  against 51 % with two stocks. Grain rose again at 40 %; still not explained.
+* **Corrected (plan §7, §10):** the greenhouses' "never above 0.754" read the same temperature the
+  condensers enforce. Read minute by minute off the outdoor air curve, the max is 0.821, never above 1. A
+  live greenhouse thermostat is buildable (an earlier line here said it was not); not built.
+* **Corrected (plan §4, §11):** `sealed_energy_drift_summary` runs Power → Thermal with no room in it;
+  fresh prediction: byte-identical at adoption.
+* **The user's call:** 75 % or 40 %, and the sealed station's thermostat (live or window).
