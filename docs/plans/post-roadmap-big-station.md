@@ -659,6 +659,15 @@ eaten, the soil solution at the crop's end:
 | F5 | late-season nitrogen may bind; if so, grain within 3 % of the carbon-limited value | crop 1: capped in **621** plant steps (soil drawn to 0.06 g/m² after dosing stops at day 93); crop 2: 12; then **0**. Crop 1's grain is **identical** to the urine-to-soil twin and to a run on the reference's nitrogen-rich soil, which is never capped (6.117 mol C/m² all three): carbon, not nitrogen, set it | held |
 | F6 | rationed 0 and 0; books close every crop | held | held |
 
+**"Capped" is not "stressed" (a side agent asked, 2026-10-21, whether a nitrogen shortage can slow
+this crop at all).** It can: 3a's floor test (§8a) cut crop 1's grain from 22.3 to 0.39 mol C/m². The
+stress (`nitrogen_stress_factor`) scales photosynthesis only below the critical concentration, 4.0·10⁻⁴
+kg N per mol C (~1.5 % of dry mass); the cap counter instead compares the uptake with what the roots
+ask for, the higher dilution-curve target. Crop 1 ended at 7.687 kg N in ~11 500 mol C — **1.66× the
+critical** — because a carbon-starved crop is small. The grain is identical across 7.7, 8.5 and 8.8 kg
+of plant nitrogen, so the stress was 1 in all three runs: the shortage fell inside the range where the
+model's crop does not feel it. A per-step stress readout was not added.
+
 **Why F1 and F2 missed: the farm fills by a fixed share of what is missing, not all at once.** Each
 crop's extra carbon is only the imported food the crew ate to cover the gap, and the soil keeps more of
 it than the crop gains (1.1× the crop's gain in crop 2, 2.4× by crop 8; soil carbon +5 487 mol in crop 2, falling to +2 001 in crop 8; 30 146 by
