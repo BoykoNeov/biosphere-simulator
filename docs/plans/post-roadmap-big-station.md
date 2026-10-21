@@ -496,7 +496,7 @@ on). Rationed 0 and 0. Nitrogen books close every crop (within 5·10⁻⁹ kg). 
 not kept) starves the first crop — grain 0.39 mol C/m² instead of 22.3, the uptake capped in 1 328
 plant steps, 22 kg of nitrogen held back — so R2's 0 counts a live cap, not a dead one. With the real
 floor, the closest the cap came: the roots could reach at least **9.2×** what the crop wanted (first
-crop), 24× in the second, 162× in the last. Outputs: `sources	emp-evidenceeal-soil\` (`n300.txt` the
+crop), 24× in the second, 162× in the last. Outputs: `sources\temp-evidence\real-soil\` (`n300.txt` the
 2c run §8's drainage figures come from, `rs1220b.txt` this run, `floor1e-3.txt` the throwaway).
 
 | | Predicted | Measured | |
