@@ -393,8 +393,14 @@ food — sum to 0 within 3·10⁻⁷ kg. Run 2026-10-21, ~13 min.
 **Why N2 missed.** I guessed the plant would hold its nitrogen thinly because its target leaves the
 grain out. It does not: at maturity the leaves, stems and roots hold ~2.3 % N, so the straw can give
 up most of it and still keep its cited 0.5 %. What binds is that residual, not a shortage. Here 2.52
-of 3.21 kg is 79 % of the plant's nitrogen in the grain; field wheat is commonly said to put ~70–80 %
-there (from memory, **not checked against a source** — a check owed before anyone leans on it).
+of 3.21 kg is 79 % of the plant's nitrogen in the grain, roots included. Field wheat: 57–83 % of the
+plant's nitrogen in the grain across 15 durum cultivars (Desai & Bhatia 1978, *Euphytica* 27:561–566,
+doi 10.1007/BF00043182 — abstract only, read via a search summary of the Indian Academy of
+Sciences repository record; full text not read), and roots hold 10–20 % of a spring wheat's nitrogen
+at maturity (Andersson & Johansson 2006, *J. Agron. Crop Sci.* 192:121–131, abstract). The model's
+79 % counts the roots; most field figures count only the plant above ground, and on that basis the
+model's share would be higher — at or above the top of the field range. Not read as an error: the
+grain's 2.49 % is what sets it.
 
 **What the books show, and what they cannot.** Nitrogen now goes round the whole loop: soil → plant →
 grain → food → crew → urine (88 %) and feces (12 %) → soil, and the inedible parts → litter → soil.
