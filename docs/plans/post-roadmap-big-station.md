@@ -957,11 +957,13 @@ USDA's figure rises to 96–98 % and protein to **~104–106 g**: dilution by yi
 al. measured in reverse (their Experiment 2, *"protein dilution by the higher yields"*).
 
 **The new limit is carbon again: the tank empties on day 1534.** With no imports after crop 1, the
-station's carbon is closed except for two sinks: the soil keeps gaining (+7 800 mol in crop 1, +10 100 in
-crop 2, falling to ~+1 400 by crop 10 and ~+620 by crop 20 — as 4a's soil did), and the farm grows
-**104.6 %** of the crew's food, so ~670 mol C a crop piles up uneaten in the food store (6 794 by crop
-10). 4a never emptied its tank because it imported 18 300 mol C, ~3 800 of it after crop 1, and stored
-no surplus. From crop 11 the farm is carbon-limited: lit minutes the tank ran short 48 394, room CO₂
+tank's fall each crop is the soil's carbon gain plus the food store's growth, read off the books (the
+crop's own change is the few mol left): crop 4 **2 724 ≈ 2 051 + 671**, crop 9 **2 044 ≈ 1 369 + 674**. The soil keeps gaining (+7 800 mol in crop 1,
++10 100 in crop 2, falling to ~+1 400 by crop 10 and ~+620 by crop 20 — as 4a's soil did), and the farm
+grows **104.6 %** of the crew's food, so ~670 mol C a crop piles up uneaten in the food store (6 794 by
+crop 10; ~670 m² would grow the diet exactly, 700 ÷ 1.046). 4a's books differ in both terms: it imported
+18 300 mol C, ~3 800 of it after crop 1, which offset part of its soil gain, and it stored no surplus;
+its tank's lowest was 2 364 mol. From crop 11 the farm is carbon-limited: lit minutes the tank ran short 48 394, room CO₂
 down to 119 ppm; grain 19.4–20.0 mol C/m² (88–90 % of 2b, where (a) sat); the crew eat the stored
 surplus down by crop 18, then imports return (1 672 mol C to day 3000). A charge only delays the soil's
 pull, as §10.2 said of 4a; a lasting fix needs a carbon source or a smaller sink (CEEF processed its
