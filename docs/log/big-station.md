@@ -79,6 +79,7 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   84 % in crop 8. Imported nitrogen 43 kg (held), but it went to the soil solution (+23 kg, to
   34.8 g/m², 537 mg/L at drained-full — a tenth of 3a), not the tank (0.4 kg; F3, F4 missed): the dose
   equals the roots' uptake and ignores everything else that feeds the soil solution (+4–8 kg a crop,
-  consistent with the old crop's straw breaking down), so the tank empties every window. The soil's gain falls with the imports. Late-season nitrogen
-  binds in crop 1 only and costs no grain (a urine-to-soil twin and a never-capped soil are identical). The urine is dosed
-  within days, not stored the one to six months EcoSanRes advises. Next choices are the user's.
+  consistent with the old crop's straw breaking down), so the tank empties every window. The soil's
+  gain falls with the imports. Late-season nitrogen binds in crop 1 only and costs no grain (a
+  urine-to-soil twin and a never-capped soil are identical). The urine is dosed within days, not
+  stored the one to six months EcoSanRes advises. Next choices are the user's.
