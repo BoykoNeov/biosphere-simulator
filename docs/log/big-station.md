@@ -99,3 +99,11 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   grain gets 48 % of USDA's nitrogen. Nitrogen parks in soil organic matter (7.4 kg) and the urine
   tank. "Feeds the crew" counts calories, not protein. The user chose a fertilizer store first, a
   legume crop later.
+* **Step 4b MEASURED 2026-10-21** (plan §10.3, §10.4). The user chose full grain protein; it tops out
+  at the crop's own ceiling, **87 %** of USDA's nitrogen (the frozen uptake leaves out the grain; 2c:
+  85.8 %). A top-up to 1.97 g N/m², urine in EcoSanRes' window and fertilizer at any time (Linquist et
+  al. 1992), reaches it: the same crop as at 10 g/m² to the printed digit (P2 missed high — capped
+  steps are caught up). Protein 53 → **94 g** per person-day (BVAD 122), grain carbon 98 %. Two loops
+  stay open: ~1.9 kg fertilizer a crop goes on after day 93 while the urine tank gains ~2.3 kg a crop
+  (39.5 kg by day 3000); and with no imports the CO₂ tank empties on day 1534 — the soil's gain and
+  a 4.6 % food surplus — after which the farm is carbon-limited at 88–90 % and imports return.

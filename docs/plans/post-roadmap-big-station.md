@@ -927,3 +927,55 @@ under [F]'s 200), fertilizer 100 kg.
   run short (4a's lowest was 2 364 mol on day 2939).
 - **P6.** Rationed 0 and 0; nitrogen books close every crop with the store in them; `--control` byte for
   byte; 4a without the flags reproduces `stress-g560.txt`'s first crops.
+
+### 10.4 Step 4b — MEASURED (2026-10-21)
+
+Runs (`sources\temp-evidence\top-up\`): `t10-560.txt` (10 g/m²) and `t197-560.txt` (1.97 g/m²), four
+crops each; `t197-3000.txt`, the anchor to day 3000; `g560-recheck.txt`, 4a without the flags.
+Fertilizer 100 kg, 4a's charges, 700 m², four crew. Rationed 0 and 0 in all; ~4 min per 560 days.
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| P1 | at 10 g/m² the grain gets 80–90 % of USDA's N; 85–95 g protein per person-day | **87.0 %** every crop (8.79 of 10.1 kg; plant 11.16 kg at maturity); **94 g** | held |
+| P2 | at 1.97 g/m² the grain gets 65–85 %; stress in the growing weeks mostly gone | **87.0 %** — the same crop as at 10 g/m² to every printed digit; no stress after the cold weeks | **missed** (high) |
+| P3 | grain carbon 97.5 % of 2b (±2) every crop | **98.0 %** (21.71–21.75 mol C/m²) in crops 1–10 of both runs | held |
+| P4 | crop 1 draws most; then the draw falls but not to zero, all after day 93; the urine tank rises crop on crop | crop 1: **11.2 kg** at 10 g/m², **5.6** at 1.97; then **1.99 → 1.89 kg** a crop, all after the window, to day 3000; urine tank 3.2 → **39.5 kg** (+~2.3 a crop, 679 days of inflow) | held |
+| P5 | the CO₂ tank does not run short in four crops | held (lowest 14 298 mol, day 559; 4a: 17 806) — but it **empties on day 1534** (crop 11) | held, then see below |
+| P6 | rationed 0 and 0; books close; control; 4a unchanged without the flags | all held (books to ~1e-10 kg; 4a's twin differs only by the new lines) | held |
+
+**Why P2 missed: the cap is caught up.** At 1.97 g/m² the roots' reach still capped uptake in 42 plant
+steps of crop 1 (0.23 kg held back) and 3–45 a crop after, but the demand-deficit uptake takes the
+shortfall in the next steps: the plant reaches the same 11.16 kg at maturity, no step is stressed after
+the cold weeks, and grain carbon and nitrogen match the 10 g/m² run to the printed digit. So the
+anchor is enough; 10 g/m² only parks 5.6 kg more in the soil solution and runs it at **237–308 mg/L**
+at a dry day's end, past [F]'s 200 (my ~150 scaled a wet-day figure). The anchor runs at 53–142.
+
+**The ceiling is the crop's, as §10.3 said.** 87 % of USDA's nitrogen — 2c's 85.8 % on the 100 kg/m²
+soil, with a bigger crop. Protein **94 g per person-day** in crops 2–10 (4a: 53; BVAD's menu 122). In
+crops 11–21, carbon-short (below), the grain is smaller but gets the same nitrogen, so its share of
+USDA's figure rises to 96–98 % and protein to **~104–106 g**: dilution by yield, the effect Linquist et
+al. measured in reverse (their Experiment 2, *"protein dilution by the higher yields"*).
+
+**The new limit is carbon again: the tank empties on day 1534.** With no imports after crop 1, the
+station's carbon is closed except for two sinks: the soil keeps gaining (+7 800 mol in crop 1, +10 100 in
+crop 2, falling to ~+1 400 by crop 10 and ~+620 by crop 20 — as 4a's soil did), and the farm grows
+**104.6 %** of the crew's food, so ~670 mol C a crop piles up uneaten in the food store (6 794 by crop
+10). 4a never emptied its tank because it imported 18 300 mol C, ~3 800 of it after crop 1, and stored
+no surplus. From crop 11 the farm is carbon-limited: lit minutes the tank ran short 48 394, room CO₂
+down to 119 ppm; grain 19.4–20.0 mol C/m² (88–90 % of 2b, where (a) sat); the crew eat the stored
+surplus down by crop 18, then imports return (1 672 mol C to day 3000). A charge only delays the soil's
+pull, as §10.2 said of 4a; a lasting fix needs a carbon source or a smaller sink (CEEF processed its
+wastes back to CO₂ — Tako et al.), the user's call.
+
+**The nitrogen does not close: fertilizer in, urine piles up (P4, the advisor's warning).** After crop
+1 every crop takes ~1.9 kg of fertilizer, all after day 93, when urine may not go on; the urine made in
+and after the window outruns what the window can use, so the tank gains ~2.3 kg a crop. Over 3000 days:
+fertilizer 43.7 kg in, urine tank 39.5 kg — the station imports nitrogen to store its own. Two ways
+out, both the user's: let urine go on after day 93 too (EcoSanRes' cutoff is hygiene for crops eaten
+raw or soon; wheat grain is threshed and cooked — a reading, not a citation), or turn urine into nitrate
+in a treatment step that can dose any time (MELiSSA's nitrifying compartment). Either would stop the
+fertilizer draw after the soil's first fill and empty the pile.
+
+**Where 4b leaves the station (day 3000, 1.97 g/m²).** Nitrogen: soil solution 4.4 kg, litter and humus
+8.4, food store 4.9, urine tank 39.5, fertilizer left 56.3 of 100. Carbon: soil 50 600 mol, CO₂ tank
+empty since day 1534. Calories 95 % home-grown in the last crops, protein ~104 g.
