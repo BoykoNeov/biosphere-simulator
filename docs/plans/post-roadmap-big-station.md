@@ -6,7 +6,10 @@ for it (§3b); nothing else changes the reference. **Step 2a MEASURED (§5a):** 
 injected in lit hours (after CEEF) brings the crop back to 99.4 % per m². **Step 2b MEASURED (§6a):** the
 harvest feeds 30 % of the crew; the O₂ the station still buys is exactly the CO₂ left in the tank. **Step 2c
 MEASURED (§7a):** nitrogen goes round through grain, crew and urine; the grain gets 86 % of
-USDA's nitrogen; the books close, but the 20 t soil hides the loop.
+USDA's nitrogen; the books close, but the 20 t soil hides the loop. **Step 3a MEASURED (§8a):** with a
+soil of real size (grams of nitrogen per m², after Soltani & Sinclair Ch. 18) the crop is never short;
+the imported food's nitrogen fills the soil solution to ~7 800 mg/L in four years, and the one loss that
+can run here (ammonia from urine) takes at most a tenth of it.
 
 ## 1. Why this exists
 
@@ -410,3 +413,101 @@ in the tank. But the soil starts at 100 kg N per m² (20 t; non-physical, record
 size (grams of available N per m²) and real loss paths (leaching, denitrification, ammonia from urine)
 — each a sourced choice, not made here. Phosphorus, potassium and trace elements each need a new
 quantity in the frozen core.
+
+## 8. Step 3 — a soil of real size, and its nitrogen losses (the user's choice, 2026-10-21)
+
+The user chose "A" from the list after Step 2c: a soil holding grams of available nitrogen per m², and
+the real ways nitrogen leaves a soil. Lab only (`big_station.rs`), as 2a–2c.
+
+**The source: [F] Chapter 18, "Soil Nitrogen Balance"** (Soltani & Sinclair, *Modeling Physiology of
+Crop Development, Growth and Yield*, pp. 239–252; PDF in `sources\`) — the same book the model's soil
+water already follows (Ch. 13–14). It gives the soil's starting nitrogen from routine soil data (Eqns
+18.19–18.24, with a worked example), what the roots can reach (Eqn 18.5), and three losses:
+ammonia gas (18.13, Table 18.1), leaching with drained water (18.14) and denitrification (18.16–18.18).
+Its mineralization (Stanford & Smith, 18.6–18.11) is **not** taken: the model already mineralizes
+through its litter → microbes → humus chain, and two forms for one process would double-count.
+
+**Read before designing (2026-10-21).**
+- *The surplus.* The crew's urine brings ~0.34 g N per m² per day to the soil (88 % of 78 g/day over
+  200 m²); the crop takes ~0.115 (3.2 kg per 140-day crop). Most of the crew's nitrogen comes from the
+  imported food, so a soil of real size will **fill**, not starve: Step 2c put 71 kg into the soil,
+  ~350 g N/m², against [F]'s example soil of 3.9 g N/m² in solution. The question is whether the
+  losses keep up, not whether the crop runs short.
+- *Which losses can run here.* A 300-day run (200 m², `--nitrogen`): the root zone **never drains** —
+  `biosphere.drainage` moves 0 kg; the station waters up to the drained-full level and no higher. The
+  only water leaving the soil is the overflow from below the roots, 39.7 kg/day, into the plants' tank,
+  which waters the plants again. So, by [F]'s own rules: **leaching** (from the top layer, with its
+  drainage) is 0, and what leaves below the roots comes back with the watering — a loop, not a loss;
+  **denitrification** needs the top layer wetter than drained (FTSW1 > 1), which never happens. Neither
+  is built. The one loss that runs is **ammonia from urine**.
+- *Where the gas goes.* The room's air has no nitrogen stock. Ammonia in a station is removed by the
+  air's trace-contaminant control; a loss to a boundary is an open leak in the books, and is shown as one.
+
+**Step 3a — the soil of real size, no losses (`--real-soil`, on top of `--nitrogen`).**
+- *The soil*: [F] Table 13.1's **silt loam** (bulk density 1.37 g/cm³; water at the lower limit 0.086,
+  drained upper limit 0.218, extractable 0.132 m³/m³ — the model's 0.13 is the same soil). Nitrogen in
+  the model's reference layer, 0.30 m (`soil_layer_depth`): 411 kg of soil per m² (Eqn 18.19). Solution
+  nitrogen at [F]'s worked-example concentrations, 15 mg/kg nitrate and 1.8 mg/kg ammonium ([F]: "little
+  error results from general estimates"): **1.97 g N/m²** (Eqns 18.22–18.23), **0.39 kg** at 200 m²,
+  replacing 20 t.
+- *What the roots can reach*, replacing the availability band (1 and 50 kg/m², design values sized for
+  the 100 kg soil, which would switch uptake off at grams): Eqn 18.5, the nitrogen dissolved in the
+  layer's plant-available water, `(NCON − 1 mg/L) × ATSW1 × FROOT1`, with NCON the layer's nitrogen over
+  all its water (lower limit + available, Eqn 18.24). Uptake per day is capped at it ([F] Ch. 17:
+  "if NUP is calculated to be greater than SNAVL, it is adjusted at SNAVL"), applied per step as a
+  daily amount × dt. FROOT1 is the model's existing root-zone fraction (Eqn 18.4, already built). The
+  model's one root-zone water store has no layers: the 0.30 m layer is taken to be as wet as the root
+  zone (recorded; [F] notes its own top-layer choice "is not required").
+- *Left out, on purpose*: the soil's organic matter. A silt loam holds 1.07 % carbon and 0.110 %
+  nitrogen ([F] Table 18.2): ~450 g of organic N and ~4.4 kg of carbon per m² in the 0.30 m layer — at
+  200 m², ~73 000 mol C, which breathes out CO₂ as it decays (in a sealed room that is Biosphere 2's
+  story). Adding it is its own choice, with its own carbon prediction; 3a keeps the carbon books equal
+  to 2c's so that the nitrogen change is read alone.
+
+**Predictions (written before the run; 200 m², four crew, 1220 days, store, food loop and nitrogen on):**
+- **R1 — the soil fills.** Solution nitrogen rises by ~0.25–0.30 g/m² per day after the first weeks
+  (Step 2c's ~60 g/day into the soil, less what sits in litter): ~35–45 g/m² by the first harvest,
+  **~250–350 g/m² by day 1220**. As a concentration in the layer's water at drained-full (65 mm),
+  ~30 mg/L at the start, **~600 mg/L by the first harvest and thousands by the end** — past both
+  reference points [F] uses (200 mg/L stops its mineralization; 400 mg/L caps its denitrification).
+  The model has no salt damage, so the crop cannot show what that would do.
+- **R2 — the crop is not short of nitrogen, except perhaps in the first crop's first weeks.** At sowing
+  the roots reach ~0.6 g N/m² per day (half the layer, at 30 mg/L), above the crop's average need.
+  Grain and peak crop within 1 % of 2c; plant nitrogen at maturity 3.21 kg ± 1 % from the second crop.
+- **R3.** Carbon identical to 2c to the printed digit, unless R2's early weeks bind (then within 1 %).
+  Nitrogen books close every crop.
+
+**Step 3b — ammonia from urine (after 3a, measured).** [F] Eqn 18.13: a share VOLF of each application
+leaves as ammonia. Urine is mostly urea (the first constituent of BVAD's urine ersatz; BVAD: urine was
+vented on Shuttle "to avoid the breakdown of urea to ammonia"), so Table 18.1's **urea** row; the
+chamber's 75 % humidity is its **humid** column. Read off the page (p. 245, Delgado
+et al. 2010 after Meisinger & Randall 1991), urea, humid: **10 % surface-applied, 2 % incorporated**
+(sub-humid 15 / 3, dry 25 / 5). EcoSanRes advises incorporating urine "to avoid … the loss of ammonia".
+Which one is the user's choice, and so is where the ammonia goes (removed from the air = lost; or
+scrubbed back into the plants' water).
+
+## 8a. Step 3a — MEASURED (2026-10-21)
+
+`examples/big_station.rs -- --real-soil` (200 m², four crew, 1220 days, store, food loop and nitrogen
+on). Rationed 0 and 0. Nitrogen books close every crop (within 5·10⁻⁹ kg). Run 2026-10-21, ~13 min.
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| R1 | solution N ~35–45 g/m² by the first harvest, ~250–350 g/m² by day 1220; ~600 mg/L by the first harvest, thousands by the end | **34.8 g/m²** at the first harvest (from 1.97), rising ~0.29 g/m² per day every crop after; **341.9 g/m²** (68.4 kg) at day 1220. Highest at a day's end **777 mg/L** in the first crop, **7 809 mg/L** in the last | held (the first crop's peak is above ~600: the dry end of each watering cycle holds the same nitrogen in less water) |
+| R2 | not short of nitrogen, except perhaps in the first crop's first weeks | the roots' reach **never** capped the uptake — 0 plant steps in all nine cycles. The first crop spends its first 8 weeks in the cold, needing almost nothing, while urine fills the soil | held (the "perhaps" did not happen) |
+| R3 | carbon identical to 2c to the printed digit | **identical**: harvests, CO₂ store 76 475.4 mol, O₂ bought 76 474.6, plant nitrogen at maturity 3.213 kg | held |
+
+**What it shows.** With a soil of real size, the nitrogen the crew bring in from imported food has
+nowhere to go. The crop takes about a third of what urine delivers, so the soil solution climbs past
+every reference point [F] uses — 200 mg/L, where its mineralization stops, in the first crop; 400
+mg/L, where its denitrification is capped, soon after — to ~7 800 mg/L by the fourth year. The model
+has no salt damage, so the crop grows as if nothing were wrong; a real crop would not. The nitrogen
+that 2c hid in a 20 t soil is now in plain sight.
+
+**What 3b can and cannot do.** The one loss that runs here, ammonia from urine, takes 2 % or 10 % of
+it (Table 18.1, humid; incorporated or surface-applied): 1.4 or 6.9 g N/day of the ~69 in urine. The
+soil would still gain ~0.26–0.29 g/m² per day. The other two real exits are closed by the station's
+own watering (no drainage from the root zone, never waterlogged). So **no sourced soil loss balances
+this loop**. What would: less imported nitrogen (more of the crew's food grown here), nitrogen taken
+out on purpose (urine kept back or its nitrogen stored, as the CO₂ is), or watering that drains — each
+a design choice for the user, not a soil property.

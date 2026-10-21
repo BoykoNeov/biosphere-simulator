@@ -10,6 +10,7 @@
 //! cargo run --release -q -p station --example big_station -- --co2-store   # Step 2a (below)
 //! cargo run --release -q -p station --example big_station -- --food-loop   # Step 2b (below)
 //! cargo run --release -q -p station --example big_station -- --nitrogen    # Step 2c (below)
+//! cargo run --release -q -p station --example big_station -- --real-soil   # Step 3a (below)
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
@@ -26,6 +27,11 @@
 //! imported food at BVAD's menu nitrogen ([`MENU_N_KG_PER_CREW_DAY`]), the grain at USDA's
 //! ([`GRAIN_N_PER_DM`]) taken from the plant at harvest ([`harvest_at_maturity`]), and the crew pass
 //! what they eat to the soil ([`CrewNitrogen`]): urine to its available nitrogen, feces to its litter.
+//!
+//! `--real-soil` (Step 3a, plan §8; turns the nitrogen on too): a soil of real size, after [F]
+//! (Soltani & Sinclair) Ch. 18. The soil's solution nitrogen at sowing from a silt loam's routine data
+//! ([`real_soil_n`], grams per m² instead of 100 kg), and the roots' reach as the nitrogen dissolved in
+//! the plant-available water ([`SolutionUptake`]) instead of the 1–50 kg/m² availability band.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -62,10 +68,12 @@
 //! temperature, the cooler's blocked and capped minutes and the heater's capped minutes; and
 //! rationing. ⚠ `rationed == 0` cannot measure starvation, so it is reported, never the verdict.
 
+use domains::biosphere::flows::NitrogenUptake;
+use domains::biosphere::science::{root_zone_fraction, WATER_DENSITY};
 use domains::biosphere::stocks::{
     CARBON_POOL, CONDENSATE, CONSUMER_CARBON, HUMUS_CARBON, HUMUS_N, LEAF_C, LITTER_CARBON,
-    LITTER_N, LITTER_SINK, MICROBIAL_CARBON, MICROBIAL_N, O2_POOL, PLANT_N, ROOT_C, SOIL_N,
-    SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C, SUBSOIL_WATER, WATER_VAPOR,
+    LITTER_N, LITTER_SINK, MICROBIAL_CARBON, MICROBIAL_N, O2_POOL, PLANT_N, ROOTED_DEPTH, ROOT_C,
+    SOIL_N, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C, SUBSOIL_WATER, WATER_VAPOR,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -230,6 +238,131 @@ fn imported_n_per_mol_c(sc: &SealedStationScenario) -> f64 {
     let crew = params::crew();
     let carbon_per_crew_day = sc.cabin.food_intake_rate(&crew) * 86_400.0 / sc.cabin.crew_count;
     MENU_N_KG_PER_CREW_DAY / carbon_per_crew_day
+}
+
+/// Step 3a's soil, [F] Table 13.1's silt loam: bulk density (kg/m³) and the water it holds below the
+/// lower limit (m³/m³). Its extractable water, 0.132, is the model's 0.13.
+const SILT_LOAM_BULK_DENSITY: f64 = 1370.0;
+const SILT_LOAM_LOWER_LIMIT: f64 = 0.086;
+/// The solution nitrogen at sowing, kg N per kg of soil: [F]'s worked example (Ch. 18, p. 250), 15
+/// mg/kg nitrate and 1.8 mg/kg ammonium, as nitrogen (Eqn 18.22: × 14/62 and × 14/18).
+const SOLUTION_N_PER_KG_SOIL: f64 = (15.0 * 14.0 / 62.0 + 1.8 * 14.0 / 18.0) * 1e-6;
+/// [F] Eqn 18.5's floor (kg N per kg water): nitrogen below 1 mg/L is out of the roots' reach.
+const SOLUTION_N_FLOOR: f64 = 1e-6;
+/// The reference's uptake flow, which [`with_real_soil`] replaces.
+const NITROGEN_UPTAKE: &str = "biosphere.nitrogen_uptake";
+
+/// Step 3a's solution nitrogen at sowing (kg N): the reference layer's soil mass (Eqn 18.19, no
+/// stones) × [`SOLUTION_N_PER_KG_SOIL`].
+fn real_soil_n(bio: &SeasonScenario) -> f64 {
+    SOLUTION_N_PER_KG_SOIL * bio.soil_layer_depth * SILT_LOAM_BULK_DENSITY * bio.ground_area
+}
+
+/// NITROGEN `soil_n → plant_n`, Step 3a: the reference's demand-deficit uptake with its availability
+/// band switched off, capped per day at what the roots reach ([F] Eqn 18.5; Ch. 17: "if NUP is
+/// calculated to be greater than SNAVL, it is adjusted at SNAVL") — `(NCON − 1 mg/L) × ATSW1 ×
+/// FROOT1`, NCON the layer's nitrogen over all its water (Eqn 18.24). The reference layer is taken
+/// to be as wet as the root zone: the model's one root-zone store has no layers.
+struct SolutionUptake {
+    inner: NitrogenUptake,
+}
+
+impl SolutionUptake {
+    fn new(sc: &SealedStationScenario) -> Self {
+        let p = sc.plant_params();
+        let bio = &sc.bio;
+        let inner = NitrogenUptake {
+            id: NITROGEN_UPTAKE.to_string(),
+            soil_n: SOIL_N.to_string(),
+            plant_n: PLANT_N.to_string(),
+            leaf_c: LEAF_C.to_string(),
+            stem_c: STEM_C.to_string(),
+            root_c: ROOT_C.to_string(),
+            storage_c: STORAGE_C.to_string(),
+            max_uptake_capacity: p.nitro.max_uptake_capacity,
+            n_target_coefficient: p.nitro.n_target_coefficient,
+            n_target_exponent: p.nitro.n_target_exponent,
+            n_target_w_plateau: p.nitro.n_target_w_plateau,
+            dm_kg_per_mol_c: p.nitro.dm_kg_per_mol_c,
+            ground_area: bio.ground_area,
+            // The band off: every amount ≥ 0 is at or above `sn_critical`, so it reads 1.
+            sn_residual: -1.0,
+            sn_critical: 0.0,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_layer_depth: bio.soil_layer_depth,
+        };
+        SolutionUptake { inner }
+    }
+
+    /// The reference layer's water (kg): plant-available (ATSW1 — the root zone's per metre of
+    /// depth, × the layer's depth) and all of it (WAT1, the lower limit's water added).
+    fn layer_water(&self, s: &State) -> (f64, f64) {
+        let i = &self.inner;
+        let per_m = WATER_DENSITY * i.ground_area;
+        let depth = s.aux.get(ROOTED_DEPTH).copied().unwrap_or(0.0);
+        let atsw = if depth > 0.0 {
+            amount(s, SOIL_WATER) / depth * i.soil_layer_depth
+        } else {
+            0.0
+        };
+        (atsw, SILT_LOAM_LOWER_LIMIT * i.soil_layer_depth * per_m + atsw)
+    }
+
+    /// NCON, the layer's solution nitrogen over all its water (kg N per kg water).
+    fn concentration(&self, s: &State) -> f64 {
+        amount(s, SOIL_N) / self.layer_water(s).1
+    }
+
+    /// SNAVL, what the roots reach (kg N, a daily amount).
+    fn reach(&self, s: &State) -> f64 {
+        let depth = s.aux.get(ROOTED_DEPTH).copied().unwrap_or(0.0);
+        (self.concentration(s) - SOLUTION_N_FLOOR).max(0.0)
+            * self.layer_water(s).0
+            * root_zone_fraction(depth, self.inner.soil_layer_depth)
+    }
+
+    /// The step's uptake without the cap, and with it (kg N).
+    fn parts(&self, s: &State, env: &dyn Environment, dt: f64) -> Result<(f64, f64), SimError> {
+        let wanted = leg(&self.inner.evaluate(s, env, dt)?, PLANT_N);
+        Ok((wanted, wanted.min(self.reach(s) * dt)))
+    }
+}
+
+impl Flow for SolutionUptake {
+    fn type_name(&self) -> &'static str {
+        "SolutionUptake"
+    }
+
+    fn id(&self) -> &str {
+        NITROGEN_UPTAKE
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let (_, given) = self.parts(snapshot, env, dt)?;
+        FlowResult::new(vec![
+            Leg::new(SOIL_N.to_string(), -given)?,
+            Leg::new(PLANT_N.to_string(), given)?,
+        ])
+    }
+}
+
+/// The plant registry with Step 3a's [`SolutionUptake`] in the reference uptake's place (the
+/// reference's reads no environment, so its sowing-clock and chamber wrappers change nothing).
+fn with_real_soil(sc: &SealedStationScenario, state: &State, bio: Registry) -> Registry {
+    let (flows, aux) = bio.into_parts();
+    let before = flows.len();
+    let mut flows: Vec<Box<dyn Flow>> = flows
+        .into_iter()
+        .filter(|f| f.id() != NITROGEN_UPTAKE)
+        .collect();
+    assert_eq!(flows.len() + 1, before, "one reference uptake to replace");
+    flows.push(Box::new(SolutionUptake::new(sc)));
+    Registry::new(flows, &state.stocks, aux).expect("plant registry")
 }
 
 /// The nitrogen the run books (kg N): the plant's, the soil's (available, litter, microbes, humus)
@@ -592,6 +725,12 @@ struct Cycle {
     harvest: Harvested,
     n_change: (f64, f64, f64),
     n_eaten: f64,
+    /// Step 3a: the soil's solution nitrogen at the cycle's end (kg N), the highest concentration at
+    /// a day's end (mg/L), and the plant steps the roots' reach held the uptake back, by how much (kg N).
+    soil_n_end: f64,
+    ncon_max: f64,
+    capped_steps: u64,
+    n_short: f64,
 }
 
 #[derive(Default)]
@@ -623,6 +762,10 @@ struct Minutes {
     store_short: u64,
     /// Step 2c: the crew's nitrogen eaten (kg N), per day.
     n_eaten: Vec<f64>,
+    /// Step 3a: per day, the plant steps the roots' reach capped the uptake, and the uptake it held
+    /// back (kg N).
+    n_capped: Vec<u64>,
+    n_short: Vec<f64>,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -639,6 +782,7 @@ struct Run {
     co2_store: bool,
     food_loop: bool,
     with_nitrogen: bool,
+    real_soil: bool,
     /// The crew's food intake over the run (mol C).
     eaten: f64,
 }
@@ -650,7 +794,9 @@ fn run(
     co2_store: bool,
     food_loop: bool,
     with_nitrogen: bool,
+    real_soil: bool,
 ) -> Run {
+    let with_nitrogen = with_nitrogen || real_soil;
     let food_loop = food_loop || with_nitrogen;
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
@@ -659,8 +805,17 @@ fn run(
         sc.cabin.food_store0 *= k;
         sc.cabin.water_store0 *= k;
     }
+    if real_soil {
+        sc.bio.soil_n0 = real_soil_n(&sc.bio);
+    }
     let chamber = sc.chamber;
     let (state, bio, fast) = on_grid(&sc, &thermal, food_loop);
+    let uptake = real_soil.then(|| SolutionUptake::new(&sc));
+    let bio = if real_soil {
+        with_real_soil(&sc, &state, bio)
+    } else {
+        bio
+    };
     let (state, fast, injector) = if co2_store || food_loop {
         let (s, f, i) = with_co2_store(&sc, state, fast);
         (s, f, Some(i))
@@ -708,6 +863,8 @@ fn run(
         lit_co2_min: f64::INFINITY,
         exhaled: vec![0.0; days],
         n_eaten: vec![0.0; days],
+        n_capped: vec![0; days],
+        n_short: vec![0.0; days],
         ..Minutes::default()
     };
     // The crop's cycle ends at each re-sow: the day index of each reset.
@@ -720,6 +877,16 @@ fn run(
             for f in bio.registry().flows() {
                 let res = f.evaluate(before, &env, sc.bio_dt).expect("plant flow");
                 tally(&mut m.water, f.id(), &res);
+            }
+            if let Some(u) = &uptake {
+                let day = (fast_steps / sc.steps_per_day) as usize;
+                let (wanted, given) = u.parts(before, &env, sc.bio_dt).expect("uptake");
+                if given < wanted {
+                    if let (Some(c), Some(x)) = (m.n_capped.get_mut(day), m.n_short.get_mut(day)) {
+                        *c += 1;
+                        *x += wanted - given;
+                    }
+                }
             }
         }
         Side::Fast => {
@@ -862,6 +1029,15 @@ fn run(
                     (y.0 - x.0, y.1 - x.1, y.2 - x.2)
                 },
                 n_eaten: m.n_eaten[w[0]..w[1]].iter().sum(),
+                soil_n_end: amount(e, SOIL_N),
+                ncon_max: uptake.as_ref().map_or(0.0, |u| {
+                    ends[w[0] + 1..=w[1]]
+                        .iter()
+                        .map(|x| 1e6 * u.concentration(x))
+                        .fold(0.0, f64::max)
+                }),
+                capped_steps: m.n_capped[w[0]..w[1]].iter().sum(),
+                n_short: m.n_short[w[0]..w[1]].iter().sum(),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -882,6 +1058,7 @@ fn run(
         co2_store: co2_store || food_loop,
         food_loop,
         with_nitrogen,
+        real_soil,
         eaten,
     }
 }
@@ -897,6 +1074,7 @@ fn report(r: &Run) {
         r.crew,
         r.days,
         match (r.co2_store, r.food_loop) {
+            (_, true) if r.real_soil => ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL",
             (_, true) if r.with_nitrogen => ", CO₂ STORE + FOOD LOOP + NITROGEN",
             (_, true) => ", CO₂ STORE + FOOD LOOP",
             (true, false) => ", CO₂ STORE",
@@ -964,6 +1142,17 @@ fn report(r: &Run) {
                 ds,
                 df,
                 dp + ds + df
+            );
+        }
+        if r.real_soil {
+            println!(
+                "           soil solution N ends {:.4} kg ({:.2} g/m²); highest {:.0} mg/L at a day's end; \
+                 uptake capped by the roots' reach in {} plant steps, {:.4} kg held back",
+                c.soil_n_end,
+                1e3 * c.soil_n_end / a,
+                c.ncon_max,
+                c.capped_steps,
+                c.n_short
             );
         }
     }
@@ -1073,6 +1262,7 @@ fn main() {
     let co2_store = args.iter().any(|x| x == "--co2-store");
     let food_loop = args.iter().any(|x| x == "--food-loop");
     let with_nitrogen = args.iter().any(|x| x == "--nitrogen");
+    let real_soil = args.iter().any(|x| x == "--real-soil");
     let big = sized(area);
     println!(
         "sizing at {area} m²: lamp {} W, chamber C {:.3e} J/K, cooler {} W, heater {} W, walls \
@@ -1087,8 +1277,9 @@ fn main() {
         big.cabin.crew_count
     );
     let (one, many) = std::thread::scope(|s| {
-        let one = s.spawn(|| run(1.0, None, days, false, false, false));
-        let many = s.spawn(|| run(area, crew, days, co2_store, food_loop, with_nitrogen));
+        let one = s.spawn(|| run(1.0, None, days, false, false, false, false));
+        let many =
+            s.spawn(|| run(area, crew, days, co2_store, food_loop, with_nitrogen, real_soil));
         (one.join().expect("1 m²"), many.join().expect("big"))
     });
     report(&one);

@@ -53,3 +53,12 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   the run; **71 kg** piles up in the soil, which at 20 t (non-physical, recorded) cannot feel it.
   Carbon identical to 2b. A real-sized soil and loss paths are the user's sourced choice; P, K and
   trace elements need new quantities in the frozen core.
+* **Step 3a MEASURED 2026-10-21** (plan §8–§8a; lab `--real-soil`): a soil of real size after Soltani &
+  Sinclair Ch. 18 — a silt loam's solution nitrogen at sowing, **1.97 g N/m²** instead of 100 kg, and
+  the roots' reach as the nitrogen dissolved in the plant-available water (Eqn 18.5) instead of the
+  1–50 kg/m² availability band. The crop is **never** short (0 capped steps); carbon identical to 2c.
+  The imported food's nitrogen fills the soil: **342 g/m²** and **~7 800 mg/L** by day 1220, past every
+  reference point the book uses; the model has no salt damage to show it. Of the three real losses,
+  only ammonia from urine can run here (2 % or 10 %, Table 18.1 read off the page): the station never
+  drains the root zone and is never waterlogged. No sourced soil loss balances the loop — the fix is a
+  design choice (grow more of the food, take nitrogen out on purpose, or drain).
