@@ -13,6 +13,8 @@
 //! cargo run --release -q -p station --example big_station -- --real-soil   # Step 3a (below)
 //! cargo run --release -q -p station --example big_station -- --feed-crew   # Step 3c (below)
 //! cargo run --release -q -p station --example big_station -- --co2-charge C --o2-charge O  # Step 4a
+//! cargo run --release -q -p station --example big_station -- --co2-charge C --o2-charge O \
+//!     --fertilizer KG --soil-n-level G                                                  # Step 4b
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
@@ -45,6 +47,11 @@
 //! charged at the start and refilled only from the room's air, after CEEF. The CO₂ store starts at
 //! its charge, and the room's O₂ makeup draws from and returns to a tank ([`O2Tank`]) with a floor,
 //! in place of the outside supply. Both charges are inputs, with no default.
+//!
+//! `--fertilizer KG --soil-n-level G` (Step 4b, plan §10.3; needs Step 4a's charges): the dose tops
+//! the soil's solution nitrogen up to `G` g N/m² each plant step, from the urine tank inside its
+//! window and from a fertilizer store ([`FERTILIZER`], starting at `KG` kg N) for the rest, at any
+//! time from sowing to maturity (Linquist et al. 1992). Both are inputs, with no default.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -321,13 +328,25 @@ impl Flow for FoodTopUp {
     }
 }
 
+/// Step 4b's fertilizer store (kg N): mineral nitrogen from outside, behind the urine tank.
+const FERTILIZER: &str = "lab.fertilizer_n";
+/// Grams of protein per gram of nitrogen: the factor BVAD's 122 g of protein was turned into the
+/// menu's nitrogen with ([`MENU_N_KG_PER_CREW_DAY`]), so protein reads back on the same basis.
+const PROTEIN_PER_N: f64 = 6.25;
+
 /// NITROGEN `lab.urine_n → soil_n`, Step 3c: in the plant step, the roots' uptake that step
 /// ([`SolutionUptake`], with its cap) is put back from the tank, so the soil's solution nitrogen
 /// is held at its level by the dose — only from sowing to [`DOSE_WINDOW_DAYS`] and no more than
 /// the tank holds. Outside the window the crop draws on the soil alone.
+///
+/// With Step 4b's `top_up` (kg N) the dose instead fills the soil solution up to that level: from
+/// the tank inside the window, and from [`FERTILIZER`] for the rest at any time — EcoSanRes' cutoff
+/// is a hygiene rule for urine, and late mineral nitrogen raises grain protein (Linquist, Cassman,
+/// Fulton & Jackson 1992, California Agriculture 46(2):13–16).
 struct UrineDose {
     uptake: SolutionUptake,
     sc: SealedStationScenario,
+    top_up: Option<f64>,
 }
 
 impl UrineDose {
@@ -353,15 +372,30 @@ impl Flow for UrineDose {
         env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let dose = if self.open(snapshot)? {
-            let (_, taken) = self.uptake.parts(snapshot, env, dt)?;
-            taken.min(amount(snapshot, URINE_TANK))
+        let open = self.open(snapshot)?;
+        let tank = if open {
+            amount(snapshot, URINE_TANK)
         } else {
             0.0
         };
+        let Some(level) = self.top_up else {
+            let dose = if open {
+                self.uptake.parts(snapshot, env, dt)?.1.min(tank)
+            } else {
+                0.0
+            };
+            return FlowResult::new(vec![
+                Leg::new(URINE_TANK.to_string(), -dose)?,
+                Leg::new(SOIL_N.to_string(), dose)?,
+            ]);
+        };
+        let deficit = (level - amount(snapshot, SOIL_N)).max(0.0);
+        let urine = deficit.min(tank);
+        let bought = (deficit - urine).min(amount(snapshot, FERTILIZER));
         FlowResult::new(vec![
-            Leg::new(URINE_TANK.to_string(), -dose)?,
-            Leg::new(SOIL_N.to_string(), dose)?,
+            Leg::new(URINE_TANK.to_string(), -urine)?,
+            Leg::new(FERTILIZER.to_string(), -bought)?,
+            Leg::new(SOIL_N.to_string(), urine + bought)?,
         ])
     }
 }
@@ -522,12 +556,13 @@ impl Flow for SolutionUptake {
 
 /// The plant registry with Step 3a's [`SolutionUptake`] in the reference uptake's place (the
 /// reference's reads no environment, so its sowing-clock and chamber wrappers change nothing) —
-/// and with `dose`, Step 3c's [`UrineDose`].
+/// and with `dose`, Step 3c's [`UrineDose`] (with Step 4b's `top_up` level, kg N).
 fn with_real_soil(
     sc: &SealedStationScenario,
     state: &State,
     bio: Registry,
     dose: bool,
+    top_up: Option<f64>,
 ) -> Registry {
     let (flows, aux) = bio.into_parts();
     let before = flows.len();
@@ -541,13 +576,14 @@ fn with_real_soil(
         flows.push(Box::new(UrineDose {
             uptake: SolutionUptake::new(sc),
             sc: *sc,
+            top_up,
         }));
     }
     Registry::new(flows, &state.stocks, aux).expect("plant registry")
 }
 
 /// The nitrogen the run books (kg N): the plant's, the soil's (available, litter, microbes, humus),
-/// the food's, and Step 3c's held back (the reserve's and the urine tank's).
+/// the food's, and held back (Step 3c's reserve and urine tank, Step 4b's fertilizer store).
 fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
     let soil = [SOIL_N, LITTER_N, MICROBIAL_N, HUMUS_N]
         .iter()
@@ -557,8 +593,16 @@ fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
         amount(s, PLANT_N),
         soil,
         amount(s, FOOD_N),
-        amount(s, FOOD_RESERVE_N) + amount(s, URINE_TANK),
+        amount(s, FOOD_RESERVE_N) + amount(s, URINE_TANK) + amount(s, FERTILIZER),
     )
+}
+
+/// The station with Step 4b's [`FERTILIZER`] store, starting at `charge` kg N.
+fn with_fertilizer(state: State, charge: f64) -> State {
+    let mut stocks = state.stocks.clone();
+    let store = simple_pool(FERTILIZER, "lab", Quantity::Nitrogen, charge).expect("fertilizer");
+    stocks.insert(store.id.clone(), store);
+    State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state")
 }
 
 /// The station with Step 2a's CO₂ store: the scrubber re-pointed at [`CO2_STORE`] (starting at
@@ -985,6 +1029,10 @@ struct Cycle {
     /// at the straw's residual after a harvest, so the cold weeks' lowest is the re-sow's).
     n_stressed_cold: u64,
     n_stress_min_warm: f64,
+    /// Step 4b (kg N): the fertilizer dosed inside the urine window and after it, and the store's end.
+    fert_window: f64,
+    fert_late: f64,
+    fert_end: f64,
 }
 
 #[derive(Default)]
@@ -1037,6 +1085,9 @@ struct Minutes {
     n_stress_min: Vec<f64>,
     /// Step 4a: the minutes the O₂ tank ended empty.
     o2_tank_empty: u64,
+    /// Step 4b, per day (kg N): the fertilizer dosed inside the urine window, and after it.
+    fert_window: Vec<f64>,
+    fert_late: Vec<f64>,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -1065,6 +1116,9 @@ struct Options {
     feed_crew: bool,
     /// Step 4a: the gas tanks' starting charges (mol CO₂, mol O₂), inputs with no default.
     tanks: Option<(f64, f64)>,
+    /// Step 4b: the fertilizer store's charge (kg N) and the soil solution's top-up level (g N/m²),
+    /// inputs with no default; needs `tanks`.
+    fertilizer: Option<(f64, f64)>,
 }
 
 impl Options {
@@ -1081,6 +1135,7 @@ impl Options {
             real_soil,
             feed_crew,
             tanks: self.tanks,
+            fertilizer: self.fertilizer,
         }
     }
 }
@@ -1094,7 +1149,12 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         real_soil,
         feed_crew,
         tanks,
+        fertilizer,
     } = opts;
+    assert!(
+        fertilizer.is_none() || tanks.is_some(),
+        "Step 4b builds on Step 4a's charged tanks"
+    );
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
         let k = n / sc.cabin.crew_count;
@@ -1116,9 +1176,12 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
     let chamber = sc.chamber;
     let (state, bio, fast) = on_grid(&sc, &thermal, food_loop);
     let uptake = real_soil.then(|| SolutionUptake::new(&sc));
+    // Step 4b's top-up level, g N/m² to kg N over the area.
+    let top_up = fertilizer.map(|(_, level)| level * a / 1e3);
     let dose = feed_crew.then(|| UrineDose {
         uptake: SolutionUptake::new(&sc),
         sc,
+        top_up,
     });
     let (state, fast, injector) = if co2_store {
         let (s, f, i) = with_co2_store(&sc, state, fast, tanks.map_or(0.0, |t| t.0));
@@ -1135,8 +1198,12 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
     } else {
         (state, fast)
     };
+    let state = match fertilizer {
+        Some((charge, _)) => with_fertilizer(state, charge),
+        None => state,
+    };
     let bio = if real_soil {
-        with_real_soil(&sc, &state, bio, feed_crew)
+        with_real_soil(&sc, &state, bio, feed_crew, top_up)
     } else {
         bio
     };
@@ -1188,6 +1255,8 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         o2_tank_low: vec![f64::INFINITY; days],
         n_stressed: vec![0; days],
         n_stress_min: vec![1.0; days],
+        fert_window: vec![0.0; days],
+        fert_late: vec![0.0; days],
         ..Minutes::default()
     };
     let nitro = sc.plant_params().nitro;
@@ -1223,7 +1292,14 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                     }
                 };
                 match f.id() {
-                    URINE_DOSE => into(&mut m.dosed, leg(&res, SOIL_N)),
+                    URINE_DOSE => {
+                        into(&mut m.dosed, leg(&res, SOIL_N));
+                        let bought = -leg(&res, FERTILIZER);
+                        if bought > 0.0 {
+                            let open = dose.as_ref().is_some_and(|d| d.open(before).expect("window"));
+                            into(if open { &mut m.fert_window } else { &mut m.fert_late }, bought);
+                        }
+                    }
                     NITROGEN_UPTAKE => into(&mut m.uptake, leg(&res, PLANT_N)),
                     _ => {}
                 }
@@ -1242,10 +1318,14 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                     }
                     // Step 3c: capped with the window open and enough urine in the tank to cover
                     // the shortfall — the dose rule holding a starved soil where it is, not the
-                    // tank running short.
+                    // tank running short. Step 4b: or with fertilizer enough, at any time — the
+                    // level set too low, not the stores running short.
                     if let Some(d) = &dose {
-                        let tank = amount(before, URINE_TANK);
-                        if tank >= wanted - given && d.open(before).expect("window") {
+                        let open = d.open(before).expect("window");
+                        let tank = if open { amount(before, URINE_TANK) } else { 0.0 };
+                        if tank + amount(before, FERTILIZER) >= wanted - given
+                            && (open || d.top_up.is_some())
+                        {
                             if let Some(c) = m.capped_with_urine.get_mut(day) {
                                 *c += 1;
                             }
@@ -1465,6 +1545,9 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                     .iter()
                     .copied()
                     .fold(1.0, f64::min),
+                fert_window: m.fert_window[w[0]..w[1]].iter().sum(),
+                fert_late: m.fert_late[w[0]..w[1]].iter().sum(),
+                fert_end: amount(e, FERTILIZER),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -1499,6 +1582,10 @@ fn report(r: &Run) {
         r.crew,
         r.days,
         match (o.co2_store, o.food_loop) {
+            (_, true) if o.fertilizer.is_some() => {
+                ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP \
+                 WITH FERTILIZER"
+            }
             (_, true) if o.tanks.is_some() => {
                 ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS CHARGED"
             }
@@ -1590,6 +1677,26 @@ fn report(r: &Run) {
             // The soil solution's change, split: the doses in, the roots' uptake out, and the rest
             // (the soil's own mineralization and immobilization) — what the dose does not decide.
             let change = c.soil_n_end - c.soil_n_start;
+            // The urine's share of the doses: Step 4b's fertilizer is the rest (0 before it).
+            let urine_dosed = c.dosed - c.fert_window - c.fert_late;
+            // The diet, calories and protein side by side (plan §10.2): the share of the crew's
+            // carbon that was grown, and the nitrogen they ate as protein per person-day.
+            println!(
+                "           diet: calories {:.1} % home-grown; protein {:.1} g per person-day (BVAD's \
+                 menu 122; N × {PROTEIN_PER_N})",
+                100.0 - 100.0 * c.imported_c * r_f_resp / c.exhaled,
+                1e3 * c.n_eaten * PROTEIN_PER_N / c.days as f64 / r.crew
+            );
+            if o.fertilizer.is_some() {
+                println!(
+                    "           fertilizer dosed {:.3} kg in the urine window + {:.3} kg after it \
+                     ({:.2} g/m² in all); store ends {:.3} kg",
+                    c.fert_window,
+                    c.fert_late,
+                    1e3 * (c.fert_window + c.fert_late) / a,
+                    c.fert_end
+                );
+            }
             println!(
                 "           soil solution N {:.2} → {:.2} g/m² (lowest {:.2}): dosed {:+.3} kg, roots took \
                  {:.3} kg, the rest (the soil's own turnover) {:+.3} kg",
@@ -1614,8 +1721,8 @@ fn report(r: &Run) {
                  person-day dose 13–17, toxic 52–69 g/m²), ends {:.3} kg ({:.0} days of inflow)",
                 c.urine_in,
                 1e3 * c.urine_in / c.days as f64,
-                c.dosed,
-                1e3 * c.dosed / a,
+                urine_dosed,
+                1e3 * urine_dosed / a,
                 c.tank_end,
                 c.tank_end / (c.urine_in / c.days as f64).max(f64::MIN_POSITIVE)
             );
@@ -1677,7 +1784,7 @@ fn report(r: &Run) {
         println!(
             "  where the nitrogen went (kg N, start → end): plant {:.3} → {:.3}; soil solution {:.3} → \
              {:.3}; soil litter, microbes and humus {:.3} → {:.3}; food store {:.3} → {:.3}; urine tank \
-             {:.3} → {:.3}; reserve {:.3} → {:.3}",
+             {:.3} → {:.3}; reserve {:.3} → {:.3}; fertilizer {:.3} → {:.3}",
             amount(s, PLANT_N),
             amount(e, PLANT_N),
             solution(s),
@@ -1689,7 +1796,9 @@ fn report(r: &Run) {
             amount(s, URINE_TANK),
             amount(e, URINE_TANK),
             amount(s, FOOD_RESERVE_N),
-            amount(e, FOOD_RESERVE_N)
+            amount(e, FOOD_RESERVE_N),
+            amount(s, FERTILIZER),
+            amount(e, FERTILIZER)
         );
     }
     println!(
@@ -1820,6 +1929,14 @@ fn main() {
             )),
             (None, None) => None,
             _ => panic!("Step 4a's tanks take both charges: --co2-charge MOL --o2-charge MOL"),
+        },
+        fertilizer: match (arg("--fertilizer"), arg("--soil-n-level")) {
+            (Some(f), Some(l)) => Some((
+                f.parse().expect("--fertilizer KG"),
+                l.parse().expect("--soil-n-level G"),
+            )),
+            (None, None) => None,
+            _ => panic!("Step 4b takes both: --fertilizer KG --soil-n-level G"),
         },
     };
     // Step 3c's farm (plan §9): 700 m², the round area above the 658 m² that feeds four crew.
