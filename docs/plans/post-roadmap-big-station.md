@@ -10,7 +10,10 @@ USDA's nitrogen; the books close, but the 20 t soil hides the loop. **Step 3a ME
 soil of real size (grams of nitrogen per m², after Soltani & Sinclair Ch. 18) the crop is never short;
 the imported food's nitrogen fills the soil solution to ~5 300 mg/L at drained-full in four years (~7 800
 at the driest end of a watering cycle), and of [F]'s three losses only ammonia from urine can run here,
-taking at most a tenth of it.
+taking at most a tenth of it. **Step 3c PLANNED (§9, the user's choice, ahead of 3b):** a 700 m² farm
+that feeds the crew, imported food kept as a reserve eaten only when the harvest runs short, and urine
+stored in a tank and dosed to the soil as the roots take it (EcoSanRes' timing window); predictions
+F1–F6 written, nothing built.
 
 ## 1. Why this exists
 
@@ -521,3 +524,103 @@ balances this loop** under this station's watering (2026-10-21) — losses outsi
 denitrification in soil that is not saturated, were not looked for. What would: less imported nitrogen (more of the crew's food grown here), nitrogen taken
 out on purpose (urine kept back or its nitrogen stored, as the CO₂ is), or watering that drains — each
 a design choice for the user, not a soil property.
+
+## 9. Step 3c — a farm that feeds the crew, the diet's switch, and a urine store (the user's choice, 2026-10-21)
+
+The user, on 3a's finding, chose this ahead of 3b (ammonia, §8): *"The solution is - a bigger "soil" -
+bigger crop, a marsh with enough size. The crew initially starts eating imported food. nitrogen goes
+into the soil (or to the marsh and then transported manually to the soil by the crew). the crew starts
+eating grown food - nitrogen reaches e relative balans"*. A store for the surplus came from a side
+note (the nitrogen already piled up never leaves a sealed station on its own; watering, rain and
+scrubbing move it in a circle) and was approved: *"yes"*. Also approved, for later steps: watering and
+artificial spray or rain (*"yes, absolutely"*), and a marsh that holds the wastewater. Lab only
+(`big_station.rs`), on top of `--real-soil` so that a nitrogen shortage can show.
+
+**Why the pile should shrink.** An adult keeps no nitrogen, so a crew eating grown food returns to the
+soil what the crop took: the loop is closed. Only imported food brings new nitrogen. In 3a the crew ate
+~70 % imported food for all 1 220 days (the crop fed 30 %), and the store's mix kept them on it: the
+crew eat at the store's average, and a 5·10⁵ mol store (~13 years of food) dilutes each harvest.
+
+**The build (lab, `--feed-crew`, on top of `--real-soil`).**
+- **The farm: 700 m²**, the round area above what feeds four crew. 2b measured 22.15 mol C of grain
+  per m² per 140-day crop and the crew eat 103.9 mol C/day, so 658 m² feeds them exactly; 700 m² gives
+  ~107 % (15 500 against 14 550 mol C per crop). Everything else sized per m² scales as in §3a.
+- **Grown food first, imported food as a reserve.** The harvest goes to the crew's food store, as in
+  2b. The imported food becomes its own reserve stock (the reference's 5·10⁵ mol C, with its
+  nitrogen at BVAD's menu ratio), moved into the food store **only when the store would run short** —
+  carbon and nitrogen together, at the imported ratio, so the crew's average reads the mix truly. The
+  crew start on the reserve: there is no harvest before day ~140.
+- **Urine to a tank, not the soil.** The crew's urine nitrogen (88 %) goes to a urine store; feces still
+  go to the litter (12 %). EcoSanRes Fact Sheet 6 (read in full): urine *"should be stored for between
+  one and six months"* before use (hygiene; the store's age is not modelled — after the first month
+  the tank always holds more than a month's urine, a readout).
+- **Dosed to replace what the roots take, in the cited window.** Each step, while the tank holds it,
+  the dose equals the roots' uptake that step (the soil's solution nitrogen held at its level), but
+  only from sowing to two-thirds of the season: EcoSanRes, urine is *"best utilized if … applied prior
+  to sowing and up until two-thirds of the period between sowing and harvest"*, *"the last application
+  … at least one month prior to harvesting"*. Two-thirds of the 140-day cycle is day 93 after sowing,
+  47 days before harvest. Outside the window the crop draws on the soil alone. This is "on demand"
+  as approved; the guideline's own dose is a fixed rate (below), kept as the cross-check.
+- **The cited cross-check and limit.** EcoSanRes' rule of thumb: *"apply the urine produced by one
+  person during one day … to one square metre of land per growing season"*, and *"the maximum
+  application rate before risking toxic effects is at least four times the dose above"*. Here one
+  person-day of urine holds **17.2 g N** on the imported menu (19.5 × 0.88) and **~13.0 g N** on an
+  all-wheat diet (2c's grain, 0.569 g N per mol C × 25.97 mol C per crew-day × 0.88). So the rule's dose
+  is **13–17 g N/m² per crop**, its toxic limit **~52–69 g N/m² per crop**. This replaces 3a's bare
+  mg/L as the readout for "too salty". (3a's urine landed ~0.34 g/m²/day, ~48 g/m² per crop — near that
+  limit before counting what had piled up.)
+- **Not built here:** ammonia (3b; incorporating the urine, as EcoSanRes advises, is the 2 % case),
+  the marsh, draining or spray watering — each its own later step.
+
+**Carbon decides the nitrogen (advisor, 2026-10-21).** A sealed station can hold only the carbon it is
+given. At 700 m² a crop at its peak holds ~33 600 mol C (48 per m², §6a), and the soil gains carbon
+every crop (2b: 3 068 falling to 488 mol per crop at 200 m², ~26 000 over the run at 700 m²). The crew
+breathe out ~13 800 mol per crop. That extra carbon can come only from imported food the crew eat —
+and each mol of it brings 0.75 g of nitrogen. So the imports do not stop when the first harvest could
+cover the diet; they stop when the crop and the soil have filled with carbon.
+**The alternative, named, not built:** CEEF bought CO₂ from outside (*"CO2 addition from external
+source"*, 23.5 mol C/day in its 2007 run; Tako et al., Fig. 2b, read in full). That builds the farm's
+carbon with no nitrogen attached — a lever on the pile's size, and the user's choice if this run shows
+the imports are large.
+
+**Predictions (written before the run; 700 m², four crew, 1220 days, CO₂ store, food loop, nitrogen
+and real soil on):**
+- **F1 — the first crops are short of carbon.** Before the first harvest only the crew's ~13 800 mol and
+  the soil's breath feed the crop. Grain per m²: crop 1 **40–65 %** of 2b's 22.15 mol C/m², crop 2
+  **70–95 %**, from crop 3 or 4 within **5 %**.
+- **F2 — imports are the carbon the farm fills with.** Imported food eaten: all of the first ~140 days,
+  then each crop's shortfall — **40 000–70 000 mol C** over the run (about 100–170 days of the whole
+  crew's food), most of it before day ~420. From crop 4 on, imported food is **under 10 %** of the diet;
+  over the run the crop feeds **65–85 %** (2b: 28 %).
+- **F3 — the imported nitrogen: 30–53 kg** (F2 × 0.75 g/mol; 3a: ~74 kg eaten). Where it ends: the
+  standing crop (up to ~11 kg at maturity), the soil's litter and humus (a few kg), the soil solution
+  (held near its 1.4 kg start), and **the rest in the urine tank, 15–35 kg at day 1220**, flat or nearly
+  so after the ramp. The tank holds the pile; the soil does not.
+- **F4 — the soil stays a soil.** Solution nitrogen between **0.5× and 2×** its 1.97 g/m² start all run
+  (3a: to 342 g/m²). Doses per crop **8–14 g N/m²** — the same size as EcoSanRes' person-day rule
+  (13–17), and far under its toxic limit (52–69).
+- **F5 — late-season nitrogen may bind.** With no dose in the last 47 days, the roots' reach may cap
+  uptake in some steps during grain fill (3a: never). If it does, grain within 3 % of F1's carbon-limited
+  value; the count is reported, not tuned.
+- **F6.** Rationed 0 and 0; carbon and nitrogen books close every crop.
+
+**Readouts.** Per crop: grain per m² and as a share of the crew's food; imported food eaten (mol C,
+kg N); the urine tank's contents and inflow; doses per m² against the person-day rule and its 4×
+limit; solution nitrogen min/max (g/m², and mg/L at drained-full); capped uptake steps; carbon in crop,
+soil, food store and CO₂ tank. Over the run: where the imported nitrogen ended.
+
+**The documented ways to send ammonia back to the crops** (asked by the user; for 3b, not built here).
+Read in full: EcoSanRes (incorporate urine to avoid ammonia loss) and Tako (CEEF). The rest from
+search summaries, **full text not read**:
+- *Wet scrubbers.* Livestock barns spray slightly acidic water. Melse & Ogink (2005, *Trans. ASAE*): acid
+  scrubbers removed 40–100 % of ammonia, 96 % on average; with sulfuric acid the result is an
+  ammonium-sulfate solution used as fertilizer. A 2016 study of slightly acidic spray scrubbers
+  (*Front. Environ. Sci. Eng.* 10(6)): the captured ammonium *"should be an excellent fertilizer"*.
+- *Condensate.* The ISS removes ammonia partly by its dissolving in the humidity condensate (NASA
+  NTRS 20180004945; ISS condensate 20–42 mg/L as N, National Academies). This model's chamber condensate
+  already returns to the plants' water.
+- *Leaves.* Above a small compensation point leaves take up ammonia from the air (Farquhar et al. 1980,
+  *Plant Physiol.* 66:710–714).
+- *Never forming it.* MELiSSA's nitrifying compartment turns urine ammonium into nitrate for the plants;
+  Lunar Palace 1 recovered ~20.5 % of urine nitrogen in its 105-day run; Biosphere 2 sent its wastewater
+  through a constructed marsh into the crop irrigation (Nelson et al. 1999, *Ecol. Eng.*).

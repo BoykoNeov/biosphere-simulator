@@ -64,3 +64,10 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   None of the three balances the loop (losses outside Ch. 18 not looked for) — the fix is a design
   choice (grow more of the food, take nitrogen out on purpose, or drain). The cap is shown live: a
   floor of 1 000 mg/L starves the first crop.
+* **Step 3c PLANNED 2026-10-21** (plan §9; the user's choice, ahead of 3b's ammonia): 700 m² so the
+  harvest can feed the crew; imported food a reserve, eaten only when the harvest runs short; urine to a
+  tank, dosed to the soil as the roots take it, from sowing to two-thirds of the season (EcoSanRes);
+  EcoSanRes' person-day dose and its 4× toxic limit as the "too salty" readout. Carbon decides the
+  nitrogen (advisor): the farm and soil fill with carbon only from imported food, so imports — and their
+  nitrogen — run until they are full; CEEF's bought CO₂ is the named alternative. Predictions F1–F6;
+  the user also approved spray watering / rain and a marsh for later steps.
