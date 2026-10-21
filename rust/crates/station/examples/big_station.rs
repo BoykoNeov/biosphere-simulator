@@ -7,7 +7,13 @@
 //! cargo run --release -q -p station --example big_station -- --area A     # another crop area (m²)
 //! cargo run --release -q -p station --example big_station -- --control    # the a = 1 golden check
 //! cargo run --release -q -p station --example big_station -- --crew N     # N crew in the big run
+//! cargo run --release -q -p station --example big_station -- --co2-store   # Step 2a (below)
 //! ```
+//!
+//! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
+//! (Tako et al.): the scrubber's outlet is a CO₂ store ([`CO2_STORE`]) instead of
+//! `boundary.co2_removed`, and an injector ([`Co2Injector`]) puts it back into the room while the
+//! lamp is on, up to the scrubber's own target. The 1 m² run stays the reference, as the yardstick.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -51,7 +57,7 @@ use domains::biosphere::stocks::{
 };
 use domains::biosphere::system::SeasonScenario;
 use domains::crew::{FOOD_STORE, WATER_STORE};
-use domains::eclss::{CO2_REMOVED, O2_SUPPLY};
+use domains::eclss::{CO2Scrubber, CO2_REMOVED, CO2_SCRUBBER, O2_SUPPLY};
 use domains::params;
 use domains::power::BATTERY;
 use domains::thermal::{temperature, ThermalParams, NODE};
@@ -66,11 +72,14 @@ use station::chamber::{
     chamber_temperature, ChamberParams, CHAMBER, CHAMBER_COOLING, CHAMBER_HEATER,
 };
 use station::driver::{DayOrder, Side, TwoRate};
+use station::flows::{CREW_RESPIRATION, LAMP_POWER_VAR};
 use station::params as sp;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
     build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
 };
+use station::sowing::twin;
+use station::stocks::{co2_composition, gas_pool};
 use station::water_reserve::working_level;
 
 /// The chamber's height (m) in `chamber.yaml`'s wall-area rule: BVAD's shoot + root zone.
@@ -79,6 +88,100 @@ const CHAMBER_HEIGHT: f64 = 0.78;
 const GRID: &str = "boundary.grid";
 /// The lab's outside-electricity flow id.
 const GRID_SUPPLY: &str = "lab.grid_supply";
+/// Step 2a's CO₂ store: the tank the scrubber fills (CEEF's reservoir).
+const CO2_STORE: &str = "lab.co2_store";
+/// Step 2a's injector flow id (CEEF's mass-flow controller).
+const CO2_INJECTOR: &str = "lab.co2_injector";
+
+/// CARBON (as CO₂) `lab.co2_store → the room`: while the lamp draws power, `rate · (target −
+/// room CO₂)` per second, no more than the store holds. The scrubber's own target and gain, so
+/// the scrubber acts only above the target and the injector only below it. The gain is DESIGN
+/// (CEEF's mass-flow controller is not published as a rate). Off when the lamp is: CEEF held the
+/// plants' CO₂ constant in the light periods.
+struct Co2Injector {
+    target: f64,
+    rate: f64,
+    sc: SealedStationScenario,
+}
+
+impl Co2Injector {
+    /// What the injector would give from `room` with the lamp at `lamp` W, before the store's cap.
+    fn wanted(&self, room: f64, lamp: f64, dt: f64) -> f64 {
+        if lamp > 0.0 {
+            self.rate * (self.target - room).max(0.0) * dt
+        } else {
+            0.0
+        }
+    }
+}
+
+impl Flow for Co2Injector {
+    fn type_name(&self) -> &'static str {
+        "Co2Injector"
+    }
+
+    fn id(&self) -> &str {
+        CO2_INJECTOR
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        // ⚠ The plain lamp variable is in no sealed resolver: a flow added after the build reads
+        // its phase twin itself (the sowing clock wraps only the build's own flows).
+        let lamp = env.get(&twin(LAMP_POWER_VAR, self.sc.phase(snapshot)?))?;
+        let given = self
+            .wanted(amount(snapshot, CARBON_POOL), lamp, dt)
+            .min(amount(snapshot, CO2_STORE));
+        FlowResult::new(vec![
+            Leg::new(CO2_STORE.to_string(), -given)?,
+            Leg::new(CARBON_POOL.to_string(), given)?,
+        ])
+    }
+}
+
+/// The station with Step 2a's CO₂ store: the scrubber re-pointed at [`CO2_STORE`] (starting
+/// empty), and [`Co2Injector`].
+fn with_co2_store(
+    sc: &SealedStationScenario,
+    state: State,
+    fast: Registry,
+) -> (State, Registry, Co2Injector) {
+    let eclss = params::eclss();
+    let air = sc.bio.chamber_air_capacity_mol;
+    let mut stocks = state.stocks.clone();
+    let store = gas_pool(CO2_STORE, Quantity::Carbon, 0.0, co2_composition()).expect("store");
+    stocks.insert(store.id.clone(), store);
+    let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
+    let (flows, aux) = fast.into_parts();
+    let mut flows: Vec<Box<dyn Flow>> = flows
+        .into_iter()
+        .map(|f| -> Box<dyn Flow> {
+            if f.id() == CO2_SCRUBBER {
+                Box::new(CO2Scrubber::new(
+                    CO2_SCRUBBER.to_string(),
+                    CARBON_POOL.to_string(),
+                    CO2_STORE.to_string(),
+                    eclss,
+                    air,
+                ))
+            } else {
+                f
+            }
+        })
+        .collect();
+    let injector = || Co2Injector {
+        target: eclss.co2_target_mol(air).expect("an above-target scrubber"),
+        rate: eclss.co2_scrub_rate,
+        sc: *sc,
+    };
+    flows.push(Box::new(injector()));
+    let fast = Registry::new(flows, &state.stocks, aux).expect("fast registry");
+    (state, fast, injector())
+}
 
 /// ENERGY `boundary.grid → power.battery`: tops the battery back up to `level` (J) each step,
 /// from the step's starting charge. A lab stand-in for a grid connection (module doc).
@@ -300,8 +403,12 @@ fn control() {
 struct Cycle {
     days: usize,
     exhaled: f64,
+    /// CO₂ that left the station (`boundary.co2_removed`).
     scrubbed: f64,
     pool_change: f64,
+    /// The change of Step 2a's CO₂ store (0 without one).
+    store_change: f64,
+    store_end: f64,
     best_day_share: f64,
     grain_max: f64,
     plant_c_max: f64,
@@ -326,6 +433,18 @@ struct Minutes {
     heater_capped: u64,
     above_setpoint: u64,
     store_min: f64,
+    /// The crew's exhaled CO₂ (mol), per day — booked from the crew's own flow, not from the
+    /// food store's fall (which a harvest refills).
+    exhaled: Vec<f64>,
+    /// Room CO₂ (mol) over the lit minutes: the lowest, and the sum for a mean.
+    lit_co2_min: f64,
+    lit_co2_sum: f64,
+    lit_minutes: u64,
+    /// Lit minutes the room is below 1 000 ppm.
+    lit_below_1000: u64,
+    /// Step 2a: the store's peak, and the lit minutes it gave less than the injector asked.
+    co2_store_max: f64,
+    store_short: u64,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -339,9 +458,10 @@ struct Run {
     rationed: (u64, u64),
     days: usize,
     crew: f64,
+    co2_store: bool,
 }
 
-fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
+fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool) -> Run {
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
         let k = n / sc.cabin.crew_count;
@@ -350,8 +470,14 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
         sc.cabin.water_store0 *= k;
     }
     let chamber = sc.chamber;
-    let f_resp = params::crew().respired_carbon_fraction;
     let (state, bio, fast) = on_grid(&sc, &thermal);
+    let (state, fast, injector) = if co2_store {
+        let (s, f, i) = with_co2_store(&sc, state, fast);
+        (s, f, Some(i))
+    } else {
+        (state, fast, None)
+    };
+    let air = sc.bio.chamber_air_capacity_mol;
     let first = state.clone();
     let bio_r = sealed_bio_resolver(&sp::lamp(), &sc).expect("bio resolver");
     let fast_r = sealed_fast_resolver(&params::charge(), &params::crew(), &sc).expect("fast");
@@ -379,6 +505,8 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
         o2_min: f64::INFINITY,
         o2_max: f64::NEG_INFINITY,
         store_min: f64::INFINITY,
+        lit_co2_min: f64::INFINITY,
+        exhaled: vec![0.0; days],
         ..Minutes::default()
     };
     // The crop's cycle ends at each re-sow: the day index of each reset.
@@ -394,6 +522,7 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
             }
         }
         Side::Fast => {
+            let day = (fast_steps / sc.steps_per_day) as usize;
             fast_steps += 1;
             let t_ch = chamber_temperature(amount(after, CHAMBER), &chamber);
             let t_node = temperature(
@@ -419,6 +548,22 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
             );
             let phase = sc.phase(before).expect("the sowing clock");
             let setpoint = sc.chamber_setpoint(phase, chamber.warm_setpoint);
+            let lamp = env.get(&twin(LAMP_POWER_VAR, phase)).expect("lamp power");
+            if lamp > 0.0 {
+                let room = amount(before, CARBON_POOL);
+                m.lit_minutes += 1;
+                m.lit_co2_min = m.lit_co2_min.min(room);
+                m.lit_co2_sum += room;
+                if room < 1e-3 * air {
+                    m.lit_below_1000 += 1;
+                }
+                if let Some(inj) = &injector {
+                    if inj.wanted(room, lamp, dt) > amount(before, CO2_STORE) {
+                        m.store_short += 1;
+                    }
+                }
+            }
+            m.co2_store_max = m.co2_store_max.max(amount(after, CO2_STORE));
             if t_before > setpoint + 0.5 {
                 m.above_setpoint += 1;
                 if node_before >= t_before {
@@ -432,6 +577,11 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
                     _ => {
                         let res = f.evaluate(before, &env, dt).expect("fast flow");
                         tally(&mut m.water, f.id(), &res);
+                        if f.id() == CREW_RESPIRATION {
+                            if let Some(e) = m.exhaled.get_mut(day) {
+                                *e += leg(&res, CARBON_POOL);
+                            }
+                        }
                         continue;
                     }
                 };
@@ -457,20 +607,22 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
     bounds.extend(reset_days.iter().copied().filter(|&d| d > 0 && d < days));
     bounds.push(days);
     bounds.dedup();
+    let exhaled_by_day = &m.exhaled;
     let cycles = bounds
         .windows(2)
         .map(|w| {
             let (s, e) = (&ends[w[0]], &ends[w[1]]);
-            let exhaled = (amount(s, FOOD_STORE) - amount(e, FOOD_STORE)) * f_resp;
+            let exhaled: f64 = exhaled_by_day[w[0]..w[1]].iter().sum();
             let mut best: f64 = f64::NEG_INFINITY;
             let mut grain: f64 = 0.0;
             let mut plant: f64 = 0.0;
             for d in w[0]..w[1] {
                 let (x, y) = (&ends[d], &ends[d + 1]);
-                let ex = (amount(x, FOOD_STORE) - amount(y, FOOD_STORE)) * f_resp;
+                let ex = exhaled_by_day[d];
                 let sc = amount(y, CO2_REMOVED) - amount(x, CO2_REMOVED);
                 let dp = amount(y, CARBON_POOL) - amount(x, CARBON_POOL);
-                best = best.max((ex - sc - dp) / ex);
+                let ds = amount(y, CO2_STORE) - amount(x, CO2_STORE);
+                best = best.max((ex - sc - dp - ds) / ex);
                 grain = grain.max(amount(y, STORAGE_C));
                 plant = plant.max(plant_c(y));
             }
@@ -479,6 +631,8 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
                 exhaled,
                 scrubbed: amount(e, CO2_REMOVED) - amount(s, CO2_REMOVED),
                 pool_change: amount(e, CARBON_POOL) - amount(s, CARBON_POOL),
+                store_change: amount(e, CO2_STORE) - amount(s, CO2_STORE),
+                store_end: amount(e, CO2_STORE),
                 best_day_share: best,
                 grain_max: grain,
                 plant_c_max: plant,
@@ -497,6 +651,7 @@ fn run(a: f64, crew: Option<f64>, days: usize) -> Run {
         rationed: (totals.slow_rationed, totals.fast_rationed),
         days,
         crew: sc.cabin.crew_count,
+        co2_store,
     }
 }
 
@@ -506,12 +661,18 @@ fn report(r: &Run) {
     let m = &r.m;
     let air = sealed_station_scenario().bio.chamber_air_capacity_mol;
     println!(
-        "\n=== {a} m², {} crew, {} days; rationed (plant, minute) {:?} ===",
-        r.crew, r.days, r.rationed
+        "\n=== {a} m², {} crew, {} days{}; rationed (plant, minute) {:?} ===",
+        r.crew,
+        r.days,
+        if r.co2_store { ", CO₂ STORE" } else { "" },
+        r.rationed
     );
-    println!("per crop cycle (closure share = ecosystem's net CO₂ draw / crew exhalation):");
+    println!(
+        "per crop cycle (closure share = ecosystem's net CO₂ draw / crew exhalation; 'scrubbed' = \
+         left the station; the store's change is not a draw):"
+    );
     for (i, c) in r.cycles.iter().enumerate() {
-        let net = c.exhaled - c.scrubbed - c.pool_change;
+        let net = c.exhaled - c.scrubbed - c.pool_change - c.store_change;
         println!(
             "  cycle {i}: {:4} days; exhaled {:9.1} mol ({:.2}/day), scrubbed {:9.1}; closure share \
              {:5.1} % (best day {:5.1} %); grain max {:.3} mol C/m², plant C max {:.3} mol C/m²",
@@ -533,11 +694,34 @@ fn report(r: &Run) {
             net - c.crop_change - c.soil_change,
             100.0 * c.plant_c_max / c.exhaled
         );
+        if r.co2_store {
+            println!(
+                "           store {:+9.1} mol over the cycle, ends {:9.1}",
+                c.store_change, c.store_end
+            );
+        }
     }
-    let (ex, scr, dp) = r.cycles.iter().fold((0.0, 0.0, 0.0), |(x, y, z), c| {
-        (x + c.exhaled, y + c.scrubbed, z + c.pool_change)
+    let (ex, scr, dp, ds) = r.cycles.iter().fold((0.0, 0.0, 0.0, 0.0), |(x, y, z, w), c| {
+        (x + c.exhaled, y + c.scrubbed, z + c.pool_change, w + c.store_change)
     });
-    println!("  whole run: closure share {:.1} %", 100.0 * (ex - scr - dp) / ex);
+    println!(
+        "  whole run: exhaled {ex:.1} mol; closure share {:.1} %; left the station {:.1} %; into \
+         the store {:.1} %",
+        100.0 * (ex - scr - dp - ds) / ex,
+        100.0 * scr / ex,
+        100.0 * ds / ex
+    );
+    println!(
+        "lit minutes {}: room CO₂ min {:.2} mol ({:.0} ppm), mean {:.0} ppm; minutes below 1000 \
+         ppm {}; store peak {:.1} mol, lit minutes the store ran short {}",
+        m.lit_minutes,
+        m.lit_co2_min,
+        1e6 * m.lit_co2_min / air,
+        1e6 * m.lit_co2_sum / m.lit_minutes.max(1) as f64 / air,
+        m.lit_below_1000,
+        m.co2_store_max,
+        m.store_short
+    );
     println!(
         "room CO₂ {:.2}–{:.2} mol ({:.0}–{:.0} ppm of {air} mol); O₂ {:.1}–{:.1} mol ({:.2}–{:.2} %)",
         m.co2_min,
@@ -610,6 +794,7 @@ fn main() {
     let days = arg("--days").map_or(sc.days(), |d| d.parse().expect("--days N"));
     let area: f64 = arg("--area").map_or(200.0, |x| x.parse().expect("--area A"));
     let crew: Option<f64> = arg("--crew").map(|x| x.parse().expect("--crew N"));
+    let co2_store = args.iter().any(|x| x == "--co2-store");
     let big = sized(area);
     println!(
         "sizing at {area} m²: lamp {} W, chamber C {:.3e} J/K, cooler {} W, heater {} W, walls \
@@ -624,8 +809,8 @@ fn main() {
         big.cabin.crew_count
     );
     let (one, many) = std::thread::scope(|s| {
-        let one = s.spawn(|| run(1.0, None, days));
-        let many = s.spawn(|| run(area, crew, days));
+        let one = s.spawn(|| run(1.0, None, days, false));
+        let many = s.spawn(|| run(area, crew, days, co2_store));
         (one.join().expect("1 m²"), many.join().expect("big"))
     });
     report(&one);

@@ -2,7 +2,8 @@
 
 **Status: Step 1 MEASURED (2026-10-21, §3a).** The 200 m² station is CO₂-starved, as predicted; its
 crop grows half as much per m², and CO₂ is the whole cause (measured). One inert plumbing change landed
-for it (§3b); nothing else changes the reference. Step 2 is a choice for the user (§4).
+for it (§3b); nothing else changes the reference. **Step 2a MEASURED (§5a):** the crew's CO₂ stored and
+injected in lit hours (after CEEF) brings the crop back to 99.4 % per m². Step 2b, the food loop, next (§6).
 
 ## 1. Why this exists
 
@@ -173,3 +174,82 @@ alone reaches it.
 5. **Sunlight through glass**, then solar and fission power, as choices.
 6. **Adopt** the big station in one unfreeze (with the 98 % recycler); the 1 m² station stays as a
    test rig if anything still needs it.
+
+## 5. Step 2a — the crew's CO₂ kept for the plants (the user's choice, 2026-10-21)
+
+The user chose §4 items 1 then 2: *"Send the crew's CO₂ to the plants. Store what the air scrubber
+removes and release it when the lights are on, using published designs. This fixes the half-size
+crop."* — then the food loop. Both are built in the lab (`examples/big_station.rs`) first, item 1
+measured and recorded before item 2 starts (advisor, 2026-10-21). Nothing in the reference changes.
+
+**The published designs.**
+- **CEEF, Rokkasho (Japan), 2005–07** — two crew, two goats and 150 m² of crops in sealed modules:
+  *"Increased carbon dioxide (CO2) in the AHM [crew] atmosphere by respiration of crew and goats was
+  separated and supplied back to the air in the PCM [plants]"*. Fig. 1, read off the rendered page:
+  the CO₂ line runs separator → reservoir → reservoir → mass-flow controller → plant module; the
+  waste processors' CO₂ joins the same reservoir. Tako, Y., Masuda, T., Tsuga, S. et al., *Major
+  achievements of material circulation — closed habitation experiments using Closed Ecology
+  Experiment Facilities*, JAXA Space Utilization Symposium (JAXA repository SA6000061006, 2017).
+  A companion SAE paper (2006-01-2076, abstract only) says the recovered CO₂ held the growth
+  chambers' CO₂ *"at a constant level during light periods"*. This is the design built.
+- **NASA's Biomass Production Chamber** (contrast only): CO₂ held at 1000–1200 ppm in the light
+  and *"allowed to accumulate from plant respiration during the dark cycles"* — the room as its
+  own store. With crew in the same air that raises their CO₂ at night, so it is not built. Wheeler,
+  R.M., *NASA's Controlled Environment Agriculture Testing for Space Habitats* (NTRS 20140017323).
+  The same paper's sizing, for the readouts: *"about 20-25 m2 of crops could supply the O2 for one
+  human, while about 50 m2 would be required for food"*.
+
+**The build (lab).** The scrubber's outlet becomes a CO₂ store (a tank, starting empty, no size
+limit on the first run so that its peak says what tank is needed) instead of `boundary.co2_removed`;
+an injector moves CO₂ from the store into the room while the lamp is on, `k · (target − room CO₂)`,
+no more than the store holds. Target and gain are the scrubber's own (0.13 kPa; 1e-2 /s), so the
+scrubber acts only above the target and the injector only below it. The gain is DESIGN, like the
+scrubber's: CEEF's mass-flow controller is not published as a rate.
+
+**Predictions (written before the run; 200 m², four crew, 1220 days, harvest still off):**
+- **C1 — "this fixes the half-size crop" (the user's claim, tested).** The crew's 98.6 mol/day
+  exceeds what an unstarved crop fixes on average (~70 mol C/day, B2), and the cold period (56 days
+  of a seedling under a dim lamp) banks ~5 000 mol before the crop's peak asks for more than the
+  crew breathes out. So the store does not run dry: grain and peak crop per m² come back to ≥ 90 %
+  of the 1 m² crop's (≥ 20 and ≥ 43 mol C/m²), every crop.
+- **C2.** In lit hours the room holds near the target (no lit minute below 1 000 ppm, against
+  158 ppm in Step 1) except while the store is empty, which C1 says does not happen.
+- **C3 — the store keeps growing.** Nothing leaves (vented 0) and the harvest is still off, so
+  the soil breathes each crop back (§3a) and the crew's carbon, imported from the food store,
+  piles up in the tank: tens of thousands of mol by day 1220 (~100 mol/day less what the soil keeps).
+  This is not closure — closure needs the food loop (item 2).
+- **C4 — oxygen.** The crop's net O₂ over the run tends to zero for the same reason, so the O₂ tank
+  supplies roughly the crew's whole need, as in Step 1 (within 10 %).
+
+## 5a. Step 2a — MEASURED (2026-10-21)
+
+`examples/big_station.rs -- --co2-store` (200 m², four crew, 1220 days; the 1 m² reference beside it
+as the yardstick). Rationed 0 and 0. `--control` still reproduces `sealed_station_state.json` byte
+for byte. The readouts now book the crew's exhalation from the crew's own flow, not from the food
+store's fall (which a harvest would refill), and count the store's change as not a draw.
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| C1 | crop per m² back to ≥ 90 % of 1 m²'s; the store never runs dry | grain **22.30–22.32** mol C/m² per crop (1 m²: 22.44), peak crop **47.96–47.99** (48.24) — **99.4 %**, every crop; lit minutes the store ran short: **0** | **held — the half-size crop is fixed** |
+| C2 | no lit minute below 1 000 ppm | lit-hour room CO₂ **1 255–1 596 ppm, mean 1 284** (Step 1: down to 158); 0 minutes below 1 000 | held |
+| C3 | nothing leaves; the store piles up tens of thousands of mol | vented **0**; store **101 948 mol** at its peak (4.5 t of CO₂ — ~6 m³ as liquid), growing ~13 000 mol per crop from the third crop on; 84.3 % of everything the crew breathed out is in the tank at the end | held |
+| C4 | O₂ tank supplies the crew's whole need within 10 % | the tank gave **101 457 mol** against 120 216 at 1 m² — **84 %** | **missed**: the soil keeps carbon (below) |
+
+**What the crop does with the CO₂.** The share of the crew's carbon the crop holds at its peak rose
+from 31–38 % (Step 1) to **69.5 %**, every crop; on its best days the crop drew twice the crew's
+output (best day 200.8 % in crop 1, 130 % later — the store paying out). Closure share over the
+run **15.7 %** (Step 1: 8.4 %), and the cycle books still close to 0.000 mol.
+
+**Why C4 missed.** I predicted the crop's net draw would tend to zero, as at 1 m². It does — the crop
+change per cycle is ±3 mol after crop 1 — but the **soil** keeps a share of each crop: soil carbon
+2 765 → 14 306 mol, gaining ~700–900 mol per crop by the end. That carbon is O₂ the crew did not
+have to buy: the O₂ tank's saving (16 %) equals the closure share (15.7 %). The soil's gain is
+falling crop to crop, so this saving shrinks toward zero over decades without a harvest.
+
+**Water through the plants is unchanged by the crop's size:** 465 kg/day, 2.33 kg/m²/day, the same
+as at half the crop (Step 1) and at 1 m². So transpiration here is set by the lamp and the air, not
+by the leaf mass — B5's miss (1.55× low) was not about growth.
+
+**What it leaves.** The CO₂ loop is closed in the sense that nothing is thrown away, but the carbon
+ends in a tank, not in food: the crop is re-sown into the soil and the crew still eats the imported
+store. That is item 2 (the food loop, §6).

@@ -29,3 +29,10 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   (1e-9 of the step's transfer) cannot absorb rounding on a stock of ~1e14 J; a long big run nears it.
 * **Plumbing, inert:** the chamber's coefficients and the room's air size are scenario inputs now
   (20 goldens identical, `tests/chamber_sizing.rs`). Step 2 is the user's choice.
+* **Step 2a MEASURED 2026-10-21** (plan §5–§5a; lab `--co2-store`): the scrubber's CO₂ goes to a store
+  and is injected back while the lamp is on, after Japan's CEEF (separator → reservoir → flow
+  controller; Tako et al.). The 200 m² crop grows back to **99.4 %** of the 1 m² crop per m², every
+  crop; lit-hour CO₂ never below 1 255 ppm (Step 1: 158); nothing vented. The tank holds **102 000 mol**
+  (4.5 t CO₂) by day 1220 and keeps growing — the carbon has nowhere to go without the food loop.
+  **Missed:** the O₂ tank still supplies 84 % of the crew's need (predicted ~100 %): the soil keeps a
+  falling share of each crop. Water through plants 2.33 kg/m²/day whatever the crop's size.
