@@ -88,3 +88,12 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   air (CO₂ 60 000 mol, O₂ 11 000 mol, both inputs; the O₂ side becomes a real tank with a floor —
   today it is an outside source), predictions G1–G6; then 4b a top-up dose, 4c drainage and a marsh.
   Ammonia dropped as a loss (the user: it comes back to the soil with the water).
+* **Step 4 (a) and 4a MEASURED 2026-10-21** (plan §10, §10.2; 3000 days each). (a) 3c run on: the
+  harvest reaches 89 % of 2b per m² by crop 20, still rising; imports never stop (74 693 mol C); soil
+  solution 54 g N/m². 4a, CO₂ tank charged with 60 000 mol and a real O₂ tank of 11 000: crop 1 at
+  97.5 % (G1), imports 18 300 mol C and 13.75 kg N (G2), the O₂ tank mirrors the CO₂ tank to 1.0000 and
+  never empties (G4), no O₂ bought. G3 missed: the CO₂ tank never ran short (lowest 2 364 mol on day
+  2939) — I over-counted the soil's gain. The farm is now nitrogen-limited (G5, stronger than said):
+  from crop 2 the soil solution sits at 0.12 g/m², stress in ~500 plant steps a crop, plant N 6.9 kg
+  against ~11.2; nitrogen parks in soil organic matter (7.4 kg) and the urine tank. The user chose a
+  fertilizer store first, a legume crop later.

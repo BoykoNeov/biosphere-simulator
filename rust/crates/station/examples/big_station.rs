@@ -12,6 +12,7 @@
 //! cargo run --release -q -p station --example big_station -- --nitrogen    # Step 2c (below)
 //! cargo run --release -q -p station --example big_station -- --real-soil   # Step 3a (below)
 //! cargo run --release -q -p station --example big_station -- --feed-crew   # Step 3c (below)
+//! cargo run --release -q -p station --example big_station -- --co2-charge C --o2-charge O  # Step 4a
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
@@ -39,6 +40,11 @@
 //! ([`FOOD_RESERVE`]) moved into the food store only when it would run short ([`FoodTopUp`]); the
 //! crew's urine nitrogen goes to a tank ([`URINE_TANK`]), dosed to the soil at the roots' uptake
 //! from sowing to two-thirds of the season ([`UrineDose`], EcoSanRes Fact Sheet 6).
+//!
+//! `--co2-charge MOL --o2-charge MOL` (Step 4a, plan §10.1; turns `--feed-crew` on too): gas tanks
+//! charged at the start and refilled only from the room's air, after CEEF. The CO₂ store starts at
+//! its charge, and the room's O₂ makeup draws from and returns to a tank ([`O2Tank`]) with a floor,
+//! in place of the outside supply. Both charges are inputs, with no default.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -76,7 +82,7 @@
 //! rationing. ⚠ `rationed == 0` cannot measure starvation, so it is reported, never the verdict.
 
 use domains::biosphere::flows::NitrogenUptake;
-use domains::biosphere::science::{root_zone_fraction, WATER_DENSITY};
+use domains::biosphere::science::{nitrogen_stress_factor, root_zone_fraction, WATER_DENSITY};
 use domains::biosphere::stocks::{
     CARBON_POOL, CONDENSATE, CONSUMER_CARBON, HUMUS_CARBON, HUMUS_N, LEAF_C, LITTER_CARBON,
     LITTER_N, LITTER_SINK, MICROBIAL_CARBON, MICROBIAL_N, O2_POOL, PLANT_N, ROOTED_DEPTH, ROOT_C,
@@ -87,7 +93,7 @@ use std::rc::Rc;
 
 use domains::biosphere::system::SeasonScenario;
 use domains::crew::{FOOD_INTAKE_VAR, FOOD_STORE, WATER_STORE};
-use domains::eclss::{CO2Scrubber, CO2_REMOVED, CO2_SCRUBBER, O2_SUPPLY};
+use domains::eclss::{CO2Scrubber, O2Makeup, CO2_REMOVED, CO2_SCRUBBER, O2_MAKEUP, O2_SUPPLY};
 use domains::params;
 use domains::power::BATTERY;
 use domains::thermal::{temperature, ThermalParams, NODE};
@@ -110,7 +116,7 @@ use station::sealed::{
     sealed_reset_hook,
 };
 use station::sowing::twin;
-use station::stocks::{co2_composition, gas_pool, simple_pool};
+use station::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
 use station::water_reserve::working_level;
 
 /// The chamber's height (m) in `chamber.yaml`'s wall-area rule: BVAD's shoot + root zone.
@@ -170,6 +176,40 @@ impl Flow for Co2Injector {
         FlowResult::new(vec![
             Leg::new(CO2_STORE.to_string(), -given)?,
             Leg::new(CARBON_POOL.to_string(), given)?,
+        ])
+    }
+}
+
+/// Step 4a's O₂ tank: CEEF's O₂ separated from the plants' air and kept. The room's makeup draws
+/// from it and its surplus goes back into it; nothing comes from outside.
+const O2_TANK: &str = "lab.o2_tank";
+
+/// OXYGEN `lab.o2_tank ⇄ the room`, Step 4a: the reference's two-sided makeup ([`O2Makeup`], its
+/// gain and setpoint) re-pointed at [`O2_TANK`], giving no more than the tank holds.
+struct O2Tank {
+    inner: O2Makeup,
+}
+
+impl Flow for O2Tank {
+    fn type_name(&self) -> &'static str {
+        "O2Tank"
+    }
+
+    fn id(&self) -> &str {
+        O2_MAKEUP
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let given = leg(&self.inner.evaluate(snapshot, env, dt)?, O2_POOL)
+            .min(amount(snapshot, O2_TANK));
+        FlowResult::new(vec![
+            Leg::new(O2_TANK.to_string(), -given)?,
+            Leg::new(O2_POOL.to_string(), given)?,
         ])
     }
 }
@@ -521,17 +561,18 @@ fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
     )
 }
 
-/// The station with Step 2a's CO₂ store: the scrubber re-pointed at [`CO2_STORE`] (starting
-/// empty), and [`Co2Injector`].
+/// The station with Step 2a's CO₂ store: the scrubber re-pointed at [`CO2_STORE`] (starting at
+/// `charge` mol — empty before Step 4a), and [`Co2Injector`].
 fn with_co2_store(
     sc: &SealedStationScenario,
     state: State,
     fast: Registry,
+    charge: f64,
 ) -> (State, Registry, Co2Injector) {
     let eclss = params::eclss();
     let air = sc.bio.chamber_air_capacity_mol;
     let mut stocks = state.stocks.clone();
-    let store = gas_pool(CO2_STORE, Quantity::Carbon, 0.0, co2_composition()).expect("store");
+    let store = gas_pool(CO2_STORE, Quantity::Carbon, charge, co2_composition()).expect("store");
     stocks.insert(store.id.clone(), store);
     let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
     let (flows, aux) = fast.into_parts();
@@ -559,6 +600,39 @@ fn with_co2_store(
     flows.push(Box::new(injector()));
     let fast = Registry::new(flows, &state.stocks, aux).expect("fast registry");
     (state, fast, injector())
+}
+
+/// The station with Step 4a's [`O2_TANK`], starting at `charge` mol, in the reference makeup's
+/// place ([`O2Tank`]); `boundary.o2_supply` stays, unused.
+fn with_o2_tank(
+    sc: &SealedStationScenario,
+    state: State,
+    fast: Registry,
+    charge: f64,
+) -> (State, Registry) {
+    let air = sc.bio.chamber_air_capacity_mol;
+    let mut stocks = state.stocks.clone();
+    let tank = gas_pool(O2_TANK, Quantity::Oxygen, charge, o2_composition()).expect("O₂ tank");
+    stocks.insert(tank.id.clone(), tank);
+    let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
+    let (flows, aux) = fast.into_parts();
+    let before = flows.len();
+    let mut flows: Vec<Box<dyn Flow>> = flows
+        .into_iter()
+        .filter(|f| f.id() != O2_MAKEUP)
+        .collect();
+    assert_eq!(flows.len() + 1, before, "one reference makeup to replace");
+    flows.push(Box::new(O2Tank {
+        inner: O2Makeup::new(
+            O2_MAKEUP.to_string(),
+            O2_TANK.to_string(),
+            O2_POOL.to_string(),
+            params::eclss(),
+            air,
+        ),
+    }));
+    let fast = Registry::new(flows, &state.stocks, aux).expect("fast registry");
+    (state, fast)
 }
 
 /// ENERGY `boundary.grid → power.battery`: tops the battery back up to `level` (J) each step,
@@ -898,6 +972,14 @@ struct Cycle {
     /// The smallest reach ÷ wanted over the cycle's plant steps with any uptake wanted (∞ if none):
     /// below 1 the cap binds; the margin it ran with otherwise.
     reach_ratio_min: f64,
+    /// Step 4a: the tanks' lowest over the cycle and their ends (mol); the plant steps under
+    /// nitrogen stress and the lowest stress factor.
+    co2_store_low: f64,
+    o2_tank_low: f64,
+    o2_tank_end: f64,
+    o2_tank_change: f64,
+    n_stressed: u64,
+    n_stress_min: f64,
 }
 
 #[derive(Default)]
@@ -942,6 +1024,14 @@ struct Minutes {
     /// the tank's lowest at a plant step's start (kg N).
     capped_with_urine: Vec<u64>,
     tank_min: Vec<f64>,
+    /// Step 4a, per day: the CO₂ and O₂ tanks' lowest at a minute's end (mol); the plant steps the
+    /// crop's nitrogen stress factor was below 1, and its lowest (1 if never).
+    co2_store_low: Vec<f64>,
+    o2_tank_low: Vec<f64>,
+    n_stressed: Vec<u64>,
+    n_stress_min: Vec<f64>,
+    /// Step 4a: the minutes the O₂ tank ended empty.
+    o2_tank_empty: u64,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -968,12 +1058,15 @@ struct Options {
     with_nitrogen: bool,
     real_soil: bool,
     feed_crew: bool,
+    /// Step 4a: the gas tanks' starting charges (mol CO₂, mol O₂), inputs with no default.
+    tanks: Option<(f64, f64)>,
 }
 
 impl Options {
     /// The options with every step a chosen one builds on turned on.
     fn closed(self) -> Options {
-        let real_soil = self.real_soil || self.feed_crew;
+        let feed_crew = self.feed_crew || self.tanks.is_some();
+        let real_soil = self.real_soil || feed_crew;
         let with_nitrogen = self.with_nitrogen || real_soil;
         let food_loop = self.food_loop || with_nitrogen;
         Options {
@@ -981,7 +1074,8 @@ impl Options {
             food_loop,
             with_nitrogen,
             real_soil,
-            feed_crew: self.feed_crew,
+            feed_crew,
+            tanks: self.tanks,
         }
     }
 }
@@ -994,6 +1088,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         with_nitrogen,
         real_soil,
         feed_crew,
+        tanks,
     } = opts;
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
@@ -1021,10 +1116,14 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         sc,
     });
     let (state, fast, injector) = if co2_store {
-        let (s, f, i) = with_co2_store(&sc, state, fast);
+        let (s, f, i) = with_co2_store(&sc, state, fast, tanks.map_or(0.0, |t| t.0));
         (s, f, Some(i))
     } else {
         (state, fast, None)
+    };
+    let (state, fast) = match tanks {
+        Some((_, o2)) => with_o2_tank(&sc, state, fast, o2),
+        None => (state, fast),
     };
     let (state, fast) = if with_nitrogen {
         with_food_nitrogen(&sc, state, fast, reserve)
@@ -1080,8 +1179,13 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         uptake: vec![0.0; days],
         capped_with_urine: vec![0; days],
         tank_min: vec![f64::INFINITY; days],
+        co2_store_low: vec![f64::INFINITY; days],
+        o2_tank_low: vec![f64::INFINITY; days],
+        n_stressed: vec![0; days],
+        n_stress_min: vec![1.0; days],
         ..Minutes::default()
     };
+    let nitro = sc.plant_params().nitro;
     // The crop's cycle ends at each re-sow: the day index of each reset.
     let mut fast_steps: u64 = 0;
     let mut reset_days: Vec<usize> = Vec::new();
@@ -1092,6 +1196,18 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
             let day = (fast_steps / sc.steps_per_day) as usize;
             if let Some(t) = m.tank_min.get_mut(day) {
                 *t = t.min(amount(before, URINE_TANK));
+            }
+            let f_n = nitrogen_stress_factor(
+                amount(before, PLANT_N),
+                [LEAF_C, STEM_C, ROOT_C].iter().map(|id| amount(before, id)).sum(),
+                nitro.n_residual_per_mol_c,
+                nitro.n_critical_per_mol_c,
+            );
+            if f_n < 1.0 {
+                if let (Some(c), Some(x)) = (m.n_stressed.get_mut(day), m.n_stress_min.get_mut(day)) {
+                    *c += 1;
+                    *x = x.min(f_n);
+                }
             }
             for f in bio.registry().flows() {
                 let res = f.evaluate(before, &env, sc.bio_dt).expect("plant flow");
@@ -1151,6 +1267,17 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
             m.o2_min = m.o2_min.min(amount(after, O2_POOL));
             m.o2_max = m.o2_max.max(amount(after, O2_POOL));
             m.store_min = m.store_min.min(amount(after, WATER_STORE));
+            if let Some(x) = m.co2_store_low.get_mut(day) {
+                *x = x.min(amount(after, CO2_STORE));
+            }
+            if tanks.is_some() {
+                if let Some(x) = m.o2_tank_low.get_mut(day) {
+                    *x = x.min(amount(after, O2_TANK));
+                }
+                if amount(after, O2_TANK) <= 0.0 {
+                    m.o2_tank_empty += 1;
+                }
+            }
             let env = fast_r.bind(before, dt);
             let t_before = chamber_temperature(amount(before, CHAMBER), &chamber);
             let node_before = temperature(
@@ -1313,6 +1440,21 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                     .iter()
                     .copied()
                     .fold(f64::INFINITY, f64::min),
+                co2_store_low: m.co2_store_low[w[0]..w[1]]
+                    .iter()
+                    .copied()
+                    .fold(f64::INFINITY, f64::min),
+                o2_tank_low: m.o2_tank_low[w[0]..w[1]]
+                    .iter()
+                    .copied()
+                    .fold(f64::INFINITY, f64::min),
+                o2_tank_end: amount(e, O2_TANK),
+                o2_tank_change: amount(e, O2_TANK) - amount(s, O2_TANK),
+                n_stressed: m.n_stressed[w[0]..w[1]].iter().sum(),
+                n_stress_min: m.n_stress_min[w[0]..w[1]]
+                    .iter()
+                    .copied()
+                    .fold(1.0, f64::min),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -1347,6 +1489,9 @@ fn report(r: &Run) {
         r.crew,
         r.days,
         match (o.co2_store, o.food_loop) {
+            (_, true) if o.tanks.is_some() => {
+                ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS CHARGED"
+            }
             (_, true) if o.feed_crew => {
                 ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW (reserve, urine tank)"
             }
@@ -1387,8 +1532,18 @@ fn report(r: &Run) {
         );
         if o.co2_store {
             println!(
-                "           store {:+9.1} mol over the cycle, ends {:9.1}",
-                c.store_change, c.store_end
+                "           store {:+9.1} mol over the cycle, ends {:9.1}, lowest {:9.1}",
+                c.store_change, c.store_end, c.co2_store_low
+            );
+        }
+        if o.tanks.is_some() {
+            println!(
+                "           O₂ tank {:+9.1} mol over the cycle, ends {:9.1}, lowest {:9.1}; O₂ change ÷ \
+                 −(CO₂ store change) {:.4}",
+                c.o2_tank_change,
+                c.o2_tank_end,
+                c.o2_tank_low,
+                -c.o2_tank_change / c.store_change
             );
         }
         if o.food_loop {
@@ -1470,6 +1625,11 @@ fn report(r: &Run) {
                 c.capped_steps,
                 c.n_short,
                 c.reach_ratio_min
+            );
+            println!(
+                "           nitrogen stress (factor below 1, photosynthesis cut) in {} plant steps, \
+                 lowest factor {:.3}",
+                c.n_stressed, c.n_stress_min
             );
         }
     }
@@ -1555,6 +1715,32 @@ fn report(r: &Run) {
         "O₂ supply change {:+.1} mol (negative: made up from the tank; positive: surplus returned)",
         amount(e, O2_SUPPLY) - amount(s, O2_SUPPLY)
     );
+    if o.tanks.is_some() {
+        let low = |v: &[f64]| {
+            v.iter()
+                .copied()
+                .enumerate()
+                .fold((f64::INFINITY, 0), |b, (d, x)| if x < b.0 { (x, d) } else { b })
+        };
+        let (co2_low, co2_day) = low(&m.co2_store_low);
+        let (o2_low, o2_day) = low(&m.o2_tank_low);
+        let (dc, do2) = (
+            amount(e, CO2_STORE) - amount(s, CO2_STORE),
+            amount(e, O2_TANK) - amount(s, O2_TANK),
+        );
+        println!(
+            "gas tanks: CO₂ {:.1} → {:.1} mol (lowest {:.1} on day {co2_day}); O₂ {:.1} → {:.1} mol \
+             (lowest {:.1} on day {o2_day}; minutes empty {}); O₂ change ÷ −(CO₂ change) {:.4}",
+            amount(s, CO2_STORE),
+            amount(e, CO2_STORE),
+            co2_low,
+            amount(s, O2_TANK),
+            amount(e, O2_TANK),
+            o2_low,
+            m.o2_tank_empty,
+            -do2 / dc
+        );
+    }
     println!(
         "water: crew store {:.1} → {:.1} kg (min {:.1}); plants' water {:.1} → {:.1} kg",
         amount(s, WATER_STORE),
@@ -1617,9 +1803,17 @@ fn main() {
         with_nitrogen: flag("--nitrogen"),
         real_soil: flag("--real-soil"),
         feed_crew: flag("--feed-crew"),
+        tanks: match (arg("--co2-charge"), arg("--o2-charge")) {
+            (Some(c), Some(o)) => Some((
+                c.parse().expect("--co2-charge MOL"),
+                o.parse().expect("--o2-charge MOL"),
+            )),
+            (None, None) => None,
+            _ => panic!("Step 4a's tanks take both charges: --co2-charge MOL --o2-charge MOL"),
+        },
     };
     // Step 3c's farm (plan §9): 700 m², the round area above the 658 m² that feeds four crew.
-    let default_area = if opts.feed_crew { 700.0 } else { 200.0 };
+    let default_area = if opts.closed().feed_crew { 700.0 } else { 200.0 };
     let area: f64 = arg("--area").map_or(default_area, |x| x.parse().expect("--area A"));
     let crew: Option<f64> = arg("--crew").map(|x| x.parse().expect("--crew N"));
     let big = sized(area);

@@ -13,8 +13,10 @@ at the driest end of a watering cycle), and of [F]'s three losses only ammonia f
 taking at most a tenth of it. **Step 3c MEASURED (§9a):** a 700 m² farm with imported food as a
 reserve and urine dosed from a tank; the farm fills by about a fifth of the gap a crop (the crop fed
 56 % over 1220 days, 84 % by crop 8), and the imported nitrogen piles in the soil, not the tank.
-**Step 4 PLANNED (§10, the user's choices):** gas tanks charged at the start (4a, predictions G1–G6
-written), then a top-up dose (4b), then drainage and a marsh (4c); ammonia dropped as a loss.
+**Step 4 (§10, the user's choices). (a) MEASURED:** 3c run to day 3000 fills to 89 % per m², the
+imports never stop, soil solution 54 g N/m². **4a MEASURED (§10.2):** gas tanks charged at the start —
+crop 1 at 97.5 %, no O₂ bought, imports 18 300 mol C — make the farm nitrogen-limited. Next: a top-up
+dose with a fertilizer store (4b), then drainage and a marsh (4c); ammonia dropped as a loss.
 
 ## 1. Why this exists
 
@@ -728,6 +730,17 @@ then (b) Step 4a; then (c) Step 4b; then (d) Step 4c, sized by what 4a and 4b le
   delay, not a sink. 3b measured it at 2–10 % of the urine's nitrogen. Not built as a zero-net loop;
   revisit only if the cabin's ammonia level matters for the crew's health.
 
+**(a) MEASURED (2026-10-21): the farm fills toward a ceiling it does not reach in eight years.**
+`fc3000.txt` (3c unchanged, 3000 days, 21 crops; rationed 0 and 0). The harvest climbs 27 → 79 % of
+2b's per m² by crop 8 (as 3c), 86 % by crop 9, **89 %** by crop 20 (19.73 mol C/m²), still rising by
+~0.4 % a crop. It fed **95 %** of the crew in crop 20; ~95 % took **12 more crops**, not the six §9a's
+ratio implied — the gap's ratio per crop drifts from ~0.8 to ~0.93 as the soil's carbon gain slows
+(+5 487 mol in crop 2, +721 in crop 20; soil carbon 49 250 mol at the end). The CO₂ tank is empty at
+every crop's end (~60 mol) and ran short in 10 % of lit minutes: the farm is carbon-limited all run.
+Imports never stop: 74 693 mol C in all (719 crew-days), still 793 mol in crop 20. Their 56 kg of
+nitrogen: soil solution **53.6 g/m²** at the end (1 221 mg/L at a dry day's end), still gaining ~0.8
+g/m² a crop; litter and humus 9.0 kg; the urine tank 6.1 kg. The baseline for 4a and 4b.
+
 ### 10.1 Step 4a — gas tanks charged at the start, refilled from the air (lab, `--co2-charge`, `--o2-charge`)
 
 **Feasible, and done:** CEEF separated both gases from its rooms' air and kept them in reservoirs —
@@ -783,7 +796,59 @@ setpoint), so a tank needs only a starting charge and a floor.
 - **G6.** Rationed 0 and 0; carbon, oxygen and nitrogen books close every crop; `--control` still
   reproduces `sealed_station_state.json` byte for byte.
 
-**Step 4b (c) and Step 4c (d) are planned after 4a is measured.** 4b: dose the soil solution up to a set
+### 10.2 Step 4a — MEASURED (2026-10-21)
+
+`examples/big_station.rs -- --co2-charge 60000 --o2-charge 11000 --days 3000` (700 m², four crew, 21
+crops; everything in 3c on). Rationed 0 and 0; carbon residual 0.000 every crop, nitrogen books to
+~1e-11 kg; `--control` reproduces `sealed_station_state.json` byte for byte; the 1 m² yardstick in the
+same output is identical to (a)'s. Output: `sources\temp-evidence\gas-tanks\g3000.txt` (three printed
+lines later lost a run of stray spaces; no number changed).
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| G1 | crop 1 grain ≥ 90 % of 2b | grain **21.60** mol C/m² (97.5 %), harvest 21.44/m² — **103 %** of the crew's food (3c: 27 %) | held |
+| G2 | imports only in crop 1, ~0 after; imported N 11–15 kg | crop 1's **14 548** mol C, **0** in crops 2–4, then small imports return (0.6–4.6 % of the diet, crops 5–20): **18 300** mol C in all, **13.75 kg N** (a: 74 693 and 56.1) | held — but the imports return because of nitrogen (G5), not carbon |
+| G3 | the soil drains the CO₂ tank; it runs short at a crop peak in crops 4–10 | **never short** (0 lit minutes; room CO₂ never below 1 160 ppm). The tank ends each crop at 33 518, 22 702, 19 680 … 2 433 mol; lowest **2 364 on day 2939**, still losing ~500 mol a crop | **missed** |
+| G4 | O₂ tank change = −(CO₂ tank change) within 2 %; low point in crop 1's cold weeks, 4 000–7 000 drawn; never empty | ratio **1.0000** every crop; lowest **4 265** on day 65 (6 735 drawn); never empty; ends **48 850** (+37 850, the charge's carbon now in crop, soil and food) | held |
+| G5 | nitrogen may bind in crop 1; from crop 2 the soil stops climbing | crop 1 barely (stress in 273 plant steps, factor ≥ 0.96); **from crop 2, every crop**: uptake capped in ~1 000–1 070 plant steps, stress in **~480–560** steps, factor down to **0.003**; soil solution pinned at **0.12 g/m²** (1.97 at the start); plant N at maturity **6.9 kg** against ~11.2 for a full crop; the grain gets **48 %** of USDA's nitrogen; grain 20.0–20.8 mol C/m² (90–94 %) | held, and stronger than said: the farm is now **nitrogen-limited** |
+| G6 | rationed 0 and 0; books close; control byte for byte | held | held |
+
+**Why G3 missed: my sum over-counted the soil.** At each peak the tank must hold out the standing crop
+(~31 700 mol) and everything the soil has kept. I took ~3 years of soil gain to be about 60 000 + the
+imports less the crop. It was less: the soil kept 9 924 mol by crop 1's end, 28 071 by crop 5's, then
+~500–1 500 a crop (45 755 by crop 20's) — about what (a)'s soil kept, the same carbon arriving early
+instead of late. At the last crops' falling rate the tank runs short around five crops after day 3000;
+the soil still gains, so a single charge only delays this. Not run on.
+
+**What the charge did, against (a) over the same 3000 days.** The crop fed **96.8 %** of the crew
+(a: 78.5 %); imported food 18 300 mol C (74 693); imported nitrogen 13.75 kg (56.1); soil solution at the
+end 2.1 kg (37.5) — 0.12 g/m² for most of the run where (a) reached 53.6. No O₂ bought (3c: 10 893 mol);
+the O₂ tank holds the oxygen the charge's carbon gave up.
+
+**The new limit: too little nitrogen goes round.** Nothing leaves the station, but nitrogen parks. Of
+the 15.4 kg in the system at the end: soil litter, microbes and humus **7.4 kg** (built from straw and
+feces), the urine tank 2.9 kg, the food store 2.7 kg, the soil solution 2.1 kg (this is mid-crop 21, at
+day 60). A full crop needs ~11 kg in the plant at once; it gets ~6.9. The dose rule makes it worse (§9a's
+flaw, now biting): uptake was capped with the window open and the tank able to cover the shortfall in
+**53–78 plant steps a crop**, and most of the rest of the capping falls after day 93, when the window
+shuts. The crew's nitrogen falls with the grain's: **34 g N/day** for four (the imported menu: 78 g), about
+53 g of protein per person-day against BVAD's menu of 122 — a readout, not a verdict on diet.
+**⚠ "Feeds the crew" counts carbon — calories, not protein (a side agent, 2026-10-21).** Every "feeds
+X %" in this plan is the harvest's carbon over the crew's; it says nothing about nutrients. Here the
+calories are 97 % home-grown while the protein is about half the menu's, near the usual adult minimum
+(0.8 g per kg body weight a day, the US Dietary Reference Intake — ~56 g at 70 kg; quoted from general
+knowledge, not read here). From 4b on, protein (grain nitrogen) is reported beside calories, and
+"feeds the crew" needs both.
+
+**What it leaves.** The gas tanks work and do what the user asked: carbon filled the farm in one crop
+instead of eight years, the O₂ side needs nothing from outside, and the nitrogen pile of 3c and (a) is
+gone. Nitrogen now limits the farm. That is 4b's subject — a top-up dose with the user's fertilizer
+store behind the urine tank — and 4a sizes it: ~4 kg more nitrogen in the crop at its peak (6.9 against ~11.2 kg).
+
+**Step 4b (c) and Step 4c (d) are planned after 4a is measured.** **The user, 2026-10-21, on where
+nitrogen comes from when imports stop: "Both, store first"** — a fertilizer store now (in 4b, so that
+4a measured the shortage first), a nitrogen-fixing crop (a legume, as CEEF grew soybean) later as its
+own step. 4b: dose the soil solution up to a set
 level from the urine tank (the level an input; anchor: the soil's 1.38 kg start), first checking against
 3c's numbers whether the soil's own release ever exceeds the uptake (then a top-up doses nothing and the
 soil still climbs). 4c: watering that drains (a cited leaching fraction) into a wastewater marsh whose
