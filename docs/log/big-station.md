@@ -36,3 +36,11 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   (4.5 t CO₂) by day 1220 and keeps growing — the carbon has nowhere to go without the food loop.
   **Missed:** the O₂ tank still supplies 84 % of the crew's need (predicted ~100 %): the soil keeps a
   falling share of each crop. Water through plants 2.33 kg/m²/day whatever the crop's size.
+* **Step 2b MEASURED 2026-10-21** (plan §6–§6a; lab `--food-loop`): the grain less the next seed goes
+  to the crew's food at maturity (a batch harvest, not the continuous `Harvest` flow); straw and roots
+  to the soil (the re-sow already did); feces to the soil. The crop feeds **30.4 %** of the four crew
+  per crop (~165 m² per person; NASA estimates ~50); the food store falls 75 mol/day instead of 104.
+  **Missed:** closure share 36.4 % (predicted ~45): eaten grain is grain the soil never keeps, so the
+  shares do not add. The O₂ the station buys equals the CO₂ piling up in the tank, to 1 mol. Nitrogen
+  closes only through the inedible parts; grain, crew and urine carry none (a gap, not built). No
+  fertilizer is added; the soil's 100 kg N/m² (non-physical, recorded) is what the crop draws on.

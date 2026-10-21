@@ -8,12 +8,18 @@
 //! cargo run --release -q -p station --example big_station -- --control    # the a = 1 golden check
 //! cargo run --release -q -p station --example big_station -- --crew N     # N crew in the big run
 //! cargo run --release -q -p station --example big_station -- --co2-store   # Step 2a (below)
+//! cargo run --release -q -p station --example big_station -- --food-loop   # Step 2b (below)
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
 //! (Tako et al.): the scrubber's outlet is a CO₂ store ([`CO2_STORE`]) instead of
 //! `boundary.co2_removed`, and an injector ([`Co2Injector`]) puts it back into the room while the
 //! lamp is on, up to the scrubber's own target. The 1 m² run stays the reference, as the yardstick.
+//!
+//! `--food-loop` (Step 2b, plan §6; turns the store on too): the crop feeds the crew. At maturity
+//! the grain less the next crop's seed goes to the crew's food store ([`harvest_at_maturity`]),
+//! then the usual re-sow puts the straw, leaves and roots into the soil; the crew's feces go to the
+//! soil too (`close_feces`). Nitrogen is not closed: the crew have no nitrogen books.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -55,6 +61,9 @@ use domains::biosphere::stocks::{
     MICROBIAL_CARBON, O2_POOL, ROOT_C, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C,
     SUBSOIL_WATER, WATER_VAPOR,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use domains::biosphere::system::SeasonScenario;
 use domains::crew::{FOOD_STORE, WATER_STORE};
 use domains::eclss::{CO2Scrubber, CO2_REMOVED, CO2_SCRUBBER, O2_SUPPLY};
@@ -71,12 +80,13 @@ use simcore::state::State;
 use station::chamber::{
     chamber_temperature, ChamberParams, CHAMBER, CHAMBER_COOLING, CHAMBER_HEATER,
 };
-use station::driver::{DayOrder, Side, TwoRate};
+use station::driver::{DayOrder, OwnedResetHook, Side, TwoRate};
 use station::flows::{CREW_RESPIRATION, LAMP_POWER_VAR};
 use station::params as sp;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
-    build_sealed_station, run_sealed, sealed_bio_resolver, sealed_fast_resolver, sealed_reset_hook,
+    build_sealed_station, is_mature, run_sealed, sealed_bio_resolver, sealed_fast_resolver,
+    sealed_reset_hook,
 };
 use station::sowing::twin;
 use station::stocks::{co2_composition, gas_pool};
@@ -327,12 +337,13 @@ fn outside_heat(a: f64) -> ThermalParams {
 fn on_grid(
     sc: &SealedStationScenario,
     thermal: &ThermalParams,
+    close_feces: bool,
 ) -> (
     State,
     simcore::registry::Registry,
     simcore::registry::Registry,
 ) {
-    let (state, bio, fast) = build(sc, thermal);
+    let (state, bio, fast) = build(sc, thermal, close_feces);
     let mut stocks = state.stocks.clone();
     let grid = simcore::boundary::source(GRID.to_string(), Quantity::Energy, 0.0, true)
         .expect("grid");
@@ -349,6 +360,7 @@ fn on_grid(
 fn build(
     sc: &SealedStationScenario,
     thermal: &ThermalParams,
+    close_feces: bool,
 ) -> (
     State,
     simcore::registry::Registry,
@@ -364,7 +376,7 @@ fn build(
         &sp::harvest(),
         sc,
         false,
-        false,
+        close_feces,
     )
     .expect("build sealed")
 }
@@ -373,7 +385,7 @@ fn build(
 /// golden, byte for byte.
 fn control() {
     let sc = sized(1.0);
-    let (state, bio, fast) = build(&sc, &params::thermal());
+    let (state, bio, fast) = build(&sc, &params::thermal(), false);
     let bio_r = sealed_bio_resolver(&sp::lamp(), &sc).expect("bio resolver");
     let fast_r = sealed_fast_resolver(&params::charge(), &params::crew(), &sc).expect("fast");
     let (states, rationed, events) = run_sealed(
@@ -399,6 +411,32 @@ fn control() {
     );
 }
 
+/// Step 2b's harvest: the station's re-sow hook, with the grain less the next crop's seed moved to
+/// the crew's food store first when the crop has matured. Each harvest (mol C) is pushed onto
+/// `harvests`. The seed is the seedling the re-sow starts (`reset_crop` refuses a smaller grain).
+fn harvest_at_maturity(
+    sc: &SealedStationScenario,
+    harvests: Rc<RefCell<Vec<f64>>>,
+) -> OwnedResetHook {
+    let base = sealed_reset_hook(sc);
+    let pheno = sc.pheno();
+    let seed = sc.bio.leaf_c0 + sc.bio.stem_c0 + sc.bio.root_c0;
+    Box::new(move |n: u64, current: &State| -> Result<Option<State>, SimError> {
+        if !is_mature(current, &pheno)? {
+            return base(n, current);
+        }
+        let eaten = (amount(current, STORAGE_C) - seed).max(0.0);
+        let mut stocks = current.stocks.clone();
+        for (id, change) in [(STORAGE_C, -eaten), (FOOD_STORE, eaten)] {
+            let held = stocks[id].with_amount(stocks[id].amount + change)?;
+            stocks.insert(id.to_string(), held);
+        }
+        let harvested = State::new(current.n, stocks, current.rng_seed, current.aux.clone())?;
+        harvests.borrow_mut().push(eaten);
+        base(n, &harvested)
+    })
+}
+
 /// One crop cycle's readouts.
 struct Cycle {
     days: usize,
@@ -416,6 +454,12 @@ struct Cycle {
     crop_change: f64,
     soil_change: f64,
     soil_end: f64,
+    /// Step 2b: the grain the crew got from this cycle's crop (0 without one).
+    harvested: f64,
+    /// The harvest inside this cycle's books: the previous crop's, at this cycle's first re-sow.
+    harvest_booked: f64,
+    /// The crew's feces into the soil over the cycle (0 unless they go there).
+    feces_to_soil: f64,
 }
 
 #[derive(Default)]
@@ -459,9 +503,12 @@ struct Run {
     days: usize,
     crew: f64,
     co2_store: bool,
+    food_loop: bool,
+    /// The crew's food intake over the run (mol C).
+    eaten: f64,
 }
 
-fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool) -> Run {
+fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool, food_loop: bool) -> Run {
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
         let k = n / sc.cabin.crew_count;
@@ -470,8 +517,8 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool) -> Run {
         sc.cabin.water_store0 *= k;
     }
     let chamber = sc.chamber;
-    let (state, bio, fast) = on_grid(&sc, &thermal);
-    let (state, fast, injector) = if co2_store {
+    let (state, bio, fast) = on_grid(&sc, &thermal, food_loop);
+    let (state, fast, injector) = if co2_store || food_loop {
         let (s, f, i) = with_co2_store(&sc, state, fast);
         (s, f, Some(i))
     } else {
@@ -481,7 +528,12 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool) -> Run {
     let first = state.clone();
     let bio_r = sealed_bio_resolver(&sp::lamp(), &sc).expect("bio resolver");
     let fast_r = sealed_fast_resolver(&params::charge(), &params::crew(), &sc).expect("fast");
-    let reset = sealed_reset_hook(&sc);
+    let harvests: Rc<RefCell<Vec<f64>>> = Rc::default();
+    let reset = if food_loop {
+        harvest_at_maturity(&sc, Rc::clone(&harvests))
+    } else {
+        sealed_reset_hook(&sc)
+    };
     let (bio, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(fast));
     let two = TwoRate {
         slow: &bio,
@@ -608,9 +660,15 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool) -> Run {
     bounds.push(days);
     bounds.dedup();
     let exhaled_by_day = &m.exhaled;
+    let f_resp = params::crew().respired_carbon_fraction;
+    // Harvest k happens at the re-sow that ends cycle k — at the START of cycle k + 1, whose
+    // books (pre-re-sow day end to pre-re-sow day end) therefore carry it.
+    let harvests = harvests.borrow().clone();
+    let eaten = m.exhaled.iter().sum::<f64>() / f_resp;
     let cycles = bounds
         .windows(2)
-        .map(|w| {
+        .enumerate()
+        .map(|(i, w)| {
             let (s, e) = (&ends[w[0]], &ends[w[1]]);
             let exhaled: f64 = exhaled_by_day[w[0]..w[1]].iter().sum();
             let mut best: f64 = f64::NEG_INFINITY;
@@ -639,6 +697,16 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool) -> Run {
                 crop_change: held_c(e).0 - held_c(s).0,
                 soil_change: held_c(e).1 - held_c(s).1,
                 soil_end: held_c(e).1,
+                harvested: harvests.get(i).copied().unwrap_or(0.0),
+                harvest_booked: i
+                    .checked_sub(1)
+                    .and_then(|k| harvests.get(k).copied())
+                    .unwrap_or(0.0),
+                feces_to_soil: if food_loop {
+                    exhaled * (1.0 - f_resp) / f_resp
+                } else {
+                    0.0
+                },
             }
         })
         .collect();
@@ -651,12 +719,15 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool) -> Run {
         rationed: (totals.slow_rationed, totals.fast_rationed),
         days,
         crew: sc.cabin.crew_count,
-        co2_store,
+        co2_store: co2_store || food_loop,
+        food_loop,
+        eaten,
     }
 }
 
 fn report(r: &Run) {
     let a = r.a;
+    let r_f_resp = params::crew().respired_carbon_fraction;
     let (s, e) = (&r.first, &r.last);
     let m = &r.m;
     let air = sealed_station_scenario().bio.chamber_air_capacity_mol;
@@ -664,7 +735,11 @@ fn report(r: &Run) {
         "\n=== {a} m², {} crew, {} days{}; rationed (plant, minute) {:?} ===",
         r.crew,
         r.days,
-        if r.co2_store { ", CO₂ STORE" } else { "" },
+        match (r.co2_store, r.food_loop) {
+            (_, true) => ", CO₂ STORE + FOOD LOOP",
+            (true, false) => ", CO₂ STORE",
+            _ => "",
+        },
         r.rationed
     );
     println!(
@@ -686,12 +761,12 @@ fn report(r: &Run) {
             c.plant_c_max / a
         );
         println!(
-            "           net draw {:9.1} mol C = crop {:+9.1} + soil {:+9.1} (soil ends {:9.1};              residual {:+.3}); peak crop / exhaled {:5.1} %",
+            "           net draw {:9.1} mol C = crop {:+9.1} + soil {:+9.1} (soil ends {:9.1}; residual {:+.3}); peak crop / exhaled {:5.1} %",
             net,
             c.crop_change,
             c.soil_change,
             c.soil_end,
-            net - c.crop_change - c.soil_change,
+            net - c.crop_change - c.soil_change - c.harvest_booked + c.feces_to_soil,
             100.0 * c.plant_c_max / c.exhaled
         );
         if r.co2_store {
@@ -700,10 +775,30 @@ fn report(r: &Run) {
                 c.store_change, c.store_end
             );
         }
+        if r.food_loop {
+            println!(
+                "           harvest {:9.1} mol C ({:.3} mol C/m²; {:.1} % of the crew's food over the cycle); in these books: harvest {:9.1}, feces to soil {:9.1}",
+                c.harvested,
+                c.harvested / a,
+                100.0 * c.harvested * r_f_resp / c.exhaled,
+                c.harvest_booked,
+                c.feces_to_soil
+            );
+        }
     }
     let (ex, scr, dp, ds) = r.cycles.iter().fold((0.0, 0.0, 0.0, 0.0), |(x, y, z, w), c| {
         (x + c.exhaled, y + c.scrubbed, z + c.pool_change, w + c.store_change)
     });
+    let harvested: f64 = r.cycles.iter().map(|c| c.harvested).sum();
+    println!(
+        "  food: the crew ate {:.1} mol C; harvested {:.1} ({:.1} %); food store {:.1} → {:.1} ({:+.2}/day)",
+        r.eaten,
+        harvested,
+        100.0 * harvested / r.eaten,
+        amount(s, FOOD_STORE),
+        amount(e, FOOD_STORE),
+        (amount(e, FOOD_STORE) - amount(s, FOOD_STORE)) / r.days as f64
+    );
     println!(
         "  whole run: exhaled {ex:.1} mol; closure share {:.1} %; left the station {:.1} %; into \
          the store {:.1} %",
@@ -795,6 +890,7 @@ fn main() {
     let area: f64 = arg("--area").map_or(200.0, |x| x.parse().expect("--area A"));
     let crew: Option<f64> = arg("--crew").map(|x| x.parse().expect("--crew N"));
     let co2_store = args.iter().any(|x| x == "--co2-store");
+    let food_loop = args.iter().any(|x| x == "--food-loop");
     let big = sized(area);
     println!(
         "sizing at {area} m²: lamp {} W, chamber C {:.3e} J/K, cooler {} W, heater {} W, walls \
@@ -809,8 +905,8 @@ fn main() {
         big.cabin.crew_count
     );
     let (one, many) = std::thread::scope(|s| {
-        let one = s.spawn(|| run(1.0, None, days, false));
-        let many = s.spawn(|| run(area, crew, days, co2_store));
+        let one = s.spawn(|| run(1.0, None, days, false, false));
+        let many = s.spawn(|| run(area, crew, days, co2_store, food_loop));
         (one.join().expect("1 m²"), many.join().expect("big"))
     });
     report(&one);

@@ -3,7 +3,8 @@
 **Status: Step 1 MEASURED (2026-10-21, §3a).** The 200 m² station is CO₂-starved, as predicted; its
 crop grows half as much per m², and CO₂ is the whole cause (measured). One inert plumbing change landed
 for it (§3b); nothing else changes the reference. **Step 2a MEASURED (§5a):** the crew's CO₂ stored and
-injected in lit hours (after CEEF) brings the crop back to 99.4 % per m². Step 2b, the food loop, next (§6).
+injected in lit hours (after CEEF) brings the crop back to 99.4 % per m². **Step 2b MEASURED (§6a):** the
+harvest feeds 30 % of the crew; the O₂ the station still buys is exactly the CO₂ left in the tank.
 
 ## 1. Why this exists
 
@@ -253,3 +254,122 @@ by the leaf mass — B5's miss (1.55× low) was not about growth.
 **What it leaves.** The CO₂ loop is closed in the sense that nothing is thrown away, but the carbon
 ends in a tank, not in food: the crop is re-sown into the soil and the crew still eats the imported
 store. That is item 2 (the food loop, §6).
+
+## 6. Step 2b — the food loop (lab, on top of the CO₂ store)
+
+**The build (lab, `--food-loop`, which turns the CO₂ store on too).**
+- **A batch harvest at maturity.** When the crop matures, the grain minus the next crop's seed goes
+  to the crew's food store, then the usual re-sow runs. Not the existing `Harvest` flow: its own
+  param file calls its continuous draw (τ ≈ 1.16 days) the wrong form, and draining the grain would
+  leave the re-sow no seed. Real crops are harvested once, at maturity (BVAD Table 4-89: wheat 75–90
+  days after planting; NASA's BPC wheat *"harvested at physiological maturity"*, Wheeler).
+- **Inedible parts to the soil** — straw, leaves and roots. Already what the re-sow does
+  (`reset_crop` puts everything but the seed into the litter); recorded, not rebuilt. The soil's
+  decomposers are the compost; CEEF burned its inedible parts and feces and recovered the CO₂
+  instead, a faster path to the same tank.
+- **Feces to the soil** (`close_feces`, an existing switch: the crew's fecal carbon goes into the
+  litter instead of a waste boundary).
+- **Urine and nitrogen: a gap, not built.** The crew have no nitrogen books and the grain carries
+  none, so harvesting removes no nitrogen and urine has none to give back. (Corrected after the run:
+  the sealed station adds no fertilizer — its rate is 0; the crop's nitrogen comes from a soil pool of
+  100 kg N per m², recorded as non-physical in `post-roadmap-nitrogen-cycle-form.md` — real soils hold
+  ~0.3.) Closing nitrogen needs nitrogen in the food and the crew first.
+
+**Predictions (written before the run; 200 m², four crew, 1220 days, store on):**
+- **D1 — food share ~30 %.** Grain 22.3 mol C/m² less ~0.16 of seed, × 200 m² ≈ 4 430 mol per
+  140-day crop ≈ 32 mol C/day, against the crew's 103.9 (98.6 ÷ 0.949). So the crop feeds **~30 %** of
+  the crew and the food store falls ~72 mol/day instead of 104. A sizing limit, not a bug: this soil
+  wheat under this lamp grows ~22 mol C of grain per m² per 140 days; NASA's estimate is ~50 m² of
+  crops per person for food (Wheeler), CEEF fed 2 crew ~90 % from 150 m² of 23 crops.
+- **D2 — closure share rises to ~45 %** (2a: 15.7 %): the harvested grain is carbon the plants fixed
+  and the crew eat instead of imported food; the O₂ tank's supply falls with it, to **~55 %** of the
+  1 m² run's.
+- **D3 — the tank grows slower**, ~8 000–9 500 mol per crop instead of ~13 000: the imported food
+  falls by the harvest.
+- **D4 — the crop is unchanged** (grain and peak crop per m² within 1 % of 2a's): the seed is kept
+  and the soil still gets the straw and roots.
+
+## 6a. Step 2b — MEASURED (2026-10-21)
+
+`examples/big_station.rs -- --food-loop` (200 m², four crew, 1220 days, the CO₂ store on). Rationed 0
+and 0. Each cycle's carbon books — crop, soil, harvest leaving, feces arriving — close to 0.000 mol.
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| D1 | the crop feeds ~30 % of the crew; the food store falls ~72 mol/day | **30.4 %** of the crew's food per crop (4 429 mol C per 140-day crop, 22.15 mol C/m²); **28.0 %** over the run (the last, unfinished crop is not harvested); the store falls **74.9** mol/day (104 without the loop) | held |
+| D2 | closure share ~45 %; the O₂ tank ~55 % of the 1 m² run's | closure share **36.4 %** over the run, settling to ~30 % per crop; the O₂ tank gave **76 475 mol — 64 %** of the 1 m² run's 120 216 | **missed** (below) |
+| D3 | the CO₂ tank grows ~8 000–9 500 mol per crop | 7 052, 8 841, 9 338, 9 485, then **9 550, 9 594, 9 630** — still rising; peak **77 403 mol** (3.4 t CO₂; 2a: 101 948) | inside the range for crops 2–4, **above it** from crop 5, still rising |
+| D4 | the crop is unchanged | grain 22.30–22.31, peak crop 47.96–47.98 mol C/m² (2a: 22.30–22.32, 47.96–47.99) | held |
+
+**Why D2 missed.** I added the harvest's share to Step 2a's 15.7 %, but the two are not additive: in
+2a, most of the closure was the **soil** keeping part of the grain it was given. Eaten grain is grain
+the soil never gets, so the soil now gains less — soil carbon ends at 10 320 mol (2a: 14 306), its
+gain per crop falling 3 068 → 488. What is left is the harvest itself: 4 429 mol per crop is 32 % of
+the crew's 13 806 mol of exhaled CO₂, and the closure share settles there.
+
+**The O₂ the station buys is the CO₂ in the tank.** The O₂ tank's supply over the run (76 474.6 mol)
+equals the CO₂ store's final contents (76 475.4 mol) to within 1 mol: every CO₂ molecule the plants
+do not take back holds the O₂ the crew breathed into it. So the remaining open part of the loop is
+one number — the tank's growth, ~68 mol/day (= the imported food) — and closing it needs either more
+food from the plants (more crop, more light, more productive crops) or turning that CO₂ back into O₂
+(a CO₂ reduction system, as ISS's Sabatier path does, or more plants than food needs).
+
+**Sizing, against the real world.** NASA's estimate is ~20–25 m² of crops per person for O₂ and ~50 m²
+for food (Wheeler, NTRS 20140017323); CEEF fed two crew ~90 % from 150 m² of 23 crops. Here 200 m²
+of this soil wheat feeds 1.2 crew-equivalents (30 % of four) — ~165 m² per person. Whether to close
+the gap with area, light, crops or CO₂ reduction is the user's choice; nothing here was tuned.
+
+**Nitrogen.** The inedible parts already return their nitrogen: the re-sow moves the old plants'
+nitrogen into the soil's litter, which the soil mineralizes back. The grain, the crew and urine carry
+none, so the harvest takes no nitrogen out. No fertilizer is added (the sealed station's rate is 0):
+the crop draws on a soil pool of **100 kg N per m²** (20 t at 200 m²), already recorded as non-physical
+(`post-roadmap-nitrogen-cycle-form.md`; real soils ~0.3 kg N/m² in all). Closing it means nitrogen in
+the grain and food, crew nitrogen books, and urine back to the soil — and a soil small enough for the
+loop to matter (§7).
+
+**Water through the plants** is unchanged (465 kg/day, 2.33 kg/m²/day): the crop is the same crop.
+
+## 7. Step 2c — nitrogen through the food (approved by the user, 2026-10-21)
+
+The user, on hearing the food loop closes carbon but not nitrogen: *"the food should have a nitrogen
+content. as well as other elements and microelements, that is the final goal - fullest cycle
+simulation of energy, elements, nutrients"*; then *"ok i agree"* to nitrogen first. Phosphorus,
+potassium and trace elements are a later choice: each is a new quantity in the frozen core.
+
+**What the model has (read 2026-10-21).** Nitrogen already cycles inside the soil and plants: the
+plant's one nitrogen pool (`plant_n`, held against the leaves', stems' and roots' carbon — not the
+grain's), shedding to litter, the decomposers mineralizing it back to `soil_n` (the plant-available
+pool). Nothing leaves: no leaching, denitrification or volatilization, and the sealed station adds no
+fertilizer (rate 0). The soil starts at 100 kg N per m² — non-physical, recorded; real soils hold
+grams of available nitrogen per m². The crew and the grain carry no nitrogen.
+
+**The build (lab, `--nitrogen`, on top of `--food-loop`).**
+- **Food nitrogen**, a stock beside the food store. The imported food carries BVAD's menu nitrogen:
+  Table 4-61 (resupplied menus at 12.71 MJ/CM-d) gives 122–125 g protein per crew-day; 122 g ÷ 6.25 =
+  **19.5 g N per crew-day**, over the model's own 25.97 mol C per crew-day. (BVAD's caveat: the table
+  compares menus and is not absolute values.)
+- **Grain nitrogen at harvest**: wheat grain is **2.49 % N of dry mass** — USDA FoodData Central
+  168890, *Wheat, hard red winter*: 12.61 g protein and 13.1 g water per 100 g, protein = N × 5.83.
+  Taken from the plant's nitrogen, but never below what the straw keeps: the cited residual 0.5 % of
+  its dry mass (`nitrogen.yaml` `n_residual`) plus the seed's share. The model's nitrogen target leaves
+  the grain out, so this cap may bind: a finding if it does, not a thing to tune.
+- **The crew** eat nitrogen with their carbon at the food store's average N:C and pass it all (an adult
+  is in balance): **88 % in urine** to the soil's available nitrogen, **12 % in feces** with the fecal
+  carbon to the litter — Jönsson & Vinnerås 2004, as tabulated in EcoSanRes Fact Sheet 6 (2005):
+  urine 85–90 % of excreted N in every country listed. Contrast: BVAD Table 4-34's feces protein
+  (4.5 g/CM-d ≈ 0.7 g N) would be ~4 %. The urine's water still goes to water recovery; separating its
+  nitrogen to the soil is a simplification (EcoSanRes applies the urine itself).
+
+**Predictions (written before the run; 200 m², four crew, 1220 days, store and food loop on):**
+- **N1.** The crew eat **78.1 g N/day** (4 × 19.5) while the store is all imported food.
+- **N2 — the cap binds.** Unrestricted, the grain would take 4 429 mol C × 0.0267 kg DM/mol C ×
+  2.49 % = **2.94 kg N per crop**. The plant holds its nitrogen against its vegetative carbon only, so
+  at maturity I expect it to hold less than grain + straw residual: the grain gets **50–70 %** of
+  USDA's nitrogen (1.5–2.0 kg per crop).
+- **N3.** So the harvest covers **15–20 %** of the crew's nitrogen (27 % uncapped), below its 30 %
+  share of their carbon.
+- **N4 — nitrogen piles up in the soil**, as CO₂ in the tank: the imported food's nitrogen arrives
+  in urine and feces and nothing removes it — ~60–65 g/day, **~75 kg over the run**, against a soil
+  pool of 20 t. The crop cannot feel it.
+- **N5.** Carbon: grain and peak crop within 1 % of Step 2b's (the soil's nitrogen is ~10⁴× what the
+  crop needs); the nitrogen books close to 0 every crop.
