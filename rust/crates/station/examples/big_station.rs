@@ -9,6 +9,7 @@
 //! cargo run --release -q -p station --example big_station -- --crew N     # N crew in the big run
 //! cargo run --release -q -p station --example big_station -- --co2-store   # Step 2a (below)
 //! cargo run --release -q -p station --example big_station -- --food-loop   # Step 2b (below)
+//! cargo run --release -q -p station --example big_station -- --nitrogen    # Step 2c (below)
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
@@ -19,7 +20,12 @@
 //! `--food-loop` (Step 2b, plan §6; turns the store on too): the crop feeds the crew. At maturity
 //! the grain less the next crop's seed goes to the crew's food store ([`harvest_at_maturity`]),
 //! then the usual re-sow puts the straw, leaves and roots into the soil; the crew's feces go to the
-//! soil too (`close_feces`). Nitrogen is not closed: the crew have no nitrogen books.
+//! soil too (`close_feces`).
+//!
+//! `--nitrogen` (Step 2c, plan §7; turns the food loop on too): the food carries nitrogen. The
+//! imported food at BVAD's menu nitrogen ([`MENU_N_KG_PER_CREW_DAY`]), the grain at USDA's
+//! ([`GRAIN_N_PER_DM`]) taken from the plant at harvest ([`harvest_at_maturity`]), and the crew pass
+//! what they eat to the soil ([`CrewNitrogen`]): urine to its available nitrogen, feces to its litter.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -57,15 +63,15 @@
 //! rationing. ⚠ `rationed == 0` cannot measure starvation, so it is reported, never the verdict.
 
 use domains::biosphere::stocks::{
-    CARBON_POOL, CONDENSATE, CONSUMER_CARBON, HUMUS_CARBON, LEAF_C, LITTER_CARBON, LITTER_SINK,
-    MICROBIAL_CARBON, O2_POOL, ROOT_C, SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C,
-    SUBSOIL_WATER, WATER_VAPOR,
+    CARBON_POOL, CONDENSATE, CONSUMER_CARBON, HUMUS_CARBON, HUMUS_N, LEAF_C, LITTER_CARBON,
+    LITTER_N, LITTER_SINK, MICROBIAL_CARBON, MICROBIAL_N, O2_POOL, PLANT_N, ROOT_C, SOIL_N,
+    SOIL_WATER, STEM_C, STEM_RESERVE_C, STORAGE_C, SUBSOIL_WATER, WATER_VAPOR,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use domains::biosphere::system::SeasonScenario;
-use domains::crew::{FOOD_STORE, WATER_STORE};
+use domains::crew::{FOOD_INTAKE_VAR, FOOD_STORE, WATER_STORE};
 use domains::eclss::{CO2Scrubber, CO2_REMOVED, CO2_SCRUBBER, O2_SUPPLY};
 use domains::params;
 use domains::power::BATTERY;
@@ -89,7 +95,7 @@ use station::sealed::{
     sealed_reset_hook,
 };
 use station::sowing::twin;
-use station::stocks::{co2_composition, gas_pool};
+use station::stocks::{co2_composition, gas_pool, simple_pool};
 use station::water_reserve::working_level;
 
 /// The chamber's height (m) in `chamber.yaml`'s wall-area rule: BVAD's shoot + root zone.
@@ -151,6 +157,89 @@ impl Flow for Co2Injector {
             Leg::new(CARBON_POOL.to_string(), given)?,
         ])
     }
+}
+
+/// Step 2c's food nitrogen (kg N): the nitrogen in the crew's food store.
+const FOOD_N: &str = "lab.food_n";
+/// Step 2c's crew nitrogen flow id.
+const CREW_NITROGEN: &str = "lab.crew_nitrogen";
+/// The imported food's nitrogen per crew-day (kg N): BVAD Table 4-61, resupplied menus at 12.71
+/// MJ/CM-d, 122 g protein per crew-day (the lowest of three menus, 122–125) ÷ 6.25. BVAD's caveat:
+/// the table compares menus; it is not absolute values.
+const MENU_N_KG_PER_CREW_DAY: f64 = 0.122 / 6.25;
+/// Wheat grain nitrogen, kg N per kg dry mass: USDA FoodData Central 168890 (*Wheat, hard red
+/// winter*, SR Legacy) — 12.61 g protein and 13.1 g water per 100 g, protein = N × 5.83.
+const GRAIN_N_PER_DM: f64 = 12.61 / 5.83 / (100.0 - 13.1);
+/// The share of excreted nitrogen in urine; the rest is in feces. Jönsson & Vinnerås (2004), as
+/// tabulated in EcoSanRes Fact Sheet 6 (2005): urine 85–90 % of excreted N in every country listed
+/// (China 3.5 of 4.0 kg/cap/yr, South Africa 3.0 of 3.4, Uganda 2.2 of 2.5).
+const URINE_N_SHARE: f64 = 0.88;
+
+/// NITROGEN `lab.food_n → soil_n + litter_n`: the crew eat nitrogen with their carbon, at the food
+/// store's average N:C, and pass all of it (an adult is in nitrogen balance): urine to the soil's
+/// available nitrogen, feces with their carbon to the litter.
+struct CrewNitrogen;
+
+impl Flow for CrewNitrogen {
+    fn type_name(&self) -> &'static str {
+        "CrewNitrogen"
+    }
+
+    fn id(&self) -> &str {
+        CREW_NITROGEN
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let carbon = env.get(FOOD_INTAKE_VAR)? * dt;
+        let eaten = carbon * amount(snapshot, FOOD_N) / amount(snapshot, FOOD_STORE);
+        let urine = eaten * URINE_N_SHARE;
+        FlowResult::new(vec![
+            Leg::new(FOOD_N.to_string(), -eaten)?,
+            Leg::new(SOIL_N.to_string(), urine)?,
+            Leg::new(LITTER_N.to_string(), eaten - urine)?,
+        ])
+    }
+}
+
+/// The station with Step 2c's food nitrogen: [`FOOD_N`] at the imported food's N:C, and
+/// [`CrewNitrogen`].
+fn with_food_nitrogen(
+    sc: &SealedStationScenario,
+    state: State,
+    fast: Registry,
+) -> (State, Registry) {
+    let mut stocks = state.stocks.clone();
+    let start = sc.cabin.food_store0 * imported_n_per_mol_c(sc);
+    let food_n = simple_pool(FOOD_N, "lab", Quantity::Nitrogen, start).expect("food nitrogen");
+    stocks.insert(food_n.id.clone(), food_n);
+    let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
+    let (mut flows, aux) = fast.into_parts();
+    flows.push(Box::new(CrewNitrogen));
+    let fast = Registry::new(flows, &state.stocks, aux).expect("fast registry");
+    (state, fast)
+}
+
+/// The imported food's nitrogen per mol of its carbon: BVAD's menu nitrogen over the model's own
+/// food carbon per crew-day.
+fn imported_n_per_mol_c(sc: &SealedStationScenario) -> f64 {
+    let crew = params::crew();
+    let carbon_per_crew_day = sc.cabin.food_intake_rate(&crew) * 86_400.0 / sc.cabin.crew_count;
+    MENU_N_KG_PER_CREW_DAY / carbon_per_crew_day
+}
+
+/// The nitrogen the run books (kg N): the plant's, the soil's (available, litter, microbes, humus)
+/// and the food's.
+fn nitrogen(s: &State) -> (f64, f64, f64) {
+    let soil = [SOIL_N, LITTER_N, MICROBIAL_N, HUMUS_N]
+        .iter()
+        .map(|id| amount(s, id))
+        .sum();
+    (amount(s, PLANT_N), soil, amount(s, FOOD_N))
 }
 
 /// The station with Step 2a's CO₂ store: the scrubber re-pointed at [`CO2_STORE`] (starting
@@ -416,25 +505,63 @@ fn control() {
 /// `harvests`. The seed is the seedling the re-sow starts (`reset_crop` refuses a smaller grain).
 fn harvest_at_maturity(
     sc: &SealedStationScenario,
-    harvests: Rc<RefCell<Vec<f64>>>,
+    harvests: Rc<RefCell<Vec<Harvested>>>,
+    with_nitrogen: bool,
 ) -> OwnedResetHook {
     let base = sealed_reset_hook(sc);
     let pheno = sc.pheno();
+    let p = sc.plant_params();
+    let dm_per_mol_c = p.nitro.dm_kg_per_mol_c;
+    let straw_n_per_mol_c = p.nitro.n_residual_per_mol_c;
     let seed = sc.bio.leaf_c0 + sc.bio.stem_c0 + sc.bio.root_c0;
     Box::new(move |n: u64, current: &State| -> Result<Option<State>, SimError> {
         if !is_mature(current, &pheno)? {
             return base(n, current);
         }
-        let eaten = (amount(current, STORAGE_C) - seed).max(0.0);
+        let grain = amount(current, STORAGE_C);
+        let eaten = (grain - seed).max(0.0);
+        let mut h = Harvested {
+            carbon: eaten,
+            plant_n: amount(current, PLANT_N),
+            ..Harvested::default()
+        };
         let mut stocks = current.stocks.clone();
-        for (id, change) in [(STORAGE_C, -eaten), (FOOD_STORE, eaten)] {
-            let held = stocks[id].with_amount(stocks[id].amount + change)?;
+        let mut set = |id: &str, value: f64| -> Result<(), SimError> {
+            let held = stocks[id].with_amount(value)?;
             stocks.insert(id.to_string(), held);
+            Ok(())
+        };
+        // What is left of the grain is exactly the seed: `reset_crop` refuses a grain below it.
+        set(STORAGE_C, if eaten > 0.0 { seed } else { grain })?;
+        set(FOOD_STORE, amount(current, FOOD_STORE) + eaten)?;
+        if with_nitrogen {
+            // USDA's grain nitrogen, from the plant, which keeps the straw's cited residual and the
+            // seed's share at that concentration (the re-sow's own rule: the seedling keeps the
+            // parent's concentration).
+            let straw: f64 = [LEAF_C, STEM_C, ROOT_C]
+                .iter()
+                .map(|id| amount(current, id))
+                .sum();
+            h.wanted_n = eaten * dm_per_mol_c * GRAIN_N_PER_DM;
+            let kept = (straw + seed) * straw_n_per_mol_c;
+            h.grain_n = h.wanted_n.min((h.plant_n - kept).max(0.0));
+            set(PLANT_N, h.plant_n - h.grain_n)?;
+            set(FOOD_N, amount(current, FOOD_N) + h.grain_n)?;
         }
         let harvested = State::new(current.n, stocks, current.rng_seed, current.aux.clone())?;
-        harvests.borrow_mut().push(eaten);
+        harvests.borrow_mut().push(h);
         base(n, &harvested)
     })
+}
+
+/// One harvest: the grain carbon the crew got (mol C); with Step 2c also the plant's nitrogen at
+/// maturity, the grain nitrogen USDA's content asks for, and the grain nitrogen given (kg N).
+#[derive(Debug, Clone, Copy, Default)]
+struct Harvested {
+    carbon: f64,
+    plant_n: f64,
+    wanted_n: f64,
+    grain_n: f64,
 }
 
 /// One crop cycle's readouts.
@@ -460,6 +587,11 @@ struct Cycle {
     harvest_booked: f64,
     /// The crew's feces into the soil over the cycle (0 unless they go there).
     feces_to_soil: f64,
+    /// Step 2c: this crop's harvest record, and the cycle's nitrogen books (kg N): the change of
+    /// the plant's, the soil's and the food's nitrogen, and what the crew ate.
+    harvest: Harvested,
+    n_change: (f64, f64, f64),
+    n_eaten: f64,
 }
 
 #[derive(Default)]
@@ -489,6 +621,8 @@ struct Minutes {
     /// Step 2a: the store's peak, and the lit minutes it gave less than the injector asked.
     co2_store_max: f64,
     store_short: u64,
+    /// Step 2c: the crew's nitrogen eaten (kg N), per day.
+    n_eaten: Vec<f64>,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -504,11 +638,20 @@ struct Run {
     crew: f64,
     co2_store: bool,
     food_loop: bool,
+    with_nitrogen: bool,
     /// The crew's food intake over the run (mol C).
     eaten: f64,
 }
 
-fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool, food_loop: bool) -> Run {
+fn run(
+    a: f64,
+    crew: Option<f64>,
+    days: usize,
+    co2_store: bool,
+    food_loop: bool,
+    with_nitrogen: bool,
+) -> Run {
+    let food_loop = food_loop || with_nitrogen;
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
         let k = n / sc.cabin.crew_count;
@@ -524,13 +667,18 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool, food_loop: bool)
     } else {
         (state, fast, None)
     };
+    let (state, fast) = if with_nitrogen {
+        with_food_nitrogen(&sc, state, fast)
+    } else {
+        (state, fast)
+    };
     let air = sc.bio.chamber_air_capacity_mol;
     let first = state.clone();
     let bio_r = sealed_bio_resolver(&sp::lamp(), &sc).expect("bio resolver");
     let fast_r = sealed_fast_resolver(&params::charge(), &params::crew(), &sc).expect("fast");
-    let harvests: Rc<RefCell<Vec<f64>>> = Rc::default();
+    let harvests: Rc<RefCell<Vec<Harvested>>> = Rc::default();
     let reset = if food_loop {
-        harvest_at_maturity(&sc, Rc::clone(&harvests))
+        harvest_at_maturity(&sc, Rc::clone(&harvests), with_nitrogen)
     } else {
         sealed_reset_hook(&sc)
     };
@@ -559,6 +707,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool, food_loop: bool)
         store_min: f64::INFINITY,
         lit_co2_min: f64::INFINITY,
         exhaled: vec![0.0; days],
+        n_eaten: vec![0.0; days],
         ..Minutes::default()
     };
     // The crop's cycle ends at each re-sow: the day index of each reset.
@@ -634,6 +783,11 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool, food_loop: bool)
                                 *e += leg(&res, CARBON_POOL);
                             }
                         }
+                        if f.id() == CREW_NITROGEN {
+                            if let Some(e) = m.n_eaten.get_mut(day) {
+                                *e -= leg(&res, FOOD_N);
+                            }
+                        }
                         continue;
                     }
                 };
@@ -697,11 +851,17 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool, food_loop: bool)
                 crop_change: held_c(e).0 - held_c(s).0,
                 soil_change: held_c(e).1 - held_c(s).1,
                 soil_end: held_c(e).1,
-                harvested: harvests.get(i).copied().unwrap_or(0.0),
+                harvested: harvests.get(i).map_or(0.0, |h| h.carbon),
                 harvest_booked: i
                     .checked_sub(1)
-                    .and_then(|k| harvests.get(k).copied())
-                    .unwrap_or(0.0),
+                    .and_then(|k| harvests.get(k))
+                    .map_or(0.0, |h| h.carbon),
+                harvest: harvests.get(i).copied().unwrap_or_default(),
+                n_change: {
+                    let (x, y) = (nitrogen(s), nitrogen(e));
+                    (y.0 - x.0, y.1 - x.1, y.2 - x.2)
+                },
+                n_eaten: m.n_eaten[w[0]..w[1]].iter().sum(),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -721,6 +881,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, co2_store: bool, food_loop: bool)
         crew: sc.cabin.crew_count,
         co2_store: co2_store || food_loop,
         food_loop,
+        with_nitrogen,
         eaten,
     }
 }
@@ -736,6 +897,7 @@ fn report(r: &Run) {
         r.crew,
         r.days,
         match (r.co2_store, r.food_loop) {
+            (_, true) if r.with_nitrogen => ", CO₂ STORE + FOOD LOOP + NITROGEN",
             (_, true) => ", CO₂ STORE + FOOD LOOP",
             (true, false) => ", CO₂ STORE",
             _ => "",
@@ -783,6 +945,25 @@ fn report(r: &Run) {
                 100.0 * c.harvested * r_f_resp / c.exhaled,
                 c.harvest_booked,
                 c.feces_to_soil
+            );
+        }
+        if r.with_nitrogen {
+            let h = c.harvest;
+            let (dp, ds, df) = c.n_change;
+            println!(
+                "           N: plant at maturity {:.3} kg; grain asks {:.3}, given {:.3} ({:.1} %); \
+                 crew ate {:.3} kg ({:.1} g/day); change plant {:+.3} soil {:+.3} food {:+.3} \
+                 (sum {:+.2e})",
+                h.plant_n,
+                h.wanted_n,
+                h.grain_n,
+                100.0 * h.grain_n / h.wanted_n.max(f64::MIN_POSITIVE),
+                c.n_eaten,
+                1e3 * c.n_eaten / c.days as f64,
+                dp,
+                ds,
+                df,
+                dp + ds + df
             );
         }
     }
@@ -891,6 +1072,7 @@ fn main() {
     let crew: Option<f64> = arg("--crew").map(|x| x.parse().expect("--crew N"));
     let co2_store = args.iter().any(|x| x == "--co2-store");
     let food_loop = args.iter().any(|x| x == "--food-loop");
+    let with_nitrogen = args.iter().any(|x| x == "--nitrogen");
     let big = sized(area);
     println!(
         "sizing at {area} m²: lamp {} W, chamber C {:.3e} J/K, cooler {} W, heater {} W, walls \
@@ -905,8 +1087,8 @@ fn main() {
         big.cabin.crew_count
     );
     let (one, many) = std::thread::scope(|s| {
-        let one = s.spawn(|| run(1.0, None, days, false, false));
-        let many = s.spawn(|| run(area, crew, days, co2_store, food_loop));
+        let one = s.spawn(|| run(1.0, None, days, false, false, false));
+        let many = s.spawn(|| run(area, crew, days, co2_store, food_loop, with_nitrogen));
         (one.join().expect("1 m²"), many.join().expect("big"))
     });
     report(&one);

@@ -44,3 +44,12 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   shares do not add. The O₂ the station buys equals the CO₂ piling up in the tank, to 1 mol. Nitrogen
   closes only through the inedible parts; grain, crew and urine carry none (a gap, not built). No
   fertilizer is added; the soil's 100 kg N/m² (non-physical, recorded) is what the crop draws on.
+* **Step 2c MEASURED 2026-10-21** (plan §7–§7a; lab `--nitrogen`): food carries nitrogen — the imported
+  menu at BVAD's 19.5 g N per crew-day, the grain at USDA's 2.49 % of dry mass, taken from the plant
+  but never below the straw's cited 0.5 %; the crew pass it all, 88 % in urine to the soil's available
+  pool and 12 % in feces to its litter (Jönsson & Vinnerås 2004). The books close every crop (within
+  3·10⁻⁷ kg). The grain gets **86 %** of USDA's nitrogen (predicted 50–70 %: the plant holds more than
+  I guessed; the straw residual is what binds); the harvest covers **21 %** of the crew's nitrogen over
+  the run; **71 kg** piles up in the soil, which at 20 t (non-physical, recorded) cannot feel it.
+  Carbon identical to 2b. A real-sized soil and loss paths are the user's sourced choice; P, K and
+  trace elements need new quantities in the frozen core.

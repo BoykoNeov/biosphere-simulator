@@ -4,7 +4,9 @@
 crop grows half as much per m², and CO₂ is the whole cause (measured). One inert plumbing change landed
 for it (§3b); nothing else changes the reference. **Step 2a MEASURED (§5a):** the crew's CO₂ stored and
 injected in lit hours (after CEEF) brings the crop back to 99.4 % per m². **Step 2b MEASURED (§6a):** the
-harvest feeds 30 % of the crew; the O₂ the station still buys is exactly the CO₂ left in the tank.
+harvest feeds 30 % of the crew; the O₂ the station still buys is exactly the CO₂ left in the tank. **Step 2c
+MEASURED (§7a):** nitrogen goes round through grain, crew and urine; the grain gets 86 % of
+USDA's nitrogen; the books close, but the 20 t soil hides the loop.
 
 ## 1. Why this exists
 
@@ -373,3 +375,32 @@ grams of available nitrogen per m². The crew and the grain carry no nitrogen.
   pool of 20 t. The crop cannot feel it.
 - **N5.** Carbon: grain and peak crop within 1 % of Step 2b's (the soil's nitrogen is ~10⁴× what the
   crop needs); the nitrogen books close to 0 every crop.
+
+## 7a. Step 2c — MEASURED (2026-10-21)
+
+`examples/big_station.rs -- --nitrogen` (200 m², four crew, 1220 days, store and food loop on).
+Rationed 0 and 0. Each cycle's nitrogen books — plant, soil (mineral, litter, microbes, humus) and
+food — sum to 0 within 3·10⁻⁷ kg. Run 2026-10-21, ~13 min.
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| N1 | the crew eat 78.1 g N/day | **78.1** in crop 1, falling to **76.7** by the last: the store's mix now holds grain, with less nitrogen per carbon than the menu (0.57 against 0.75 g N per mol C) | held |
+| N2 | the cap binds; the grain gets 50–70 % of USDA's 2.94 kg N per crop | the cap binds, but at **85.8 %**: 2.52 kg of 2.94, every crop. The plant holds **3.21 kg N** at maturity (≈2.3 % of its leaf, stem and root dry mass); the straw keeps its 0.5 % (0.69 kg) and the grain gets the rest | **missed** (high) |
+| N3 | the harvest covers 15–20 % of the crew's nitrogen | **23 %** per crop (2.52 of ~10.9 kg); **21 %** over the run (20.2 of 94.4 kg) | **missed** (follows N2) |
+| N4 | ~75 kg of nitrogen piles up in the soil | **71.0 kg** into the soil (8.2–8.4 kg per crop), 3.2 kg in the growing crop at the end, the food store down 74.2 kg; 20 t of soil nitrogen does not notice it | held |
+| N5 | carbon within 1 % of 2b; nitrogen books close | carbon **identical** to 2b to the printed digit (harvests, CO₂ store 76 475.4 mol, O₂ bought 76 474.6); nitrogen books close every crop | held |
+
+**Why N2 missed.** I guessed the plant would hold its nitrogen thinly because its target leaves the
+grain out. It does not: at maturity the leaves, stems and roots hold ~2.3 % N, so the straw can give
+up most of it and still keep its cited 0.5 %. What binds is that residual, not a shortage. Here 2.52
+of 3.21 kg is 79 % of the plant's nitrogen in the grain; field wheat is commonly said to put ~70–80 %
+there (from memory, **not checked against a source** — a check owed before anyone leans on it).
+
+**What the books show, and what they cannot.** Nitrogen now goes round the whole loop: soil → plant →
+grain → food → crew → urine (88 %) and feces (12 %) → soil, and the inedible parts → litter → soil.
+Nothing is lost, so the imported food's nitrogen piles up in the soil, as its carbon piles up as CO₂
+in the tank. But the soil starts at 100 kg N per m² (20 t; non-physical, recorded): the 71 kg moved is
+0.35 % of it, so the crop cannot feel the loop. Making nitrogen limit the crop needs a soil of real
+size (grams of available N per m²) and real loss paths (leaching, denitrification, ammonia from urine)
+— each a sourced choice, not made here. Phosphorus, potassium and trace elements each need a new
+quantity in the frozen core.
