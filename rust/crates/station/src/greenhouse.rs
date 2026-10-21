@@ -97,7 +97,6 @@ pub(crate) fn shared_room_cabin_flows(
             &greenhouse_plant_params(scenario),
             scenario.bio.chamber_air_capacity_mol,
             HUMIDITY_CONDENSATE,
-            Thermostat::Window,
         )
     };
     build_cabin_flows(

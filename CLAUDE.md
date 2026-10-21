@@ -119,7 +119,8 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
 - **Units** validated at the file boundary — **`rust/crates/config`** is now the only one
   (an exact unit-string guard; every live pint conversion had been measured to be an
   identity). The core stores plain floats + a unit label.
-- **Parameters are data** (YAML, loaded by Rust). No hardcoded coefficients.
+- **Parameters are data** (YAML, loaded by Rust). No hardcoded coefficients, and a build takes
+  them as inputs (a scenario field or argument), never re-reading a file inside (user, 2026-10-21).
 
 ## Reuse & licensing (see docs/reuse-and-licenses.md)
 

@@ -132,27 +132,9 @@ fn condenser_window(p: &BiosphereParams) -> &'static [&'static str] {
 
 /// The crew's condenser in a one-store room: the plants' [`Condensation`] law, on the minute
 /// step, at the plants' setting (`p`, already through [`RoomVapour::plant_params`]), into `dest`
-/// (where the crew's condensate goes in this build). Under [`Thermostat::Window`] it reads the
-/// plants' water temperature for the window; under [`Thermostat::LiveChamber`] the chamber's.
-pub fn room_condenser(
-    p: &BiosphereParams,
-    air_capacity_mol: f64,
-    dest: &str,
-    thermostat: Thermostat,
-) -> Box<dyn Flow> {
-    if thermostat == Thermostat::LiveChamber {
-        return crate::chamber::reads_chamber(
-            Box::new(Condensation {
-                id: ROOM_CONDENSER.to_string(),
-                water_vapor: WATER_VAPOR.to_string(),
-                condensate: dest.to_string(),
-                temp_var: TEMP_VAR.to_string(),
-                air_capacity_mol,
-                humidity_setpoint: p.water.humidity_setpoint,
-            }),
-            &crate::params::chamber(),
-        );
-    }
+/// (where the crew's condensate goes in this build), reading the plants' water temperature for
+/// the window ([`Thermostat::Window`]). [`chamber_room_condenser`] is the live chamber's.
+pub fn room_condenser(p: &BiosphereParams, air_capacity_mol: f64, dest: &str) -> Box<dyn Flow> {
     let window = condenser_window(p);
     Box::new(OnFastStep::reading(
         Box::new(Condensation {
@@ -166,6 +148,28 @@ pub fn room_condenser(
         HashMap::new(),
         window,
     ))
+}
+
+/// [`room_condenser`] under [`Thermostat::LiveChamber`]: it reads the chamber's temperature,
+/// from the chamber's heat store and `chamber`'s heat capacity (the build's own chamber, so a
+/// resized chamber is read at its own size — 2026-10-21).
+pub fn chamber_room_condenser(
+    p: &BiosphereParams,
+    air_capacity_mol: f64,
+    dest: &str,
+    chamber: &crate::chamber::ChamberParams,
+) -> Box<dyn Flow> {
+    crate::chamber::reads_chamber(
+        Box::new(Condensation {
+            id: ROOM_CONDENSER.to_string(),
+            water_vapor: WATER_VAPOR.to_string(),
+            condensate: dest.to_string(),
+            temp_var: TEMP_VAR.to_string(),
+            air_capacity_mol,
+            humidity_setpoint: p.water.humidity_setpoint,
+        }),
+        chamber,
+    )
 }
 
 /// The plant-step aux process that records the within-day air for its window, under

@@ -71,7 +71,7 @@ use crate::plant_chamber::{
     chamber_fast_forcings, chamber_flows, chamber_latent_heat_flow, chamber_plants,
     chamber_reset_hook, chamber_start_stocks, ChamberPorts, ResowRule,
 };
-use crate::room_vapour::{record_room_air, room_condenser, Thermostat};
+use crate::room_vapour::{chamber_room_condenser, record_room_air, room_condenser, Thermostat};
 use crate::scenario::{Phase, SealedStationScenario};
 use crate::sowing::{insert_twins, on_sowing_clock, PLANT_PROGRAM_VARS};
 use crate::stocks::{
@@ -250,7 +250,7 @@ pub fn wrap_last(
     stocks: &BTreeMap<String, Stock>,
     scenario: &SealedStationScenario,
 ) -> Result<(Registry, Registry), SimError> {
-    let bio_reg = plants_read_chamber(bio_reg, stocks, &crate::params::chamber())?;
+    let bio_reg = plants_read_chamber(bio_reg, stocks, &scenario.chamber)?;
     on_sowing_clock(bio_reg, fast_reg, stocks, scenario)
 }
 
@@ -286,7 +286,7 @@ pub fn build_sealed_station_unread(
         FECAL_WASTE
     };
     let node0 = sealed_node_heat(charge, thermal_params, lamp, scenario);
-    let chamber = crate::params::chamber();
+    let chamber = scenario.chamber;
     require_step_within_response(scenario.cabin_dt, &chamber)?;
     let room = scenario.room_vapour;
     if !room.has_cabin_vapour() && gas != GasExchangeStep::Minute {
@@ -358,15 +358,19 @@ pub fn build_sealed_station_unread(
     // The crew's breath: the plants' vapour held by the room's minute condenser (one store, the
     // reference since 2026-10-20, `room_vapour`), or its own stock held by the ECLSS condenser
     // (two stocks, the form until then).
-    let condenser = if room.has_cabin_vapour() {
-        eclss_condenser(eclss, room.crew_vapour(), RECOVERED_WATER)
-    } else {
-        room_condenser(
+    let condenser = match room.thermostat() {
+        None => eclss_condenser(eclss, room.crew_vapour(), RECOVERED_WATER),
+        Some(Thermostat::Window) => room_condenser(
             &scenario.plant_params(),
             scenario.bio.chamber_air_capacity_mol,
             RECOVERED_WATER,
-            room.thermostat().unwrap_or(Thermostat::Window),
-        )
+        ),
+        Some(Thermostat::LiveChamber) => chamber_room_condenser(
+            &scenario.plant_params(),
+            scenario.bio.chamber_air_capacity_mol,
+            RECOVERED_WATER,
+            &chamber,
+        ),
     };
     let fast_flows = sealed_fast_flows(
         charge,
@@ -382,6 +386,8 @@ pub fn build_sealed_station_unread(
             co2: CARBON_POOL, // the greenhouse seam: crew exhales into the bio CO₂
             o2: O2_POOL,      // the greenhouse seam: crew breathes the bio O₂
             h2o: room.crew_vapour(),
+            // One room: the scrubber's and the makeup's targets are on the plants' own air.
+            air_mol: scenario.bio.chamber_air_capacity_mol,
         },
         condenser,
         fecal_target,
@@ -420,6 +426,8 @@ pub(crate) struct CabinAir<'a> {
     pub co2: &'a str,
     pub o2: &'a str,
     pub h2o: &'a str,
+    /// The room's air (mol) the CO₂ scrubber's and the O₂ makeup's targets are taken on.
+    pub air_mol: f64,
 }
 
 /// The sealed station's fast registry, in its one canonical order. Extracted so the lab
@@ -462,7 +470,7 @@ pub(crate) fn sealed_fast_flows(
                 air.co2.to_string(),
                 CO2_REMOVED.to_string(),
                 *eclss,
-                crate::scenario::STATION_CABIN_AIR_MOL,
+                air.air_mol,
             ),
         ),
         condenser, // the Step-4 seam: condensate → the buffer
@@ -471,7 +479,7 @@ pub(crate) fn sealed_fast_flows(
             O2_SUPPLY.to_string(),
             air.o2.to_string(),
             *eclss,
-            crate::scenario::STATION_CABIN_AIR_MOL,
+            air.air_mol,
         )),
         Box::new(WaterRecovery::new(
             WATER_RECOVERY.to_string(),
@@ -701,7 +709,7 @@ pub fn with_averaged_chamber_start(
             state.n
         )));
     }
-    let chamber = crate::params::chamber();
+    let chamber = scenario.chamber;
     let phase = scenario.phase_since_sowing(0);
     let q0 = chamber_heat0(
         &chamber,

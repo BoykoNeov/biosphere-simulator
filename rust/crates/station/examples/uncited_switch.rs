@@ -33,9 +33,10 @@
 //! for writing. A run that rations, reverses or fails is printed as that result, never
 //! hidden behind a panic — the goldens' runners assert well-fedness, this does not.
 //!
-//! ⚠ **The chamber's five DESIGN values are not here**: `sealed.rs` and `plant_chamber.rs`
-//! read `params::chamber()` inside the build, so there is no value to hand in without a
-//! change to the reference. The plan names that as a separate, offered change.
+//! ⚠ **The chamber's five DESIGN values are not here.** When this tool was written the build
+//! read `params::chamber()` inside itself, so there was no value to hand in. Since 2026-10-21
+//! they are an input (`SealedStationScenario::chamber`, `docs/plans/post-roadmap-big-station.md`),
+//! so they could be added as rows; not done.
 
 use std::collections::BTreeMap;
 

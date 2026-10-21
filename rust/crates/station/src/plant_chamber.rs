@@ -199,7 +199,7 @@ pub fn chamber_fast_forcings(
         OUTDOOR_TEMP_VAR.to_string(),
         crate::sealed::outdoor_temperature(scenario)?,
     );
-    crate::sealed::chamber_setpoint_twins(&mut forcings, scenario, &crate::params::chamber())?;
+    crate::sealed::chamber_setpoint_twins(&mut forcings, scenario, &scenario.chamber)?;
     Ok(forcings)
 }
 
@@ -277,7 +277,7 @@ pub fn assemble_chamber_habitat(
     habitat_flows: Vec<Box<dyn Flow>>,
     rng_seed: u64,
 ) -> Result<ChamberHabitat, SimError> {
-    let chamber = crate::params::chamber();
+    let chamber = scenario.chamber;
     require_step_within_response(scenario.cabin_dt, &chamber)?;
     let plants = chamber_plants(scenario)?;
     let mut stocks = plants.stocks;

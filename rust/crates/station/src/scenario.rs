@@ -430,6 +430,11 @@ pub struct SealedStationScenario {
     /// Where the plants get water their own tank cannot give, and where their extra goes
     /// ([`crate::water_reserve`]; the crew's store in the sealed station since 2026-10-21).
     pub water_reserve: WaterReserve,
+    /// The plant chamber's heat coefficients — its heat capacity, cooler, heater and walls
+    /// (`chamber.yaml` in the reference). A field since 2026-10-21, so a chamber can be sized
+    /// (the big station, `docs/plans/post-roadmap-big-station.md`): every reader in the build
+    /// takes it from here, none re-reads the file.
+    pub chamber: crate::chamber::ChamberParams,
 }
 
 /// The crop a plant chamber grows.
@@ -616,6 +621,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         crop: Crop::Wheat,
         room_vapour: shared_room(Thermostat::LiveChamber),
         water_reserve: WaterReserve::CrewStore,
+        chamber: crate::params::chamber(),
     }
 }
 
