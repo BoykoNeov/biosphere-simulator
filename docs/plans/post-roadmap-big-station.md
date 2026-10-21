@@ -624,3 +624,73 @@ search summaries, **full text not read**:
 - *Never forming it.* MELiSSA's nitrifying compartment turns urine ammonium into nitrate for the plants;
   Lunar Palace 1 recovered ~20.5 % of urine nitrogen in its 105-day run; Biosphere 2 sent its wastewater
   through a constructed marsh into the crop irrigation (Nelson et al. 1999, *Ecol. Eng.*).
+
+## 9a. Step 3c — MEASURED (2026-10-21)
+
+`examples/big_station.rs -- --feed-crew` (700 m², four crew, 1220 days; CO₂ store, food loop, nitrogen
+and real soil on). Rationed 0 and 0; carbon books close to 0.000 mol and nitrogen books to ~1e-10 kg
+every crop. `--control` still reproduces `sealed_station_state.json` byte for byte, and `--real-soil`
+reproduces 3a's first crop to the printed digit (the refactor moved nothing). Outputs:
+`sources\temp-evidence\feed-crew\` (`fc1220.txt` this run; `d160c.txt` its first 160 days with the
+dose-rule counter; `twin700.txt` 160 days at 700 m² with urine straight to the soil, as 3a; `rs160.txt`
+the 3a check).
+
+Per crop: harvest per m² (share of 2b's 22.15), the harvest's share of the crew's food, imported food
+eaten, the soil solution at the crop's end:
+
+| crop | harvest mol C/m² | of 2b | feeds the crew | imported mol C | soil solution g N/m² |
+|---|---|---|---|---|---|
+| 1 | 5.96 | 27 % | 28.7 % | 14 548 | 0.31 (lowest 0.06) |
+| 2 | 8.46 | 38 % | 40.7 % | 10 378 | 3.92 |
+| 3 | 10.60 | 48 % | 51.0 % | 8 626 | 9.31 |
+| 4 | 12.45 | 56 % | 59.9 % | 7 128 | 15.45 |
+| 5 | 14.20 | 64 % | 68.3 % | 5 837 | 21.19 |
+| 6 | 15.66 | 71 % | 75.3 % | 4 609 | 25.99 |
+| 7 | 16.74 | 76 % | 80.6 % | 3 587 | 29.88 |
+| 8 | 17.48 | 79 % | 84.1 % | 2 829 | 32.93 |
+| (9, day 100 of 140) | — | — | — | 0 | 34.77 |
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| F1 | crop 1 at 40–65 % of 2b, crop 2 at 70–95 %, within 5 % from crop 3 or 4 | **27 %, 38 %**, then a slow climb: **79 %** at crop 8, still rising | **missed** |
+| F2 | imports 40 000–70 000 mol C, most before day ~420; under 10 % of the diet from crop 4; the crop feeds 65–85 % over the run | **57 541 mol C** (554 crew-days of food), 58 % of it in the first three crops; **49 %** of the diet at crop 4, 19 % at crop 8; the crop fed **56 %** over the run | total held; the timing **missed** |
+| F3 | imported N 30–53 kg: standing crop ≤ ~11, litter and humus a few, solution near its 1.4 kg start, **15–35 kg in the tank** | **43.2 kg**: plant +11.3, litter/microbes/humus +7.4, food store +1.2, **soil solution +23.0** (1.38 → 24.34), **tank 0.41** | total held; where it went **missed** |
+| F4 | solution 0.5×–2× its start all run; doses 8–14 g N/m² per crop, far under the 52–69 toxic limit | solution **0.03× to 17.6×** (0.06 to 34.8 g/m²); doses **9.2–13.3 g/m²**, under the limit | doses held; the soil **missed** |
+| F5 | late-season nitrogen may bind; if so, grain within 3 % of the carbon-limited value | crop 1: capped in **621** plant steps (soil drawn to 0.06 g/m² after dosing stops at day 93); crop 2: 12; then **0**. Crop 1's grain is **identical** to the urine-to-soil twin (6.117 mol C/m² both): carbon, not nitrogen, set it | held |
+| F6 | rationed 0 and 0; books close every crop | held | held |
+
+**Why F1 and F2 missed: the farm fills by a fixed share of what is missing, not all at once.** Each
+crop's extra carbon is only the imported food the crew ate to cover the gap, and the soil keeps about as
+much of it as the crop gains (soil carbon +5 487 mol in crop 2, falling to +2 001 in crop 8; 30 146 by
+day 1120). So the gap in the diet shrinks by about a fifth per crop — 71 → 59 → 49 → 40 → 32 → 25 → 19 %,
+ratio 0.78–0.83 — a slow exponential, not a fill. I had budgeted the carbon right (the imports' total
+held) but assumed the crop would take it first. At that ratio, ~95 % takes about six more crops
+(~2.3 years). The crop is still short of CO₂: the tank ran dry in **19 %** of lit minutes (194 808 of
+1 045 440), room CO₂ down to the 100 ppm floor, mean 1 059 ppm. The O₂ bought (10 893 mol) is again the
+CO₂ left in the tank at the end (~10 950 mol, 9.1 % of the crew's breath), as in 2b.
+
+**Why F3 and F4 missed: the dose rule ignores the soil's own supply.** The dose equals what the roots
+take, but the soil also releases nitrogen from the previous crop's straw and roots (the "rest" column:
+**+4 to +8 kg per crop** after crop 1). The roots take most of their nitrogen inside the dosing window,
+so the dose empties the tank every window (lowest 4 g); the soil's own release plus all the urine is
+more than the crop takes, and the excess — the imported nitrogen — lands in the soil solution, not the
+tank. The side agent (2026-10-21) warned that holding the soil by dosing would make F4 pass by
+construction; it failed instead, through exactly the term it said to watch. The soil's gain per crop
+follows the imports down (+3.8, +4.3, +4.0, +3.4, +2.7, +2.1 kg from crop 3), so it would level off
+when the imports stop. That is the user's "relative balance", reached slowly; the pile is 34.8 g/m²
+(**537 mg/L** at drained-full, 864 at the dry end of a watering cycle) where 3a reached 342 g/m² and
+5 300 mg/L — a tenth, but still past [F]'s 200 mg/L (mineralization stops) and 400 mg/L reference points.
+
+**The dose rule's own flaw, measured.** Dosing "what the roots took" holds the soil where it is and can
+never raise it. In crop 1 the tank could have covered the shortfall in **28** of the 621 capped steps
+(12 in crop 2, then none); the rest of the cap came after day 93, when EcoSanRes says to stop. It cost
+no grain (the twin). Not changed: the rule is the one approved.
+
+**Unpredicted: the urine is not stored a month.** EcoSanRes advises storing urine one to six months.
+The tank is emptied every window, so the urine made inside a window reaches the soil within days; only
+the ~47 days made after each window (~3.2 kg) waits for the next sowing.
+
+**Next (the user's choice):** (a) let the run go on — the farm is still filling and the imports still
+falling; (b) CEEF's bought CO₂ (§9) to fill the farm's carbon without imported nitrogen; (c) a dose rule
+that subtracts the soil's own release, which would keep the imported nitrogen in the tank as F3
+expected; (d) 3b's ammonia, the marsh, or draining.

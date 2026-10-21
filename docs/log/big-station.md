@@ -71,3 +71,14 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   nitrogen (advisor): the farm and soil fill with carbon only from imported food, so imports — and their
   nitrogen — run until they are full; CEEF's bought CO₂ is the named alternative. Predictions F1–F6;
   the user also approved spray watering / rain and a marsh for later steps.
+* **Step 3c MEASURED 2026-10-21** (plan §9a; lab `--feed-crew`, 700 m², 1220 days). Rationed 0, every
+  book closes. The farm fills slowly: harvest 27 % of 2b's per m² in crop 1, 38 % in crop 2, 79 % by
+  crop 8 and still rising — each crop's extra carbon is only the imported food eaten to cover the gap,
+  and the soil keeps as much as the crop gains, so the gap shrinks by about a fifth per crop (F1, F2's
+  timing missed; the imports' total, 57 541 mol C, held). The crop fed 56 % of the crew over four years,
+  84 % in crop 8. Imported nitrogen 43 kg (held), but it went to the soil solution (+23 kg, to
+  34.8 g/m², 537 mg/L at drained-full — a tenth of 3a), not the tank (0.4 kg; F3, F4 missed): the dose
+  equals the roots' uptake and ignores the soil's own release from the old crop's straw (+4–8 kg a
+  crop), so the tank empties every window. The soil's gain falls with the imports. Late-season nitrogen
+  binds in crop 1 only and costs no grain (a urine-to-soil twin is identical). The urine is dosed
+  within days, not stored the one to six months EcoSanRes advises. Next choices are the user's.
