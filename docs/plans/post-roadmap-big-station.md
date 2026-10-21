@@ -399,8 +399,8 @@ doi 10.1007/BF00043182 — abstract only, read via a search summary of the India
 Sciences repository record; full text not read), and roots hold 10–20 % of a spring wheat's nitrogen
 at maturity (Andersson & Johansson 2006, *J. Agron. Crop Sci.* 192:121–131, abstract). The model's
 79 % counts the roots; most field figures count only the plant above ground, and on that basis the
-model's share would be higher — at or above the top of the field range. Not read as an error: the
-grain's 2.49 % is what sets it.
+model's share would be higher — at or above the top of the field range. It follows from the straw
+keeping only its cited 0.5 %; not tuned.
 
 **What the books show, and what they cannot.** Nitrogen now goes round the whole loop: soil → plant →
 grain → food → crew → urine (88 %) and feces (12 %) → soil, and the inedible parts → litter → soil.
