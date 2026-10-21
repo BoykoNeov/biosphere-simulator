@@ -10,10 +10,11 @@ USDA's nitrogen; the books close, but the 20 t soil hides the loop. **Step 3a ME
 soil of real size (grams of nitrogen per m², after Soltani & Sinclair Ch. 18) the crop is never short;
 the imported food's nitrogen fills the soil solution to ~5 300 mg/L at drained-full in four years (~7 800
 at the driest end of a watering cycle), and of [F]'s three losses only ammonia from urine can run here,
-taking at most a tenth of it. **Step 3c PLANNED (§9, the user's choice, ahead of 3b):** a 700 m² farm
-that feeds the crew, imported food kept as a reserve eaten only when the harvest runs short, and urine
-stored in a tank and dosed to the soil as the roots take it (EcoSanRes' timing window); predictions
-F1–F6 written, nothing built.
+taking at most a tenth of it. **Step 3c MEASURED (§9a):** a 700 m² farm with imported food as a
+reserve and urine dosed from a tank; the farm fills by about a fifth of the gap a crop (the crop fed
+56 % over 1220 days, 84 % by crop 8), and the imported nitrogen piles in the soil, not the tank.
+**Step 4 PLANNED (§10, the user's choices):** gas tanks charged at the start (4a, predictions G1–G6
+written), then a top-up dose (4b), then drainage and a marsh (4c); ammonia dropped as a loss.
 
 ## 1. Why this exists
 
@@ -706,3 +707,85 @@ that tops the soil solution up to a set level from the tank, which would keep th
 F3 expected (⚠ not "the uptake less the soil's release": that holds the soil flat in the window and lets
 it fall after day 93 — ~3.7 kg taken and ~1.9 kg released over crop 7's last 47 days, −1.7 kg a season
 against a 1.38 kg start — so it would starve the crop; advisor, 2026-10-21); (d) 3b's ammonia, the marsh, or draining.
+
+## 10. Step 4 — gas tanks charged at the start, a top-up dose, then drainage and a marsh (the user's choices, 2026-10-21)
+
+The user, on §9a's four options: *"a) your choice b) the station can have gas tanks to store gases
+initially and refill them from the inside atmosphere if it is technologicaly feasible. c)ok d)wastewaer
+marsh and soil draining ok - ammonia with artificial rain should go to the soil again i think"*.
+
+**Order (advisor, 2026-10-21): one change at a time, each measured before the next** — all three move
+the same carbon and nitrogen books, and built together no one could say which did what. (a) runs now;
+then (b) Step 4a; then (c) Step 4b; then (d) Step 4c, sized by what 4a and 4b leave.
+
+- **(a), my choice: run 3c on to day 3000** (`--feed-crew --days 3000`, no code;
+  `sources\temp-evidence\feed-crew\fc3000.txt`). At the measured ~0.8 per crop the diet's gap falls to
+  ~5 % in about six more crops, and enough crops follow to see whether the soil's nitrogen levels off
+  once imports fade. It is the baseline 4a and 4b are read against.
+- **Ammonia (the old 3b) is dropped as a loss — the user's call, recorded.** In sealed air ammonia does not
+  leave; it dissolves back into water the plants get (the chamber's condensate already returns to the
+  plants' water here, §9; the ISS loses ammonia partly into its condensate, NTRS 20180004945), so it is a
+  delay, not a sink. 3b measured it at 2–10 % of the urine's nitrogen. Not built as a zero-net loop;
+  revisit only if the cabin's ammonia level matters for the crew's health.
+
+### 10.1 Step 4a — gas tanks charged at the start, refilled from the air (lab, `--co2-charge`, `--o2-charge`)
+
+**Feasible, and done:** CEEF separated both gases from its rooms' air and kept them in reservoirs —
+*"The oxygen (O2) added to the air in the PCM by photosynthesis of crops was separated and supplied to
+the air in the AHM. Increased carbon dioxide (CO2) in the AHM atmosphere … was separated and supplied
+back to the air in the PCM"* (Tako et al., p. 1; Fig. 1 draws the CO₂ line through two reservoirs and a
+mass-flow controller). Size: 2a's CO₂ tank peaked at 4.5 t, ~6 m³ as liquid.
+
+**What is there today.** The CO₂ tank (2a) already refills from the air and starts **empty**. The
+oxygen side is **not a tank**: `boundary.o2_supply` is an outside source with no floor (it starts at 0
+and goes negative — 3c "bought" 10 893 mol). Its regulator is two-sided (it returns surplus O₂ above the
+setpoint), so a tank needs only a starting charge and a floor.
+
+**The build (lab, on top of `--feed-crew`).**
+- **CO₂: the existing tank starts charged** — `--co2-charge MOL` (an input; no default).
+- **O₂: a real tank**, `lab.o2_tank`, starting at `--o2-charge MOL` (an input; no default). A lab flow
+  replaces the reference's makeup on this run: the same law (gain × (setpoint − room O₂), both ways, the
+  reference's gain and setpoint) but it never gives more than the tank holds. Nothing from outside.
+- **The charges counted as starting stock**, so the books close against them as they stand.
+- **Charges for this run, from 3c's measurements:** CO₂ **60 000 mol** (3c's imported food was 57 541 mol
+  C — the carbon the farm filled with — rounded up; ~2.6 t, ~2.3 m³ as liquid); O₂ **11 000 mol** (3c
+  bought 10 893; ~0.35 t).
+- **Readouts added:** each tank's lowest point and when; lit minutes the CO₂ tank ran short (already
+  there); steps where the crop's nitrogen stress factor is below 1, and its lowest value (3c showed
+  "capped" is not "stressed", §9a — now the difference matters).
+
+**Predictions (written before the run; 700 m², four crew, 3000 days, everything in 3c on):**
+- **G1 — the carbon shortage of 3c's first crops is gone.** Crop 1 grain **≥ 90 %** of 2b's 22.15 mol
+  C/m² (3c: 27 %), unless nitrogen stops it (G5).
+- **G2 — imports shrink to the first crop.** The crew must eat the reserve until the first harvest
+  (~14 500 mol C, as in 3c). After that a crop at ≥ 89 % of 2b covers the diet (700 m² gives 107 %), so
+  imports are near **0 from crop 2 on** while the CO₂ tank lasts. Imported nitrogen **11–15 kg** in all,
+  against 3c's 43 kg by day 1220.
+- **G3 — the soil drains the CO₂ tank slowly.** The tank falls by the crop's standing carbon at each peak
+  (~33 600 mol at full size), refills as the crop is eaten and rots, and loses for good whatever the soil
+  keeps (3c: +2 000 to +5 500 mol per crop, more with a bigger crop). 60 000 plus crop 1's imports is
+  roughly what the crop's peak and ~3 years of soil gain take together, so the tank **runs short at a
+  crop peak somewhere in crops 4–10** (day ~560–1400). When it does the crop is CO₂-short again and
+  imports come back, smaller than in 3c. A one-off charge is not a steady state while the soil still
+  gains; CEEF covered its own shortfall from waste processing (Tako et al.), the cited next lever.
+- **G4 — the O₂ tank mirrors the CO₂ tank.** Every mol of carbon the crop fixes from the CO₂ tank frees a
+  mol of O₂, and every mol the crew burn takes one (2b and 3c: O₂ bought = CO₂ left in the tank, within
+  0.5 %). So the O₂ tank's change is minus the CO₂ tank's change, **within 2 %**. Its low point comes in
+  crop 1's cold weeks, when the crew breathe imported food and the seedling fixes little: ~**4 000–7 000
+  mol** drawn of 11 000. It **never runs dry**, and ends above its start by about what the CO₂ tank lost.
+- **G5 — nitrogen may bind in crop 1 (the side agent's point, 2026-10-21, carried into 4a).** A full-size
+  crop holds ~11.2 kg N at maturity (2c: 3.21 kg per 200 m²). Crop 1 has the soil's 1.38 kg plus the
+  urine of crop 1's imports (10.9 kg in 3c, of which the tank doses only what the roots take inside the
+  window). So the cap binds **far more than 3c's 621 steps**, and the stress factor may drop below 1; if it
+  does, grain falls short of G1 by the shortage, not the carbon. From crop 2 on the crew eat grown grain,
+  so its nitrogen comes back as urine and the loop runs closed: the soil solution **stops climbing**
+  (3c: to 34.8 g/m²).
+- **G6.** Rationed 0 and 0; carbon, oxygen and nitrogen books close every crop; `--control` still
+  reproduces `sealed_station_state.json` byte for byte.
+
+**Step 4b (c) and Step 4c (d) are planned after 4a is measured.** 4b: dose the soil solution up to a set
+level from the urine tank (the level an input; anchor: the soil's 1.38 kg start), first checking against
+3c's numbers whether the soil's own release ever exceeds the uptake (then a top-up doses nothing and the
+soil still climbs). 4c: watering that drains (a cited leaching fraction) into a wastewater marsh whose
+denitrification turns nitrate into N₂ (a cited wetland rate; the books need an N₂ stock); §4 item 4's
+connectable rooms, with run speed measured.

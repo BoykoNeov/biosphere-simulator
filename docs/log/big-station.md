@@ -83,3 +83,8 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   gain falls with the imports. Late-season nitrogen binds in crop 1 only and costs no grain (a
   urine-to-soil twin and a never-capped soil are identical). The urine is dosed within days, not
   stored the one to six months EcoSanRes advises. Next choices are the user's.
+* **Step 4 PLANNED 2026-10-21** (plan §10; the user's choices on §9a's four). One change at a time:
+  (a) 3c run on to day 3000 as the baseline; 4a gas tanks charged at the start and refilled from the
+  air (CO₂ 60 000 mol, O₂ 11 000 mol, both inputs; the O₂ side becomes a real tank with a floor —
+  today it is an outside source), predictions G1–G6; then 4b a top-up dose, 4c drainage and a marsh.
+  Ammonia dropped as a loss (the user: it comes back to the soil with the water).
