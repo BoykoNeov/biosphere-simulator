@@ -57,8 +57,10 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   Sinclair Ch. 18 — a silt loam's solution nitrogen at sowing, **1.97 g N/m²** instead of 100 kg, and
   the roots' reach as the nitrogen dissolved in the plant-available water (Eqn 18.5) instead of the
   1–50 kg/m² availability band. The crop is **never** short (0 capped steps); carbon identical to 2c.
-  The imported food's nitrogen fills the soil: **342 g/m²** and **~7 800 mg/L** by day 1220, past every
-  reference point the book uses; the model has no salt damage to show it. Of the three real losses,
-  only ammonia from urine can run here (2 % or 10 %, Table 18.1 read off the page): the station never
-  drains the root zone and is never waterlogged. No sourced soil loss balances the loop — the fix is a
-  design choice (grow more of the food, take nitrogen out on purpose, or drain).
+  The imported food's nitrogen fills the soil: **342 g/m²**, **~5 300 mg/L** at drained-full (~7 800 at
+  the dry end of a watering cycle) by day 1220, past every reference point the book uses; the model has
+  no salt damage to show it. Of the book's three losses, only ammonia from urine can run here (2 % or
+  10 %, Table 18.1 read off the page): the station never drains the root zone and is never waterlogged.
+  None of the three balances the loop (losses outside Ch. 18 not looked for) — the fix is a design
+  choice (grow more of the food, take nitrogen out on purpose, or drain). The cap is shown live: a
+  floor of 1 000 mg/L starves the first crop.

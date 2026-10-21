@@ -731,6 +731,9 @@ struct Cycle {
     ncon_max: f64,
     capped_steps: u64,
     n_short: f64,
+    /// The smallest reach ÷ wanted over the cycle's plant steps with any uptake wanted (∞ if none):
+    /// below 1 the cap binds; the margin it ran with otherwise.
+    reach_ratio_min: f64,
 }
 
 #[derive(Default)]
@@ -766,6 +769,7 @@ struct Minutes {
     /// back (kg N).
     n_capped: Vec<u64>,
     n_short: Vec<f64>,
+    reach_ratio_min: Vec<f64>,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -865,6 +869,7 @@ fn run(
         n_eaten: vec![0.0; days],
         n_capped: vec![0; days],
         n_short: vec![0.0; days],
+        reach_ratio_min: vec![f64::INFINITY; days],
         ..Minutes::default()
     };
     // The crop's cycle ends at each re-sow: the day index of each reset.
@@ -881,6 +886,11 @@ fn run(
             if let Some(u) = &uptake {
                 let day = (fast_steps / sc.steps_per_day) as usize;
                 let (wanted, given) = u.parts(before, &env, sc.bio_dt).expect("uptake");
+                if wanted > 0.0 {
+                    if let Some(r) = m.reach_ratio_min.get_mut(day) {
+                        *r = r.min(u.reach(before) * sc.bio_dt / wanted);
+                    }
+                }
                 if given < wanted {
                     if let (Some(c), Some(x)) = (m.n_capped.get_mut(day), m.n_short.get_mut(day)) {
                         *c += 1;
@@ -1038,6 +1048,10 @@ fn run(
                 }),
                 capped_steps: m.n_capped[w[0]..w[1]].iter().sum(),
                 n_short: m.n_short[w[0]..w[1]].iter().sum(),
+                reach_ratio_min: m.reach_ratio_min[w[0]..w[1]]
+                    .iter()
+                    .copied()
+                    .fold(f64::INFINITY, f64::min),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -1147,12 +1161,13 @@ fn report(r: &Run) {
         if r.real_soil {
             println!(
                 "           soil solution N ends {:.4} kg ({:.2} g/m²); highest {:.0} mg/L at a day's end; \
-                 uptake capped by the roots' reach in {} plant steps, {:.4} kg held back",
+                 uptake capped by the roots' reach in {} plant steps, {:.4} kg held back; reach ÷ wanted at least {:.2}",
                 c.soil_n_end,
                 1e3 * c.soil_n_end / a,
                 c.ncon_max,
                 c.capped_steps,
-                c.n_short
+                c.n_short,
+                c.reach_ratio_min
             );
         }
     }
