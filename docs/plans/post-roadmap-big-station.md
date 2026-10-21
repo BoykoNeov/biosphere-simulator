@@ -1,6 +1,8 @@
 # Post-roadmap — the big station (opened 2026-10-21)
 
-**Status: PLAN. Step 1 (a measuring lab) not started.** Nothing here changes the reference.
+**Status: Step 1 MEASURED (2026-10-21, §3a).** The 200 m² station is CO₂-starved, as predicted; its
+crop grows half as much per m², and CO₂ is the whole cause (measured). One inert plumbing change landed
+for it (§3b); nothing else changes the reference. Step 2 is a choice for the user (§4).
 
 ## 1. Why this exists
 
@@ -84,6 +86,78 @@ costs. Speed is measured when rooms are composed (Step 4).
 **Readouts:** closure share (plant net carbon draw ÷ crew exhalation), daily and per crop; crop carbon
 per m² against the 1 m² run; CO₂ and O₂ in the room (min/max); scrubbed and made-up totals; water
 through plants, crew store, reserve top-ups; lamp energy and room temperature range; rationing.
+
+## 3a. Step 1 — MEASURED (2026-10-21)
+
+The lab: `rust/crates/station/examples/big_station.rs` (1 m² and 200 m² side by side, 1220 days, four
+crew). Everything sized per m² of crop is ×a: crop and soil starts, the plants' tank (it starts empty
+at both sizes: the reference's tank starts at 0, so the advisor's feared tank-vs-store mismatch does
+not arise), the lamp, the chamber's heat capacity, cooler and heater, its walls by `chamber.yaml`'s box
+rule (`2a + 4·0.78·√a`: 444 m² at 200 m², not ×200's 1 024). The room's air (9 500 mol), its CO₂ and
+O₂ targets, the crew and their stores are the reference's. **Control:** the sizing at a = 1, through the
+reference driver, reproduces `sealed_station_state.json` byte for byte (`--control`).
+
+**Two stand-ins, neither bound.** Outside electricity is a lab flow that tops the battery back up each
+minute from `boundary.grid`; heat rejection is the radiator and the structure's heat capacity ×a. The
+structure ran at 100–129 K (1 m²: 162–176 K), so the cooler was **never** blocked by a warmer
+structure; cooler-at-cap and heater-at-cap minutes are the same at both sizes (~1 770 and ~2 030 — the
+setpoint's jumps at each re-sow and cold-period end), and the chamber held 4.00–22.07 °C (1 m²:
+4.00–22.06). Rationed: 0 and 0 at both sizes — so the starvation below is the crop's kinetics, not the
+arbitration backstop.
+
+**The predictions:**
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| B1 | crew 98.6 mol CO₂/day | 98.62 mol/day | held (by construction) |
+| B2 | an unstarved crop would fix ~70 mol C/day | did not occur — the crop is starved (B3) | — |
+| B3 | CO₂-starved; closure share 20–50 %; crop/m² below 1 m² | starved: room CO₂ falls to **158 ppm** in lit hours (1 m²: never below 1 290). Grain 9.6–11.6 mol C/m² per crop (1 m²: 22.4), peak crop C 21.6–26.4 (48.2) — **43–55 %**. Closure share: crop 1 **36.7 %**, then 19.2, 9.9, 6.0, 4.4, 3.6, 3.2, 2.9 %; whole run **8.4 %** | starvation and crop held; the share held for crop 1 only — **missed** over the run (below) |
+| B4 | O₂ never climbs without bound | 20.96–21.01 % | held |
+| B5 | ~300 kg/day through the plants (~42 t per crop); the crew store does not run dry | **466 kg/day** (2.33 kg/m²/day — the same per m² as the 1 m² crop's 2.33, though it grows half as much); ~65 t per crop. Crew store 20 → 16.2 t (1 m²: → 17.8 t — the reference itself loses ~2.2 t to brine over 1220 days); reserve top-ups 1.5 t in all | store held; throughput **missed, 1.55× low** |
+| B6 | lamp ~640 kWh/day; the room holds its setpoint | lamp 640 kWh/day in the warm phase (40 kW × 16 h, by construction); **430 kWh/day** averaged over the run (the cold period's dim lamp, 56 days of each crop); setpoint held | held |
+
+**Why the closure share falls (measured, not asserted).** The lab books every crop cycle's carbon: the
+ecosystem's net draw = the crop's change + the soil's change (litter, microbes, humus, consumers, the
+litter sink), with a residual of 0.000 mol in every cycle. At each re-sow the old crop goes into the
+soil (crop −4 372, soil +4 073 at the first), and the soil breathes it back out: soil carbon climbs
+1 300 → 7 482 mol, its gain per crop falling 2 099 → 366. With the harvest off, nothing leaves, so in
+the long run everything the crop fixes comes back and the net draw tends to zero — at 1 m² the same
+(0.4 % → 0.0 %). **The share of the crew's CO₂ the crop holds at its peak is 31–38 % per crop and does
+not fall** — that is the crop's capacity; turning it into closure needs the harvest to leave the room
+(the food loop, §4 item 2).
+
+**Is it the CO₂? (the attribution check, `--crew 800`).** 200 m² with 800 crew — every m² gets the 1 m²
+run's CO₂ — over the first crop: grain **24.1** mol C/m², peak crop C **52.7** — back at (above) the 1 m²
+run's 22.4 and 48.2. The room's CO₂ ran 2 733–3 883 ppm (the 9 500 mol room's scrubber cannot keep 800
+crew at its target), hence the overshoot. So the half-sized crop at four crew is the CO₂ and nothing else
+the sizing moved.
+
+**An engine limit met on the way.** The first stand-in for outside electricity was a battery of 1e14 J.
+Both runs (1 m² too) failed the every-step conservation check on day one: the check allows 1e-9 of the
+step's largest transfer (`simcore::conservation`, `tol = atol + rtol·scale`), and a stock that large
+rounds by ~0.016 J. The same bound applies to every stock that keeps a running total, the boundaries
+included: at 200 m² the heat sent to space reaches ~1.9e12 J over 1220 days (ULP ~2e-4 J against a
+minute's tolerance of ~1e-3 J) — inside the bound for this run, near it for a bigger or longer one. A
+station "bigger than Biosphere 2" running for decades will meet it; not a change for this step, a
+finding for Step 4.
+
+**The crew's water store drains in the reference too** (20 → 17.8 t at 1 m² over 1220 days): the
+recycler's losses. The approved 98 % recycler is folded into the adoption (§1).
+
+## 3b. The plumbing Step 1 needed (landed, inert)
+
+The sealed build read `chamber.yaml` inside itself at seven places, and its scrubber and O₂ makeup took
+their targets on a `const` room size beside a second copy in the scenario, so no lab could size the
+chamber. Now `SealedStationScenario::chamber` carries the chamber's coefficients (defaulting to the
+file's) and the regulators read the scenario's `chamber_air_capacity_mol`. All 20 goldens identical;
+`tests/chamber_sizing.rs` checks that a distinctive value reaches every reader (each reverted reader
+turns a test red — measured). The user's rule from this step: parameters are inputs, not files re-read
+inside a build (`CLAUDE.md`, invariants).
+
+**Step 2 is the user's choice** (§4). What Step 1 says about the order: the crop can hold a third of
+the crew's carbon but is starved to half its growth, and what it fixes comes back because nothing
+leaves. Item 1 (CO₂ to the plants) and item 2 (the food loop) are both needed for closure; neither
+alone reaches it.
 
 ## 4. After Step 1 (each its own choice, ordered by what Step 1 shows)
 

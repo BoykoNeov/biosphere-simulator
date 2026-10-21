@@ -18,3 +18,14 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   adopted in ONE unfreeze, the approved 98 % recycler folded into it (advisor).
 * **Step 1, next:** a lab at 200 m² and 4 crew on outside electricity, predictions B1–B6 written in the
   plan §3 (headline: CO₂-starved, closure share 20–50 %).
+* **Step 1 MEASURED 2026-10-21** (plan §3a; lab `examples/big_station.rs`, 1 m² and 200 m², 1220 days,
+  four crew). At 200 m² the room's CO₂ falls to 158 ppm in lit hours and the crop grows 43–55 % of the
+  1 m² crop per m²; with 800 crew (the 1 m² CO₂ per m²) it grows back — CO₂ is the whole cause.
+* **Closure share** 36.7 % in the first crop, 8.4 % over the run: with the harvest off, each re-sow puts
+  the crop into the soil and the soil breathes it out (carbon books close to 0.000 mol). The crop holds
+  31–38 % of the crew's carbon at its peak, every crop: the capacity, not yet closure.
+* **Missed:** B5's water, 1.55× low (466 kg/day, 2.33 kg/m²/day at both sizes). Stand-ins never bound
+  (cooler never blocked, rationed 0). Engine limit found: the every-step conservation tolerance
+  (1e-9 of the step's transfer) cannot absorb rounding on a stock of ~1e14 J; a long big run nears it.
+* **Plumbing, inert:** the chamber's coefficients and the room's air size are scenario inputs now
+  (20 goldens identical, `tests/chamber_sizing.rs`). Step 2 is the user's choice.
