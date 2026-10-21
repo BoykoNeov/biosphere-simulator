@@ -870,3 +870,60 @@ level from the urine tank (the level an input; anchor: the soil's 1.38 kg start)
 soil still climbs). 4c: watering that drains (a cited leaching fraction) into a wastewater marsh whose
 denitrification turns nitrate into N₂ (a cited wetland rate; the books need an N₂ stock); §4 item 4's
 connectable rooms, with run speed measured.
+
+### 10.3 Step 4b — a top-up dose with a fertilizer store behind the urine tank (lab, `--fertilizer`, `--soil-n-level`)
+
+**The user, 2026-10-21: aim at full grain protein** (my recommendation, over "no cut to growth only").
+
+**⚠ "Full" cannot mean 100 % here (advisor and a side agent, 2026-10-21).** The harvest gives the grain
+the plant's nitrogen less the straw's cited residual (`harvest_at_maturity`), and the plant's nitrogen
+is set by the frozen uptake rule, whose target counts leaves, stems and roots but not the grain. On 2c's
+soil of 100 kg N/m², never short, the grain got **85.8 %** of USDA's nitrogen every crop. No dose
+pushes past what the crop itself asks; going further is a change to frozen science, not in scope. So
+the aim is **the crop's own ceiling**, measured first (P1), and even there an all-wheat diet stays under
+BVAD's 122 g of protein — a known gap, not a failure of 4b. "About 9.5 kg a crop" (§10.2) is what
+USDA's content asks of 4a's grain, not what this crop can take up.
+
+**The rule.** Each plant step the soil's solution nitrogen is topped up to a set level, `--soil-n-level
+G` g N/m² (an input, no default; anchor: the soil's start, 1.97 g/m², [F]'s silt loam). The deficit is
+filled from the urine tank first, inside EcoSanRes' window (sowing to day 93, as §9 — a hygiene rule
+for urine), and from a fertilizer store for the rest, **at any time from sowing to maturity**: the
+cutoff is about urine on food, not mineral nitrogen. Late fertilizer raising grain protein is cited:
+Linquist, Cassman, Fulton & Jackson (1992), *Late-season nitrogen may be efficient way to increase
+winter wheat protein*, California Agriculture 46(2):13–16 (read on the page,
+`sources/Linquist_1992_late_N_wheat_protein_CalAg46-2.pdf`): *"late-season nitrogen (N) applications
+coupled with irrigation can lead to efficient fertilizer N uptake and partitioning to grain, and
+increased grain protein"* — 40 lb N/ac (4.5 g/m²) at flowering raised grain N from 2.43 to 2.59 % over
+ten on-farm sites (Table 2); recovery was poor where soil nitrogen was already high. Also Giordano,
+Sadras & Lollato (2022), Field Crops Research 290, 108740 (title and the abstract's opening only):
+nitrogen after flag-leaf emergence raises grain protein, neutral for yield.
+- **The store** `lab.fertilizer_n` (kg N) starts at `--fertilizer KG` (an input, no default), counted as
+  starting stock and in the books' "held back". Charged generously for these runs so it never binds:
+  its draw per crop is the readout that would size a real store.
+- 4b builds on 4a (both tank charges required); without its two flags 4a's dose runs unchanged.
+- **Readouts added:** fertilizer drawn per crop, inside and after the urine window; the urine tank at
+  each crop's end; protein per person-day beside calories (grain and menu nitrogen × 6.25, the factor
+  the menu's nitrogen was derived with from BVAD's 122 g); the soil solution's highest mg/L against
+  [F]'s 200; the soil's own turnover now net of both doses.
+
+**Two runs, four crops each (560 days, 700 m², four crew, 4a's charges):** the anchor level, 1.97 g/m²;
+and a ceiling run at **10 g/m²** (~150 mg/L at a wet day's end, scaled from 3c's 34.8 g/m² → 537 mg/L —
+under [F]'s 200), fertilizer 100 kg.
+
+**Predictions (written before the runs):**
+- **P1 — the ceiling.** At 10 g/m² the grain gets **80–90 %** of USDA's nitrogen from crop 2 on (2c:
+  85.8 %), about **8 kg** a crop; the crew eat **85–95 g protein per person-day** (4a: 53; BVAD 122).
+- **P2 — the anchor.** At 1.97 g/m² the reach still caps late in grain fill on a drier day; grain
+  **65–85 %** of USDA's nitrogen, stress in the growing weeks mostly gone (factor ≥ 0.97).
+- **P3 — carbon.** Grain carbon back to crop 1's 97.5 % (±2 %) in every crop of both runs; 4a's 6–10 %
+  growth loss was the nitrogen.
+- **P4 — fertilizer, and the urine left over (advisor).** Crop 1 draws the most (filling the soil
+  solution to its level — 5.6 kg at 10 g/m² — and a bigger crop). After it the draw falls but **does not
+  reach zero**: after day 93 only fertilizer may go on, so urine made in and after the window waits, and
+  the urine tank's end-of-crop level **rises crop on crop**. Nitrogen in the station grows each crop. How
+  to stop that (urine turned into nitrate usable any time, as MELiSSA does, or urine allowed late) is the
+  user's call, not patched here.
+- **P5 — carbon tank.** A bigger crop takes more from the CO₂ tank at its peak; in four crops it does not
+  run short (4a's lowest was 2 364 mol on day 2939).
+- **P6.** Rationed 0 and 0; nitrogen books close every crop with the store in them; `--control` byte for
+  byte; 4a without the flags reproduces `stress-g560.txt`'s first crops.
