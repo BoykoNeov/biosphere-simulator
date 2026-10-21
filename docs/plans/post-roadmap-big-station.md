@@ -810,7 +810,7 @@ lines later lost a run of stray spaces; no number changed).
 | G2 | imports only in crop 1, ~0 after; imported N 11–15 kg | crop 1's **14 548** mol C, **0** in crops 2–4, then small imports return (0.6–4.6 % of the diet, crops 5–20): **18 300** mol C in all, **13.75 kg N** (a: 74 693 and 56.1) | held — but the imports return because of nitrogen (G5), not carbon |
 | G3 | the soil drains the CO₂ tank; it runs short at a crop peak in crops 4–10 | **never short** (0 lit minutes; room CO₂ never below 1 160 ppm). The tank ends each crop at 33 518, 22 702, 19 680 … 2 433 mol; lowest **2 364 on day 2939**, still losing ~500 mol a crop | **missed** |
 | G4 | O₂ tank change = −(CO₂ tank change) within 2 %; low point in crop 1's cold weeks, 4 000–7 000 drawn; never empty | ratio **1.0000** every crop; lowest **4 265** on day 65 (6 735 drawn); never empty; ends **48 850** (+37 850, the charge's carbon now in crop, soil and food) | held |
-| G5 | nitrogen may bind in crop 1; from crop 2 the soil stops climbing | crop 1 barely (stress in 273 plant steps, factor ≥ 0.96); **from crop 2, every crop**: uptake capped in ~1 000–1 070 plant steps, stress in **~480–560** steps, factor down to **0.003**; soil solution pinned at **0.12 g/m²** (1.97 at the start); plant N at maturity **6.9 kg** against ~11.2 for a full crop; the grain gets **48 %** of USDA's nitrogen; grain 20.0–20.8 mol C/m² (90–94 %) | held, and stronger than said: the farm is now **nitrogen-limited** |
+| G5 | nitrogen may bind in crop 1; from crop 2 the soil stops climbing | crop 1 barely (stress in 273 plant steps, factor ≥ 0.96); **from crop 3, every crop**: uptake capped in ~1 000–1 070 plant steps, stress in **~480–560** steps, factor ≥ **0.88** in the growing weeks (a 3000-day run's lowest, 0.003, is the re-sow's — below); soil solution pinned at **0.12 g/m²** (1.97 at the start); plant N at maturity **6.9 kg**; the grain gets **48 %** of USDA's nitrogen; grain 20.0–20.8 mol C/m² (90–94 %) | held: the farm is now **nitrogen-limited** — mildly in growth, strongly in protein |
 | G6 | rationed 0 and 0; books close; control byte for byte | held | held |
 
 **Why G3 missed: my sum over-counted the soil.** At each peak the tank must hold out the standing crop
@@ -825,10 +825,24 @@ the soil still gains, so a single charge only delays this. Not run on.
 end 2.1 kg (37.5) — 0.12 g/m² for most of the run where (a) reached 53.6. No O₂ bought (3c: 10 893 mol);
 the O₂ tank holds the oxygen the charge's carbon gave up.
 
+**How hard the shortage bites, checked (advisor, 2026-10-21).** The 3000-day run printed a lowest
+stress factor of 0.003 every crop, which would mean photosynthesis nearly stopped. Two four-crop twins
+with the stressed steps split into the seedling's cold weeks and the rest (`stress-a560.txt`,
+`stress-g560.txt`): (a) shows **no** stress in any crop; 4a shows 25–35 stressed steps in the cold
+weeks from crop 2 on — a re-sown seedling keeps its parent's nitrogen concentration
+(`reset_crop`), which after a harvest is the straw's residual, the stress curve's zero — and from crop
+3 on **~500 in the growing weeks, at a factor no lower than 0.88**: photosynthesis cut by at most 12 %,
+consistent with the grain's 6–10 % fall. Crop 2 has none in its growing weeks. So nitrogen costs this
+farm a little growth and half its grain protein. ⚠ The 11.2 kg "full crop" figure below is 2c's plant
+on a 100 kg N/m² soil, which took up more than it needed (§9a: a crop can sit well above the critical
+concentration unstressed) — not a requirement. 4b is sized on the grain's nitrogen asked against given
+(~9.5 against ~4.6 kg a crop) and on the grain carbon lost (97.5 % in crop 1, 90–94 % after); 4b must
+say which it aims at — full grain protein, or no cut to photosynthesis.
+
 **The new limit: too little nitrogen goes round.** Nothing leaves the station, but nitrogen parks. Of
 the 15.4 kg in the system at the end: soil litter, microbes and humus **7.4 kg** (built from straw and
 feces), the urine tank 2.9 kg, the food store 2.7 kg, the soil solution 2.1 kg (this is mid-crop 21, at
-day 60). A full crop needs ~11 kg in the plant at once; it gets ~6.9. The dose rule makes it worse (§9a's
+day 60). 2c's crop held ~11 kg at maturity (on a soil far richer than it needed); this one holds ~6.9. The dose rule makes it worse (§9a's
 flaw, now biting): uptake was capped with the window open and the tank able to cover the shortfall in
 **53–78 plant steps a crop**, and most of the rest of the capping falls after day 93, when the window
 shuts. The crew's nitrogen falls with the grain's: **34 g N/day** for four (the imported menu: 78 g), about
@@ -843,7 +857,9 @@ knowledge, not read here). From 4b on, protein (grain nitrogen) is reported besi
 **What it leaves.** The gas tanks work and do what the user asked: carbon filled the farm in one crop
 instead of eight years, the O₂ side needs nothing from outside, and the nitrogen pile of 3c and (a) is
 gone. Nitrogen now limits the farm. That is 4b's subject — a top-up dose with the user's fertilizer
-store behind the urine tank — and 4a sizes it: ~4 kg more nitrogen in the crop at its peak (6.9 against ~11.2 kg).
+store behind the urine tank — and 4a sizes it: the grain asks ~9.5 kg of nitrogen a crop and gets ~4.6.
+The top-up will dose: the soil's own release (the "rest", ~+3.8 kg a crop here, +4.7 in (a)) stays
+below the roots' uptake (~8 kg here, 12.5 in (a)), so the precondition §10 named is met.
 
 **Step 4b (c) and Step 4c (d) are planned after 4a is measured.** **The user, 2026-10-21, on where
 nitrogen comes from when imports stop: "Both, store first"** — a fertilizer store now (in 4b, so that

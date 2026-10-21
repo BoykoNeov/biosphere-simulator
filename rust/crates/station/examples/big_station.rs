@@ -980,6 +980,11 @@ struct Cycle {
     o2_tank_change: f64,
     n_stressed: u64,
     n_stress_min: f64,
+    /// Of `n_stressed`, the plant steps in the cycle's cold weeks (the scenario's `cold.days`), and
+    /// the lowest factor after them (a re-sown seedling keeps its parent's nitrogen concentration,
+    /// at the straw's residual after a harvest, so the cold weeks' lowest is the re-sow's).
+    n_stressed_cold: u64,
+    n_stress_min_warm: f64,
 }
 
 #[derive(Default)]
@@ -1451,6 +1456,11 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                 o2_tank_end: amount(e, O2_TANK),
                 o2_tank_change: amount(e, O2_TANK) - amount(s, O2_TANK),
                 n_stressed: m.n_stressed[w[0]..w[1]].iter().sum(),
+                n_stressed_cold: m.n_stressed[w[0]..w[1].min(w[0] + sc.cold.days)].iter().sum(),
+                n_stress_min_warm: m.n_stress_min[w[1].min(w[0] + sc.cold.days)..w[1]]
+                    .iter()
+                    .copied()
+                    .fold(1.0, f64::min),
                 n_stress_min: m.n_stress_min[w[0]..w[1]]
                     .iter()
                     .copied()
@@ -1627,9 +1637,9 @@ fn report(r: &Run) {
                 c.reach_ratio_min
             );
             println!(
-                "           nitrogen stress (factor below 1, photosynthesis cut) in {} plant steps, \
-                 lowest factor {:.3}",
-                c.n_stressed, c.n_stress_min
+                "           nitrogen stress (factor below 1, photosynthesis cut) in {} plant steps \
+                 ({} in the cold weeks), lowest factor {:.3} ({:.3} after the cold weeks)",
+                c.n_stressed, c.n_stressed_cold, c.n_stress_min, c.n_stress_min_warm
             );
         }
     }

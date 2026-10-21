@@ -93,7 +93,9 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   solution 54 g N/m². 4a, CO₂ tank charged with 60 000 mol and a real O₂ tank of 11 000: crop 1 at
   97.5 % (G1), imports 18 300 mol C and 13.75 kg N (G2), the O₂ tank mirrors the CO₂ tank to 1.0000 and
   never empties (G4), no O₂ bought. G3 missed: the CO₂ tank never ran short (lowest 2 364 mol on day
-  2939) — I over-counted the soil's gain. The farm is now nitrogen-limited (G5, stronger than said):
-  from crop 2 the soil solution sits at 0.12 g/m², stress in ~500 plant steps a crop, plant N 6.9 kg
-  against ~11.2; nitrogen parks in soil organic matter (7.4 kg) and the urine tank. The user chose a
-  fertilizer store first, a legume crop later.
+  2939) — I over-counted the soil's gain. The farm is now nitrogen-limited (G5): the soil solution
+  sits at 0.12 g/m²; ~500 stressed plant steps a crop in the growing weeks, factor ≥ 0.88 (a twin
+  checked; the printed 0.003 is a re-sown seedling's inherited residual) — little growth lost, but the
+  grain gets 48 % of USDA's nitrogen. Nitrogen parks in soil organic matter (7.4 kg) and the urine
+  tank. "Feeds the crew" counts calories, not protein. The user chose a fertilizer store first, a
+  legume crop later.
