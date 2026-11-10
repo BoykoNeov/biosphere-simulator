@@ -107,3 +107,12 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   stay open: ~1.9 kg fertilizer a crop goes on after day 93 while the urine tank gains ~2.3 kg a crop
   (39.5 kg by day 3000); and with no imports the CO₂ tank empties on day 1534 — the soil's gain and
   a 4.6 % food surplus — after which the farm is carbon-limited at 88–90 % and imports return.
+* **Step 4b-2 MEASURED 2026-11-10** (plan §10.5, §10.6; the user chose nitrogen first, urine at any
+  time, then carbon, then the marsh). `--urine-any-time` sets aside EcoSanRes' day-93 cutoff (a hygiene
+  rule; wheat is threshed and cooked — a reading, not a citation). The crop, diet and carbon books are
+  4b's to every printed digit (Q4); the CO₂ tank still empties on day 1534. Fertilizer over 3000 days
+  **43.7 → 13.2 kg**, urine tank at the end 39.5 → 9.0 kg. It does not reach zero: in crops 2–11 the
+  fertilizer equals, to the gram, the soil's nitrogen gain plus the uneaten food store's — the station
+  buys what those two sinks hold back. From crop 12, carbon-short, the crew eat the surplus down, the
+  fertilizer stops and the tank climbs again (+0.4 kg a crop). Q1/Q2 missed high: the soil ends every
+  crop above its level, so the last month's urine (1.81 kg) waits for the next sowing.

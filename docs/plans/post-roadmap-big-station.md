@@ -17,6 +17,10 @@ reserve and urine dosed from a tank; the farm fills by about a fifth of the gap 
 imports never stop, soil solution 54 g N/m². **4a MEASURED (§10.2):** gas tanks charged at the start —
 crop 1 at 97.5 %, no O₂ bought, imports 18 300 mol C — make the farm nitrogen-limited. Next: a top-up
 dose with a fertilizer store (4b), then drainage and a marsh (4c); ammonia dropped as a loss.
+**4b MEASURED (§10.4):** a top-up with fertilizer lifts protein 53 → 94 g per person-day, the crop's own
+ceiling; urine piles up and the CO₂ tank empties on day 1534. **4b-2 MEASURED (§10.6):** urine allowed
+after day 93 cuts the fertilizer 43.7 → 13.2 kg over 3000 days, not to zero — what it still buys is
+exactly what the soil and the uneaten food hold back. Next (the user's order): carbon, then the marsh.
 
 ## 1. Why this exists
 
@@ -1021,3 +1025,45 @@ late **should not stop the fertilizer** — I said it would (to the user, 2026-1
 
 **Runs (`sources\temp-evidence\urine-any-time\`):** `u197-3000.txt` (700 m², four crew, 4a's charges,
 fertilizer 100 kg, 1.97 g/m², `--urine-any-time`, 3000 days); `t197-560-recheck.txt`, 4b without it.
+
+### 10.6 Step 4b-2 — MEASURED (2026-11-10)
+
+Runs (`sources\temp-evidence\urine-any-time\`): `u197-3000.txt` (`--urine-any-time`, 3000 days, 21
+crops) and `t197-560-recheck.txt` (4b without the flag). Rationed 0 and 0; ~20 min for 3000 days.
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| Q1 | crop 1: fertilizer in the window ~3.4 kg; after day 93 urine instead; tank ends ~1.0 kg | in the window **3.430 kg** (as 4b); after it **1.320 kg** of fertilizer still (4b 2.181) beside 0.861 of urine; tank ends **2.347 kg** | missed (high) |
+| Q2 | from crop 2 the tank ends every crop under 1.5 kg; no pile | **1.810–1.811 kg** at every crop's end, crops 2–11 (34 days of inflow); from crop 12 it climbs again, **+0.4 kg a crop** to 5.55 by crop 21, 9.04 at day 3000 | missed (high), then see below |
+| Q3 | fertilizer ~1.3 kg in crop 2, 0.5–0.8 by crop 10; 10–20 kg to day 3000 | crop 2 **1.739**, crop 6 0.690, crop 10 **0.613**, crop 11 0.599, crop 12 0.223, **0 from crop 13 on**; **13.23 kg** in all (4b 43.7) | crop 2 high; rest held |
+| Q4 | the crop, diet and carbon books as 4b to every printed digit; CO₂ tank empties day 1534 | every line but the urine and fertilizer ones identical to `t197-3000.txt`, bar the books' ~1e-11 kg residual; CO₂ tank empty on **day 1534** | held |
+| Q5 | rationed 0 and 0; books close; `--control`; 4b unchanged without the flag | all held; the twin is **byte for byte** `t197-560.txt` | held |
+
+**Why Q1 and Q2 missed: the soil ends every crop above its level.** The soil solution closes each crop
+at **3.0–3.3 g/m²** against the 1.97 top-up level (its own turnover, +4.4 kg a crop, outruns the
+late-season uptake), so in about the last month no dose is drawn and that month's urine waits — the
+same 1.81 kg, 34 days of inflow, at every crop's end. Inside the season the tank does run dry after day
+93 (the late peak of uptake), and the fertilizer covers that gap. I took the end-of-crop tank as what
+the season had left; it is what the last month made.
+
+**The fertilizer is exactly the station's two nitrogen sinks.** In crops 2–11 each crop's fertilizer
+equals the soil's nitrogen gain plus the food store's, to the gram: crop 6 **0.302 + 0.388 = 0.690**
+(fertilizer 0.690), crop 10 **0.224 + 0.389 = 0.613** (0.613). The soil's litter and humus keep
+building, and the 4.6 % of the grain the crew do not eat piles up with its nitrogen in the food store
+(4b's carbon finding, §10.4) — so the station buys exactly what those two hold back. The urine itself
+is now all used: urine in = urine dosed in crops 3–11 (7.398 / 7.397 kg in crop 4).
+
+**Then carbon decides nitrogen too.** From crop 11 the CO₂ tank is empty, the crop is smaller, and the
+crew eat the food surplus down (food store nitrogen −0.13 to −0.62 kg a crop, crops 12–18): that
+nitrogen comes back through their urine (in: 7.4 → 8.2–8.3 kg a crop), the fertilizer stops (0 from
+crop 13), and the tank climbs again. From crop 19 imports return (calories 95–98 % home-grown) and bring their own nitrogen.
+So the loop closes only while the food store neither grows nor shrinks — the nitrogen books follow the
+carbon books, and the carbon fix (next) decides where the nitrogen settles.
+
+**Hygiene, as set aside.** Urine now goes on up to maturity, the last month's urine waits ~34 days to
+the next sowing, and urine made in the season is used within days — shorter than EcoSanRes' one to six
+months' storage (as already in 3c, §9a). Lab only.
+
+**Where 4b-2 leaves the station (day 3000).** Nitrogen: fertilizer left **86.8 of 100 kg** (4b 56.3),
+urine tank **9.0 kg** (4b 39.5); soil solution 4.4, litter and humus 8.4, food store 4.9 — as 4b. Carbon
+as 4b: CO₂ tank empty since day 1534, soil 50 600 mol. Protein 94 g per person-day, then ~104.
