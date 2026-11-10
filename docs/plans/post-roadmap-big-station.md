@@ -981,3 +981,43 @@ fertilizer draw after the soil's first fill and empty the pile.
 **Where 4b leaves the station (day 3000, 1.97 g/m²).** Nitrogen: soil solution 4.4 kg, litter and humus
 8.4, food store 4.9, urine tank 39.5, fertilizer left 56.3 of 100. Carbon: soil 50 600 mol, CO₂ tank
 empty since day 1534. Calories 95 % home-grown in the last crops, protein ~104 g.
+
+### 10.5 Step 4b-2 — urine allowed after day 93 (lab, `--urine-any-time`)
+
+**The user, 2026-11-10: nitrogen first, urine allowed at any time** (my recommendation, over the
+nitrification step; then carbon, then the marsh — a marsh stores carbon in its soil, so built before a
+carbon fix it would deepen the CO₂ shortage).
+
+**The rule.** 4b's top-up unchanged — the soil's solution nitrogen filled to `--soil-n-level` each plant
+step, urine first, fertilizer for the rest — except that urine may go on **at any time from sowing to
+maturity**, not only to day 93. `--urine-any-time` needs `--fertilizer` and `--soil-n-level`; without
+it 4b runs unchanged. The fertilizer store stays as the backstop: its draw per crop is the readout.
+- **⚠ What this sets aside.** EcoSanRes Fact Sheet 6 asks for urine *"up until two-thirds of the period
+  between sowing and harvest"* and *"the last application … at least one month prior to harvesting"*.
+  Both are hygiene rules for crops eaten raw or soon; wheat grain is threshed, dried and cooked. That is
+  my reading, not a citation, and the run is lab only.
+- **Readouts.** Day 93 stays the label every readout splits on (fertilizer and now urine, "in the
+  window" and "after it"), so the run reads against 4b line for line. New: urine dosed after day 93.
+
+**Predictions (written before the runs; from 4b's books, `t197-3000.txt`).** In 4b each crop from crop 2
+on the crew made ~7.40 kg of urine nitrogen and the top-up put on ~8.1 kg (urine ~6.2 + fertilizer ~1.9):
+crop 2 9.69, crop 3 8.53, crop 4 8.22, crop 10 7.99. The top-up is more than the urine, because ~0.6–0.7
+kg a crop goes into the soil's growing litter and humus and the uneaten food surplus. So letting urine on
+late **should not stop the fertilizer** — I said it would (to the user, 2026-11-10); the books say not.
+- **Q1 — crop 1.** Fertilizer inside the window as 4b (~3.4 kg; the tank starts empty); after day 93
+  urine instead of 4b's 2.18 kg of fertilizer, so the tank ends crop 1 at **~1.0 kg** (4b: 3.21).
+- **Q2 — the tank does not pile up.** From crop 2 the tank is emptied within each crop and ends every
+  crop under **1.5 kg** (4b: 2.9 → 39.5 kg by day 3000).
+- **Q3 — fertilizer falls, not to zero.** After crop 1 it comes back once the tank runs dry: **~1.3 kg**
+  in crop 2, falling to **0.5–0.8 kg** a crop by crop 10 (4b: 1.90–1.99). To day 3000 **10–20 kg** in all
+  (4b: 43.7). Crops 11–21 are a guess: carbon-short, the crew eat the food surplus down and imports
+  return (urine in rose to 7.9–8.2 kg in 4b), which may cut the draw further.
+- **Q4 — the crop is 4b's.** The top-up fills the same deficit whatever the source while the fertilizer
+  store lasts, so the soil solution, the plant, the grain, the crew's diet and the carbon books match 4b
+  to every printed digit (the split of a deficit into urine and fertilizer may move a last bit); the CO₂
+  tank still empties on **day 1534**.
+- **Q5.** Rationed 0 and 0; nitrogen books close every crop; `--control` byte for byte; 4b without the
+  new flag reproduces `t197-560.txt` but for the new lines.
+
+**Runs (`sources\temp-evidence\urine-any-time\`):** `u197-3000.txt` (700 m², four crew, 4a's charges,
+fertilizer 100 kg, 1.97 g/m², `--urine-any-time`, 3000 days); `t197-560-recheck.txt`, 4b without it.
