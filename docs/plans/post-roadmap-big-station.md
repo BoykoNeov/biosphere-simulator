@@ -19,8 +19,9 @@ crop 1 at 97.5 %, no O₂ bought, imports 18 300 mol C — make the farm nitroge
 dose with a fertilizer store (4b), then drainage and a marsh (4c); ammonia dropped as a loss.
 **4b MEASURED (§10.4):** a top-up with fertilizer lifts protein 53 → 94 g per person-day, the crop's own
 ceiling; urine piles up and the CO₂ tank empties on day 1534. **4b-2 MEASURED (§10.6):** urine allowed
-after day 93 cuts the fertilizer 43.7 → 13.2 kg over 3000 days, not to zero — what it still buys is
-exactly what the soil and the uneaten food hold back. Next (the user's order): carbon, then the marsh.
+after day 93 cuts the fertilizer 43.7 → 13.2 kg over 3000 days, not to zero; the crop is unchanged.
+The station's own urine is all used; the books show the rest pays for what the soil and the uneaten food
+hold back. Next (the user's order): carbon, then the marsh.
 
 ## 1. Why this exists
 
@@ -1041,17 +1042,20 @@ crops) and `t197-560-recheck.txt` (4b without the flag). Rationed 0 and 0; ~20 m
 
 **Why Q1 and Q2 missed: the soil ends every crop above its level.** The soil solution closes each crop
 at **3.0–3.3 g/m²** against the 1.97 top-up level (its own turnover, +4.4 kg a crop, outruns the
-late-season uptake), so in about the last month no dose is drawn and that month's urine waits — the
-same 1.81 kg, 34 days of inflow, at every crop's end. Inside the season the tank does run dry after day
-93 (the late peak of uptake), and the fertilizer covers that gap. I took the end-of-crop tank as what
-the season had left; it is what the last month made.
+late-season uptake), so late in the crop no dose is drawn and urine collects: the tank ends every crop
+at the same 1.81 kg, 34 days of inflow (the run does not print when the last draw falls). Inside the
+season the tank does run dry after day 93 — fertilizer is drawn only when it is empty — and the
+fertilizer covers that gap. I took the end-of-crop tank as what the season had left; it is what
+collected after the dose stopped drawing.
 
-**The fertilizer is exactly the station's two nitrogen sinks.** In crops 2–11 each crop's fertilizer
-equals the soil's nitrogen gain plus the food store's, to the gram: crop 6 **0.302 + 0.388 = 0.690**
-(fertilizer 0.690), crop 10 **0.224 + 0.389 = 0.613** (0.613). The soil's litter and humus keep
-building, and the 4.6 % of the grain the crew do not eat piles up with its nitrogen in the food store
-(4b's carbon finding, §10.4) — so the station buys exactly what those two hold back. The urine itself
-is now all used: urine in = urine dosed in crops 3–11 (7.398 / 7.397 kg in crop 4).
+**What the fertilizer still pays for (the books, not a new measurement — advisor, 2026-11-10).** The
+station's own urine is now all used: urine in = urine dosed in crops 3–11 (7.398 / 7.397 kg in crop 4),
+the tank flat at 1.81 kg, nothing imported. With those three fixed, the nitrogen books leave the
+fertilizer no other place to go than the two stocks still growing, so it equals their gain by
+construction: crop 6 soil **+0.302** and food store **+0.388** against **0.690** of fertilizer, crop 10
++0.224 and +0.389 against 0.613. What the books do show is which two stocks those are: the soil's
+litter and humus, still building, and the 4.6 % of the grain the crew do not eat, piling up with its
+nitrogen in the food store (4b's carbon finding, §10.4). The station buys what those two hold back.
 
 **Then carbon decides nitrogen too.** From crop 11 the CO₂ tank is empty, the crop is smaller, and the
 crew eat the food surplus down (food store nitrogen −0.13 to −0.62 kg a crop, crops 12–18): that
@@ -1060,10 +1064,24 @@ crop 13), and the tank climbs again. From crop 19 imports return (calories 95–
 So the loop closes only while the food store neither grows nor shrinks — the nitrogen books follow the
 carbon books, and the carbon fix (next) decides where the nitrogen settles.
 
-**Hygiene, as set aside.** Urine now goes on up to maturity, the last month's urine waits ~34 days to
-the next sowing, and urine made in the season is used within days — shorter than EcoSanRes' one to six
-months' storage (as already in 3c, §9a). Lab only.
+**Hygiene, as set aside.** Urine now goes on up to maturity. How long it is stored was not measured:
+the tank holds 34 days' inflow at each crop's end, and the next crop's first weeks draw nothing (the
+soil starts each crop at 3.0–3.3 g/m², above its level; the run's last 60 days, crop 22's cold weeks,
+dosed 0), so late urine may wait into the next crop's growing weeks — nearer EcoSanRes' one to six
+months than the in-window dosing of 3c (§9a), not further. A per-batch age is not modelled. Lab only.
 
 **Where 4b-2 leaves the station (day 3000).** Nitrogen: fertilizer left **86.8 of 100 kg** (4b 56.3),
 urine tank **9.0 kg** (4b 39.5); soil solution 4.4, litter and humus 8.4, food store 4.9 — as 4b. Carbon
 as 4b: CO₂ tank empty since day 1534, soil 50 600 mol. Protein 94 g per person-day, then ~104.
+
+**Next (the user's choice): the carbon fix, and what each option does to the nitrogen just closed.**
+- **(a) A smaller farm, ~670 m²** (700 ÷ 1.046, §10.4): grows the diet exactly, so no surplus piles up
+  in the food store — that sink leaves both the carbon and the nitrogen books. The soil's build-up
+  stays, so the CO₂ tank still falls, only more slowly, and some fertilizer still pays for the soil.
+- **(b) Wastes back to CO₂, as CEEF did.** Tako et al. (read on the page, 2026-11-10): CEEF processed
+  *"feces and urine of crew and goats and inedible part of crops"* by *"carbonization and
+  incineration"*, recovering 245 mol C of CO₂ in ten days (877 supplied to the plants), and its Fig. 1
+  draws an *"Additive nutrient solution"* into the crops' nutrients. The paper reports no nitrogen
+  figure for the processors. Burning organic matter generally sends much of its nitrogen off as gas
+  (general knowledge, not from this paper — to be cited before it is built), so (b) may reopen the
+  nitrogen books unless that nitrogen is caught.

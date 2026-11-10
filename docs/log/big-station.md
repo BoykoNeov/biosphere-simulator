@@ -112,7 +112,7 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   rule; wheat is threshed and cooked — a reading, not a citation). The crop, diet and carbon books are
   4b's to every printed digit (Q4); the CO₂ tank still empties on day 1534. Fertilizer over 3000 days
   **43.7 → 13.2 kg**, urine tank at the end 39.5 → 9.0 kg. It does not reach zero: in crops 2–11 the
-  fertilizer equals, to the gram, the soil's nitrogen gain plus the uneaten food store's — the station
-  buys what those two sinks hold back. From crop 12, carbon-short, the crew eat the surplus down, the
+  urine is all used, and the books show the fertilizer pays for the two stocks still growing, the
+  soil's organic matter and the uneaten food store (equal by construction, not a measurement). From crop 12, carbon-short, the crew eat the surplus down, the
   fertilizer stops and the tank climbs again (+0.4 kg a crop). Q1/Q2 missed high: the soil ends every
-  crop above its level, so the last month's urine (1.81 kg) waits for the next sowing.
+  crop above its level, so late urine (1.81 kg at each crop's end) collects; storage time unmeasured.
