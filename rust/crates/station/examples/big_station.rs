@@ -68,7 +68,9 @@
 //! the roots stay in the soil), the crew's feces and, at each harvest, the food store above `D`
 //! days of the crew's food go to a burner ([`Burner`]) that returns carbon × (1 − char share) to the
 //! CO₂ tank, one O₂ from the O₂ tank for each, and sends the nitrogen × lost to N₂ (BVAD Eq. 4-1),
-//! the rest to the urine tank. All three are inputs, with no default.
+//! the rest to the urine tank. All three are inputs, with no default. `--burn-co2-leak F` (plan
+//! §10.9; optional, absent = leak-free) sends carbon × F of the burned carbon outside as CO₂, taken
+//! from the tank's share, its O₂ still drawn.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -140,7 +142,7 @@ use station::sealed::{
     sealed_reset_hook,
 };
 use station::sowing::twin;
-use station::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
+use station::stocks::{co2_composition, gas_boundary, gas_pool, o2_composition, simple_pool};
 use station::water_reserve::working_level;
 
 /// The chamber's height (m) in `chamber.yaml`'s wall-area rule: BVAD's shoot + root zone.
@@ -300,15 +302,22 @@ const CHAR: &str = "lab.char";
 const N2_GAS: &str = "lab.n2_gas";
 /// Step 4c's burner flow id.
 const BURNER: &str = "lab.burner";
+/// Step 4c's leaked CO₂ (mol C), outside the station: the burner's carbon that escapes as CO₂
+/// before it reaches the tank (`--burn-co2-leak`; Tako et al. Fig. 2(b)'s "CO₂ leak", an
+/// ESTIMATED remainder, plan §10.9).
+const BURNER_LEAK: &str = "boundary.burner_co2_leak";
 
 /// Step 4c's inputs, none with a default: the share of the burned carbon kept as char, the share of
 /// the burned nitrogen lost as N₂ (the rest caught into the urine tank), and the food reserve in
-/// days of the crew's food.
+/// days of the crew's food. The leak (`--burn-co2-leak`, plan §10.9) is the one optional input:
+/// absent, the burner is leak-free (the DESIGN of §10.7) and builds exactly as before it existed.
 #[derive(Debug, Clone, Copy)]
 struct Burn {
     char_share: f64,
     n_lost: f64,
     reserve_days: f64,
+    /// The share of the burned carbon that escapes as CO₂ to [`BURNER_LEAK`], not to the tank.
+    co2_leak: Option<f64>,
 }
 
 /// CARBON + OXYGEN + NITROGEN `lab.burner_feed + lab.o2_tank → lab.co2_store + lab.char`, Step 4c:
@@ -339,6 +348,7 @@ impl Flow for Burner {
         let Burn {
             char_share,
             n_lost,
+            co2_leak,
             ..
         } = self.burn;
         let feed = amount(snapshot, BURNER_FEED);
@@ -351,15 +361,31 @@ impl Flow for Burner {
         let share = if feed > 0.0 { burned / feed } else { 1.0 };
         let n = amount(snapshot, BURNER_FEED_N) * share;
         let co2 = burned * (1.0 - char_share);
-        FlowResult::new(vec![
-            Leg::new(BURNER_FEED.to_string(), -burned)?,
-            Leg::new(CO2_STORE.to_string(), co2)?,
-            Leg::new(CHAR.to_string(), burned - co2)?,
-            Leg::new(O2_TANK.to_string(), -co2)?,
+        let mut legs = match co2_leak {
+            // Every carbon burned to gas takes its O₂, the leaked as well as the returned.
+            Some(leak) => {
+                let leaked = burned * leak;
+                vec![
+                    Leg::new(BURNER_FEED.to_string(), -burned)?,
+                    Leg::new(CO2_STORE.to_string(), co2 - leaked)?,
+                    Leg::new(BURNER_LEAK.to_string(), leaked)?,
+                    Leg::new(CHAR.to_string(), burned - co2)?,
+                    Leg::new(O2_TANK.to_string(), -co2)?,
+                ]
+            }
+            None => vec![
+                Leg::new(BURNER_FEED.to_string(), -burned)?,
+                Leg::new(CO2_STORE.to_string(), co2)?,
+                Leg::new(CHAR.to_string(), burned - co2)?,
+                Leg::new(O2_TANK.to_string(), -co2)?,
+            ],
+        };
+        legs.extend([
             Leg::new(BURNER_FEED_N.to_string(), -n)?,
             Leg::new(N2_GAS.to_string(), n * n_lost)?,
             Leg::new(URINE_TANK.to_string(), n - n * n_lost)?,
-        ])
+        ]);
+        FlowResult::new(legs)
     }
 }
 
@@ -413,6 +439,10 @@ fn with_burner(state: State, fast: Registry, burn: Burn) -> (State, Registry) {
         simple_pool(N2_GAS, "lab", Quantity::Nitrogen, 0.0),
     ] {
         let s = s.expect("Step 4c stock");
+        stocks.insert(s.id.clone(), s);
+    }
+    if burn.co2_leak.is_some() {
+        let s = gas_boundary(BURNER_LEAK, Quantity::Carbon, co2_composition(), false).expect("leak");
         stocks.insert(s.id.clone(), s);
     }
     let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
@@ -1291,6 +1321,8 @@ struct Cycle {
     feces_n: f64,
     burned_co2: f64,
     char_end: f64,
+    /// Step 4c, `--burn-co2-leak`: the CO₂ the burner leaked outside over the cycle (mol C).
+    leaked: f64,
     n_to_gas: f64,
     n_caught: f64,
 }
@@ -1868,6 +1900,11 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                     - amount(s, CHAR),
                 burned_co2: m.burned_co2[w[0]..w[1]].iter().sum(),
                 char_end: amount(e, CHAR),
+                leaked: if burn.is_some_and(|b| b.co2_leak.is_some()) {
+                    amount(e, BURNER_LEAK) - amount(s, BURNER_LEAK)
+                } else {
+                    0.0
+                },
                 n_to_gas: amount(e, N2_GAS) - amount(s, N2_GAS),
                 n_caught: m.burn_n_caught[w[0]..w[1]].iter().sum(),
                 feces_to_soil: if food_loop {
@@ -1956,7 +1993,8 @@ fn report(r: &Run) {
             c.soil_end,
             net - c.crop_change - c.soil_change - c.burner_change - c.harvest_booked
                 + c.feces_to_soil
-                + c.food_burned_booked,
+                + c.food_burned_booked
+                - c.leaked,
             100.0 * c.plant_c_max / c.exhaled
         );
         if o.co2_store {
@@ -2006,6 +2044,12 @@ fn report(r: &Run) {
                 b.char_share,
                 b.n_lost
             );
+            if let Some(leak) = b.co2_leak {
+                println!(
+                    "           burner leak: {:.1} mol C out as CO₂ (share {leak})",
+                    c.leaked
+                );
+            }
         }
         if o.with_nitrogen {
             let h = c.harvest;
@@ -2176,6 +2220,12 @@ fn report(r: &Run) {
                 amount(e, N2_GAS),
                 r.cycles.iter().map(|c| c.food_burned_booked).sum::<f64>()
             );
+            if o.burn.is_some_and(|b| b.co2_leak.is_some()) {
+                println!(
+                    "  burner leak over the run: {:.1} mol C out as CO₂",
+                    amount(e, BURNER_LEAK)
+                );
+            }
         }
     }
     println!(
@@ -2327,6 +2377,15 @@ fn main() {
                 char_share: need("--burn-char-share"),
                 n_lost: need("--burn-n-lost"),
                 reserve_days: need("--food-reserve-days"),
+                co2_leak: arg("--burn-co2-leak").map(|x| {
+                    let leak: f64 = x.parse().expect("--burn-co2-leak F");
+                    let char_share = need("--burn-char-share");
+                    assert!(
+                        (0.0..=1.0 - char_share).contains(&leak),
+                        "--burn-co2-leak F: 0 to 1 − char share"
+                    );
+                    leak
+                }),
             }
         }),
     };
