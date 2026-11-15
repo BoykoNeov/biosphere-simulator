@@ -1191,7 +1191,7 @@ tank down — at char 0.064 it would first have run dry at **crop 13's** peak (d
 here 37 565 < 38 000); at char 0 it would have just held (38 693 − 38 000 = 693, about a week of the
 crew's breath at the low point).
 
-**⚠ The burner here is leak-free, CEEF's was not (a side agent, 2026-11-15).** Of the 51.9 mol C/day
+**⚠ The burner here is leak-free, CEEF's was not (a side agent, 2026-11-15). ⚠ CORRECTED in §10.9: the 45 % is an estimated remainder (Fig. 2(b), in parentheses); Fig. 3 measured ~86 % back.** Of the 51.9 mol C/day
 CEEF processed, 25.1 came back as CO₂ (**48 %**), 23.5 leaked (**45 %**) and 3.3 stayed (6.4 %). I set
 the leak aside as a fault, on the paper's own words (*"will substantially decrease, if CO2 leak from
 the waste processing system is suppressed"*), without putting it to the user. At 45 % of ~13 000 mol
@@ -1228,3 +1228,130 @@ home-grown from crop 2, protein 94 g.
   "later" of §10.2), or keep buying ~8 kg a year.
 - **The marsh** (§10's (d)), last of the user's order: it removes nitrogen too, so it is best placed
   after the nitrogen choice.
+
+### 10.9 Step 4c-2 — what CEEF measured, read again; a leak put in as an input (lab, `--burn-co2-leak`)
+
+**The user, 2026-11-15: "work on those"** — the three items §10.8 left: the leak, the char, the
+burned nitrogen. My recommendation, which the user's message carried, was to run CEEF's 45 % leak once
+to show its cost while keeping leak-free as the design.
+
+**⚠ Correction to §10.8 and commit `2f3c047`: "CEEF's burner leaked 45 %" overstates the page (the
+advisor, 2026-11-15, checked against Figs. 2(b) and 3).**
+- In Fig. 2(b) the caption marks values *in parentheses* as **estimated**. "CO₂ leak (23.5 mol C d⁻¹)"
+  is in parentheses, and so are the inputs (feces 19.3 and 5.9, urine 2.9, waste crop biomass 33.3).
+  The two outputs that are *not* — CO₂ back 25.1, deposition 3.3 — are the measured ones. The text calls
+  the leak *"Estimated leak amount"* and finds it *"comparable to"* the outside CO₂ addition (23.5
+  against 23.5). So the 45 % is the gap between estimated inputs and measured outputs: a remainder, which
+  is why §10.7's sum "closed on the figure".
+- Fig. 3 covers the same trouble-free days (Dec 2–11) with measured curves: *"Carbon in processed waste"*
+  ends at **~285 mol**, *"CO₂ recovered from the waste"* at **245** (the text's number). So **~86 %** of
+  the carbon the processor measured came back as CO₂; the ~40 mol gap is the deposition (3.3 × ~10 days)
+  and matches the **38 mol** *"released out of the system during cleaning of the carbonization system"*
+  on Dec 6. On the measured stream almost nothing leaked beyond the char.
+- What reached the processor (~28.4 mol C d⁻¹) is about the excreta alone (19.3 + 5.9 + 2.9 + 1.3 =
+  29.4); the estimated "leak" is about the size of the crop waste, which Fig. 1 sends to a *second*
+  carbonizer on the plant side. The missing carbon may belong to that line or to the estimates, not to
+  a burner like ours.
+- The text's whole-station check over the same days: CO₂ to the crops 877 mol, from the crew's room 543,
+  from the waste 245 — *"approximately 90 % … recovered"*; the 89 mol missing is ~10 % of the crops'
+  CO₂, *"nearly half"* of it the cleaning release.
+
+**The char, read (item 2).** Fig. 1 draws both carbonizers' *"Carbon with minerals"* into the
+**incinerator**, whose outputs are ash and gas: by design the char is burned. In the 2007 run it built
+up in the carbonizer and was **dumped outside at cleaning** (the 38 mol). So the page supports both:
+**0** (the station as drawn) and **0.064** (what the experiment did; on the measured stream it is
+3.3 / 28.4 = **0.116** of what the processor received). The two runs of §10.8 bracket it; no new run.
+
+**The build.** `--burn-co2-leak F` (optional; absent = leak-free, the §10.7 DESIGN, building exactly as
+before): carbon × F of the burned carbon goes as CO₂ to an outside stock, `boundary.burner_co2_leak`,
+taken from the tank's share; its O₂ is still drawn (it was burned). Must have F ≤ 1 − char share.
+
+**Run**: `l45-3000.txt` — §10.8's `b-3000.txt` (char 0.064) with F = **0.45**, labelled an **upper bound
+from an estimated remainder**, not CEEF's leak. And `b-3000-recheck.txt`: the new build without the flag.
+
+**Predictions (written before the runs; from `b-3000.txt`'s books).** The burner takes ~13 000 mol C a
+crop (straw ~12 250, feces ~740).
+- **L1 — the leak**: ~0.45 × 13 000 ≈ **5 850 mol C a crop** out; the tank falls by that much more than
+  in `b-3000.txt` (1 842 at crop 20) — **~7 000–9 000 a crop**.
+- **L2 — the tank runs dry** between **crop 8 and crop 12** (days ~1100–1700), against never in
+  `b-3000.txt`; after that the injector is short and the crop shrinks as 4b-2's did (grain to ~88–90 %
+  of full, falling further as the leak keeps draining what the crew breathe out).
+- **L3 — oxygen**: until the tank runs short the O₂ tank follows `b-3000.txt` (the burner draws the same
+  O₂; the crop fixes the same carbon); its change = −(CO₂ tank change + leaked) within 0.1 % each crop.
+  B3's equality (O₂ change = −CO₂ change) **fails by design**.
+- **L4** — rationed 0 and 0; carbon, oxygen and nitrogen books close (the leak in the carbon residual);
+  nitrogen as `b-3000.txt` until the crop shrinks; `b-3000-recheck.txt` equals `b-3000.txt` byte for byte.
+
+**The burned nitrogen (item 3) — the user, 2026-11-15: "1, 2 in the future"**: run the catalyst share now,
+a legume (a nitrogen-fixing species, as CEEF's soybean) as a later step of its own. **The source:
+Takahashi & Ohya 1986, *Wet-oxidation waste management system for CELSS*** (NASA CELSS conference,
+NTRS 19860010442; `sources\Takahashi_Ohya_1986_wet_oxidation_CELSS_NTRS_19860010442.pdf`), read on the
+page: without a catalyst the nitrogen stays in the liquid as **ammonia** (Fig. 2; it falls only above
+260 °C, *"due to either the denitrification or NOx formation"*) and the carbon does not burn out (acetic
+acid remains); with catalysts, *"When a Pt or Pd catalyst is used, nitrogen in the liquid is denitrified
+at 100 per cent. When a Ru or Rh catalyst is used, a half of nitrogen in the liquid is denitrified. The
+rest remains in the liquid as a nitrate when Ru is used and as ammonia when Rh is."* So **Ru: lost
+0.5**, the rest as nitrate, the form the paper calls plant-usable. ⚠ A wet oxidizer is not CEEF's dry
+burner; the run keeps the burner's carbon side (char 0.064, no leak) and changes only the nitrogen —
+a lab mix of two machines, stated, not a design.
+
+**Run**: `n50-3000.txt` — `b-3000.txt` with `--burn-n-lost 0.5`.
+
+**Predictions (written before the run).**
+- **N1** — to N₂ **~1.29 kg a crop** (half of 2.57), the other ~1.29 caught into the urine tank.
+- **N2** — the fertilizer draw falls by about the caught amount: **~1.7–2.0 kg a crop** (b-3000: 3.0–3.3),
+  **~35–42 kg** in all (b-3000: 66.5). Not to 0: the soil and the uneaten-food sinks of 4b-2 remain.
+- **N3** — the crop, grain N (87 % of USDA's) and protein (~94 g) as `b-3000.txt` (the top-up fills the
+  same deficit from a different store); carbon lines equal `b-3000.txt`'s to the printed digit or close.
+- **N4** — rationed 0 and 0; books close.
+
+### 10.10 Step 4c-2 — MEASURED (2026-11-15)
+
+Runs (`sources\temp-evidence\burn-wastes\`), all `b-3000.txt`'s settings (98 000 mol CO₂, 11 000 O₂,
+fertilizer 300 kg, 1.97 g/m², reserve 365 days, 700 m², four crew, 3000 days) with one change each:
+`l45-3000.txt` (leak 0.45), `b-char116-3000.txt` (char 0.116), `n50-3000.txt` (N lost 0.5), and
+`b-3000-recheck.txt` (the new build, no leak flag).
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| L1 | ~5 850 mol C a crop leaks; the tank falls ~7 000–9 000 a crop | **5 840–5 849** a crop while the crop is full; the tank fell 12 464, 9 522, 8 702 … **8 206** (crop 7) | held |
+| L2 | the tank runs dry crop 8–12; the crop then shrinks to ~88–90 % | dry on **day 1257** (crop 8); grain 21.9 → 14.4 (crop 9) → **12.7 mol C/m²**, **58 %** of full; calories home-grown 100 → **~61 %**, imported food back (20.5 % of all eaten, 63 816 mol C) | held (date); **missed** (size: 58 %, not 88–90 %) |
+| L3 | O₂ tank follows `b-3000.txt` until the CO₂ tank is short; O₂ change = −(CO₂ change + leaked) | equal to the printed digit every crop while both tanks have gas (crop 2: +3 677.2 = −(−9 522.4 + 5 845.2)). Then the **O₂ tank drains ~4 700 a crop and empties: within days from crop 18, for good on day 2443**; the crew's room falls to **0.00 % O₂** | held, and **a loss not predicted** |
+| L4 | rationed 0; books close; recheck byte for byte | recheck **byte for byte** ✓. Rationed **(3 192, 207 732)** steps; the printed carbon residual is 0.000 to crop 17, then **+1 197, +3 096, +4 690, +5 124** — once the O₂ tank empties within the day. The engine's own conservation check held (the run finished); the printed books' gap under rationing is **not traced** | **missed** |
+| N1 | ~1.29 kg N a crop to N₂ | **27.3 kg** over the run (half of 54.7) | held |
+| N2 | fertilizer ~1.7–2.0 kg a crop, 35–42 kg in all | **40.3 kg** in all (~1.9 a crop; `b-3000.txt` 66.5); the urine tank ends 6.1 kg (4.97) | held |
+| N3 | crop, grain N, protein as `b-3000.txt`; carbon lines equal | every carbon line equal to `b-3000.txt`'s; protein **93.8 g**, grain 87 % of USDA's N | held |
+| N4 | rationed 0; books close | 0 and 0; residuals 0.000 | held |
+
+**The leak takes oxygen, not only carbon — the finding the predictions missed.** Every carbon that
+leaves as CO₂ takes its two oxygen atoms. While the CO₂ tank has gas, the O₂ the burner draws is made
+back by the crop fixing that CO₂, so the O₂ tank holds. Once the CO₂ tank is dry the crop fixes only
+what the crew breathe and the burner returns, but the burner still draws one O₂ for every carbon it
+burns, and 45 % of that leaves. The O₂ tank had grown to ~62 000 mol by crop 8; it drained ~4 700 a
+crop and emptied, and the crew's room went to no oxygen. A leak of this size is not a slower carbon
+loss; **it ends the station in about seven years** (98 000 mol CO₂ and 11 000 O₂ charged). Whether CEEF
+had a leak this large is doubtful (§10.9's correction); the run is the upper bound.
+
+**Why L2 missed: the crop is not short by a margin, it is short by the leak.** 4b-2's tank ran dry with
+the farm needing a little more than the crew breathe; here 45 % of the straw's carbon leaves for good,
+so the crop gets the crew's breath plus ~5 100 a crop back from the burner — about 58 % of a full crop.
+
+**The char at 0.116 (CEEF's measured stream).** The tank never ran short (0 lit minutes), the crop full
+size, every nitrogen and crop line as `b-3000.txt`. Lowest **8 460 mol on day 2939** (0.064: 22 012;
+0: 38 693); fall at crop 20 **2 518** (0.064: 1 842; 0: 1 010). So at 0.116 the 98 000 charge lasts the
+eight years with ~3 crops to spare; at 0 it would hold indefinitely once the food store reaches its
+year.
+
+**The nitrogen at Takahashi's Ru catalyst (lost 0.5).** Exactly the predicted half: 27.3 kg to N₂, the
+fertilizer down to 40.3 kg over eight years (~5 kg a year), the urine tank catching the rest; the crop,
+diet and carbon untouched. Not zero: the soil and the uneaten food still hold nitrogen back (4b-2's two
+sinks), and half still goes to gas. The legume (the user's "2 in the future") would replace the rest.
+
+**Where this leaves the choices (the user's).**
+- **Leak**: keep leak-free as the design (the user's standing choice); the 0.45 run is the upper bound
+  and its lesson is the oxygen. A measured leak, if one is wanted, is ≤ ~15 % of the waste carbon on
+  Fig. 3's days (the 51 unexplained mol of 89, against ~336 processed), not run.
+- **Char**: 0 (incinerated, as Fig. 1 draws it) or 0.116 (dumped at cleaning, as CEEF's 2007 run did,
+  measured on what reached the processor). 0.064 is neither: it divided by an estimated input.
+- **Nitrogen**: the catalyst share is ready (`--burn-n-lost 0.5`); the legume is a future step.
+- **Not traced**: the printed carbon residual under heavy rationing (L4).

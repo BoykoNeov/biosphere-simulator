@@ -128,3 +128,11 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   crop) — whether CEEF's deposition is a lasting sink is unread. Nitrogen opens: 2.6 kg a crop to N₂,
   fertilizer ~3.0 kg a crop (66.5 kg in all). The food rule fires only in a 5-day twin (the year is
   not reached in eight years).
+* **Step 4c-2 MEASURED 2026-11-15** (plan §10.9, §10.10; the user: "work on those" — the leak, the
+  char, the burned nitrogen). ⚠ Correction: CEEF's "45 % leak" (Tako et al. Fig. 2(b)) is an
+  ESTIMATED remainder; Fig. 3's measured curves return ~86 % of what reached the processor, the rest
+  the deposition dumped at cleaning (38 mol). `--burn-co2-leak 0.45` as an upper bound: the CO₂ tank
+  dry day 1257, the crop at 58 %, and — not predicted — the O₂ tank empties (day 2443): every leaked
+  carbon takes two oxygen atoms; the room reaches 0 % O₂. Char 0.116 (the measured stream): never
+  short, lowest 8 460 mol. Nitrogen at Takahashi & Ohya 1986's Ru catalyst (half denitrified):
+  fertilizer 66.5 → 40.3 kg over 3000 days, nothing else moves; a legume later (the user).
