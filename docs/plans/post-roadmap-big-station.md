@@ -1584,7 +1584,10 @@ the same step — no second copy of a water rule:
 build) against `ms-recheck-3000.txt` (same build, no `--leaching`). `ms-recheck` matches §10.12's `ms-3000.txt`
 line for line apart from the whitespace fix in the marsh strings (`diff -w` empty), so the new plumbing is
 inert when off. `ml-recheck` matches the first `--leaching` run `ml-3000.txt` the same way (only the run-level
-line's spacing was fixed between them).
+line's spacing was fixed between them). The full command (`big_station` example, release build):
+`--co2-charge 98000 --o2-charge 11000 --fertilizer 300 --soil-n-level 1.97 --urine-any-time --burn-wastes
+--burn-char-share 0.116 --burn-n-lost 0.5 --food-reserve-days 365 --days 3000 --marsh-area 20
+--marsh-growth 40.5 --marsh-plant-n 0.037 --marsh-residence-days 4 --marsh-plants-to soil [--leaching]`.
 
 | per crop (crops 1–20) | no leaching | leaching |
 |---|---|---|
@@ -1615,7 +1618,8 @@ costing fertilizer.** The other organic and food pools are unchanged.
   tank and its watering); the subsoil held 0.49–0.95 kg (in the 0.1–1.5 band); nothing left. **The tank
   figure was WRONG**: predicted under 0.05 kg, measured 0.07–0.21 kg at crop ends, 1.4–4× over. The
   run-average estimate (2.6 g/day in × ~8 days' water residence: 14 632 kg held at the end ÷ 1 748 kg/day
-  watered) gives ~0.02 kg, which is what the prediction assumed, and the run's in and out totals balance
+  watered; the 14 632 kg is the run's last reading, after the 60-day stub with almost no crop, not a
+  typical crop end) gives ~0.02 kg, which is what the prediction assumed, and the run's in and out totals balance
   (7.757 / 7.682). So the crop-end readings sit above the run's average. **Cause not measured.** A candidate
   — the watering pausing while the ripe crop stops drinking, the overflow still arriving — is unconfirmed;
   the dips at crops 8, 15, 20 (0.103, 0.085, 0.075) are not explained either.
@@ -1629,9 +1633,9 @@ costing fertilizer.** The other organic and food pools are unchanged.
 **Two things the run shows that were not predicted:**
 - **A two-crop rhythm.** Leaching, fertilizer and the N below the roots alternate crop to crop (leaching
   1.52/1.59/1.62/1.68 on crops 2/4/6/8 against 1.18/1.16/1.11/1.09 on 3/5/7/9), with phase slips at crops
-  10 and 17 (1.25 each). The same rhythm, with the same slips, is already in the run without leaching —
-  in the steps the roots' reach caps uptake (36/19/15/9 against 3/1/0/24 …). So it is the crop and soil's
-  own; the leaching makes it visible in the fertilizer. Its cause is not measured. Judge the cost by the
+  10 and 17 (1.25 each). A similar alternation is already in the run without leaching — in the steps the
+  roots' reach caps uptake (36/19/15 on crops 2/4/6 against 3/1/0 on 3/5/7) — slipping within a crop or
+  two of the leaching's (around crops 9–10 and 15–16). So it is the crop and soil's own; the leaching makes it visible in the fertilizer. Its cause is not measured. Judge the cost by the
   run's total, not one crop.
 - **The roots hit their reach limit more often** (crop 2: 36 → 41 steps, crop 4: 19 → 34), because the soil
   solution is lower. Held-back N rises a little (crop 4: 0.120 → 0.153 kg); grain N stays 87.0 %. The first
