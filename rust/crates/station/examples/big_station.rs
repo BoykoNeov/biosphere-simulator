@@ -17,6 +17,9 @@
 //!     --fertilizer KG --soil-n-level G                                                  # Step 4b
 //! cargo run --release -q -p station --example big_station -- --co2-charge C --o2-charge O \
 //!     --fertilizer KG --soil-n-level G --urine-any-time                                 # Step 4b-2
+//! cargo run --release -q -p station --example big_station -- --co2-charge C --o2-charge O \
+//!     --fertilizer KG --soil-n-level G --urine-any-time --burn-wastes \
+//!     --burn-char-share F --burn-n-lost F --food-reserve-days D                          # Step 4c
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
@@ -59,6 +62,13 @@
 //! at any time from sowing to maturity, not only inside EcoSanRes' window — a hygiene rule for crops
 //! eaten raw or soon, set aside for threshed and cooked wheat (a reading, not a citation). Day 93
 //! stays the label every readout splits on.
+//!
+//! `--burn-wastes --burn-char-share F --burn-n-lost F --food-reserve-days D` (Step 4c, plan §10.7;
+//! needs Step 4b-2): CEEF's waste processing (Tako et al.). The straw (leaves, stems, stem reserve;
+//! the roots stay in the soil), the crew's feces and, at each harvest, the food store above `D`
+//! days of the crew's food go to a burner ([`Burner`]) that returns carbon × (1 − char share) to the
+//! CO₂ tank, one O₂ from the O₂ tank for each, and sends the nitrogen × lost to N₂ (BVAD Eq. 4-1),
+//! the rest to the urine tank. All three are inputs, with no default.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -247,9 +257,10 @@ const URINE_N_SHARE: f64 = 0.88;
 /// NITROGEN `lab.food_n → soil_n (or the urine tank) + litter_n`: the crew eat nitrogen with their
 /// carbon, at the food store's average N:C, and pass all of it (an adult is in nitrogen balance):
 /// urine to `urine_to` (the soil's available nitrogen, or Step 3c's [`URINE_TANK`]), feces with
-/// their carbon to the litter.
+/// their carbon to `feces_to` (the litter, or Step 4c's [`BURNER_FEED_N`]).
 struct CrewNitrogen {
     urine_to: &'static str,
+    feces_to: &'static str,
 }
 
 impl Flow for CrewNitrogen {
@@ -273,9 +284,155 @@ impl Flow for CrewNitrogen {
         FlowResult::new(vec![
             Leg::new(FOOD_N.to_string(), -eaten)?,
             Leg::new(self.urine_to.to_string(), urine)?,
-            Leg::new(LITTER_N.to_string(), eaten - urine)?,
+            Leg::new(self.feces_to.to_string(), eaten - urine)?,
         ])
     }
+}
+
+/// Step 4c's burner feed (mol C) and its nitrogen (kg N): the straw, the crew's feces and the food
+/// above the reserve, waiting for [`Burner`].
+const BURNER_FEED: &str = "lab.burner_feed";
+const BURNER_FEED_N: &str = "lab.burner_feed_n";
+/// Step 4c's char (mol C): the carbon the processor keeps (Tako et al. Fig. 2(b), "Deposition").
+const CHAR: &str = "lab.char";
+/// Step 4c's nitrogen gas (kg N): the burned nitrogen as N₂ (BVAD Eq. 4-1), out of every plant's
+/// reach while no legume is grown.
+const N2_GAS: &str = "lab.n2_gas";
+/// Step 4c's burner flow id.
+const BURNER: &str = "lab.burner";
+
+/// Step 4c's inputs, none with a default: the share of the burned carbon kept as char, the share of
+/// the burned nitrogen lost as N₂ (the rest caught into the urine tank), and the food reserve in
+/// days of the crew's food.
+#[derive(Debug, Clone, Copy)]
+struct Burn {
+    char_share: f64,
+    n_lost: f64,
+    reserve_days: f64,
+}
+
+/// CARBON + OXYGEN + NITROGEN `lab.burner_feed + lab.o2_tank → lab.co2_store + lab.char`, Step 4c:
+/// CEEF's carbonizer and incinerator (Tako et al.). The whole feed each step (DESIGN: the burner
+/// keeps up; its CO₂ goes to a tank, so its timing moves nothing the crop reads), capped by the O₂
+/// tank. Carbon × (1 − char) to the CO₂ tank with one O₂ from the O₂ tank each (the model's
+/// decomposer ratio), carbon × char kept; the feed's nitrogen burned in step with its carbon, × lost
+/// to [`N2_GAS`], the rest to [`URINE_TANK`].
+struct Burner {
+    burn: Burn,
+}
+
+impl Flow for Burner {
+    fn type_name(&self) -> &'static str {
+        "Burner"
+    }
+
+    fn id(&self) -> &str {
+        BURNER
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        _dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let Burn {
+            char_share,
+            n_lost,
+            ..
+        } = self.burn;
+        let feed = amount(snapshot, BURNER_FEED);
+        let o2 = amount(snapshot, O2_TANK);
+        let burned = if char_share < 1.0 {
+            feed.min(o2 / (1.0 - char_share))
+        } else {
+            feed
+        };
+        let share = if feed > 0.0 { burned / feed } else { 1.0 };
+        let n = amount(snapshot, BURNER_FEED_N) * share;
+        let co2 = burned * (1.0 - char_share);
+        FlowResult::new(vec![
+            Leg::new(BURNER_FEED.to_string(), -burned)?,
+            Leg::new(CO2_STORE.to_string(), co2)?,
+            Leg::new(CHAR.to_string(), burned - co2)?,
+            Leg::new(O2_TANK.to_string(), -co2)?,
+            Leg::new(BURNER_FEED_N.to_string(), -n)?,
+            Leg::new(N2_GAS.to_string(), n * n_lost)?,
+            Leg::new(URINE_TANK.to_string(), n - n * n_lost)?,
+        ])
+    }
+}
+
+/// CARBON `crew.food_store → the room + lab.burner_feed`, Step 4c: the crew's own flow with its
+/// fecal leg (the litter's since Step 2b) re-pointed at [`BURNER_FEED`].
+struct FecesToBurner {
+    inner: Box<dyn Flow>,
+}
+
+impl Flow for FecesToBurner {
+    fn type_name(&self) -> &'static str {
+        "FecesToBurner"
+    }
+
+    fn id(&self) -> &str {
+        CREW_RESPIRATION
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let legs = self
+            .inner
+            .evaluate(snapshot, env, dt)?
+            .legs
+            .into_iter()
+            .map(|l| {
+                if l.stock == LITTER_CARBON {
+                    Leg::new(BURNER_FEED.to_string(), l.amount)
+                } else {
+                    Ok(l)
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        FlowResult::new(legs)
+    }
+}
+
+/// The station with Step 4c's burner: its four stocks (empty), the crew's feces re-pointed at the
+/// feed ([`FecesToBurner`]), and [`Burner`]. The straw and the food above the reserve reach the feed
+/// at harvest ([`harvest_at_maturity`]).
+fn with_burner(state: State, fast: Registry, burn: Burn) -> (State, Registry) {
+    let mut stocks = state.stocks.clone();
+    for s in [
+        simple_pool(BURNER_FEED, "lab", Quantity::Carbon, 0.0),
+        simple_pool(BURNER_FEED_N, "lab", Quantity::Nitrogen, 0.0),
+        simple_pool(CHAR, "lab", Quantity::Carbon, 0.0),
+        simple_pool(N2_GAS, "lab", Quantity::Nitrogen, 0.0),
+    ] {
+        let s = s.expect("Step 4c stock");
+        stocks.insert(s.id.clone(), s);
+    }
+    let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
+    let (flows, aux) = fast.into_parts();
+    let mut replaced = 0;
+    let mut flows: Vec<Box<dyn Flow>> = flows
+        .into_iter()
+        .map(|f| -> Box<dyn Flow> {
+            if f.id() == CREW_RESPIRATION {
+                replaced += 1;
+                Box::new(FecesToBurner { inner: f })
+            } else {
+                f
+            }
+        })
+        .collect();
+    assert_eq!(replaced, 1, "one crew respiration to re-point");
+    flows.push(Box::new(Burner { burn }));
+    let fast = Registry::new(flows, &state.stocks, aux).expect("fast registry");
+    (state, fast)
 }
 
 /// Step 3c's imported food, held back (mol C) — and its nitrogen (kg N) at the menu's N:C.
@@ -419,11 +576,13 @@ impl Flow for UrineDose {
 /// The station with Step 2c's food nitrogen: [`FOOD_N`] at the imported food's N:C, and
 /// [`CrewNitrogen`]. With Step 3c's `reserve` (mol C of imported food held back) also
 /// [`FOOD_RESERVE`] with its nitrogen, [`FoodTopUp`] to `level`, and the urine to [`URINE_TANK`].
+/// With Step 4c's `burn` the feces' nitrogen goes to [`BURNER_FEED_N`] instead of the litter.
 fn with_food_nitrogen(
     sc: &SealedStationScenario,
     state: State,
     fast: Registry,
     reserve: Option<(f64, f64)>,
+    burn: bool,
 ) -> (State, Registry) {
     let mut stocks = state.stocks.clone();
     let ratio = imported_n_per_mol_c(sc);
@@ -446,7 +605,10 @@ fn with_food_nitrogen(
         SOIL_N
     };
     let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
-    flows.push(Box::new(CrewNitrogen { urine_to }));
+    flows.push(Box::new(CrewNitrogen {
+        urine_to,
+        feces_to: if burn { BURNER_FEED_N } else { LITTER_N },
+    }));
     let fast = Registry::new(flows, &state.stocks, aux).expect("fast registry");
     (state, fast)
 }
@@ -601,7 +763,8 @@ fn with_real_soil(
 }
 
 /// The nitrogen the run books (kg N): the plant's, the soil's (available, litter, microbes, humus),
-/// the food's, and held back (Step 3c's reserve and urine tank, Step 4b's fertilizer store).
+/// the food's, and held back (Step 3c's reserve and urine tank, Step 4b's fertilizer store, Step
+/// 4c's burner feed and the N₂ it made).
 fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
     let soil = [SOIL_N, LITTER_N, MICROBIAL_N, HUMUS_N]
         .iter()
@@ -611,7 +774,11 @@ fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
         amount(s, PLANT_N),
         soil,
         amount(s, FOOD_N),
-        amount(s, FOOD_RESERVE_N) + amount(s, URINE_TANK) + amount(s, FERTILIZER),
+        amount(s, FOOD_RESERVE_N)
+            + amount(s, URINE_TANK)
+            + amount(s, FERTILIZER)
+            + amount(s, BURNER_FEED_N)
+            + amount(s, N2_GAS),
     )
 }
 
@@ -918,10 +1085,18 @@ fn control() {
 /// Step 2b's harvest: the station's re-sow hook, with the grain less the next crop's seed moved to
 /// the crew's food store first when the crop has matured. Each harvest (mol C) is pushed onto
 /// `harvests`. The seed is the seedling the re-sow starts (`reset_crop` refuses a smaller grain).
+///
+/// With Step 4c's `reserve` (mol C) two things go to [`BURNER_FEED`] first, each with its
+/// nitrogen: the food store above `reserve` before the new grain goes in — only the old carryover,
+/// so the harvest the crew need until the next one is never burned — and the straw: the leaves,
+/// stems and stem reserve, with the plant's nitrogen in their carbon's share, so the seedling keeps
+/// the parent's concentration as `reset_crop` gives it. The roots stay for the re-sow to put in
+/// the soil, as CEEF's residue stayed in its planting medium (Tako et al., Fig. 2(b)).
 fn harvest_at_maturity(
     sc: &SealedStationScenario,
     harvests: Rc<RefCell<Vec<Harvested>>>,
     with_nitrogen: bool,
+    reserve: Option<f64>,
 ) -> OwnedResetHook {
     let base = sealed_reset_hook(sc);
     let pheno = sc.pheno();
@@ -946,9 +1121,28 @@ fn harvest_at_maturity(
             stocks.insert(id.to_string(), held);
             Ok(())
         };
+        // Step 4c's running amounts (the `set` closure holds the stocks while it lives).
+        let mut food_n = amount(current, FOOD_N);
+        let mut feed = amount(current, BURNER_FEED);
+        let mut feed_n = amount(current, BURNER_FEED_N);
+        // Step 4c: the old carryover above the reserve, before the new grain goes in.
+        let mut food = amount(current, FOOD_STORE);
+        if let Some(level) = reserve {
+            let over = (food - level).max(0.0);
+            if over > 0.0 {
+                let n = over * food_n / food;
+                h.food_burned_c = over;
+                h.food_burned_n = n;
+                food -= over;
+                food_n -= n;
+                feed += over;
+                feed_n += n;
+            }
+        }
         // What is left of the grain is exactly the seed: `reset_crop` refuses a grain below it.
         set(STORAGE_C, if eaten > 0.0 { seed } else { grain })?;
-        set(FOOD_STORE, amount(current, FOOD_STORE) + eaten)?;
+        set(FOOD_STORE, food + eaten)?;
+        let mut plant_n = h.plant_n;
         if with_nitrogen {
             // USDA's grain nitrogen, from the plant, which keeps the straw's cited residual and the
             // seed's share at that concentration (the re-sow's own rule: the seedling keeps the
@@ -960,8 +1154,35 @@ fn harvest_at_maturity(
             h.wanted_n = eaten * dm_per_mol_c * GRAIN_N_PER_DM;
             let kept = (straw + seed) * straw_n_per_mol_c;
             h.grain_n = h.wanted_n.min((h.plant_n - kept).max(0.0));
-            set(PLANT_N, h.plant_n - h.grain_n)?;
-            set(FOOD_N, amount(current, FOOD_N) + h.grain_n)?;
+            plant_n = h.plant_n - h.grain_n;
+            set(PLANT_N, plant_n)?;
+            set(FOOD_N, food_n + h.grain_n)?;
+        }
+        if reserve.is_some() {
+            // Step 4c: the straw to the burner. Its nitrogen is the plant's (after the grain's)
+            // in the leaves' and stems' share of the vegetative carbon — `reset_crop`'s own
+            // concentration basis, so the seedling's nitrogen is what it would have been.
+            let (leaf, stem, root) = (
+                amount(current, LEAF_C),
+                amount(current, STEM_C),
+                amount(current, ROOT_C),
+            );
+            let veg = leaf + stem + root;
+            let n = if veg > 0.0 {
+                plant_n * (leaf + stem) / veg
+            } else {
+                0.0
+            };
+            h.straw_c = leaf + stem + amount(current, STEM_RESERVE_C);
+            h.straw_n = n;
+            set(LEAF_C, 0.0)?;
+            set(STEM_C, 0.0)?;
+            if current.stocks.contains_key(STEM_RESERVE_C) {
+                set(STEM_RESERVE_C, 0.0)?;
+            }
+            set(PLANT_N, plant_n - n)?;
+            set(BURNER_FEED, feed + h.straw_c)?;
+            set(BURNER_FEED_N, feed_n + n)?;
         }
         let harvested = State::new(current.n, stocks, current.rng_seed, current.aux.clone())?;
         harvests.borrow_mut().push(h);
@@ -977,6 +1198,12 @@ struct Harvested {
     plant_n: f64,
     wanted_n: f64,
     grain_n: f64,
+    /// Step 4c: the straw (leaves, stems, stem reserve) and the food above the reserve sent to the
+    /// burner, mol C and kg N.
+    straw_c: f64,
+    straw_n: f64,
+    food_burned_c: f64,
+    food_burned_n: f64,
 }
 
 /// One crop cycle's readouts.
@@ -1053,6 +1280,19 @@ struct Cycle {
     fert_end: f64,
     /// Step 4b-2 (kg N): the urine dosed after the window.
     urine_late: f64,
+    /// Step 4c: the change of the burner's feed and char (mol C); the CO₂ it returned to the tank
+    /// (mol C); the nitrogen it sent to N₂ and caught (kg N) over the cycle.
+    burner_change: f64,
+    /// Step 4c, booked in this cycle (the previous crop's, at this cycle's first re-sow): the straw
+    /// (mol C, kg N) and the food above the reserve; and the feces' nitrogen over the cycle (kg N).
+    straw_booked: (f64, f64),
+    food_burned_booked: f64,
+    food_burned_n_booked: f64,
+    feces_n: f64,
+    burned_co2: f64,
+    char_end: f64,
+    n_to_gas: f64,
+    n_caught: f64,
 }
 
 #[derive(Default)]
@@ -1110,6 +1350,9 @@ struct Minutes {
     fert_late: Vec<f64>,
     /// Step 4b-2, per day (kg N): the urine dosed after the window.
     urine_late: Vec<f64>,
+    /// Step 4c, per day: the burner's CO₂ to the tank (mol C) and nitrogen caught (kg N).
+    burned_co2: Vec<f64>,
+    burn_n_caught: Vec<f64>,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -1143,6 +1386,9 @@ struct Options {
     fertilizer: Option<(f64, f64)>,
     /// Step 4b-2: urine dosed at any time, not only inside the window; needs `fertilizer`.
     urine_any_time: bool,
+    /// Step 4c: the straw, the feces and the food above a reserve burned back to CO₂; needs
+    /// `urine_any_time`.
+    burn: Option<Burn>,
 }
 
 impl Options {
@@ -1161,6 +1407,7 @@ impl Options {
             tanks: self.tanks,
             fertilizer: self.fertilizer,
             urine_any_time: self.urine_any_time,
+            burn: self.burn,
         }
     }
 }
@@ -1176,6 +1423,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         tanks,
         fertilizer,
         urine_any_time,
+        burn,
     } = opts;
     assert!(
         fertilizer.is_none() || tanks.is_some(),
@@ -1184,6 +1432,10 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
     assert!(
         !urine_any_time || fertilizer.is_some(),
         "Step 4b-2 builds on Step 4b's top-up"
+    );
+    assert!(
+        burn.is_none() || urine_any_time,
+        "Step 4c builds on Step 4b-2's urine at any time"
     );
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
@@ -1225,10 +1477,17 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         None => (state, fast),
     };
     let (state, fast) = if with_nitrogen {
-        with_food_nitrogen(&sc, state, fast, reserve)
+        with_food_nitrogen(&sc, state, fast, reserve, burn.is_some())
     } else {
         (state, fast)
     };
+    let (state, fast) = match burn {
+        Some(b) => with_burner(state, fast, b),
+        None => (state, fast),
+    };
+    // Step 4c's food reserve (mol C): the crew's intake × the input days.
+    let food_reserve = burn
+        .map(|b| b.reserve_days * sc.cabin.food_intake_rate(&params::crew()) * 86_400.0);
     let state = match fertilizer {
         Some((charge, _)) => with_fertilizer(state, charge),
         None => state,
@@ -1244,7 +1503,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
     let fast_r = sealed_fast_resolver(&params::charge(), &params::crew(), &sc).expect("fast");
     let harvests: Rc<RefCell<Vec<Harvested>>> = Rc::default();
     let reset = if food_loop {
-        harvest_at_maturity(&sc, Rc::clone(&harvests), with_nitrogen)
+        harvest_at_maturity(&sc, Rc::clone(&harvests), with_nitrogen, food_reserve)
     } else {
         sealed_reset_hook(&sc)
     };
@@ -1289,6 +1548,8 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         fert_window: vec![0.0; days],
         fert_late: vec![0.0; days],
         urine_late: vec![0.0; days],
+        burned_co2: vec![0.0; days],
+        burn_n_caught: vec![0.0; days],
         ..Minutes::default()
     };
     let nitro = sc.plant_params().nitro;
@@ -1442,6 +1703,14 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                                 *e += leg(&res, CARBON_POOL);
                             }
                         }
+                        if f.id() == BURNER {
+                            if let (Some(c), Some(u)) =
+                                (m.burned_co2.get_mut(day), m.burn_n_caught.get_mut(day))
+                            {
+                                *c += leg(&res, CO2_STORE);
+                                *u += leg(&res, URINE_TANK);
+                            }
+                        }
                         if f.id() == CREW_NITROGEN {
                             if let Some(e) = m.n_eaten.get_mut(day) {
                                 *e -= leg(&res, FOOD_N);
@@ -1486,6 +1755,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         .enumerate()
         .map(|(i, w)| {
             let (s, e) = (&ends[w[0]], &ends[w[1]]);
+            let booked = i.checked_sub(1).and_then(|k| harvests.get(k)).copied();
             let exhaled: f64 = exhaled_by_day[w[0]..w[1]].iter().sum();
             let mut best: f64 = f64::NEG_INFINITY;
             let mut grain: f64 = 0.0;
@@ -1585,6 +1855,21 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                 fert_late: m.fert_late[w[0]..w[1]].iter().sum(),
                 fert_end: amount(e, FERTILIZER),
                 urine_late: m.urine_late[w[0]..w[1]].iter().sum(),
+                straw_booked: booked.map_or((0.0, 0.0), |h| (h.straw_c, h.straw_n)),
+                food_burned_booked: booked.map_or(0.0, |h| h.food_burned_c),
+                food_burned_n_booked: booked.map_or(0.0, |h| h.food_burned_n),
+                feces_n: if burn.is_some() {
+                    m.n_eaten[w[0]..w[1]].iter().sum::<f64>() * (1.0 - URINE_N_SHARE)
+                } else {
+                    0.0
+                },
+                burner_change: amount(e, BURNER_FEED) + amount(e, CHAR)
+                    - amount(s, BURNER_FEED)
+                    - amount(s, CHAR),
+                burned_co2: m.burned_co2[w[0]..w[1]].iter().sum(),
+                char_end: amount(e, CHAR),
+                n_to_gas: amount(e, N2_GAS) - amount(s, N2_GAS),
+                n_caught: m.burn_n_caught[w[0]..w[1]].iter().sum(),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -1619,6 +1904,10 @@ fn report(r: &Run) {
         r.crew,
         r.days,
         match (o.co2_store, o.food_loop) {
+            (_, true) if o.burn.is_some() => {
+                ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP \
+                 WITH FERTILIZER + URINE AT ANY TIME + WASTES BURNED"
+            }
             (_, true) if o.urine_any_time => {
                 ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP \
                  WITH FERTILIZER + URINE AT ANY TIME"
@@ -1665,7 +1954,9 @@ fn report(r: &Run) {
             c.crop_change,
             c.soil_change,
             c.soil_end,
-            net - c.crop_change - c.soil_change - c.harvest_booked + c.feces_to_soil,
+            net - c.crop_change - c.soil_change - c.burner_change - c.harvest_booked
+                + c.feces_to_soil
+                + c.food_burned_booked,
             100.0 * c.plant_c_max / c.exhaled
         );
         if o.co2_store {
@@ -1692,6 +1983,28 @@ fn report(r: &Run) {
                 100.0 * c.harvested * r_f_resp / c.exhaled,
                 c.harvest_booked,
                 c.feces_to_soil
+            );
+        }
+        if let Some(b) = o.burn {
+            println!(
+                "           burner: in {:.1} mol C (straw {:.1}, feces {:.1}, food above the reserve \
+                 {:.1}), CO₂ back to the tank {:.1}, char {:+.1} (ends {:.1}); N in {:.3} kg (straw \
+                 {:.3}, feces {:.3}, food {:.3}), to N₂ {:.3}, caught {:.3} (char share {}, N lost {})",
+                c.straw_booked.0 + c.feces_to_soil + c.food_burned_booked,
+                c.straw_booked.0,
+                c.feces_to_soil,
+                c.food_burned_booked,
+                c.burned_co2,
+                c.burner_change,
+                c.char_end,
+                c.straw_booked.1 + c.feces_n + c.food_burned_n_booked,
+                c.straw_booked.1,
+                c.feces_n,
+                c.food_burned_n_booked,
+                c.n_to_gas,
+                c.n_caught,
+                b.char_share,
+                b.n_lost
             );
         }
         if o.with_nitrogen {
@@ -1848,6 +2161,22 @@ fn report(r: &Run) {
             amount(s, FERTILIZER),
             amount(e, FERTILIZER)
         );
+        if o.burn.is_some() {
+            let (in_c, back) = r.cycles.iter().fold((0.0, 0.0), |(x, y), c| {
+                (
+                    x + c.straw_booked.0 + c.feces_to_soil + c.food_burned_booked,
+                    y + c.burned_co2,
+                )
+            });
+            println!(
+                "  burner over the run: in {in_c:.1} mol C, CO₂ back {back:.1}, char {:.1}, feed left \
+                 {:.1}; N₂ {:.3} kg; food burned {:.1} mol C",
+                amount(e, CHAR),
+                amount(e, BURNER_FEED),
+                amount(e, N2_GAS),
+                r.cycles.iter().map(|c| c.food_burned_booked).sum::<f64>()
+            );
+        }
     }
     println!(
         "  whole run: exhaled {ex:.1} mol; closure share {:.1} %; left the station {:.1} %; into \
@@ -1987,6 +2316,19 @@ fn main() {
             _ => panic!("Step 4b takes both: --fertilizer KG --soil-n-level G"),
         },
         urine_any_time: flag("--urine-any-time"),
+        burn: flag("--burn-wastes").then(|| {
+            let need = |name: &str| -> f64 {
+                arg(name)
+                    .unwrap_or_else(|| panic!("Step 4c takes {name} (no default)"))
+                    .parse()
+                    .unwrap_or_else(|_| panic!("{name} F"))
+            };
+            Burn {
+                char_share: need("--burn-char-share"),
+                n_lost: need("--burn-n-lost"),
+                reserve_days: need("--food-reserve-days"),
+            }
+        }),
     };
     // Step 3c's farm (plan §9): 700 m², the round area above the 658 m² that feeds four crew.
     let default_area = if opts.closed().feed_crew { 700.0 } else { 200.0 };
