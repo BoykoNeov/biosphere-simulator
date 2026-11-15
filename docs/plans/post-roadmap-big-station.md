@@ -1186,9 +1186,18 @@ filling to a lower level, not giving back: its gain falls ~7 % a crop late in th
 
 **The carbon fix works, and the charge was needed.** The tank never ran short in eight years and the
 crop stayed at full size; 4b-2's ran dry on day 1534. The bigger charge mattered only with the char:
-the old 60 000 is 38 000 lower, so at char 0.064 the tank would have been empty well before day 2939
-(lowest 22 012 − 38 000 < 0); at char 0 it would have just held (38 693 − 38 000 = 693, about a week
-of the crew's breath at the low point).
+the old 60 000 is 38 000 lower, and the injector was never short, so a smaller charge only shifts the
+tank down — at char 0.064 it would first have run dry at **crop 13's** peak (days 1680–1820; its low
+here 37 565 < 38 000); at char 0 it would have just held (38 693 − 38 000 = 693, about a week of the
+crew's breath at the low point).
+
+**⚠ The burner here is leak-free, CEEF's was not (a side agent, 2026-11-15).** Of the 51.9 mol C/day
+CEEF processed, 25.1 came back as CO₂ (**48 %**), 23.5 leaked (**45 %**) and 3.3 stayed (6.4 %). I set
+the leak aside as a fault, on the paper's own words (*"will substantially decrease, if CO2 leak from
+the waste processing system is suppressed"*), without putting it to the user. At 45 % of ~13 000 mol
+C a crop, a leak would lose ~5 800 a crop — three times this run's fall — and the 98 000 charge would
+last about eight crops more, three years (a sum from the books, not run). Whether to model a leak (an input share, lost to outside) is the
+user's call; not built.
 
 **What still drains the tank, crop 20 (char 0.064): char 832 (45 %), the food pile 666 (36 %), the
 soil 344 (19 %).** The soil's share is still shrinking; the food pile stops when the store reaches its

@@ -108,14 +108,15 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   (39.5 kg by day 3000); and with no imports the CO₂ tank empties on day 1534 — the soil's gain and
   a 4.6 % food surplus — after which the farm is carbon-limited at 88–90 % and imports return.
 * **Step 4b-2 MEASURED 2026-11-10** (plan §10.5, §10.6; the user chose nitrogen first, urine at any
-  time, then carbon, then the marsh). `--urine-any-time` sets aside EcoSanRes' day-93 cutoff (a hygiene
-  rule; wheat is threshed and cooked — a reading, not a citation). The crop, diet and carbon books are
-  4b's to every printed digit (Q4); the CO₂ tank still empties on day 1534. Fertilizer over 3000 days
-  **43.7 → 13.2 kg**, urine tank at the end 39.5 → 9.0 kg. It does not reach zero: in crops 2–11 the
-  urine is all used, and the books show the fertilizer pays for the two stocks still growing, the
-  soil's organic matter and the uneaten food store (equal by construction, not a measurement). From crop 12, carbon-short, the crew eat the surplus down, the
-  fertilizer stops and the tank climbs again (+0.4 kg a crop). Q1/Q2 missed high: the soil ends every
-  crop above its level, so late urine (1.81 kg at each crop's end) collects; storage time unmeasured.
+  time, then carbon, then the marsh). `--urine-any-time` sets aside EcoSanRes' day-93 cutoff (a
+  hygiene rule; wheat is threshed and cooked — a reading, not a citation). The crop, diet and carbon
+  books are 4b's to every printed digit (Q4); the CO₂ tank still empties on day 1534. Fertilizer
+  over 3000 days **43.7 → 13.2 kg**, urine tank at the end 39.5 → 9.0 kg. It does not reach zero: in
+  crops 2–11 the urine is all used, and the books show the fertilizer pays for the two stocks still
+  growing, the soil's organic matter and the uneaten food store (equal by construction, not a
+  measurement). From crop 12, carbon-short, the crew eat the surplus down, the fertilizer stops and
+  the tank climbs again (+0.4 kg a crop). Q1/Q2 missed high: the soil ends every crop above its
+  level, so late urine (1.81 kg at each crop's end) collects; storage time unmeasured.
 * **Step 4c MEASURED 2026-11-15** (plan §10.7, §10.8; the user chose (b), wastes burned back to CO₂
   as CEEF did, plus a bigger CO₂ charge and a one-year food reserve, grain above it burned).
   `--burn-wastes`: straw (leaves, stems, stem reserve; the roots stay), feces and the food above the
