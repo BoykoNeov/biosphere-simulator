@@ -138,3 +138,20 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   fertilizer 66.5 → 40.3 kg over 3000 days, nothing else moves; a legume later (the user). The
   leak run is unrationed to day 2380: the 58 % crop is the science, the rationing starts with the O₂
   tank empty. The user chose char 0.116 (dumped, borrowed for straw) and the catalyst share kept on.
+* **Step 4d-1 MEASURED 2026-11-15** (plan §10.11, §10.12; the user chose (d) the marsh, for urine and
+  the farm's drained water, then "measure both" for its plants). `--marsh-area` etc.: a 20 m² urine
+  marsh after Biosphere 2's (Nelson et al. 1999) takes up nitrogen into plants that are cut and sent to
+  the soil or the burner; the rest flows to the urine tank. The tank's inflow 7.4 → 3.2 kg N a crop.
+  To the soil: +2.49 kg fertilizer in crop 0 shrinking to +0.08 by crop 20, +7.5 kg in all, banked as
+  soil organic N (11.2 against 3.7 kg) — a one-time cost; the CO₂ tank's low 994 mol (M3 WRONG: it was
+  predicted to empty; the soil fills toward a steady level). To the burner: ~+2.1 kg fertilizer and
+  N₂ every crop — a permanent leak — and the CO₂ tank empty on day 2935. Gap named: the marsh draws CO₂
+  at a fixed rate whatever the room holds. The user chose the soil.
+* **Step 4d-2 MEASURED 2026-11-15** (plan §10.13, §10.14). `--leaching`: two nitrogen stocks (below the
+  roots; in the plants' tank) moved by wrapping the water flows, the leached share by Soltani & Sinclair
+  Eqn 18.14. 1.35 kg a crop leached; the roots take 73 % back, the plants' tank waters the rest back;
+  fertilizer +0.465 kg over 3000 days, the rest of the ~1 kg parked paid by the soil solution's surplus
+  (−18 %). Crop, carbon, grain N, stress identical. L2's tank figure WRONG (0.07–0.21 kg against
+  < 0.05; cause unmeasured); a two-crop rhythm already in the crop and soil shows in the fertilizer. The
+  three exit paths are built but carried nothing — at 700 m² no water leaves the farm's loop, so which
+  water goes to the marsh in 4d-3 is the user's call, not yet asked.

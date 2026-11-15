@@ -1543,3 +1543,117 @@ and crop 20's harvest fell to 95.9 % of the crew's food — while rationing stil
 never asks for more than the room holds. Its crop 20 is distorted (its 95.2 % grain-nitrogen share is the
 smaller crop's side effect, not a gain). It matters only once a tank is empty; recorded with the marsh's lamp,
 water and sediment as gaps, not built.
+
+**The user's choice (2026-11-15): plants to the soil.** Slices 4d-2 and 4d-3 run with `--marsh-plants-to soil`
+only.
+
+## 10.13 Step 4d-2 — nitrogen in the drained water: the build, and predictions (written before the run)
+
+**The build (`--leaching`, needs `--marsh-area`; run with `--marsh-plants-to soil`, the user's choice).** Two
+new nitrogen stocks: `lab.subsoil_n` (dissolved in the water below the roots) and `lab.plant_tank_n` (in the
+plants' water tank). The water flows themselves are wrapped so their nitrogen moves with their own legs, in
+the same step — no second copy of a water rule:
+- **The watering** (`biosphere.recycling`, and the crew-store top-up, inert at 700 m²): its share past the
+  roots carries [F] Eqn 18.14's `NSOL × DRAIN ÷ (WAT1 + DRAIN)` from the soil solution to the subsoil, set to
+  0 at or below 1 mg/L (the book's BASIC listing: `If NCON <= 0.000001 Then NLEACH = 0`). NSOL, WAT1 and the
+  concentration are the roots' own (`SolutionUptake`). The water drawn from the plants' tank carries the
+  tank's nitrogen at its concentration, split as the water splits (soil solution / subsoil).
+- **The drainage below the roots** (`biosphere.drainage`, inert): the same Eqn 18.14 on its water.
+- **The roots' capture of subsoil water** and **the subsoil's overflow to the plants' tank**: the subsoil's
+  nitrogen at its concentration, to the soil solution and to the tank.
+- **The tank's drain to the crew's recycler** (minute step; inert at 700 m², the tank stays below its
+  working level): the tank's nitrogen at its concentration, to the urine tank (the recycler's brine — a reading).
+- **Not moved**: the re-sow returns the abandoned root zone's water to the subsoil, but the soil solution is
+  the top layer's ([F]'s NSOL, the layer the roots' concentration reads), which stays in the root zone.
+  Transpiration and evaporation carry no nitrogen.
+
+**Predictions, against `ms-3000.txt` (same settings, no `--leaching`).** Scale: the percolation share is
+~175 kg/day; the top layer (0.30 m) holds ~25 000 kg of water at ~40–60 mg/L.
+- **L1 — leached**: **~1.2 kg a crop** (0.8–1.8), ~9 g/day.
+- **L2 — where it goes**: nearly all comes back — the roots' capture (630 kg/day against the overflow's 97)
+  returns most to the soil solution, the overflow sends the rest to the plants' tank, which waters it back.
+  The subsoil holds **0.1–1.5 kg** at a crop's end, the tank **under 0.05 kg**. Nothing leaves the station.
+- **L3 — fertilizer**: **+0.2 to +1.5 kg in crop 0** (filling the subsoil), then **within ±0.2 kg a crop** of
+  `ms`; **+0.3 to +2 kg** over the run.
+- **L4 — nothing else moves**: CO₂ tank low within ±300 mol of `ms`, grain nitrogen 87 %, rationed 0 and 0,
+  nitrogen stress 4 plant steps a crop (the cold weeks); the books close every step.
+
+## 10.14 Step 4d-2 — MEASURED: the drained water's nitrogen comes back, and thins the soil's surplus
+
+**Runs** (git-ignored, `sources/temp-evidence/marsh/`): `ml-recheck-3000.txt` (`--leaching`, the committed
+build) against `ms-recheck-3000.txt` (same build, no `--leaching`). `ms-recheck` matches §10.12's `ms-3000.txt`
+line for line apart from the whitespace fix in the marsh strings (`diff -w` empty), so the new plumbing is
+inert when off. `ml-recheck` matches the first `--leaching` run `ml-3000.txt` the same way (only the run-level
+line's spacing was fixed between them).
+
+| per crop (crops 1–20) | no leaching | leaching |
+|---|---|---|
+| leached past the roots | — | 0.97–1.71 kg (mean 1.35; 9.4 g/day over the run) |
+| the roots took back from below them | — | 0.18 (crop 0), then 0.93–1.13 kg |
+| overflow to the plants' tank / watered back | — | 0.31–0.45 / 0.17–0.47 kg |
+| N below the roots at a crop's end | — | 0.49–0.95 kg |
+| N in the plants' tank at a crop's end | — | 0.07–0.21 kg |
+| soil solution N at a crop's end | 2.58–2.84 kg | 2.17–2.52 kg (about 18 % lower) |
+| fertilizer, crop 0 / crop 20 | 6.998 / 1.803 kg | 7.187 / 1.952 kg |
+| fertilizer store at the end | 252.188 kg | 251.723 kg (+0.465 kg used) |
+| CO₂ tank low, N₂, grain N, stress, rationed | 994.2 mol, 27.33 kg, 87 %, 4 steps, (0, 0) | identical |
+
+Over the run: leached 28.284 kg; the roots took back 20.589; the overflow sent 7.757 to the plants' tank, the
+watering brought 7.682 back; nothing reached the urine tank; at the end 0.706 kg below the roots and 0.075 kg
+in the plants' tank.
+
+**The balance (crop 20's end, leaching − no leaching).** Held below the roots + in the plants' tank:
+0.946 + 0.075 = **1.021 kg**. Paid for by: extra fertilizer **0.465 kg** + a lower soil solution
+(2.841 → 2.286) **0.555 kg** = 1.020 kg. Crop 0 the same way: 0.489 + 0.146 = 0.635 kg held, paid by
+fertilizer 0.190 + soil solution 0.371 + a lower urine tank 0.075 = 0.636 kg. **The drained water mostly
+draws down the soil's standing surplus above the dosing floor — about half of what it parks — rather than
+costing fertilizer.** The other organic and food pools are unchanged.
+
+**The predictions:**
+- **L1 — leached ~1.2 kg a crop (0.8–1.8): HELD.** 0.97–1.71, mean 1.35.
+- **L2 — where it goes: HALF HELD.** Nearly all comes back (73 % by the roots, the rest via the plants'
+  tank and its watering); the subsoil held 0.49–0.95 kg (in the 0.1–1.5 band); nothing left. **The tank
+  figure was WRONG**: predicted under 0.05 kg, measured 0.07–0.21 kg at crop ends, 1.4–4× over. The
+  run-average estimate (2.6 g/day in × ~8 days' water residence: 14 632 kg held at the end ÷ 1 748 kg/day
+  watered) gives ~0.02 kg, which is what the prediction assumed, and the run's in and out totals balance
+  (7.757 / 7.682). So the crop-end readings sit above the run's average. **Cause not measured.** A candidate
+  — the watering pausing while the ripe crop stops drinking, the overflow still arriving — is unconfirmed;
+  the dips at crops 8, 15, 20 (0.103, 0.085, 0.075) are not explained either.
+- **L3 — fertilizer: MOSTLY HELD.** Crop 0 **+0.189 kg — just under the +0.2 floor, a miss**: the
+  prediction assumed the subsoil's fill would be bought as fertilizer, and the soil's surplus paid for more
+  than half of it. After crop 0 every crop is within ±0.2 kg (−0.12 to +0.15); the run **+0.465 kg** (in
+  +0.3 to +2).
+- **L4 — nothing else moves: HELD, identically.** CO₂ low 994.2 mol in both, N₂ 27.329 kg, grain 87.0 %,
+  rationed (0, 0), stress 4 plant steps a crop, the books close (sums ~1e-10, as before).
+
+**Two things the run shows that were not predicted:**
+- **A two-crop rhythm.** Leaching, fertilizer and the N below the roots alternate crop to crop (leaching
+  1.52/1.59/1.62/1.68 on crops 2/4/6/8 against 1.18/1.16/1.11/1.09 on 3/5/7/9), with phase slips at crops
+  10 and 17 (1.25 each). The same rhythm, with the same slips, is already in the run without leaching —
+  in the steps the roots' reach caps uptake (36/19/15/9 against 3/1/0/24 …). So it is the crop and soil's
+  own; the leaching makes it visible in the fertilizer. Its cause is not measured. Judge the cost by the
+  run's total, not one crop.
+- **The roots hit their reach limit more often** (crop 2: 36 → 41 steps, crop 4: 19 → 34), because the soil
+  solution is lower. Held-back N rises a little (crop 4: 0.120 → 0.153 kg); grain N stays 87.0 %. The first
+  sign the thinner surplus touches the crop — and no harm yet.
+
+**What this run did not test.** Three wrapped paths carried nothing because their water never moved at
+700 m²: the drainage below the roots, the crew-store top-up, and the plants' tank drain to the recycler.
+"Nothing leaves the station" held because the one exit path never ran. Their nitrogen legs are built but
+unexercised. Step 4d-3 sends drained water out to the marsh — the first run with an exit — so it must either
+reuse one of these paths (and so test it) or say that it does not.
+
+**In plain words.** Washing nitrogen out with the drained water costs about half a kilogram of fertilizer
+over eight years: the roots reach below and take most of it back, and the plants' tank waters the rest back
+in. What it changes is where the station's spare nitrogen sits — less in the topsoil, about a kilogram
+held below the roots and in the tank. In a closed loop the wash-out is a slow circulation, not a loss.
+
+**Open before Step 4d-3 — which water goes to the marsh? (the user's call; not yet asked).** At 700 m² no
+water leaves the farm's own loop: the water below the roots goes back to the roots or to the plants' tank,
+and the tank's drain to the recycler waits for a level (72 294 kg) it never reaches. So "drained water
+through the marsh" carries nothing unless the build names a stream. The candidates, with this run's flows:
+(a) the subsoil's overflow (97 kg/day, ~0.37 kg N a crop) sent to the marsh instead of the plants' tank;
+(b) the whole watering stream (1 748 kg/day) passed through the marsh before it reaches the soil — about
+7 000 kg held at a 4-day residence; (c) a lower drain level on the plants' tank, so the existing drain path
+(to the recycler, built and unexercised) runs and its water goes via the marsh. Each is a different station;
+the denitrified share F then sets what is lost. Ask before building.
