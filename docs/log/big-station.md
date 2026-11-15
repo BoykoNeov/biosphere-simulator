@@ -116,3 +116,14 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   soil's organic matter and the uneaten food store (equal by construction, not a measurement). From crop 12, carbon-short, the crew eat the surplus down, the
   fertilizer stops and the tank climbs again (+0.4 kg a crop). Q1/Q2 missed high: the soil ends every
   crop above its level, so late urine (1.81 kg at each crop's end) collects; storage time unmeasured.
+* **Step 4c MEASURED 2026-11-15** (plan §10.7, §10.8; the user chose (b), wastes burned back to CO₂
+  as CEEF did, plus a bigger CO₂ charge and a one-year food reserve, grain above it burned).
+  `--burn-wastes`: straw (leaves, stems, stem reserve; the roots stay), feces and the food above the
+  reserve go to a burner — carbon × 0.936 to the CO₂ tank, 0.064 kept as char (Tako et al. Fig. 2(b),
+  "Deposition" 3.3 of 51.9 mol C/day), nitrogen to N₂ (BVAD Eq. 4-1). Over 3000 days at 98 000 mol
+  CO₂: the tank never runs short and the crop stays full size (4b-2's emptied on day 1534); lowest
+  22 012 (char 0: 38 693), so the bigger charge was needed only with the char. The soil still gains
+  (roots and shed leaves, +344 by crop 20; B1 missed); the tank's lasting leak is the char (832 a
+  crop) — whether CEEF's deposition is a lasting sink is unread. Nitrogen opens: 2.6 kg a crop to N₂,
+  fertilizer ~3.0 kg a crop (66.5 kg in all). The food rule fires only in a 5-day twin (the year is
+  not reached in eight years).

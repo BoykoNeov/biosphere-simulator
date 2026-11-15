@@ -1162,3 +1162,60 @@ crop; the soil gained 1 841 in crop 5, 623 in crop 20, against far larger yearly
   At lost 0 the nitrogen would close as 4b-2's did; not run (BVAD says 1.0).
 - **B6.** Rationed 0 and 0; carbon, oxygen and nitrogen books close every crop; `--control` byte for
   byte; 4b-2 without the flag reproduces `u197-3000.txt`'s first crops (`u197-560-recheck.txt`).
+
+### 10.8 Step 4c — MEASURED (2026-11-15)
+
+Runs (`sources\temp-evidence\burn-wastes\`): `b-3000.txt` (char 0.064), `b-char0-3000.txt` (char 0),
+`b-res30-560.txt` and `b-res5-560.txt` (the food rule), `u197-560-recheck.txt` (4b-2, no flag). 98 000
+mol CO₂, 11 000 O₂, fertilizer 300 kg, 1.97 g/m², N lost 1.0, 700 m², four crew. Rationed 0 and 0 in
+all; ~20 min for 3000 days.
+
+| | Predicted | Measured | |
+|---|---|---|---|
+| B1 | the soil stops being the sink; ends under a third of 4b-2's 46 400 mol; its N turnover +1 to +2.5 kg a crop | still a sink, a smaller one: +7 345 in crop 1, +5 116, +2 176, … **+344** in crop 20 (4b-2: +7 800, +10 100, … +623); ends **29 071 mol** (63 %); turnover **+1.4 → +2.06 kg** a crop | **missed** (sink), held (N) |
+| B2 | the tank does not empty; with char it still falls ~1 500 a crop; at char 0 ~670 | never empty, never short (0 lit minutes; grain 21.89 mol C/m² every crop, 98.9 % of 2b, where 4b-2 fell to 88–90 % from crop 11). Lowest **22 012 mol on day 2939** (char 0: **38 693**). Crop 20 fall **1 842** = soil 344 + char 832 + food pile 666 (char 0: **1 010**) | held; the falls ~20–50 % high (the soil still gains) |
+| B3 | O₂ tank change = −(CO₂ tank change) within 0.1 % | **1.0000** every crop after crop 1 (1.0001) | held |
+| B4 | main run burns no food; a 30-day reserve fires | main: **0** burned (the carryover reached 13 380 of the 37 900 reserve by crop 20). 30 days did **not** fire in four crops (carryover 2 074 < 3 117): my reserve was too big for the twin. **5 days** (520 mol): burns 234 at crop 3's re-sow, then **661** a crop — the surplus — and the store holds at ~1 180; imports 0; books close | held (the twin re-run at 5 days) |
+| B5 | ~3 kg N a crop to N₂; fertilizer 2.5–4.5 kg a crop, 60–90 kg in all; crop, grain N and protein as 4b-2 | N₂ **2.57 kg** a crop (straw 1.56, feces 1.01), 54.7 kg in all; fertilizer **3.0–3.3 kg** a crop, **66.5 kg** in all; grain 87.0 % of USDA's N, protein **93.8 g** | held (straw N low: the roots keep their share) |
+| B6 | rationed 0; books close; control; 4b-2 unchanged | all held: carbon residual 0.000 every crop, nitrogen ~1e-11 kg; control byte for byte; `u197-560-recheck.txt`'s crops 1–4 equal `u197-3000.txt`'s line for line but crop 4's own harvest, after day 560 | held |
+
+**Why B1 missed: the burner takes the straw, not all the plant.** The crop holds ~33 000 mol C at its
+peak; the grain is ~15 200 and the straw burned **12 250**, so ~5 500 a crop still reaches the soil —
+the roots and the leaves shed during the season — on a soil that starts nearly empty. It is the soil
+filling to a lower level, not giving back: its gain falls ~7 % a crop late in the run (697 in crop 10, 344 in crop 20).
+
+**The carbon fix works, and the charge was needed.** The tank never ran short in eight years and the
+crop stayed at full size; 4b-2's ran dry on day 1534. The bigger charge mattered only with the char:
+the old 60 000 is 38 000 lower, so at char 0.064 the tank would have been empty well before day 2939
+(lowest 22 012 − 38 000 < 0); at char 0 it would have just held (38 693 − 38 000 = 693, about a week
+of the crew's breath at the low point).
+
+**What still drains the tank, crop 20 (char 0.064): char 832 (45 %), the food pile 666 (36 %), the
+soil 344 (19 %).** The soil's share is still shrinking; the food pile stops when the store reaches its
+year (37 900 mol — ~37 more crops at 666); **the char never stops**. So the one leak left for good is
+the 6.4 % CEEF's processor kept. ⚠ Whether that is real is unread: Fig. 1 draws the carbonizer's
+*"Carbon with minerals"* on into the incinerator, so the 3.3 mol C/day "Deposition" may be ten days'
+inventory rather than a lasting sink. At char 0 the tank's fall is soil + food pile alone, 1 010 a crop
+and falling.
+
+**Nitrogen is open again: ~2.6 kg a crop leaves as N₂.** BVAD's stoichiometry sends all the burned
+nitrogen to N₂, so the straw's 1.56 kg and the feces' 1.01 kg leave every crop, and the fertilizer
+pays: ~3.0 kg a crop, 66.5 kg over eight years (4b-2: 13.2, and 0 after crop 13). The soil's own
+turnover covers less than in 4b-2 (+2.06 against +4.35 kg a crop) because it no longer gets the straw
+and feces. Burning the food above a reserve would add its nitrogen too (the 5-day twin: +0.38 kg a
+crop). The carbon loop closed by opening the nitrogen one — the trade the plan named in §10.6 (b).
+
+**Where 4c leaves the station (day 3000, char 0.064).** Carbon: CO₂ tank 47 300 mol (lowest 22 012),
+char 17 485, soil 27 500, food store 22 358 (13 380 before crop 20's harvest went in). Nitrogen: N₂
+54.7 kg, fertilizer left 233.5 of 300, urine tank 5.0, food store 12.9, soil 6.2. Calories 100 %
+home-grown from crop 2, protein 94 g.
+
+**Next (the user's choice).**
+- **The char**: read whether CEEF's deposition is a lasting sink, or run at 0 as the incinerator's
+  end state (Fig. 1). At 0 the only lasting carbon leak left is the food pile, which stops at its year.
+- **The nitrogen the burner sends to N₂ (2.6 kg a crop)**: catch it (a processor that keeps nitrogen in
+  solution — wet oxidation, as BIOS-3 used — or NOx scrubbed to nitrate; `--burn-n-lost` is ready
+  for a cited share), or grow a nitrogen-fixing crop (a legume, as CEEF grew soybean; the user's
+  "later" of §10.2), or keep buying ~8 kg a year.
+- **The marsh** (§10's (d)), last of the user's order: it removes nitrogen too, so it is best placed
+  after the nitrogen choice.
