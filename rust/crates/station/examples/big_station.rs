@@ -20,6 +20,7 @@
 //! cargo run --release -q -p station --example big_station -- --co2-charge C --o2-charge O \
 //!     --fertilizer KG --soil-n-level G --urine-any-time --burn-wastes \
 //!     --burn-char-share F --burn-n-lost F --food-reserve-days D                          # Step 4c
+//! cargo run --release -q -p station --example big_station -- <Step 4c's flags> //!     --marsh-area A --marsh-growth G --marsh-plant-n F --marsh-residence-days D //!     --marsh-plants-to soil|burner                                                     # Step 4d-1
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
@@ -71,6 +72,13 @@
 //! the rest to the urine tank. All three are inputs, with no default. `--burn-co2-leak F` (plan
 //! §10.9; optional, absent = leak-free) sends carbon × F of the burned carbon outside as CO₂, taken
 //! from the tank's share, its O₂ still drawn.
+//!
+//! `--marsh-area A --marsh-growth G --marsh-plant-n F --marsh-residence-days D --marsh-plants-to
+//! soil|burner` (Step 4d-1, plan §10.11; needs Step 4c): Biosphere 2's wastewater marsh (Nelson et al.
+//! 1999). The crew's urine nitrogen goes to the marsh's water ([`MARSH_N`]) instead of the urine
+//! tank; [`Marsh`] sends it on to the tank over the residence time `D` days, and grows marsh plants
+//! on `A` m² at `G` g dry mass/m²/day with `F` of it nitrogen, their carbon from the room's CO₂, cut as
+//! they grow to the farm soil's litter or the burner's feed. All five are inputs, with no default.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -465,6 +473,100 @@ fn with_burner(state: State, fast: Registry, burn: Burn) -> (State, Registry) {
     (state, fast)
 }
 
+/// Step 4d-1's marsh water nitrogen (kg N): the crew's urine on its way to the urine tank.
+const MARSH_N: &str = "lab.marsh_n";
+/// Step 4d-1's marsh flow id.
+const MARSH: &str = "lab.marsh";
+/// Biosphere 2's marsh lamps (Nelson et al. 1999, §3.2): six 1000 W sodium lamps over its 41.1 m²
+/// (W/m²). A readout only — the marsh's lamp is not drawn from the grid nor heats the room (plan
+/// §10.11, a named gap).
+const B2_MARSH_LAMP_W_PER_M2: f64 = 6.0 * 1000.0 / 41.1;
+
+/// Step 4d-1's inputs, none with a default (plan §10.11): the marsh's area (m²), its plants' growth
+/// (g dry mass per m² per day; Biosphere 2's measured 40.5), their nitrogen (kg N per kg dry mass;
+/// Reddy et al. 1985's 0.037), the marsh water's residence time (days; Biosphere 2's 4), and where
+/// the cut plants go — the farm soil's litter, or the burner's feed (the user's switch).
+#[derive(Debug, Clone, Copy)]
+struct MarshOpts {
+    area: f64,
+    growth: f64,
+    plant_n: f64,
+    residence_days: f64,
+    to_soil: bool,
+}
+
+/// CARBON + OXYGEN + NITROGEN, Step 4d-1: Biosphere 2's wastewater marsh (Nelson et al. 1999). The
+/// crew's urine nitrogen arrives in [`MARSH_N`] ([`CrewNitrogen`] re-pointed). Each step:
+/// * the outflow, the water's nitrogen × dt ÷ the residence time, goes on to [`URINE_TANK`] (Biosphere
+///   2 sent its outflow to the crop irrigation);
+/// * the plants grow at `growth` g DM/m²/day, harvested as they grow (no standing crop kept), taking
+///   `plant_n` of their dry mass as nitrogen from what the outflow leaves — less if the water holds
+///   less, the growth then what the nitrogen allows. Their carbon, dry mass ÷ the crop's own dry mass
+///   per mol C (its carbon fraction, applied to marsh plants: a reading), comes from the room's CO₂
+///   with one O₂ back to the room; carbon and nitrogen to the soil's litter or the burner's feed.
+struct Marsh {
+    opts: MarshOpts,
+    dm_kg_per_mol_c: f64,
+}
+
+impl Flow for Marsh {
+    fn type_name(&self) -> &'static str {
+        "Marsh"
+    }
+
+    fn id(&self) -> &str {
+        MARSH
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let o = self.opts;
+        let water = amount(snapshot, MARSH_N);
+        let out = water * (dt / (o.residence_days * 86_400.0)).min(1.0);
+        let dm = o.area * o.growth * 1e-3 * dt / 86_400.0;
+        let n = (dm * o.plant_n).min(water - out).max(0.0);
+        let c = if o.plant_n > 0.0 { n / o.plant_n } else { dm } / self.dm_kg_per_mol_c;
+        let (to_c, to_n) = if o.to_soil {
+            (LITTER_CARBON, LITTER_N)
+        } else {
+            (BURNER_FEED, BURNER_FEED_N)
+        };
+        FlowResult::new(vec![
+            Leg::new(CARBON_POOL.to_string(), -c)?,
+            Leg::new(O2_POOL.to_string(), c)?,
+            Leg::new(to_c.to_string(), c)?,
+            Leg::new(MARSH_N.to_string(), -out - n)?,
+            Leg::new(URINE_TANK.to_string(), out)?,
+            Leg::new(to_n.to_string(), n)?,
+        ])
+    }
+}
+
+/// The station with Step 4d-1's marsh: [`MARSH_N`] (empty) and [`Marsh`]. The urine reaches it
+/// through [`with_food_nitrogen`]'s `urine_to`.
+fn with_marsh(
+    sc: &SealedStationScenario,
+    state: State,
+    fast: Registry,
+    opts: MarshOpts,
+) -> (State, Registry) {
+    let mut stocks = state.stocks.clone();
+    let s = simple_pool(MARSH_N, "lab", Quantity::Nitrogen, 0.0).expect("marsh water");
+    stocks.insert(s.id.clone(), s);
+    let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
+    let (mut flows, aux) = fast.into_parts();
+    flows.push(Box::new(Marsh {
+        opts,
+        dm_kg_per_mol_c: sc.plant_params().nitro.dm_kg_per_mol_c,
+    }));
+    let fast = Registry::new(flows, &state.stocks, aux).expect("fast registry");
+    (state, fast)
+}
+
 /// Step 3c's imported food, held back (mol C) — and its nitrogen (kg N) at the menu's N:C.
 const FOOD_RESERVE: &str = "lab.food_reserve";
 const FOOD_RESERVE_N: &str = "lab.food_reserve_n";
@@ -606,13 +708,15 @@ impl Flow for UrineDose {
 /// The station with Step 2c's food nitrogen: [`FOOD_N`] at the imported food's N:C, and
 /// [`CrewNitrogen`]. With Step 3c's `reserve` (mol C of imported food held back) also
 /// [`FOOD_RESERVE`] with its nitrogen, [`FoodTopUp`] to `level`, and the urine to [`URINE_TANK`].
-/// With Step 4c's `burn` the feces' nitrogen goes to [`BURNER_FEED_N`] instead of the litter.
+/// With Step 4c's `burn` the feces' nitrogen goes to [`BURNER_FEED_N`] instead of the litter; with
+/// Step 4d-1's `marsh` the urine goes to [`MARSH_N`] instead of the tank.
 fn with_food_nitrogen(
     sc: &SealedStationScenario,
     state: State,
     fast: Registry,
     reserve: Option<(f64, f64)>,
     burn: bool,
+    marsh: bool,
 ) -> (State, Registry) {
     let mut stocks = state.stocks.clone();
     let ratio = imported_n_per_mol_c(sc);
@@ -630,7 +734,11 @@ fn with_food_nitrogen(
             stocks.insert(s.id.clone(), s);
         }
         flows.push(Box::new(FoodTopUp { level }));
-        URINE_TANK
+        if marsh {
+            MARSH_N
+        } else {
+            URINE_TANK
+        }
     } else {
         SOIL_N
     };
@@ -808,7 +916,8 @@ fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
             + amount(s, URINE_TANK)
             + amount(s, FERTILIZER)
             + amount(s, BURNER_FEED_N)
-            + amount(s, N2_GAS),
+            + amount(s, N2_GAS)
+            + amount(s, MARSH_N),
     )
 }
 
@@ -1325,6 +1434,13 @@ struct Cycle {
     leaked: f64,
     n_to_gas: f64,
     n_caught: f64,
+    /// Step 4d-1 over the cycle: the urine into the marsh, the nitrogen its plants took, its
+    /// outflow to the tank (kg N), the carbon they fixed (mol C), and its water's nitrogen at the end.
+    marsh_in: f64,
+    marsh_n: f64,
+    marsh_out: f64,
+    marsh_c: f64,
+    marsh_end: f64,
 }
 
 #[derive(Default)]
@@ -1385,6 +1501,12 @@ struct Minutes {
     /// Step 4c, per day: the burner's CO₂ to the tank (mol C) and nitrogen caught (kg N).
     burned_co2: Vec<f64>,
     burn_n_caught: Vec<f64>,
+    /// Step 4d-1, per day: the urine into the marsh (kg N), the carbon its plants fixed from the
+    /// room (mol C), the nitrogen they took (kg N), and its outflow to the urine tank (kg N).
+    marsh_in: Vec<f64>,
+    marsh_c: Vec<f64>,
+    marsh_n: Vec<f64>,
+    marsh_out: Vec<f64>,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -1421,6 +1543,8 @@ struct Options {
     /// Step 4c: the straw, the feces and the food above a reserve burned back to CO₂; needs
     /// `urine_any_time`.
     burn: Option<Burn>,
+    /// Step 4d-1: the crew's urine through a marsh on its way to the urine tank; needs `burn`.
+    marsh: Option<MarshOpts>,
 }
 
 impl Options {
@@ -1440,6 +1564,7 @@ impl Options {
             fertilizer: self.fertilizer,
             urine_any_time: self.urine_any_time,
             burn: self.burn,
+            marsh: self.marsh,
         }
     }
 }
@@ -1456,6 +1581,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         fertilizer,
         urine_any_time,
         burn,
+        marsh,
     } = opts;
     assert!(
         fertilizer.is_none() || tanks.is_some(),
@@ -1468,6 +1594,10 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
     assert!(
         burn.is_none() || urine_any_time,
         "Step 4c builds on Step 4b-2's urine at any time"
+    );
+    assert!(
+        marsh.is_none() || burn.is_some(),
+        "Step 4d-1 builds on Step 4c's burner"
     );
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
@@ -1509,12 +1639,16 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         None => (state, fast),
     };
     let (state, fast) = if with_nitrogen {
-        with_food_nitrogen(&sc, state, fast, reserve, burn.is_some())
+        with_food_nitrogen(&sc, state, fast, reserve, burn.is_some(), marsh.is_some())
     } else {
         (state, fast)
     };
     let (state, fast) = match burn {
         Some(b) => with_burner(state, fast, b),
+        None => (state, fast),
+    };
+    let (state, fast) = match marsh {
+        Some(mo) => with_marsh(&sc, state, fast, mo),
         None => (state, fast),
     };
     // Step 4c's food reserve (mol C): the crew's intake × the input days.
@@ -1582,6 +1716,10 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         urine_late: vec![0.0; days],
         burned_co2: vec![0.0; days],
         burn_n_caught: vec![0.0; days],
+        marsh_in: vec![0.0; days],
+        marsh_c: vec![0.0; days],
+        marsh_n: vec![0.0; days],
+        marsh_out: vec![0.0; days],
         ..Minutes::default()
     };
     let nitro = sc.plant_params().nitro;
@@ -1750,6 +1888,16 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                             if let Some(u) = m.urine_in.get_mut(day) {
                                 *u += leg(&res, URINE_TANK);
                             }
+                            if let Some(u) = m.marsh_in.get_mut(day) {
+                                *u += leg(&res, MARSH_N);
+                            }
+                        }
+                        if f.id() == MARSH && day < days {
+                            // The marsh's outflow is the urine reaching the tank.
+                            m.urine_in[day] += leg(&res, URINE_TANK);
+                            m.marsh_out[day] += leg(&res, URINE_TANK);
+                            m.marsh_c[day] -= leg(&res, CARBON_POOL);
+                            m.marsh_n[day] += leg(&res, LITTER_N) + leg(&res, BURNER_FEED_N);
                         }
                         continue;
                     }
@@ -1907,6 +2055,11 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                 },
                 n_to_gas: amount(e, N2_GAS) - amount(s, N2_GAS),
                 n_caught: m.burn_n_caught[w[0]..w[1]].iter().sum(),
+                marsh_in: m.marsh_in[w[0]..w[1]].iter().sum(),
+                marsh_c: m.marsh_c[w[0]..w[1]].iter().sum(),
+                marsh_n: m.marsh_n[w[0]..w[1]].iter().sum(),
+                marsh_out: m.marsh_out[w[0]..w[1]].iter().sum(),
+                marsh_end: amount(e, MARSH_N),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -1941,6 +2094,9 @@ fn report(r: &Run) {
         r.crew,
         r.days,
         match (o.co2_store, o.food_loop) {
+            (_, true) if o.marsh.is_some() => {
+                ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP                  WITH FERTILIZER + URINE AT ANY TIME + WASTES BURNED + URINE MARSH"
+            }
             (_, true) if o.burn.is_some() => {
                 ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP \
                  WITH FERTILIZER + URINE AT ANY TIME + WASTES BURNED"
@@ -2124,6 +2280,24 @@ fn report(r: &Run) {
                 c.tank_end,
                 c.tank_end / (c.urine_in / c.days as f64).max(f64::MIN_POSITIVE)
             );
+            if let Some(mo) = o.marsh {
+                println!(
+                    "           marsh ({} m²): urine in {:.3} kg; plants fixed {:.1} mol C ({:.3} mol C/m²/day)                      and took {:.3} kg N ({:.3} g/m²/day) to the {}; outflow to the urine tank {:.3} kg                      (the tank's 'in' above); water holds {:.1} g at the end",
+                    mo.area,
+                    c.marsh_in,
+                    c.marsh_c,
+                    c.marsh_c / mo.area / c.days as f64,
+                    c.marsh_n,
+                    1e3 * c.marsh_n / mo.area / c.days as f64,
+                    if mo.to_soil {
+                        "soil's litter"
+                    } else {
+                        "burner (not in its 'in' above)"
+                    },
+                    c.marsh_out,
+                    1e3 * c.marsh_end
+                );
+            }
             if o.urine_any_time {
                 println!(
                     "           urine dosed after the window {:.3} kg (inside it {:.3} kg)",
@@ -2205,6 +2379,27 @@ fn report(r: &Run) {
             amount(s, FERTILIZER),
             amount(e, FERTILIZER)
         );
+        if let Some(mo) = o.marsh {
+            let (n_in, c_fixed, n_taken, out) = r.cycles.iter().fold((0.0, 0.0, 0.0, 0.0), |t, c| {
+                (t.0 + c.marsh_in, t.1 + c.marsh_c, t.2 + c.marsh_n, t.3 + c.marsh_out)
+            });
+            println!(
+                "  marsh over the run ({} m², growth {} g DM/m²/day, plant N {}, residence {} days,                  plants to the {}): urine in {:.3} kg N; plants fixed {:.1} mol C and took {:.3} kg N;                  outflow {:.3} kg N; water {:.1} → {:.1} g N; its lamp at Biosphere 2's {:.0} W/m²                  would draw {:.1} kWh/day (NOT drawn: a named gap)",
+                mo.area,
+                mo.growth,
+                mo.plant_n,
+                mo.residence_days,
+                if mo.to_soil { "soil" } else { "burner" },
+                n_in,
+                c_fixed,
+                n_taken,
+                out,
+                1e3 * amount(s, MARSH_N),
+                1e3 * amount(e, MARSH_N),
+                B2_MARSH_LAMP_W_PER_M2,
+                B2_MARSH_LAMP_W_PER_M2 * mo.area * 24.0 / 1e3
+            );
+        }
         if o.burn.is_some() {
             let (in_c, back) = r.cycles.iter().fold((0.0, 0.0), |(x, y), c| {
                 (
@@ -2387,6 +2582,31 @@ fn main() {
                     leak
                 }),
             }
+        }),
+        marsh: arg("--marsh-area").map(|x| {
+            let need = |name: &str| -> f64 {
+                arg(name)
+                    .unwrap_or_else(|| panic!("Step 4d-1 takes {name} (no default)"))
+                    .parse()
+                    .unwrap_or_else(|_| panic!("{name} X"))
+            };
+            let o = MarshOpts {
+                area: x.parse().expect("--marsh-area M2"),
+                growth: need("--marsh-growth"),
+                plant_n: need("--marsh-plant-n"),
+                residence_days: need("--marsh-residence-days"),
+                to_soil: match arg("--marsh-plants-to").map(String::as_str) {
+                    Some("soil") => true,
+                    Some("burner") => false,
+                    _ => panic!("Step 4d-1 takes --marsh-plants-to soil|burner (no default)"),
+                },
+            };
+            assert!(
+                o.area > 0.0 && o.growth >= 0.0 && o.residence_days > 0.0,
+                "--marsh-area > 0, --marsh-growth >= 0, --marsh-residence-days > 0"
+            );
+            assert!((0.0..1.0).contains(&o.plant_n), "--marsh-plant-n: 0 to 1");
+            o
         }),
     };
     // Step 3c's farm (plan §9): 700 m², the round area above the 658 m² that feeds four crew.

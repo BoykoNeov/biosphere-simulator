@@ -1362,3 +1362,132 @@ straw, which CEEF burned in a separate carbonizer whose char was never measured 
 borrowed, not measured). **Nitrogen: the Ru catalyst's half caught (`--burn-n-lost 0.5`) stays on**
 for later steps, until a legume. **Leak**: leak-free stays the design. So the next steps run on
 `--burn-char-share 0.116 --burn-n-lost 0.5`, not `b-3000.txt`'s settings.
+
+## 10.11 Step 4d — the wastewater marsh: urine through a marsh, nitrogen in the drained water, the drained water through the marsh (lab)
+
+**The user, 2026-11-15**, after `/clear` and "what is next": the marsh (§10's (d), last of the user's
+order). Asked *what the marsh treats*: **"Both"** — the crew's urine and the farm's drained water. Asked
+*whether it keeps nitrogen for the farm or cleans the water* (a side note had flagged that the user's
+October words, *"to the marsh and then transported manually to the soil by the crew"*, describe a marsh
+that HOLDS nitrogen): **"Measure both"** — a switch for where the cut marsh plants go, both runs.
+Settings for every run: the user's choices of §10.10 (`--burn-char-share 0.116 --burn-n-lost 0.5`,
+leak-free), with `b-3000.txt`'s others (98 000 / 11 000 mol, 300 kg, 1.97 g/m², 365 days, 700 m², four
+crew, 3000 days). The new baseline is `m0-3000.txt` (no marsh); none of §10.10's runs had 0.116 and
+0.5 together.
+
+**⚠ Correction to how the question was put.** Both questions said a treatment marsh *"mostly loses
+nitrogen to the air"*. The two sources read below say it depends on the FORM the nitrogen arrives in:
+- **Ammonium** (urine, after its urea hydrolyses) in a bed with little oxygen **stays ammonium**: the
+  bacteria that make N₂ need nitrate, and nitrate needs oxygen to form. Biosphere 2 measured this
+  (Nelson et al. 1999, §3.3: *"N was predominantly present as ammonium in the anaerobic holding tanks
+  and wetlands, and was oxidized to nitrate in the crop irrigation tanks"*; dissolved oxygen *"typically
+  measured around 1 mg/l"*), and the EPA manual says it of submerged beds (EPA 2000, §3.4.3: *"there
+  will be insufficient oxygen to promote reliable nitrification in all but the most lowly loaded
+  systems"*).
+- **Nitrate** (what drained farm water carries) **is denitrified quickly** in the same bed, limited by
+  organic carbon (EPA 2000, §3.4.3: such beds *"would seem to be well suited for denitrification of
+  nitrified influents"*; §5.2.1.4: minimum *"2.3 g-COD/g-NO3-N"*; Gersberg et al. 1983, as quoted
+  there: *"nitrate removal improved from 30% to 80% when mulched biomass … was applied"*).
+So the urine marsh should mostly KEEP nitrogen (its plants take some, the rest flows on), and the
+drainage marsh should LOSE most of the nitrate sent to it. The user's two choices stand; this is
+recorded so the record does not carry the wrong framing.
+
+**Sources** (`sources\temp-evidence\marsh\README.md` lists the URLs).
+- **Nelson et al. 1999**, *Ecol. Eng.* 13:189–197 (`sources\Nelson_1999_Biosphere2_constructed_wetland_EcolEng13.pdf`,
+  read in full). Biosphere 2's marsh, 1991–93: **41.1 m²**, 0.4 m deep, gravel + soil, fed from below
+  (submerged flow), **~4 days** residence; it took the habitat's wastewater (0.76–0.95 m³/day), the goats'
+  and the labs'; the hydraulic loading is *"estimated"* (§2.1: extrapolated from a 3-month log). **Harvest
+  measured** (§2.1: *"weighing all cut material"*): **723 kg dry emergent + 493 kg dry floating = 1 216
+  kg over two years → 40.5 g DM/m²/day**, light-limited, under glass at 40–50 % of outside light with six
+  1000 W sodium lamps added six months in (**146 W/m²**). Cut plants fed to the animals, the rest
+  composted (Fig. 2c caption); the outflow went to the crop irrigation. Its nitrogen analyses were
+  *"single analyses, so must be interpreted as only suggestive"* — the marsh's nitrogen balance was
+  never measured.
+- **US EPA 2000**, *Constructed Wetlands Treatment of Municipal Wastewaters*, EPA/625/R-99/010
+  (`sources\EPA_2000_constructed_wetlands_manual_625R99010.pdf`; the nitrogen sections read in full).
+  Submerged beds: plant nitrogen uptake *"(0.03 to 0.3 g/m²/d) … is low compared to typical nitrogen
+  loading"* (§3.4.3); fully vegetated surface marshes remove ~28 % of TKN, mostly by settling (§4.1.5.3).
+- **Reddy, Hueston & McKim 1985**, *J. Solar Energy Eng.* 107(2) — ⚠ **abstract only** (OSTI record):
+  water hyacinth on primary sewage effluent **3.7 % N** of dry mass (2.8 % on secondary); ~16 g DM/m²/day
+  outdoors in Florida; 1 176–1 193 kg N/ha/yr (**0.32 g N/m²/day**).
+- **Soltani & Sinclair** (`[F]`, on the shelf), Ch. 18, **Eqn 18.14**: *"NLEACH = NSOL × (DRAIN1 / (WAT1
+  + DRAIN1))"* — leached nitrogen is the soil's soluble nitrogen times the share of the water that
+  leaves; *"set to 0 if N concentration in the top layer is very low, i.e. less than 0.000001 g N g-1
+  water (1 mg N l-1)"*.
+
+**Three slices, each its own flag, each measured before the next** (the advisor's order of §10 holds:
+one change at a time). Without the flags the build is byte for byte the old one
+(`m0-recheck-3000.txt` against `m0-3000.txt`).
+
+### Slice 4d-1 — the urine marsh (`--marsh-area A --marsh-growth G --marsh-plant-n F --marsh-residence-days D --marsh-plants-to soil|burner`)
+
+- **The urine goes to a marsh, not straight to the tank.** The crew's urine nitrogen (88 %, as now)
+  goes to the marsh's water (`lab.marsh_n`); the marsh's outflow, its water nitrogen ÷ `D` per day
+  (Biosphere 2's **4 days**), goes on to the urine tank, which doses the soil as before — as Biosphere 2
+  sent its outflow to the crop irrigation. The burner's caught nitrogen still goes to the tank directly.
+- **The marsh plants grow at Biosphere 2's measured rate, harvested as they grow.** `G` = **40.5 g
+  DM/m²/day** (Nelson et al.; one source of truth — the EPA's 0.03–0.3 g N/m²/day is for a different
+  kind of bed, and Reddy's outdoor 0.32 is the cross-check this will exceed by ~5×). Carbon = DM × the
+  crop's own carbon fraction **0.45** (a reading: wheat's, source `[B]` of `nitrogen.yaml`, applied to marsh
+  plants), drawn from the room's CO₂ with one O₂ back (the model's photosynthesis ratio), spread evenly
+  over the day (the lamp's hours are not modelled). Nitrogen = DM × `F` = **0.037** (Reddy, abstract),
+  from the marsh's water; if the water holds less, growth falls to what the nitrogen allows. No standing
+  marsh crop is kept: Biosphere 2 cut continuously, so the standing biomass is taken as steady.
+- **Where the cut plants go — the user's switch.** `soil`: to the farm soil's litter (carbon and
+  nitrogen), the crew carrying the compost over (Biosphere 2 composted what the animals did not eat; the
+  user's October picture). `burner`: to the burner's feed, CO₂ back to the tank less the char, half the
+  nitrogen to N₂ (the catalyst), half to the urine tank.
+- **`A` = 20 m²** — Biosphere 2's 41.1 m² ÷ 8 crew × 4: ⚠ a reading, not a citation; that marsh also took
+  the animals' and the labs' water.
+- **Named gaps, not built**: the marsh's lamp (146 W/m² × 20 m² = 2.9 kW, ~70 kWh/day, ~4.7 % of the
+  station's 1 500) — reported, not drawn from the grid nor heating the room; the marsh's water (its
+  transpiration, ~2.4 kg/m²/day if it matches the crop, ~50 kg/day into the room's air) — not modelled;
+  the marsh's own sediment carbon (the cut plants carry all of it).
+
+**Predictions (written before the runs; from `b-char116-3000.txt`'s books, whose carbon `m0-3000.txt`
+should repeat).** At 20 m²: carbon **1.52 mol C/m²/day → 30.4 mol/day, ~4 250 mol a crop**; nitrogen
+**1.50 g/m²/day → 30.0 g/day, 4.20 kg a crop** (the urine brings 52.8 g/day, so the marsh is not short).
+- **M1 — the urine tank**: inflow from the urine falls **7.40 → ~3.2 kg a crop** (the marsh's outflow,
+  52.8 − 30.0 g/day); the marsh's water holds a steady **~90 g** (22.8 g/day × 4 days).
+- **M2 (`soil`) — nitrogen**: the 4.2 kg a crop reaches the soil as litter instead of as urine, so the
+  fertilizer draw moves little once the litter turns over: **+0 to +1.5 kg a crop** in the first crops
+  (nitrogen settling into the humus), back within **~0.5 kg** of `m0-3000.txt`'s draw by the last crops.
+- **M3 (`soil`) — carbon, the risk**: ~4 250 mol a crop into the litter. The soil breathes most of it back,
+  but its slow pools keep a share; if **≥ ~2 %** of what goes in stays each crop the tank's 8 460 mol of
+  spare runs out. Prediction: **the CO₂ tank runs dry, between crop 8 and crop 18**; after that the crop
+  shrinks (the leak run of §10.10: to ~58 %).
+- **M4 (`burner`) — nitrogen**: half of 4.2 kg to N₂ — **+~2.1 kg a crop of fertilizer, +~40–45 kg over
+  the run** against `m0-3000.txt`.
+- **M5 (`burner`) — carbon**: char **+~490 mol a crop**, ~10 300 over the run against the 8 460 spare:
+  **the tank runs dry in the last crops (day ~2400–2939), or ends within ~2 000 mol of empty**.
+- **M6** — rationed 0 and 0 while the tank holds; carbon, oxygen and nitrogen books close every crop;
+  the marsh's uptake per m² is **~5×** Reddy's outdoor 0.32 and **~5–50×** the EPA's 0.03–0.3.
+
+### Slice 4d-2 — nitrogen leaves with the drained water (`--leaching`)
+
+- **The rule** ([F] Eqn 18.14): when a watering event sends water past the roots, it carries the root
+  zone's dissolved nitrogen × percolated ÷ (root-zone water + percolated). ⚠ The book applies it to the
+  **top layer's drainage**; here that drainage is inert (the watering stops at field capacity), and the
+  water that passes the roots is the watering's own percolation share (FAO's application efficiency) —
+  applying the equation to that share is a **reading**, stated. The concentration comes from the same
+  function the roots' uptake reads (one copy, so they cannot drift); the book's 1 mg/L floor is kept.
+- **The nitrogen follows the water everywhere the water goes below the roots**: a subsoil nitrogen stock;
+  the roots' capture of subsoil water carries its share back up into the soil's solution; the subsoil's
+  overflow carries its share to the plants' water tank (a tank nitrogen stock), which returns it with each
+  watering in proportion to the water drawn; the tank's drain to the crew's recycler sends its share to
+  the urine tank (the recycler's brine — a reading). Without a marsh the loop is closed: a delay, not a
+  sink.
+- **Predictions are written before its run**, after 4d-1 is measured. The scale, for orientation:
+  percolation ~174 kg/day at ~50 mg/L ≈ **~9 g N/day, ~1.2 kg a crop** leached; the roots recapture most
+  of it (root capture 625 kg/day against overflow 96).
+
+### Slice 4d-3 — the drained water through the marsh (`--drain-to-marsh --marsh-denitrified F`)
+
+- The subsoil overflow's nitrogen goes to the marsh's water instead of the plants' tank (the water
+  itself still to the tank: the marsh's water is not modelled). Of it, **`F` is denitrified to N₂ on
+  entry** (Gersberg et al. 1983 via EPA 2000: **0.3** without added plant matter, **0.8** with) — run at
+  both ends; the rest joins the marsh's water as in 4d-1. The bacteria's carbon (2.3 g COD per g nitrate
+  N, EPA 2000) is checked against the marsh's plant production, not drawn (a readout).
+- **Predictions are written before its run.** The scale: the overflow carries ~13 % of what the subsoil
+  turns over, so **~0.1–0.3 kg N a crop** reaches the marsh and **~0.05–0.25 kg** goes to N₂ — small,
+  because the watering only refills what the soil lost.
