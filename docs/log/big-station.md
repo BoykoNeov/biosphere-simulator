@@ -135,4 +135,6 @@ for a whole ecosystem, bigger than biosphere-2"*. A plan; nothing built, no valu
   dry day 1257, the crop at 58 %, and — not predicted — the O₂ tank empties (day 2443): every leaked
   carbon takes two oxygen atoms; the room reaches 0 % O₂. Char 0.116 (the measured stream): never
   short, lowest 8 460 mol. Nitrogen at Takahashi & Ohya 1986's Ru catalyst (half denitrified):
-  fertilizer 66.5 → 40.3 kg over 3000 days, nothing else moves; a legume later (the user).
+  fertilizer 66.5 → 40.3 kg over 3000 days, nothing else moves; a legume later (the user). The
+  leak run is unrationed to day 2380: the 58 % crop is the science, the rationing starts with the O₂
+  tank empty. The user chose char 0.116 (dumped, borrowed for straw) and the catalyst share kept on.

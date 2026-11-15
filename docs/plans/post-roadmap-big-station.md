@@ -1317,7 +1317,7 @@ fertilizer 300 kg, 1.97 g/m², reserve 365 days, 700 m², four crew, 3000 days) 
 | L1 | ~5 850 mol C a crop leaks; the tank falls ~7 000–9 000 a crop | **5 840–5 849** a crop while the crop is full; the tank fell 12 464, 9 522, 8 702 … **8 206** (crop 7) | held |
 | L2 | the tank runs dry crop 8–12; the crop then shrinks to ~88–90 % | dry on **day 1257** (crop 8); grain 21.9 → 14.4 (crop 9) → **12.7 mol C/m²**, **58 %** of full; calories home-grown 100 → **~61 %**, imported food back (20.5 % of all eaten, 63 816 mol C) | held (date); **missed** (size: 58 %, not 88–90 %) |
 | L3 | O₂ tank follows `b-3000.txt` until the CO₂ tank is short; O₂ change = −(CO₂ change + leaked) | equal to the printed digit every crop while both tanks have gas (crop 2: +3 677.2 = −(−9 522.4 + 5 845.2)). Then the **O₂ tank drains ~4 700 a crop and empties: within days from crop 18, for good on day 2443**; the crew's room falls to **0.00 % O₂** | held, and **a loss not predicted** |
-| L4 | rationed 0; books close; recheck byte for byte | recheck **byte for byte** ✓. Rationed **(3 192, 207 732)** steps; the printed carbon residual is 0.000 to crop 17, then **+1 197, +3 096, +4 690, +5 124** — once the O₂ tank empties within the day. The engine's own conservation check held (the run finished); the printed books' gap under rationing is **not traced** | **missed** |
+| L4 | rationed 0; books close; recheck byte for byte | recheck **byte for byte** ✓. Rationed **(3 192, 207 732)** steps; the printed carbon residual is 0.000 to crop 17, then **+1 197, +3 096, +4 690, +5 124** — once the O₂ tank empties within the day. **Timed (advisor's check): `l45-2380.txt` (crops 0–16) and `l45-1250.txt` are rationed (0, 0)** — the rationing and the residual begin only once the O₂ tank empties, after the station has failed; the 58 % crop is the science, not the backstop. The engine's own conservation check held (the run finished); the printed books' gap under rationing is **not traced** | **missed** (only after failure) |
 | N1 | ~1.29 kg N a crop to N₂ | **27.3 kg** over the run (half of 54.7) | held |
 | N2 | fertilizer ~1.7–2.0 kg a crop, 35–42 kg in all | **40.3 kg** in all (~1.9 a crop; `b-3000.txt` 66.5); the urine tank ends 6.1 kg (4.97) | held |
 | N3 | crop, grain N, protein as `b-3000.txt`; carbon lines equal | every carbon line equal to `b-3000.txt`'s; protein **93.8 g**, grain 87 % of USDA's N | held |
@@ -1355,3 +1355,10 @@ sinks), and half still goes to gas. The legume (the user's "2 in the future") wo
   measured on what reached the processor). 0.064 is neither: it divided by an estimated input.
 - **Nitrogen**: the catalyst share is ready (`--burn-n-lost 0.5`); the legume is a future step.
 - **Not traced**: the printed carbon residual under heavy rationing (L4).
+
+**The user's choices, 2026-11-15.** **Char: 0.116, dumped** — what CEEF's 2007 run did (the
+measured stream; ⚠ that stream was the crew-and-goat waste line, and ~94 % of this burner's feed is
+straw, which CEEF burned in a separate carbonizer whose char was never measured — so 0.116 on straw is
+borrowed, not measured). **Nitrogen: the Ru catalyst's half caught (`--burn-n-lost 0.5`) stays on**
+for later steps, until a legume. **Leak**: leak-free stays the design. So the next steps run on
+`--burn-char-share 0.116 --burn-n-lost 0.5`, not `b-3000.txt`'s settings.
