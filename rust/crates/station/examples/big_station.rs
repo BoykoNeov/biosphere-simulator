@@ -21,6 +21,7 @@
 //!     --fertilizer KG --soil-n-level G --urine-any-time --burn-wastes \
 //!     --burn-char-share F --burn-n-lost F --food-reserve-days D                          # Step 4c
 //! cargo run --release -q -p station --example big_station -- <Step 4c's flags> //!     --marsh-area A --marsh-growth G --marsh-plant-n F --marsh-residence-days D //!     --marsh-plants-to soil|burner                                                     # Step 4d-1
+//! cargo run --release -q -p station --example big_station -- <Step 4d-1's flags> --leaching  # 4d-2
 //! ```
 //!
 //! `--co2-store` (Step 2a, plan §5): the big run keeps the crew's CO₂ for the plants, after CEEF
@@ -79,6 +80,13 @@
 //! tank; [`Marsh`] sends it on to the tank over the residence time `D` days, and grows marsh plants
 //! on `A` m² at `G` g dry mass/m²/day with `F` of it nitrogen, their carbon from the room's CO₂, cut as
 //! they grow to the farm soil's litter or the burner's feed. All five are inputs, with no default.
+//!
+//! `--leaching` (Step 4d-2, plan §10.13; needs Step 4d-1): the drained water carries its nitrogen.
+//! The flows that move water into, out of or below the root zone are wrapped
+//! ([`CarriesNitrogen`]): the watering's share past the roots leaches the soil solution by [F]
+//! Eqn 18.14 into [`SUBSOIL_N`], the roots' capture and the overflow carry the subsoil's nitrogen
+//! back to the soil and on to the plants' tank ([`PLANT_TANK_N`]), and the watering brings the
+//! tank's back.
 //!
 //! `--crew N` (the attribution check): the big run with N crew, their food and water stores ×
 //! N / 4. At `N = 4a` every m² gets the 1 m² run's CO₂, so a crop per m² back at the 1 m² run's
@@ -151,7 +159,7 @@ use station::sealed::{
 };
 use station::sowing::twin;
 use station::stocks::{co2_composition, gas_boundary, gas_pool, o2_composition, simple_pool};
-use station::water_reserve::working_level;
+use station::water_reserve::{working_level, RESERVE_TOP_UP, TANK_DRAIN};
 
 /// The chamber's height (m) in `chamber.yaml`'s wall-area rule: BVAD's shoot + root zone.
 const CHAMBER_HEIGHT: f64 = 0.78;
@@ -567,6 +575,182 @@ fn with_marsh(
     (state, fast)
 }
 
+/// Step 4d-2's nitrogen dissolved in the water below the roots, and in the plants' water tank (kg N).
+const SUBSOIL_N: &str = "lab.subsoil_n";
+const PLANT_TANK_N: &str = "lab.plant_tank_n";
+/// The water flows [`CarriesNitrogen`] wraps, by id.
+const WATERING: &str = "biosphere.recycling";
+const DRAINAGE: &str = "biosphere.drainage";
+const ROOT_ZONE_CAPTURE: &str = "biosphere.root_zone_capture";
+const SUBSOIL_OVERFLOW: &str = "biosphere.subsoil_overflow";
+
+/// What a wrapped water flow's water carries (Step 4d-2, plan §10.13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Carry {
+    /// Water onto the soil (the watering, the crew store's top-up) or past the roots (drainage):
+    /// the share past the roots leaches the soil solution ([F] Eqn 18.14), and water drawn from
+    /// the plants' tank brings the tank's nitrogen, split as the water splits.
+    Down,
+    /// Water from below the roots, to the root zone (the roots' capture) or the plants' tank (the
+    /// overflow): the subsoil's nitrogen at its concentration.
+    Subsoil,
+    /// The plants' tank to the crew's recycler: the tank's nitrogen to the urine tank (the
+    /// recycler's brine — a reading).
+    TankDrain,
+}
+
+/// NITROGEN with WATER, Step 4d-2: a water flow whose own legs carry their dissolved nitrogen in
+/// the same step — the water rule is the wrapped flow's, never a second copy. The soil solution is
+/// the top layer's ([F]'s NSOL, the layer the roots' concentration reads), so the re-sow's return
+/// of the abandoned root zone's water to the subsoil carries none.
+struct CarriesNitrogen {
+    inner: Box<dyn Flow>,
+    carry: Carry,
+    soil: SolutionUptake,
+}
+
+/// `n` × the share `out` of `held` moved, 0 when nothing is held or moved.
+fn carried(n: f64, out: f64, held: f64) -> f64 {
+    if out > 0.0 && held > 0.0 {
+        n * (out / held).min(1.0)
+    } else {
+        0.0
+    }
+}
+
+impl CarriesNitrogen {
+    /// [F] Eqn 18.14, NLEACH = NSOL × DRAIN1 ÷ (WAT1 + DRAIN1), set to 0 when the concentration
+    /// is at or below 1 mg/L (the book's listing: `If NCON <= 0.000001 Then NLEACH = 0`).
+    fn leached(&self, s: &State, drain: f64) -> f64 {
+        if drain <= 0.0 || self.soil.concentration(s) <= SOLUTION_N_FLOOR {
+            return 0.0;
+        }
+        amount(s, SOIL_N) * drain / (self.soil.layer_water(s).1 + drain)
+    }
+}
+
+fn add(n: &mut std::collections::BTreeMap<&'static str, f64>, id: &'static str, x: f64) {
+    *n.entry(id).or_insert(0.0) += x;
+}
+
+impl Flow for CarriesNitrogen {
+    fn type_name(&self) -> &'static str {
+        "CarriesNitrogen"
+    }
+
+    fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    fn priority(&self) -> i64 {
+        self.inner.priority()
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let res = self.inner.evaluate(snapshot, env, dt)?;
+        let w = |id: &str| leg(&res, id);
+        let mut n = std::collections::BTreeMap::new();
+        match self.carry {
+            Carry::Down => {
+                let (to_soil, below) = (w(SOIL_WATER).max(0.0), w(SUBSOIL_WATER).max(0.0));
+                let from_tank = carried(
+                    amount(snapshot, PLANT_TANK_N),
+                    -w(CONDENSATE),
+                    amount(snapshot, CONDENSATE),
+                );
+                if from_tank > 0.0 && to_soil + below > 0.0 {
+                    add(&mut n, PLANT_TANK_N, -from_tank);
+                    add(&mut n, SOIL_N, from_tank * to_soil / (to_soil + below));
+                    add(&mut n, SUBSOIL_N, from_tank * below / (to_soil + below));
+                }
+                let leached = self.leached(snapshot, below);
+                add(&mut n, SOIL_N, -leached);
+                add(&mut n, SUBSOIL_N, leached);
+            }
+            Carry::Subsoil => {
+                let out = carried(
+                    amount(snapshot, SUBSOIL_N),
+                    -w(SUBSOIL_WATER),
+                    amount(snapshot, SUBSOIL_WATER),
+                );
+                let (up, tank) = (w(SOIL_WATER).max(0.0), w(CONDENSATE).max(0.0));
+                if out > 0.0 && up + tank > 0.0 {
+                    add(&mut n, SUBSOIL_N, -out);
+                    add(&mut n, SOIL_N, out * up / (up + tank));
+                    add(&mut n, PLANT_TANK_N, out * tank / (up + tank));
+                }
+            }
+            Carry::TankDrain => {
+                let out = carried(
+                    amount(snapshot, PLANT_TANK_N),
+                    -w(CONDENSATE),
+                    amount(snapshot, CONDENSATE),
+                );
+                add(&mut n, PLANT_TANK_N, -out);
+                add(&mut n, URINE_TANK, out);
+            }
+        }
+        let mut legs = res.legs;
+        for (id, x) in n {
+            if x != 0.0 {
+                legs.push(Leg::new(id.to_string(), x)?);
+            }
+        }
+        FlowResult::new(legs)
+    }
+}
+
+/// The station with Step 4d-2's [`SUBSOIL_N`] and [`PLANT_TANK_N`] (both empty at the start), and
+/// every flow that moves water into, out of or below the root zone wrapped in [`CarriesNitrogen`]:
+/// the watering, the crew store's top-up and the drainage ([`Carry::Down`]), the roots' capture and
+/// the overflow ([`Carry::Subsoil`]), the tank's drain ([`Carry::TankDrain`]). Each of the watering,
+/// the capture and the overflow must be found once — a build that lost one would lose its nitrogen.
+fn with_leaching(
+    sc: &SealedStationScenario,
+    state: State,
+    bio: Registry,
+    fast: Registry,
+) -> (State, Registry, Registry) {
+    let mut stocks = state.stocks.clone();
+    for id in [SUBSOIL_N, PLANT_TANK_N] {
+        let s = simple_pool(id, "lab", Quantity::Nitrogen, 0.0).expect("Step 4d-2 stock");
+        stocks.insert(s.id.clone(), s);
+    }
+    let state = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).expect("state");
+    let mut found = std::collections::BTreeMap::new();
+    let mut wrap = |reg: Registry| -> Registry {
+        let (flows, aux) = reg.into_parts();
+        let flows = flows
+            .into_iter()
+            .map(|f| -> Box<dyn Flow> {
+                let carry = match f.id() {
+                    WATERING | RESERVE_TOP_UP | DRAINAGE => Carry::Down,
+                    ROOT_ZONE_CAPTURE | SUBSOIL_OVERFLOW => Carry::Subsoil,
+                    TANK_DRAIN => Carry::TankDrain,
+                    _ => return f,
+                };
+                *found.entry(f.id().to_string()).or_insert(0) += 1;
+                Box::new(CarriesNitrogen {
+                    inner: f,
+                    carry,
+                    soil: SolutionUptake::new(sc),
+                })
+            })
+            .collect();
+        Registry::new(flows, &state.stocks, aux).expect("registry")
+    };
+    let (bio, fast) = (wrap(bio), wrap(fast));
+    for id in [WATERING, ROOT_ZONE_CAPTURE, SUBSOIL_OVERFLOW] {
+        assert_eq!(found.get(id), Some(&1), "Step 4d-2 wraps {id} exactly once");
+    }
+    (state, bio, fast)
+}
+
 /// Step 3c's imported food, held back (mol C) — and its nitrogen (kg N) at the menu's N:C.
 const FOOD_RESERVE: &str = "lab.food_reserve";
 const FOOD_RESERVE_N: &str = "lab.food_reserve_n";
@@ -902,9 +1086,10 @@ fn with_real_soil(
 
 /// The nitrogen the run books (kg N): the plant's, the soil's (available, litter, microbes, humus),
 /// the food's, and held back (Step 3c's reserve and urine tank, Step 4b's fertilizer store, Step
-/// 4c's burner feed and the N₂ it made).
+/// 4c's burner feed and the N₂ it made, Step 4d-1's marsh water; Step 4d-2's subsoil nitrogen with
+/// the soil's, its plants' tank with what is held back).
 fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
-    let soil = [SOIL_N, LITTER_N, MICROBIAL_N, HUMUS_N]
+    let soil = [SOIL_N, LITTER_N, MICROBIAL_N, HUMUS_N, SUBSOIL_N]
         .iter()
         .map(|id| amount(s, id))
         .sum();
@@ -917,7 +1102,8 @@ fn nitrogen(s: &State) -> (f64, f64, f64, f64) {
             + amount(s, FERTILIZER)
             + amount(s, BURNER_FEED_N)
             + amount(s, N2_GAS)
-            + amount(s, MARSH_N),
+            + amount(s, MARSH_N)
+            + amount(s, PLANT_TANK_N),
     )
 }
 
@@ -1441,6 +1627,11 @@ struct Cycle {
     marsh_out: f64,
     marsh_c: f64,
     marsh_end: f64,
+    /// Step 4d-2 over the cycle: [`Minutes::leach`]'s six sums (kg N), and the nitrogen below the
+    /// roots and in the plants' tank at the end.
+    leach: [f64; 6],
+    subsoil_n_end: f64,
+    plant_tank_n_end: f64,
 }
 
 #[derive(Default)]
@@ -1507,6 +1698,10 @@ struct Minutes {
     marsh_c: Vec<f64>,
     marsh_n: Vec<f64>,
     marsh_out: Vec<f64>,
+    /// Step 4d-2, per day (kg N): leached past the roots, taken back up by the roots' capture, sent
+    /// by the overflow to the plants' tank, watered back from the tank, drained from the tank to the
+    /// urine tank, and the soil solution's net change from all of them.
+    leach: Vec<[f64; 6]>,
     /// Every flow's legs on the water stocks ([`WATER_STOCKS`]), summed over the run (kg).
     water: std::collections::BTreeMap<(String, &'static str), f64>,
 }
@@ -1545,6 +1740,8 @@ struct Options {
     burn: Option<Burn>,
     /// Step 4d-1: the crew's urine through a marsh on its way to the urine tank; needs `burn`.
     marsh: Option<MarshOpts>,
+    /// Step 4d-2: the drained water carries its nitrogen ([`with_leaching`]); needs `marsh`.
+    leaching: bool,
 }
 
 impl Options {
@@ -1565,6 +1762,7 @@ impl Options {
             urine_any_time: self.urine_any_time,
             burn: self.burn,
             marsh: self.marsh,
+            leaching: self.leaching,
         }
     }
 }
@@ -1582,6 +1780,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         urine_any_time,
         burn,
         marsh,
+        leaching,
     } = opts;
     assert!(
         fertilizer.is_none() || tanks.is_some(),
@@ -1599,6 +1798,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         marsh.is_none() || burn.is_some(),
         "Step 4d-1 builds on Step 4c's burner"
     );
+    assert!(!leaching || marsh.is_some(), "Step 4d-2 builds on Step 4d-1's marsh");
     let (mut sc, thermal) = (sized(a), outside_heat(a));
     if let Some(n) = crew {
         let k = n / sc.cabin.crew_count;
@@ -1663,6 +1863,11 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
     } else {
         bio
     };
+    let (state, bio, fast) = if leaching {
+        with_leaching(&sc, state, bio, fast)
+    } else {
+        (state, bio, fast)
+    };
     let air = sc.bio.chamber_air_capacity_mol;
     let first = state.clone();
     let bio_r = sealed_bio_resolver(&sp::lamp(), &sc).expect("bio resolver");
@@ -1720,6 +1925,7 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
         marsh_c: vec![0.0; days],
         marsh_n: vec![0.0; days],
         marsh_out: vec![0.0; days],
+        leach: vec![[0.0; 6]; days],
         ..Minutes::default()
     };
     let nitro = sc.plant_params().nitro;
@@ -1768,6 +1974,26 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                         }
                     }
                     NITROGEN_UPTAKE => into(&mut m.uptake, leg(&res, PLANT_N)),
+                    WATERING | RESERVE_TOP_UP | DRAINAGE if leaching && day < days => {
+                        let from_tank = -leg(&res, PLANT_TANK_N);
+                        let (up, below) =
+                            (leg(&res, SOIL_WATER).max(0.0), leg(&res, SUBSOIL_WATER).max(0.0));
+                        let below_share = if from_tank > 0.0 && up + below > 0.0 {
+                            below / (up + below)
+                        } else {
+                            0.0
+                        };
+                        let l = &mut m.leach[day];
+                        l[0] += leg(&res, SUBSOIL_N) - from_tank * below_share;
+                        l[3] += from_tank;
+                        l[5] += leg(&res, SOIL_N);
+                    }
+                    ROOT_ZONE_CAPTURE | SUBSOIL_OVERFLOW if leaching && day < days => {
+                        let l = &mut m.leach[day];
+                        l[1] += leg(&res, SOIL_N);
+                        l[2] += leg(&res, PLANT_TANK_N);
+                        l[5] += leg(&res, SOIL_N);
+                    }
                     _ => {}
                 }
             }
@@ -1891,6 +2117,9 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                             if let Some(u) = m.marsh_in.get_mut(day) {
                                 *u += leg(&res, MARSH_N);
                             }
+                        }
+                        if f.id() == TANK_DRAIN && leaching && day < days {
+                            m.leach[day][4] += leg(&res, URINE_TANK);
                         }
                         if f.id() == MARSH && day < days {
                             // The marsh's outflow is the urine reaching the tank.
@@ -2060,6 +2289,14 @@ fn run(a: f64, crew: Option<f64>, days: usize, opts: Options) -> Run {
                 marsh_n: m.marsh_n[w[0]..w[1]].iter().sum(),
                 marsh_out: m.marsh_out[w[0]..w[1]].iter().sum(),
                 marsh_end: amount(e, MARSH_N),
+                leach: m.leach[w[0]..w[1]].iter().fold([0.0; 6], |mut t, d| {
+                    for (x, y) in t.iter_mut().zip(d) {
+                        *x += y;
+                    }
+                    t
+                }),
+                subsoil_n_end: amount(e, SUBSOIL_N),
+                plant_tank_n_end: amount(e, PLANT_TANK_N),
                 feces_to_soil: if food_loop {
                     exhaled * (1.0 - f_resp) / f_resp
                 } else {
@@ -2094,8 +2331,13 @@ fn report(r: &Run) {
         r.crew,
         r.days,
         match (o.co2_store, o.food_loop) {
+            (_, true) if o.leaching => {
+                ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP \
+                 WITH FERTILIZER + URINE AT ANY TIME + WASTES BURNED + URINE MARSH + LEACHING"
+            }
             (_, true) if o.marsh.is_some() => {
-                ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP                  WITH FERTILIZER + URINE AT ANY TIME + WASTES BURNED + URINE MARSH"
+                ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP \
+                 WITH FERTILIZER + URINE AT ANY TIME + WASTES BURNED + URINE MARSH"
             }
             (_, true) if o.burn.is_some() => {
                 ", CO₂ STORE + FOOD LOOP + NITROGEN + REAL SOIL + FEED THE CREW + GAS TANKS + TOP-UP \
@@ -2251,16 +2493,44 @@ fn report(r: &Run) {
                     c.fert_end
                 );
             }
-            println!(
-                "           soil solution N {:.2} → {:.2} g/m² (lowest {:.2}): dosed {:+.3} kg, roots took \
-                 {:.3} kg, the rest (the soil's own turnover) {:+.3} kg",
-                1e3 * c.soil_n_start / a,
-                1e3 * c.soil_n_end / a,
-                1e3 * c.soil_n_min / a,
-                c.dosed,
-                c.uptake,
-                change - c.dosed + c.uptake
-            );
+            if o.leaching {
+                println!(
+                    "           soil solution N {:.2} → {:.2} g/m² (lowest {:.2}): dosed {:+.3} kg, roots \
+                     took {:.3} kg, the drained water {:+.3} kg, the rest (the soil's own turnover) \
+                     {:+.3} kg",
+                    1e3 * c.soil_n_start / a,
+                    1e3 * c.soil_n_end / a,
+                    1e3 * c.soil_n_min / a,
+                    c.dosed,
+                    c.uptake,
+                    c.leach[5],
+                    change - c.dosed + c.uptake - c.leach[5]
+                );
+                println!(
+                    "           drained water: leached {:.3} kg N past the roots ([F] Eqn 18.14); the \
+                     roots took back {:.3} kg from below them; the overflow sent {:.3} kg to the plants' \
+                     tank, the watering brought {:.3} kg back from it, its drain {:.3} kg to the urine \
+                     tank; below the roots {:.3} kg, in the plants' tank {:.4} kg at the end",
+                    c.leach[0],
+                    c.leach[1],
+                    c.leach[2],
+                    c.leach[3],
+                    c.leach[4],
+                    c.subsoil_n_end,
+                    c.plant_tank_n_end
+                );
+            } else {
+                println!(
+                    "           soil solution N {:.2} → {:.2} g/m² (lowest {:.2}): dosed {:+.3} kg, roots took \
+                     {:.3} kg, the rest (the soil's own turnover) {:+.3} kg",
+                    1e3 * c.soil_n_start / a,
+                    1e3 * c.soil_n_end / a,
+                    1e3 * c.soil_n_min / a,
+                    c.dosed,
+                    c.uptake,
+                    change - c.dosed + c.uptake
+                );
+            }
             println!(
                 "           imported food eaten {:9.1} mol C ({:.1} % of the crew's food), {:.3} kg N; \
                  food store ends {:.1}, reserve {:.1} mol C",
@@ -2282,7 +2552,9 @@ fn report(r: &Run) {
             );
             if let Some(mo) = o.marsh {
                 println!(
-                    "           marsh ({} m²): urine in {:.3} kg; plants fixed {:.1} mol C ({:.3} mol C/m²/day)                      and took {:.3} kg N ({:.3} g/m²/day) to the {}; outflow to the urine tank {:.3} kg                      (the tank's 'in' above); water holds {:.1} g at the end",
+                    "           marsh ({} m²): urine in {:.3} kg; plants fixed {:.1} mol C ({:.3} mol C/m²/day) \
+                 and took {:.3} kg N ({:.3} g/m²/day) to the {}; outflow to the urine tank {:.3} kg \
+                 (the tank's 'in' above); water holds {:.1} g at the end",
                     mo.area,
                     c.marsh_in,
                     c.marsh_c,
@@ -2384,7 +2656,10 @@ fn report(r: &Run) {
                 (t.0 + c.marsh_in, t.1 + c.marsh_c, t.2 + c.marsh_n, t.3 + c.marsh_out)
             });
             println!(
-                "  marsh over the run ({} m², growth {} g DM/m²/day, plant N {}, residence {} days,                  plants to the {}): urine in {:.3} kg N; plants fixed {:.1} mol C and took {:.3} kg N;                  outflow {:.3} kg N; water {:.1} → {:.1} g N; its lamp at Biosphere 2's {:.0} W/m²                  would draw {:.1} kWh/day (NOT drawn: a named gap)",
+                "  marsh over the run ({} m², growth {} g DM/m²/day, plant N {}, residence {} days, \
+                 plants to the {}): urine in {:.3} kg N; plants fixed {:.1} mol C and took {:.3} kg N; \
+                 outflow {:.3} kg N; water {:.1} → {:.1} g N; its lamp at Biosphere 2's {:.0} W/m² \
+                 would draw {:.1} kWh/day (NOT drawn: a named gap)",
                 mo.area,
                 mo.growth,
                 mo.plant_n,
@@ -2398,6 +2673,29 @@ fn report(r: &Run) {
                 1e3 * amount(e, MARSH_N),
                 B2_MARSH_LAMP_W_PER_M2,
                 B2_MARSH_LAMP_W_PER_M2 * mo.area * 24.0 / 1e3
+            );
+        }
+        if o.leaching {
+            let t = r.cycles.iter().fold([0.0; 6], |mut t, c| {
+                for (x, y) in t.iter_mut().zip(c.leach) {
+                    *x += y;
+                }
+                t
+            });
+            println!(
+                "  drained water over the run (kg N): leached {:.3} past the roots; the roots took back \
+                 {:.3}; the overflow sent {:.3} to the plants' tank, the watering brought {:.3} back, \
+                 its drain {:.3} to the urine tank; below the roots {:.3} → {:.3}, in the plants' tank \
+                 {:.4} → {:.4}",
+                t[0],
+                t[1],
+                t[2],
+                t[3],
+                t[4],
+                amount(s, SUBSOIL_N),
+                amount(e, SUBSOIL_N),
+                amount(s, PLANT_TANK_N),
+                amount(e, PLANT_TANK_N)
             );
         }
         if o.burn.is_some() {
@@ -2608,6 +2906,7 @@ fn main() {
             assert!((0.0..1.0).contains(&o.plant_n), "--marsh-plant-n: 0 to 1");
             o
         }),
+        leaching: flag("--leaching"),
     };
     // Step 3c's farm (plan §9): 700 m², the round area above the 658 m² that feeds four crew.
     let default_area = if opts.closed().feed_crew { 700.0 } else { 200.0 };
