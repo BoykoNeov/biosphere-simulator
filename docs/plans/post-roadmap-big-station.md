@@ -1491,3 +1491,55 @@ should repeat).** At 20 m²: carbon **1.52 mol C/m²/day → 30.4 mol/day, ~4 25
 - **Predictions are written before its run.** The scale: the overflow carries ~13 % of what the subsoil
   turns over, so **~0.1–0.3 kg N a crop** reaches the marsh and **~0.05–0.25 kg** goes to N₂ — small,
   because the watering only refills what the soil lost.
+
+## 10.12 Step 4d-1 — MEASURED: the urine marsh, plants to the soil and plants to the burner
+
+Runs (git-ignored, `sources/temp-evidence/marsh/`): `m0-3000.txt` (no marsh; byte-identical to
+`m0-recheck-3000.txt`, so the flags-off build changes nothing), `ms-3000.txt` (`--marsh-plants-to soil`),
+`mb-3000.txt` (`--marsh-plants-to burner`). All: §10.10's settings (char 0.116, half the burned nitrogen to
+N₂, no leak), `--marsh-area 20 --marsh-growth 40.5 --marsh-plant-n 0.037 --marsh-residence-days 4`.
+
+| per crop (700 m² run) | no marsh | plants → soil | plants → burner |
+|---|---|---|---|
+| urine tank inflow, crops 2–20 | 7.40 kg | 3.20 kg | 3.20 kg |
+| marsh plants: carbon / nitrogen | — | 4 249 mol / 4.20 kg | 4 249 mol / 4.20 kg |
+| fertilizer, crop 0 / 1 / 20 | 4.51 / 2.03 / 1.72 kg | 7.00 / 3.29 / 1.80 kg | 6.25 / 4.06 / 3.81 kg |
+| N₂ from the burner, crops 1–20 | 1.28 kg | 1.28 kg | 3.38 kg |
+| char added, crops 1–20 | ~1 507 mol | ~1 507 mol | ~1 999 mol |
+| CO₂ tank lowest, crop 19 / 20 | 10 978 / 8 460 | 3 597 / 994 | 1 387 / **0.0 (day 2935)** |
+| soil carbon at crop 20's end | 29 071 mol | 36 657 mol | 29 047 mol |
+
+Over the run (start → end, kg N): fertilizer 300 → 259.70 (no marsh), → 252.19 (soil), → 216.20 (burner);
+N₂ 27.33 / 27.33 / 72.28; soil organic nitrogen 3.65 / 11.18 / 3.63; soil solution 2.60 / 5.36 / 2.59;
+urine tank 6.09 / 3.27 / 4.83. Rationed (0, 0) in all three. Carbon, oxygen and nitrogen books closed every
+step (the run asserts it).
+
+**The predictions, scored.**
+- **M1 — held.** Tank inflow 7.40 → **3.20 kg a crop**. The marsh water held **91.5–92 g** from crop 1 on; crop 0
+  ended at **155 g** (that crop's imported food brings more nitrogen), outside the "steady ~90 g".
+- **M2 (`soil`) — missed in crop 0, held after.** Extra fertilizer +2.49 kg in crop 0 (outside +0 to +1.5),
+  +1.26 in crop 1, within 0.5 kg from crop 2 on, **+0.08 kg by crop 20** and still shrinking. Over the run
+  +7.5 kg — not lost: the soil's organic matter holds +7.5 kg more and its solution +2.8 kg; the urine tank
+  ends 2.8 kg lower (the sum closes to ~0.1 kg, the rest the marsh water and the food store).
+- **M3 (`soil`) — WRONG.** The tank did not run dry: lowest **994 mol on day 2939**. The prediction took a
+  steady ≥ 2 % share of the litter kept each crop; in fact the soil fills toward a steady level, so the
+  extra soil carbon over `m0` grew **+2 811 mol in crop 0 and ~+90 mol by crop 20**, ~7 590 in all — and the
+  tank's low fell by the same amount (7 466). The cost is a one-time fill, not a leak.
+- **M4 (`burner`) — held.** +2.09 kg fertilizer a crop, **+43.5 kg** over the run (predicted 40–45); N₂ +45 kg.
+- **M5 (`burner`) — held.** Char **+492 mol a crop**, +10 513 over the run; the tank ran dry on **day 2935**.
+- **M6 — held** within its claim (rationed 0 while the tank holds; books closed). The marsh's uptake,
+  1.50 g N/m²/day, is an input: 4.7× Reddy's outdoor 0.32, 5–50× the EPA's 0.03–0.3.
+
+**What the choice is, read from the late crops (not the run totals).** The station without a marsh already
+spends ~2 520 mol of CO₂ margin a crop (char) and would run dry ~3–4 crops after day 3000. On top of that:
+- **Plants to the soil**: ~+85 mol of CO₂ margin and ~+0.08 kg of fertilizer a crop, both still shrinking —
+  a **one-time cost**, paid by banking nitrogen and carbon in the soil's organic matter.
+- **Plants to the burner**: ~+490 mol, ~+2.1 kg of fertilizer and ~+2.1 kg of nitrogen to the air **every
+  crop, for good** — a permanent leak.
+
+**New named gap — the marsh does not feel the room's CO₂.** The marsh draws carbon at a fixed rate. After the
+burner run's tank emptied (day 2935) the room fell to **120 ppm**, the store ran short for 3 368 lit minutes,
+and crop 20's harvest fell to 95.9 % of the crew's food — while rationing still reads 0, because the marsh
+never asks for more than the room holds. Its crop 20 is distorted (its 95.2 % grain-nitrogen share is the
+smaller crop's side effect, not a gain). It matters only once a tank is empty; recorded with the marsh's lamp,
+water and sediment as gaps, not built.
